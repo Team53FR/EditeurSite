@@ -63,6 +63,8 @@ function afficherPage(i) {
   const page = livreActuel().pages[i];
   document.getElementById("titrePage").value = page.titre || "";
   document.getElementById("zoneTexte").value = page.contenu || "";
+  const total = livreActuel().pages.length;
+  document.getElementById("numeroPage").textContent = `Page ${i + 1} sur ${total}`;
 }
 
 function sauvegarderPageEnMemoire() {

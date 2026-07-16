@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <title>Mon livre</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital@0;1&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -14,13 +17,15 @@
       <button onclick="nouvellePage()" class="secondaire petit">+ Nouvelle page</button>
     </aside>
 
-    <main class="carte carte-large">
+    <main class="page-livre">
       <div class="entete-page">
-        <input type="text" id="titrePage" placeholder="Titre de la page">
+        <input type="text" id="titrePage" class="titre-page-livre" placeholder="Titre de la page">
         <button onclick="supprimerPage()" class="danger petit">Supprimer</button>
       </div>
 
-      <textarea id="zoneTexte" placeholder="Écris ton texte ici..."></textarea>
+      <textarea id="zoneTexte" class="texte-livre" placeholder="Écris ton texte ici..."></textarea>
+
+      <div class="numero-page" id="numeroPage"></div>
 
       <div class="barre-actions">
         <button onclick="pagePrecedente()">← Précédent</button>
@@ -28,11 +33,13 @@
         <button onclick="pageSuivante()">Suivant →</button>
       </div>
 
-      <button onclick="retourBibliotheque()" class="secondaire">← Retour à la bibliothèque</button>
-      <button onclick="seDeconnecter()" class="secondaire">Se déconnecter</button>
-
       <p id="message" class="message"></p>
     </main>
+  </div>
+
+  <div class="barre-basse">
+    <button onclick="retourBibliotheque()" class="secondaire petit">← Retour à la bibliothèque</button>
+    <button onclick="seDeconnecter()" class="secondaire petit">Se déconnecter</button>
 
   </div>
 
