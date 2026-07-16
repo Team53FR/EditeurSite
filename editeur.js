@@ -125,16 +125,93 @@ function pageSuivante() {
   }
 }
 
+// ----- Gestion du curseur -----
+
+function sauvegarderCurseur(conteneur) {
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return null;
+  const range = sel.getRangeAt(0);
+  if (!conteneur.contains(range.startContainer)) return null;
+
+  // Calcule l'offset texte absolu depuis le début du conteneur
+  function offsetAbsolu(noeud, offset) {
+    let total = 0;
+    const walker = document.createTreeWalker(conteneur, NodeFilter.SHOW_TEXT);
+    while (walker.nextNode()) {
+      if (walker.currentNode === noeud) return total + offset;
+      total += walker.currentNode.textContent.length;
+    }
+    return total;
+  }
+
+  return {
+    start: offsetAbsolu(range.startContainer, range.startOffset),
+    end: offsetAbsolu(range.endContainer, range.endOffset)
+  };
+}
+
+function restaurerCurseur(conteneur, sauvegarde) {
+  if (!sauvegarde) return;
+  const sel = window.getSelection();
+  if (!sel) return;
+
+  let total = 0, startNode = null, startOff = 0, endNode = null, endOff = 0;
+  const walker = document.createTreeWalker(conteneur, NodeFilter.SHOW_TEXT);
+
+  while (walker.nextNode()) {
+    const len = walker.currentNode.textContent.length;
+    if (!startNode && total + len >= sauvegarde.start) {
+      startNode = walker.currentNode;
+      startOff = sauvegarde.start - total;
+    }
+    if (!endNode && total + len >= sauvegarde.end) {
+      endNode = walker.currentNode;
+      endOff = sauvegarde.end - total;
+    }
+    if (startNode && endNode) break;
+    total += len;
+  }
+
+  if (!startNode) return;
+  const range = document.createRange();
+  range.setStart(startNode, startOff);
+  range.setEnd(endNode || startNode, endNode ? endOff : startOff);
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
 // ----- Pagination automatique -----
 
 function gererSaisie() {
   clearTimeout(minuteurSaisie);
   minuteurSaisie = setTimeout(() => {
+    // Identifier sur quelle page se trouve le curseur
+    const pageGauche = document.getElementById("pageGauche");
+    const pageDroite = document.getElementById("pageDroite");
+    const sel = window.getSelection();
+    let conteneurActif = null;
+    if (sel && sel.rangeCount > 0) {
+      const ancre = sel.anchorNode;
+      if (pageGauche.contains(ancre)) conteneurActif = pageGauche;
+      else if (pageDroite.contains(ancre)) conteneurActif = pageDroite;
+    }
+
+    const curseur = conteneurActif ? sauvegarderCurseur(conteneurActif) : null;
+
     flushSpread();
     repaginerCascade(indexSpread);
     nettoyerPagesVides();
     afficherSpread();
     afficherSommaire();
+
+    // Restaurer le curseur dans le bon conteneur
+    if (curseur && conteneurActif) {
+      // Après afficherSpread, les divs ont été réécrites : retrouver le bon élément
+      const nouveauConteneur = conteneurActif.id === "pageGauche"
+        ? document.getElementById("pageGauche")
+        : document.getElementById("pageDroite");
+      restaurerCurseur(nouveauConteneur, curseur);
+    }
   }, 400);
 }
 
