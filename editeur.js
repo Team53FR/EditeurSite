@@ -62,6 +62,23 @@ function formater(commande, valeur) {
   document.execCommand(commande, false, valeur || null);
 }
 
+function appliquerTaille(pt) {
+  const val = parseInt(pt);
+  if (!val || val < 6 || val > 72) return;
+  const px = Math.round(val * 1.333);
+  // execCommand fontSize place un <font size="7"> qu'on remplace par un span stylé
+  document.execCommand("fontSize", false, "7");
+  const pages = [document.getElementById("pageGauche"), document.getElementById("pageDroite")];
+  pages.forEach(page => {
+    page.querySelectorAll("font[size='7']").forEach(el => {
+      const span = document.createElement("span");
+      span.style.fontSize = px + "px";
+      span.innerHTML = el.innerHTML;
+      el.replaceWith(span);
+    });
+  });
+}
+
 // ----- Blocage en fin de page -----
 
 function afficherPagePleine() {

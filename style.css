@@ -294,3 +294,20 @@ button.danger {
   justify-content: center;
   margin-top: 16px;
 }
+.separateur-outils {
+  width: 1px;
+  height: 22px;
+  background: #ddd;
+  margin: 0 4px;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.input-taille {
+  width: 46px;
+  padding: 4px 6px;
+  font-size: 13px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  text-align: center;
+}
