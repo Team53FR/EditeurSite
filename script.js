@@ -1,6 +1,6 @@
 // ===== A MODIFIER avec tes informations =====
-const PROPRIETAIRE = "TON_USER_GITHUB";
-const DEPOT_BDD = "mon-site-bdd";
+const PROPRIETAIRE = "Team53FR";
+const DEPOT_BDD = "BDD";
 // =============================================
 
 async function lireFichierJSON(nomFichier, token) {
