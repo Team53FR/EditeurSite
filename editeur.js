@@ -64,31 +64,43 @@ function formater(commande, valeur) {
 
 // ----- Blocage en fin de page -----
 
-function pageEstPleine(conteneur) {
-  return conteneur.scrollHeight > conteneur.clientHeight + 2;
+function afficherPagePleine() {
+  document.getElementById("message").textContent = "Page pleine — utilisez Suivant → pour continuer sur la page suivante.";
+  setTimeout(() => { document.getElementById("message").textContent = ""; }, 3000);
 }
 
 function bloquerSiPlein(e, conteneur) {
-  // Touches qui ne rajoutent pas de contenu : on laisse passer
+  // Touches qui ne rajoutent pas de contenu : on laisse toujours passer
   const touchesAutorisees = [
     "Backspace", "Delete", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown",
     "Home", "End", "PageUp", "PageDown", "Tab", "Escape",
     "F1","F2","F3","F4","F5","F6","F7","F8","F9","F10","F11","F12"
   ];
   if (touchesAutorisees.includes(e.key)) return;
-  if (e.ctrlKey || e.metaKey) return; // Ctrl+C, Ctrl+Z, etc.
+  if (e.ctrlKey || e.metaKey) return;
 
-  // Vérifier APRÈS l'éventuelle frappe si la page déborderait
-  // On teste en regardant si la page est déjà pleine avant de taper
-  if (pageEstPleine(conteneur)) {
-    e.preventDefault();
-    document.getElementById("message").textContent = "Page pleine — utilisez Suivant → pour continuer sur la page suivante.";
-    setTimeout(() => {
-      document.getElementById("message").textContent = "";
-    }, 3000);
-  } else {
-    document.getElementById("message").textContent = "";
-  }
+  // Laisser le navigateur insérer le caractère, puis vérifier et annuler si ça déborde
+  const snapshotHTML = conteneur.innerHTML;
+
+  // Sauvegarde position curseur
+  const sel = window.getSelection();
+  let range = null;
+  if (sel && sel.rangeCount > 0) range = sel.getRangeAt(0).cloneRange();
+
+  requestAnimationFrame(() => {
+    if (conteneur.scrollHeight > conteneur.clientHeight + 2) {
+      // Rollback
+      conteneur.innerHTML = snapshotHTML;
+      // Restaurer le curseur
+      if (range) {
+        try {
+          sel.removeAllRanges();
+          sel.addRange(range);
+        } catch (_) {}
+      }
+      afficherPagePleine();
+    }
+  });
 }
 
 // ----- Affichage -----
