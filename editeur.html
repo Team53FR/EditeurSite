@@ -14,13 +14,32 @@
     <aside class="sommaire">
       <h2 id="titreLivre">Mon livre</h2>
       <ul id="listePages"></ul>
-      <button onclick="nouvellePage()" class="secondaire petit">+ Nouvelle page</button>
     </aside>
 
-    <main class="page-livre">
-      <textarea id="zoneTexte" class="texte-livre" placeholder="Écris ton texte ici..."></textarea>
+    <div class="zone-livre">
 
-      <div class="numero-page" id="numeroPage"></div>
+      <div class="barre-outils">
+        <button onmousedown="event.preventDefault()" onclick="formater('bold')"><b>G</b></button>
+        <button onmousedown="event.preventDefault()" onclick="formater('italic')"><i>I</i></button>
+        <button onmousedown="event.preventDefault()" onclick="formater('underline')"><u>S</u></button>
+        <select onmousedown="event.preventDefault()" onchange="formater('fontSize', this.value)">
+          <option value="2">Petit</option>
+          <option value="3" selected>Normal</option>
+          <option value="5">Grand</option>
+          <option value="7">Très grand</option>
+        </select>
+      </div>
+
+      <div class="livre-ouvert">
+        <div class="page-livre">
+          <div id="pageGauche" class="texte-livre" contenteditable="true"></div>
+          <div class="numero-page" id="numeroGauche"></div>
+        </div>
+        <div class="page-livre">
+          <div id="pageDroite" class="texte-livre" contenteditable="true"></div>
+          <div class="numero-page" id="numeroDroite"></div>
+        </div>
+      </div>
 
       <div class="barre-actions">
         <button onclick="pagePrecedente()">← Précédent</button>
@@ -29,14 +48,15 @@
       </div>
 
       <p id="message" class="message"></p>
-    </main>
+    </div>
   </div>
 
   <div class="barre-basse">
     <button onclick="retourBibliotheque()" class="secondaire petit">← Retour à la bibliothèque</button>
     <button onclick="seDeconnecter()" class="secondaire petit">Se déconnecter</button>
-
   </div>
+
+  <div id="mesureCachee" class="texte-livre" style="position:absolute; visibility:hidden; left:-9999px; top:0;"></div>
 
   <script src="script.js"></script>
   <script src="editeur.js"></script>
