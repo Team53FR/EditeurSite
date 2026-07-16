@@ -47,7 +47,9 @@ function afficherListeLivres() {
     const li = document.createElement("li");
 
     const nomPages = livre.pages ? livre.pages.length : 0;
-    li.innerHTML = `<span class="titre-livre">${livre.titre}</span><span class="detail-livre">${nomPages} page(s)</span>`;
+    const labels = { "149x210": "14,9×21 cm", "155x235": "15,5×23,5 cm", "105x148": "Poche", "210x297": "A4" };
+    const labelFormat = labels[livre.format] || "14,9×21 cm";
+    li.innerHTML = `<span class="titre-livre">${livre.titre}</span><span class="detail-livre">${labelFormat} · ${nomPages} page(s)</span>`;
     li.onclick = () => ouvrirLivre(livre.id);
 
     liste.appendChild(li);
@@ -64,6 +66,7 @@ async function creerLivre() {
   const message = document.getElementById("message");
   const champTitre = document.getElementById("titreNouveauLivre");
   const titre = champTitre.value.trim();
+  const format = document.getElementById("formatNouveauLivre").value;
 
   if (!titre) {
     message.textContent = "Merci de donner un titre au livre.";
@@ -74,6 +77,7 @@ async function creerLivre() {
   bibliotheque.livres.push({
     id: nouvelId,
     titre: titre,
+    format: format,
     pages: [{ id: "p1", titre: "Page 1", contenu: "" }]
   });
 

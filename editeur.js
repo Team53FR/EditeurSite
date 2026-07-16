@@ -8,6 +8,40 @@ let indexSpread = 0;
 let coteActif = "gauche";
 let selectionSauvegardee = null;
 
+const FORMATS = {
+  "149x210": { larg: 149, haut: 210, padH: 20, padV: 20 },
+  "155x235": { larg: 155, haut: 235, padH: 20, padV: 22 },
+  "105x148": { larg: 105, haut: 148, padH: 14, padV: 14 },
+  "210x297": { larg: 210, haut: 297, padH: 25, padV: 25 },
+};
+
+function appliquerFormatPage(formatKey) {
+  const f = FORMATS[formatKey] || FORMATS["149x210"];
+  const PX = 3.7795; // 1mm = 3.7795px
+  const lPx = Math.round(f.larg * PX);
+  const hPx = Math.round(f.haut * PX);
+  const padHPx = Math.round(f.padH * PX * 2); // padding gauche+droite
+  const padVPx = Math.round(f.padV * PX * 2); // padding haut+bas
+  const innerW = lPx - padHPx;
+  const innerH = hPx - padVPx - 30; // 30px pour le numéro de page
+
+  document.querySelectorAll(".page-livre").forEach(el => {
+    el.style.width = lPx + "px";
+    el.style.height = hPx + "px";
+    el.style.padding = Math.round(f.padV * PX) + "px " + Math.round(f.padH * PX) + "px 20px";
+  });
+  document.querySelectorAll(".texte-livre").forEach(el => {
+    el.style.width = innerW + "px";
+    el.style.height = innerH + "px";
+  });
+  // Mettre à jour aussi le mesureCachee
+  const mesure = document.getElementById("mesureCachee");
+  if (mesure) {
+    mesure.style.width = innerW + "px";
+    mesure.style.height = innerH + "px";
+  }
+}
+
 async function chargerLivre() {
   const token = sessionStorage.getItem("gh_token");
   const message = document.getElementById("message");
@@ -36,6 +70,7 @@ async function chargerLivre() {
     }
 
     document.getElementById("titreLivre").textContent = livre.titre || "Mon livre";
+    appliquerFormatPage(livre.format || "149x210");
     indexSpread = 0;
 
     document.execCommand("defaultParagraphSeparator", false, "p");

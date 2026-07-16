@@ -13,6 +13,12 @@
 
     <div class="entete-page">
       <input type="text" id="titreNouveauLivre" placeholder="Titre du nouveau livre">
+      <select id="formatNouveauLivre" style="padding:8px;border:1px solid #ccc;border-radius:6px;font-size:14px;">
+        <option value="149x210">Roman standard — 14,9 × 21,0 cm</option>
+        <option value="155x235">Grand roman — 15,5 × 23,5 cm</option>
+        <option value="105x148">Poche — 10,5 × 14,8 cm</option>
+        <option value="210x297">A4 — 21,0 × 29,7 cm</option>
+      </select>
       <button onclick="creerLivre()">+ Créer un livre</button>
     </div>
 
