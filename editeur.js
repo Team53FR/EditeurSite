@@ -122,6 +122,10 @@ function afficherPagePleine() {
 }
 
 function lireTailleCourrante() {
+  const input = document.getElementById("inputTaille");
+  // Ne pas écraser l'input si l'utilisateur est en train de le modifier
+  if (input && document.activeElement === input) return;
+
   const sel = window.getSelection();
   if (!sel || sel.rangeCount === 0) return;
   let noeud = sel.anchorNode;
@@ -130,7 +134,6 @@ function lireTailleCourrante() {
     const fs = window.getComputedStyle(noeud).fontSize;
     if (fs) {
       const pt = Math.round(parseFloat(fs) / 1.333);
-      const input = document.getElementById("inputTaille");
       if (input) input.value = pt;
       return;
     }
