@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Connexion</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="carte">
+    <h1>Connexion</h1>
+
+    <label for="login">Identifiant</label>
+    <input type="text" id="login" placeholder="Identifiant">
+
+    <label for="password">Mot de passe</label>
+    <input type="password" id="password" placeholder="Mot de passe">
+
+    <label for="token">Token GitHub</label>
+    <input type="password" id="token" placeholder="ghp_xxxxxxxxxxxx">
+
+    <button onclick="seConnecter()">Se connecter</button>
+
+    <p id="message" class="message"></p>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
