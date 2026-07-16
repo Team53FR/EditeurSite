@@ -82,21 +82,45 @@ function bloquerSiPlein(e, conteneur) {
   // Laisser le navigateur insérer le caractère, puis vérifier et annuler si ça déborde
   const snapshotHTML = conteneur.innerHTML;
 
-  // Sauvegarde position curseur
+  // Sauvegarde position curseur en offset texte absolu (résiste au innerHTML=)
   const sel = window.getSelection();
-  let range = null;
-  if (sel && sel.rangeCount > 0) range = sel.getRangeAt(0).cloneRange();
+  let offsetSauvegarde = null;
+  if (sel && sel.rangeCount > 0) {
+    const r = sel.getRangeAt(0);
+    if (conteneur.contains(r.startContainer)) {
+      function compterOffset(noeudCible, offsetCible) {
+        let total = 0;
+        const walker = document.createTreeWalker(conteneur, NodeFilter.SHOW_TEXT);
+        while (walker.nextNode()) {
+          if (walker.currentNode === noeudCible) return total + offsetCible;
+          total += walker.currentNode.textContent.length;
+        }
+        return total;
+      }
+      offsetSauvegarde = compterOffset(r.startContainer, r.startOffset);
+    }
+  }
 
   requestAnimationFrame(() => {
     if (conteneur.scrollHeight > conteneur.clientHeight + 2) {
       // Rollback
       conteneur.innerHTML = snapshotHTML;
-      // Restaurer le curseur
-      if (range) {
-        try {
-          sel.removeAllRanges();
-          sel.addRange(range);
-        } catch (_) {}
+      // Restaurer le curseur via offset texte
+      if (offsetSauvegarde !== null) {
+        let total = 0;
+        const walker = document.createTreeWalker(conteneur, NodeFilter.SHOW_TEXT);
+        while (walker.nextNode()) {
+          const len = walker.currentNode.textContent.length;
+          if (total + len >= offsetSauvegarde) {
+            const range = document.createRange();
+            range.setStart(walker.currentNode, offsetSauvegarde - total);
+            range.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(range);
+            break;
+          }
+          total += len;
+        }
       }
       afficherPagePleine();
     }
