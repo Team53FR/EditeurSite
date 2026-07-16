@@ -6,6 +6,7 @@ let livreId = null;
 let indexLivre = -1;
 let indexSpread = 0;
 let coteActif = "gauche";
+let selectionSauvegardee = null;
 
 async function chargerLivre() {
   const token = sessionStorage.getItem("gh_token");
@@ -46,6 +47,8 @@ async function chargerLivre() {
     pageDroite.addEventListener("keydown", (e) => bloquerSiPlein(e, pageDroite));
     pageGauche.addEventListener("focus", () => { coteActif = "gauche"; });
     pageDroite.addEventListener("focus", () => { coteActif = "droite"; });
+    pageGauche.addEventListener("blur", sauvegarderSelection);
+    pageDroite.addEventListener("blur", sauvegarderSelection);
 
     afficherSpread();
     afficherSommaire();
@@ -62,10 +65,27 @@ function formater(commande, valeur) {
   document.execCommand(commande, false, valeur || null);
 }
 
+function sauvegarderSelection() {
+  const sel = window.getSelection();
+  if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
+    selectionSauvegardee = sel.getRangeAt(0).cloneRange();
+  }
+}
+
+function restaurerSelection() {
+  if (!selectionSauvegardee) return false;
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(selectionSauvegardee);
+  return true;
+}
+
 function appliquerTaille(pt) {
   const val = parseInt(pt);
   if (!val || val < 6 || val > 72) return;
   const px = Math.round(val * 1.333);
+  // Restaurer la sélection perdue au moment du clic sur l'input
+  restaurerSelection();
   // execCommand fontSize place un <font size="7"> qu'on remplace par un span stylé
   document.execCommand("fontSize", false, "7");
   const pages = [document.getElementById("pageGauche"), document.getElementById("pageDroite")];
