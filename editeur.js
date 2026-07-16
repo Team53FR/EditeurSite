@@ -43,8 +43,8 @@ async function chargerLivre() {
     const pageGauche = document.getElementById("pageGauche");
     const pageDroite = document.getElementById("pageDroite");
 
-    pageGauche.addEventListener("keydown", (e) => bloquerSiPlein(e, pageGauche));
-    pageDroite.addEventListener("keydown", (e) => bloquerSiPlein(e, pageDroite));
+    pageGauche.addEventListener("keydown", (e) => { intercepterEntree(e); bloquerSiPlein(e, pageGauche); });
+    pageDroite.addEventListener("keydown", (e) => { intercepterEntree(e); bloquerSiPlein(e, pageDroite); });
     pageGauche.addEventListener("focus", () => { coteActif = "gauche"; });
     pageDroite.addEventListener("focus", () => { coteActif = "droite"; });
     pageGauche.addEventListener("blur", sauvegarderSelection);
@@ -104,6 +104,12 @@ function appliquerTaille(pt) {
 function afficherPagePleine() {
   document.getElementById("message").textContent = "Page pleine — utilisez Suivant → pour continuer sur la page suivante.";
   setTimeout(() => { document.getElementById("message").textContent = ""; }, 3000);
+}
+
+function intercepterEntree(e) {
+  if (e.key !== "Enter" || e.shiftKey) return;
+  e.preventDefault();
+  document.execCommand("insertLineBreak");
 }
 
 function bloquerSiPlein(e, conteneur) {
