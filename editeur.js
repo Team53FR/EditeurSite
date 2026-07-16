@@ -49,6 +49,7 @@ async function chargerLivre() {
     pageDroite.addEventListener("focus", () => { coteActif = "droite"; });
     pageGauche.addEventListener("blur", sauvegarderSelection);
     pageDroite.addEventListener("blur", sauvegarderSelection);
+    document.addEventListener("selectionchange", lireTailleCourrante);
 
     afficherSpread();
     afficherSommaire();
@@ -83,20 +84,34 @@ function restaurerSelection() {
 function appliquerTaille(pt) {
   const val = parseInt(pt);
   if (!val || val < 6 || val > 72) return;
-  const px = Math.round(val * 1.333);
-  // Restaurer la sélection perdue au moment du clic sur l'input
+
   restaurerSelection();
-  // execCommand fontSize place un <font size="7"> qu'on remplace par un span stylé
-  document.execCommand("fontSize", false, "7");
-  const pages = [document.getElementById("pageGauche"), document.getElementById("pageDroite")];
-  pages.forEach(page => {
-    page.querySelectorAll("font[size='7']").forEach(el => {
-      const span = document.createElement("span");
-      span.style.fontSize = px + "px";
-      span.innerHTML = el.innerHTML;
-      el.replaceWith(span);
-    });
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
+
+  const range = sel.getRangeAt(0);
+
+  // Extraire le contenu sélectionné
+  const fragment = range.extractContents();
+
+  // Supprimer les font-size existants dans la sélection pour éviter les conflits
+  fragment.querySelectorAll("span[style]").forEach(el => {
+    el.style.fontSize = "";
+    if (!el.getAttribute("style")) el.removeAttribute("style");
   });
+
+  // Envelopper dans un span avec la nouvelle taille
+  const span = document.createElement("span");
+  span.style.fontSize = val + "pt";
+  span.appendChild(fragment);
+
+  range.insertNode(span);
+
+  // Replacer la sélection sur le span inséré
+  const nouvelRange = document.createRange();
+  nouvelRange.selectNodeContents(span);
+  sel.removeAllRanges();
+  sel.addRange(nouvelRange);
 }
 
 // ----- Blocage en fin de page -----
@@ -104,6 +119,23 @@ function appliquerTaille(pt) {
 function afficherPagePleine() {
   document.getElementById("message").textContent = "Page pleine — utilisez Suivant → pour continuer sur la page suivante.";
   setTimeout(() => { document.getElementById("message").textContent = ""; }, 3000);
+}
+
+function lireTailleCourrante() {
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return;
+  let noeud = sel.anchorNode;
+  if (noeud && noeud.nodeType === Node.TEXT_NODE) noeud = noeud.parentElement;
+  while (noeud) {
+    const fs = window.getComputedStyle(noeud).fontSize;
+    if (fs) {
+      const pt = Math.round(parseFloat(fs) / 1.333);
+      const input = document.getElementById("inputTaille");
+      if (input) input.value = pt;
+      return;
+    }
+    noeud = noeud.parentElement;
+  }
 }
 
 function intercepterEntree(e) {
