@@ -2,19 +2,38 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<title>Mes notes</title>
+<title>Mon livre</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="carte carte-large">
-    <h1>Mes notes</h1>
+  <div class="conteneur-livre">
 
-    <textarea id="zoneTexte" placeholder="Écris ton texte ici..."></textarea>
+    <aside class="sommaire">
+      <h2 id="titreLivre">Mon livre</h2>
+      <ul id="listePages"></ul>
+      <button onclick="nouvellePage()" class="secondaire petit">+ Nouvelle page</button>
+    </aside>
 
-    <button onclick="sauvegarder()">Sauvegarder</button>
-    <button onclick="seDeconnecter()" class="secondaire">Se déconnecter</button>
+    <main class="carte carte-large">
+      <div class="entete-page">
+        <input type="text" id="titrePage" placeholder="Titre de la page">
+        <button onclick="supprimerPage()" class="danger petit">Supprimer</button>
+      </div>
 
-    <p id="message" class="message"></p>
+      <textarea id="zoneTexte" placeholder="Écris ton texte ici..."></textarea>
+
+      <div class="barre-actions">
+        <button onclick="pagePrecedente()">← Précédent</button>
+        <button onclick="sauvegarder()">Sauvegarder</button>
+        <button onclick="pageSuivante()">Suivant →</button>
+      </div>
+
+      <button onclick="retourBibliotheque()" class="secondaire">← Retour à la bibliothèque</button>
+      <button onclick="seDeconnecter()" class="secondaire">Se déconnecter</button>
+
+      <p id="message" class="message"></p>
+    </main>
+
   </div>
 
   <script src="script.js"></script>

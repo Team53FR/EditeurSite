@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Ma bibliothèque</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="carte carte-large">
+    <h1>Ma bibliothèque</h1>
+
+    <ul id="listeLivres" class="liste-livres"></ul>
+
+    <div class="entete-page">
+      <input type="text" id="titreNouveauLivre" placeholder="Titre du nouveau livre">
+      <button onclick="creerLivre()">+ Créer un livre</button>
+    </div>
+
+    <button onclick="seDeconnecter()" class="secondaire">Se déconnecter</button>
+
+    <p id="message" class="message"></p>
+  </div>
+
+  <script src="script.js"></script>
+  <script src="bibliotheque.js"></script>
+</body>
+</html>

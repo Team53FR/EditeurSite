@@ -1,36 +1,120 @@
-let shaActuel = null;
+const NOM_FICHIER_BIBLIO = "bibliotheque.json";
 
-async function chargerNotes() {
+let bibliotheque = null;
+let shaBiblio = null;
+let livreId = null;
+let indexLivre = -1;
+let indexActuel = 0;
+
+async function chargerLivre() {
   const token = sessionStorage.getItem("gh_token");
   const message = document.getElementById("message");
 
-  if (!token) {
-    window.location.href = "index.html";
+  livreId = sessionStorage.getItem("livre_id");
+
+  if (!token || !livreId) {
+    window.location.href = "bibliotheque.html";
     return;
   }
 
   try {
-    const { contenu, sha } = await lireFichierJSON("notes.json", token);
-    document.getElementById("zoneTexte").value = contenu.contenu || "";
-    shaActuel = sha;
+    const { contenu, sha } = await lireFichierJSON(NOM_FICHIER_BIBLIO, token);
+    bibliotheque = contenu;
+    shaBiblio = sha;
+
+    indexLivre = bibliotheque.livres.findIndex(l => l.id === livreId);
+    if (indexLivre === -1) {
+      message.textContent = "Livre introuvable.";
+      return;
+    }
+
+    const livre = bibliotheque.livres[indexLivre];
+    if (!livre.pages || livre.pages.length === 0) {
+      livre.pages = [{ id: "p1", titre: "Page 1", contenu: "" }];
+    }
+
+    document.getElementById("titreLivre").textContent = livre.titre || "Mon livre";
+    indexActuel = 0;
+    afficherSommaire();
+    afficherPage(indexActuel);
   } catch (erreur) {
     message.textContent = erreur.message;
   }
 }
 
+function livreActuel() {
+  return bibliotheque.livres[indexLivre];
+}
+
+function afficherSommaire() {
+  const liste = document.getElementById("listePages");
+  liste.innerHTML = "";
+
+  livreActuel().pages.forEach((page, i) => {
+    const li = document.createElement("li");
+    li.textContent = page.titre || `Page ${i + 1}`;
+    li.className = i === indexActuel ? "actif" : "";
+    li.onclick = () => allerAPage(i);
+    liste.appendChild(li);
+  });
+}
+
+function afficherPage(i) {
+  const page = livreActuel().pages[i];
+  document.getElementById("titrePage").value = page.titre || "";
+  document.getElementById("zoneTexte").value = page.contenu || "";
+}
+
+function sauvegarderPageEnMemoire() {
+  livreActuel().pages[indexActuel].titre = document.getElementById("titrePage").value;
+  livreActuel().pages[indexActuel].contenu = document.getElementById("zoneTexte").value;
+}
+
+function allerAPage(i) {
+  sauvegarderPageEnMemoire();
+  indexActuel = i;
+  afficherSommaire();
+  afficherPage(indexActuel);
+}
+
+function pagePrecedente() {
+  if (indexActuel > 0) allerAPage(indexActuel - 1);
+}
+
+function pageSuivante() {
+  if (indexActuel < livreActuel().pages.length - 1) allerAPage(indexActuel + 1);
+}
+
+function nouvellePage() {
+  sauvegarderPageEnMemoire();
+  const pages = livreActuel().pages;
+  const nouvelId = "p" + (pages.length + 1) + "_" + Date.now();
+  pages.push({ id: nouvelId, titre: `Page ${pages.length + 1}`, contenu: "" });
+  allerAPage(pages.length - 1);
+}
+
+function supprimerPage() {
+  const pages = livreActuel().pages;
+  if (pages.length <= 1) {
+    document.getElementById("message").textContent = "Impossible de supprimer la dernière page.";
+    return;
+  }
+  if (!confirm("Supprimer cette page ?")) return;
+
+  pages.splice(indexActuel, 1);
+  indexActuel = Math.max(0, indexActuel - 1);
+  afficherSommaire();
+  afficherPage(indexActuel);
+}
+
 async function sauvegarder() {
   const token = sessionStorage.getItem("gh_token");
   const message = document.getElementById("message");
-  const texte = document.getElementById("zoneTexte").value;
 
-  const nouveauContenu = {
-    contenu: texte,
-    derniere_modif: new Date().toISOString()
-  };
+  sauvegarderPageEnMemoire();
 
-  const contenuEncode = btoa(unescape(encodeURIComponent(JSON.stringify(nouveauContenu, null, 2))));
-
-  const url = `https://api.github.com/repos/${PROPRIETAIRE}/${DEPOT_BDD}/contents/notes.json`;
+  const contenuEncode = btoa(unescape(encodeURIComponent(JSON.stringify(bibliotheque, null, 2))));
+  const url = `https://api.github.com/repos/${PROPRIETAIRE}/${DEPOT_BDD}/contents/${NOM_FICHIER_BIBLIO}`;
 
   try {
     const reponse = await fetch(url, {
@@ -40,9 +124,9 @@ async function sauvegarder() {
         "Accept": "application/vnd.github+json"
       },
       body: JSON.stringify({
-        message: "Mise à jour des notes",
+        message: "Mise à jour du livre",
         content: contenuEncode,
-        sha: shaActuel
+        sha: shaBiblio
       })
     });
 
@@ -51,16 +135,23 @@ async function sauvegarder() {
     }
 
     const data = await reponse.json();
-    shaActuel = data.content.sha; // indispensable pour la prochaine sauvegarde
+    shaBiblio = data.content.sha;
+    afficherSommaire();
     message.textContent = "Sauvegardé avec succès.";
   } catch (erreur) {
     message.textContent = erreur.message;
   }
 }
 
+function retourBibliotheque() {
+  sauvegarderPageEnMemoire();
+  window.location.href = "bibliotheque.html";
+}
+
 function seDeconnecter() {
   sessionStorage.removeItem("gh_token");
+  sessionStorage.removeItem("livre_id");
   window.location.href = "index.html";
 }
 
-chargerNotes();
+chargerLivre();

@@ -13,7 +13,9 @@ async function lireFichierJSON(nomFichier, token) {
   });
 
   if (!reponse.ok) {
-    throw new Error("Impossible de lire le fichier (token invalide ou dépôt introuvable).");
+    const erreur = new Error("Impossible de lire le fichier (token invalide ou dépôt introuvable).");
+    erreur.status = reponse.status;
+    throw erreur;
   }
 
   const data = await reponse.json();
@@ -44,7 +46,7 @@ async function seConnecter() {
     if (utilisateurValide) {
       // Le token reste UNIQUEMENT en mémoire de session (jamais écrit dans un fichier)
       sessionStorage.setItem("gh_token", token);
-      window.location.href = "editeur.html";
+      window.location.href = "bibliotheque.html";
     } else {
       message.textContent = "Identifiants incorrects.";
     }
