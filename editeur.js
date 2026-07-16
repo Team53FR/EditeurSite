@@ -52,23 +52,32 @@ function afficherSommaire() {
 
   livreActuel().pages.forEach((page, i) => {
     const li = document.createElement("li");
-    li.textContent = page.titre || `Page ${i + 1}`;
     li.className = i === indexActuel ? "actif" : "";
-    li.onclick = () => allerAPage(i);
+
+    const span = document.createElement("span");
+    span.textContent = `Page ${i + 1}`;
+    span.className = "libelle-page";
+    span.onclick = () => allerAPage(i);
+
+    const btnSupprimer = document.createElement("span");
+    btnSupprimer.textContent = "×";
+    btnSupprimer.className = "supprimer-page";
+    btnSupprimer.onclick = (e) => { e.stopPropagation(); supprimerPage(i); };
+
+    li.appendChild(span);
+    li.appendChild(btnSupprimer);
     liste.appendChild(li);
   });
 }
 
 function afficherPage(i) {
   const page = livreActuel().pages[i];
-  document.getElementById("titrePage").value = page.titre || "";
   document.getElementById("zoneTexte").value = page.contenu || "";
   const total = livreActuel().pages.length;
-  document.getElementById("numeroPage").textContent = `Page ${i + 1} sur ${total}`;
+  document.getElementById("numeroPage").textContent = `${i + 1}`;
 }
 
 function sauvegarderPageEnMemoire() {
-  livreActuel().pages[indexActuel].titre = document.getElementById("titrePage").value;
   livreActuel().pages[indexActuel].contenu = document.getElementById("zoneTexte").value;
 }
 
@@ -95,7 +104,7 @@ function nouvellePage() {
   allerAPage(pages.length - 1);
 }
 
-function supprimerPage() {
+function supprimerPage(i) {
   const pages = livreActuel().pages;
   if (pages.length <= 1) {
     document.getElementById("message").textContent = "Impossible de supprimer la dernière page.";
@@ -103,8 +112,9 @@ function supprimerPage() {
   }
   if (!confirm("Supprimer cette page ?")) return;
 
-  pages.splice(indexActuel, 1);
-  indexActuel = Math.max(0, indexActuel - 1);
+  pages.splice(i, 1);
+  if (indexActuel >= pages.length) indexActuel = pages.length - 1;
+  if (indexActuel === i && i > 0) indexActuel = i - 1;
   afficherSommaire();
   afficherPage(indexActuel);
 }
