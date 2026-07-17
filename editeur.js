@@ -44,7 +44,7 @@ function appliquerFormatPage(formatKey) {
   const MM = largPx / f.larg;
   const margeVPx = Math.round(f.margeV * MM);
   const margeHPx = Math.round(f.margeH * MM);
-  const numPageH = 22;
+  const numPageH = 32; // 6px padding-top + ~16px texte + 10px padding-bottom
 
   document.querySelectorAll(".page-livre").forEach(el => {
     el.style.width     = largPx + "px";
