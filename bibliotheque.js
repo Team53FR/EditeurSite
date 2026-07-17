@@ -49,8 +49,20 @@ function afficherListeLivres() {
     const nomPages = livre.pages ? livre.pages.length : 0;
     const labels = { "149x210": "14,9×21 cm", "155x235": "15,5×23,5 cm", "105x148": "Poche", "210x297": "A4" };
     const labelFormat = labels[livre.format] || "14,9×21 cm";
-    li.innerHTML = `<span class="titre-livre">${livre.titre}</span><span class="detail-livre">${labelFormat} · ${nomPages} page(s)</span>`;
-    li.onclick = () => ouvrirLivre(livre.id);
+
+    const infos = document.createElement("span");
+    infos.innerHTML = `<span class="titre-livre">${livre.titre}</span><span class="detail-livre">${labelFormat} · ${nomPages} page(s)</span>`;
+    infos.style.flex = "1";
+    infos.onclick = () => ouvrirLivre(livre.id);
+    li.appendChild(infos);
+
+    const btnSuppr = document.createElement("button");
+    btnSuppr.textContent = "✕";
+    btnSuppr.className = "secondaire petit danger";
+    btnSuppr.title = "Supprimer ce livre";
+    btnSuppr.style.marginTop = "0";
+    btnSuppr.onclick = (e) => { e.stopPropagation(); supprimerLivre(livre.id); };
+    li.appendChild(btnSuppr);
 
     liste.appendChild(li);
   });
@@ -111,6 +123,49 @@ async function creerLivre() {
     message.textContent = "Livre créé avec succès.";
   } catch (erreur) {
     message.textContent = erreur.message;
+  }
+}
+
+async function supprimerLivre(id) {
+  const token = sessionStorage.getItem("gh_token");
+  const message = document.getElementById("message");
+  const livre = bibliotheque.livres.find(l => l.id === id);
+  if (!livre) return;
+  if (!confirm(`Supprimer le livre « ${livre.titre} » ? Cette action est irréversible.`)) return;
+
+  bibliotheque.livres = bibliotheque.livres.filter(l => l.id !== id);
+
+  const contenuEncode = btoa(unescape(encodeURIComponent(JSON.stringify(bibliotheque, null, 2))));
+  const url = `https://api.github.com/repos/${PROPRIETAIRE}/${DEPOT_BDD}/contents/${NOM_FICHIER_BIBLIO}`;
+
+  const corps = {
+    message: "Suppression d'un livre",
+    content: contenuEncode,
+    sha: shaBiblio
+  };
+
+  try {
+    const reponse = await fetch(url, {
+      method: "PUT",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Accept": "application/vnd.github+json"
+      },
+      body: JSON.stringify(corps)
+    });
+
+    if (!reponse.ok) {
+      throw new Error("Échec de la suppression. Vérifie ton token.");
+    }
+
+    const data = await reponse.json();
+    shaBiblio = data.content.sha;
+    afficherListeLivres();
+    message.textContent = "Livre supprimé.";
+  } catch (erreur) {
+    message.textContent = erreur.message;
+    // Remettre le livre en mémoire en cas d'échec de la sauvegarde
+    bibliotheque.livres.push(livre);
   }
 }
 

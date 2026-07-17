@@ -318,11 +318,46 @@ function afficherSommaire() {
 
   pages.forEach((page, i) => {
     const li = document.createElement("li");
-    li.textContent = "Page " + (i + 1);
     li.className = (i === indexSpread || i === indexSpread + 1) ? "actif" : "";
-    li.onclick = () => allerAPage(i);
+
+    const libelle = document.createElement("span");
+    libelle.textContent = "Page " + (i + 1);
+    libelle.className = "libelle-page";
+    libelle.onclick = () => allerAPage(i);
+    li.appendChild(libelle);
+
+    if (pages.length > 1) {
+      const btnSuppr = document.createElement("span");
+      btnSuppr.textContent = "✕";
+      btnSuppr.className = "supprimer-page";
+      btnSuppr.title = "Supprimer cette page";
+      btnSuppr.onclick = (e) => { e.stopPropagation(); supprimerPage(i); };
+      li.appendChild(btnSuppr);
+    }
+
     liste.appendChild(li);
   });
+}
+
+function supprimerPage(i) {
+  const pages = livreActuel().pages;
+  if (pages.length <= 1) return;
+  if (!confirm(`Supprimer la page ${i + 1} ? Cette action est irréversible.`)) return;
+
+  flushSpread();
+  pages.splice(i, 1);
+
+  // Recalculer indexSpread sur une paire valide
+  if (indexSpread >= pages.length) {
+    indexSpread = Math.max(0, pages.length - 1 - ((pages.length - 1) % 2));
+  } else if (i <= indexSpread && indexSpread > 0) {
+    indexSpread = Math.max(0, indexSpread - 1 - ((indexSpread - 1) % 2));
+  }
+  // Toujours commencer sur un index pair
+  indexSpread = indexSpread - (indexSpread % 2);
+
+  afficherSpread();
+  afficherSommaire();
 }
 
 function allerAPage(i) {
