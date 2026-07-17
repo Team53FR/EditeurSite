@@ -78,6 +78,9 @@ button.secondaire {
   border-radius: 10px;
   box-shadow: 0 2px 10px rgba(0,0,0,0.1);
   width: 200px;
+  display: flex;
+  flex-direction: column;
+  min-height: 300px;
 }
 
 .sommaire h2 {
@@ -290,11 +293,18 @@ button.danger {
   padding-top: 8px;
 }
 
-.barre-basse {
+.sommaire-actions {
   display: flex;
-  gap: 8px;
-  justify-content: center;
-  margin-top: 16px;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: auto;
+  padding-top: 16px;
+  border-top: 1px solid #eee;
+}
+
+.sommaire-actions button {
+  width: 100%;
+  text-align: center;
 }
 .separateur-outils {
   width: 1px;
