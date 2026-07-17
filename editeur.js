@@ -18,45 +18,56 @@ const FORMATS = {
 
 function appliquerFormatPage(formatKey) {
   const f = FORMATS[formatKey] || FORMATS["149x210"];
-  const MM = 3.7795; // 1mm = 3.7795px à 96dpi
+  const ratio = f.haut / f.larg; // ratio hauteur/largeur du format
 
-  const largPx   = Math.round(f.larg  * MM);
-  const hautPx   = Math.round(f.haut  * MM);
+  // Espace disponible (fenêtre - sommaire - paddings - barre outils - barre actions)
+  const sommaireLarg = 240; // sommaire 200px + gap 20px + marge 20px
+  const margesH      = 32;  // padding conteneur gauche+droite
+  const barresH      = 56 + 52 + 10 + 32 + 10; // barre outils + barre actions + gaps + message
+  const gapPages     = 26;
+  const margeV       = 32;  // padding conteneur haut+bas
+
+  const dispoW = window.innerWidth  - sommaireLarg - margesH;
+  const dispoH = window.innerHeight - barresH - margeV;
+
+  // Largeur d'une page = moitié de l'espace horizontal (deux pages côte à côte)
+  let largPx = Math.floor((dispoW - gapPages) / 2);
+  let hautPx = Math.round(largPx * ratio);
+
+  // Si ça dépasse en hauteur, on recalcule depuis la hauteur
+  if (hautPx > dispoH) {
+    hautPx = dispoH;
+    largPx = Math.round(hautPx / ratio);
+  }
+
+  // Marges internes proportionnelles au format réel (en mm)
+  const MM = largPx / f.larg;
   const margeVPx = Math.round(f.margeV * MM);
   const margeHPx = Math.round(f.margeH * MM);
-  const numPageH = 24; // px réservés au numéro de page
+  const numPageH = 22;
 
-  // La page utilise box-sizing:border-box donc width/height = taille totale
-  // Le texte occupe tout l'espace restant après le padding (flex:1)
   document.querySelectorAll(".page-livre").forEach(el => {
-    el.style.width      = largPx + "px";
-    el.style.height     = hautPx + "px";
-    el.style.padding    = margeVPx + "px " + margeHPx + "px 0";
-    el.style.boxSizing  = "border-box";
+    el.style.width     = largPx + "px";
+    el.style.height    = hautPx + "px";
+    el.style.padding   = margeVPx + "px " + margeHPx + "px 0";
+    el.style.boxSizing = "border-box";
+    el.style.flexShrink = "0";
   });
 
-  // Le texte prend toute la largeur/hauteur dispo via flex:1, on fixe juste overflow
   document.querySelectorAll(".texte-livre").forEach(el => {
     el.style.width  = (largPx - margeHPx * 2) + "px";
     el.style.height = (hautPx - margeVPx - numPageH) + "px";
   });
 
-  // Zoom auto pour tenir dans la fenêtre visible
-  // Largeur totale : sommaire (220px) + gap (20px) + barre outils centrée sur les pages
-  // On zoom uniquement la zone-livre (pages + barre outils)
-  const sommaireLarg = 220; // largeur du sommaire + gap
-  const gapPages = 26;
-  const dispoPx = window.innerWidth - sommaireLarg - 40; // 40px marges extérieures
-  const dispoH  = window.innerHeight - 160; // barre outils + boutons + marges
-
-  const scaleW = dispoPx / (largPx * 2 + gapPages);
-  const scaleH = dispoH  / hautPx;
-  const scale  = Math.min(scaleW, scaleH, 1);
-
+  // Supprimer tout transform (on adapte directement la taille)
   const zoneLivre = document.querySelector(".zone-livre");
-  if (zoneLivre) {
-    zoneLivre.style.transformOrigin = "top left";
-    zoneLivre.style.transform = scale < 1 ? `scale(${scale.toFixed(3)})` : "";
+  if (zoneLivre) zoneLivre.style.transform = "";
+
+  // Mettre à jour le mesureCachee
+  const mesure = document.getElementById("mesureCachee");
+  if (mesure) {
+    mesure.style.width  = (largPx - margeHPx * 2) + "px";
+    mesure.style.height = (hautPx - margeVPx - numPageH) + "px";
   }
 }
 
@@ -88,7 +99,9 @@ async function chargerLivre() {
     }
 
     document.getElementById("titreLivre").textContent = livre.titre || "Mon livre";
-    appliquerFormatPage(livre.format || "149x210");
+    const formatCourant = livre.format || "149x210";
+    appliquerFormatPage(formatCourant);
+    window.addEventListener("resize", () => appliquerFormatPage(formatCourant));
     indexSpread = 0;
 
     document.execCommand("defaultParagraphSeparator", false, "p");

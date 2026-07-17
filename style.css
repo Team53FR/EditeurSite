@@ -4,7 +4,8 @@ body {
   display: flex;
   justify-content: center;
   align-items: center;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   margin: 0;
 }
 
@@ -69,7 +70,12 @@ button.secondaire {
 .conteneur-livre {
   display: flex;
   gap: 20px;
-  align-items: flex-start;
+  align-items: stretch;
+  height: calc(100vh - 32px);
+  max-height: 100vh;
+  padding: 16px;
+  box-sizing: border-box;
+  width: 100%;
 }
 
 .sommaire {
@@ -78,9 +84,10 @@ button.secondaire {
   border-radius: 10px;
   box-shadow: 0 2px 10px rgba(0,0,0,0.1);
   width: 200px;
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  min-height: 300px;
+  overflow: hidden;
 }
 
 .sommaire h2 {
@@ -95,6 +102,8 @@ button.secondaire {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  overflow-y: auto;
+  flex: 1;
 }
 
 .sommaire li {
@@ -216,7 +225,9 @@ button.danger {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 14px;
+  gap: 10px;
+  flex: 1;
+  overflow: hidden;
 }
 
 .barre-outils {
