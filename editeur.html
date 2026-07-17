@@ -13,25 +13,40 @@
 
     <aside class="sommaire">
       <h2 id="titreLivre">Mon livre</h2>
+
+      <div class="sommaire-couvertures">
+        <button onclick="ouvrirCouverture('couverture')" id="btnCouv" class="secondaire petit btn-couv">📖 Couverture</button>
+        <button onclick="ouvrirCouverture('quatrieme')" id="btnQuatr" class="secondaire petit btn-couv">📕 4e de couv.</button>
+      </div>
+
+      <div class="sommaire-separateur"></div>
+
       <ul id="listePages"></ul>
+
       <div class="sommaire-actions">
         <button onclick="retourBibliotheque()" class="secondaire petit">&#8592; Bibliothèque</button>
         <button onclick="seDeconnecter()" class="secondaire petit">Se déconnecter</button>
       </div>
     </aside>
 
-    <div class="zone-livre">
+    <!-- Vue éditeur de texte (mode normal) -->
+    <div class="zone-livre" id="vueEditeur">
 
       <div class="barre-outils">
-        <button onmousedown="event.preventDefault()" onclick="formater('bold')"><b>G</b></button>
-        <button onmousedown="event.preventDefault()" onclick="formater('italic')"><i>I</i></button>
-        <button onmousedown="event.preventDefault()" onclick="formater('underline')"><u>S</u></button>
-        <select onmousedown="event.preventDefault()" onchange="formater('fontSize', this.value)">
-          <option value="2">Petit</option>
-          <option value="3" selected>Normal</option>
-          <option value="5">Grand</option>
-          <option value="7">Très grand</option>
-        </select>
+        <button onmousedown="event.preventDefault()" onclick="formater('bold')" title="Gras"><b>G</b></button>
+        <button onmousedown="event.preventDefault()" onclick="formater('italic')" title="Italique"><i>I</i></button>
+        <button onmousedown="event.preventDefault()" onclick="formater('underline')" title="Souligné"><u>S</u></button>
+        <span class="separateur-outils"></span>
+        <button onmousedown="event.preventDefault()" onclick="formater('justifyLeft')" title="Gauche">&#8676;</button>
+        <button onmousedown="event.preventDefault()" onclick="formater('justifyCenter')" title="Centrer">&#8633;</button>
+        <button onmousedown="event.preventDefault()" onclick="formater('justifyRight')" title="Droite">&#8677;</button>
+        <span class="separateur-outils"></span>
+        <input type="number" id="inputTaille" value="18" min="6" max="72" title="Taille (pt)"
+          class="input-taille"
+          onmousedown="sauvegarderSelection()"
+          onchange="appliquerTaille(this.value)"
+          onkeydown="if(event.key==='Enter'){appliquerTaille(this.value);event.preventDefault();}">
+        <span style="font-size:12px;color:#666;">pt</span>
       </div>
 
       <div class="livre-ouvert">
@@ -46,13 +61,73 @@
       </div>
 
       <div class="barre-actions">
-        <button onclick="pagePrecedente()">← Précédent</button>
+        <button onclick="pagePrecedente()">&#8592; Précédent</button>
         <button onclick="sauvegarder()">Sauvegarder</button>
-        <button onclick="pageSuivante()">Suivant →</button>
+        <button onclick="pageSuivante()">Suivant &#8594;</button>
       </div>
 
       <p id="message" class="message"></p>
     </div>
+
+    <!-- Vue éditeur de couverture -->
+    <div class="zone-livre" id="vueCouverture" style="display:none;">
+
+      <div class="barre-outils">
+        <span style="font-size:13px;color:#555;font-weight:600;" id="titreModeCouv">Couverture</span>
+      </div>
+
+      <div class="livre-ouvert">
+        <!-- Page couverture prévisualisée -->
+        <div class="page-livre" id="previewCouv" style="position:relative;overflow:hidden;cursor:default;">
+          <div id="previewCouverture" class="apercu-couverture"></div>
+        </div>
+        <!-- Panneau d'édition -->
+        <div class="page-livre paneau-edition-couv">
+          <div class="champs-couverture">
+
+            <label class="label-couv">Titre</label>
+            <input type="text" id="champTitreCouv" placeholder="Titre du livre" oninput="previewCouverture()">
+
+            <label class="label-couv">Auteur</label>
+            <input type="text" id="champAuteurCouv" placeholder="Nom de l'auteur" oninput="previewCouverture()">
+
+            <label class="label-couv">Couleur de fond</label>
+            <div class="choix-couleurs">
+              <div class="pastille" style="background:#1a1a2e;" onclick="setCouleurFond('#1a1a2e')" title="Nuit"></div>
+              <div class="pastille" style="background:#2d4a22;" onclick="setCouleurFond('#2d4a22')" title="Forêt"></div>
+              <div class="pastille" style="background:#4a1a2e;" onclick="setCouleurFond('#4a1a2e')" title="Bordeaux"></div>
+              <div class="pastille" style="background:#1a3a4a;" onclick="setCouleurFond('#1a3a4a')" title="Océan"></div>
+              <div class="pastille" style="background:#3a2a1a;" onclick="setCouleurFond('#3a2a1a')" title="Cuir"></div>
+              <div class="pastille" style="background:#f4f0e8;" onclick="setCouleurFond('#f4f0e8')" title="Ivoire" style="border:1px solid #ccc"></div>
+              <div class="pastille" style="background:#2a2a2a;" onclick="setCouleurFond('#2a2a2a')" title="Ardoise"></div>
+              <input type="color" id="couleurLibre" value="#1a1a2e" oninput="setCouleurFond(this.value)" title="Couleur libre" class="input-couleur-libre">
+            </div>
+
+            <label class="label-couv">Image de fond</label>
+            <input type="file" id="inputImage" accept="image/*" onchange="chargerImageFond(event)" class="input-fichier">
+            <button onclick="supprimerImageFond()" class="secondaire petit" style="margin-top:4px;">✕ Supprimer l'image</button>
+
+            <label class="label-couv">Couleur du texte</label>
+            <div class="choix-couleurs">
+              <div class="pastille" style="background:#ffffff;" onclick="setCouleurTexte('#ffffff')"></div>
+              <div class="pastille" style="background:#f4e4c1;" onclick="setCouleurTexte('#f4e4c1')"></div>
+              <div class="pastille" style="background:#1a1a1a;" onclick="setCouleurTexte('#1a1a1a')"></div>
+              <div class="pastille" style="background:#c9a96e;" onclick="setCouleurTexte('#c9a96e')"></div>
+              <input type="color" id="couleurTexteLibre" value="#ffffff" oninput="setCouleurTexte(this.value)" class="input-couleur-libre">
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <div class="barre-actions">
+        <button onclick="fermerCouverture()" class="secondaire">&#8592; Retour au texte</button>
+        <button onclick="sauvegarder()">Sauvegarder</button>
+      </div>
+
+      <p id="messageCouv" class="message"></p>
+    </div>
+
   </div>
 
   <div id="mesureCachee" class="texte-livre" style="position:absolute; visibility:hidden; left:-9999px; top:0;"></div>

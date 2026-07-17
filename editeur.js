@@ -7,6 +7,7 @@ let indexLivre = -1;
 let indexSpread = 0;
 let coteActif = "gauche";
 let selectionSauvegardee = null;
+let modeCouverture = null; // 'couverture' | 'quatrieme' | null
 
 // Formats : dimensions en mm, marges en mm (haut/bas, gauche/droite)
 const FORMATS = {
@@ -60,8 +61,22 @@ function appliquerFormatPage(formatKey) {
   });
 
   // Supprimer tout transform (on adapte directement la taille)
-  const zoneLivre = document.querySelector(".zone-livre");
-  if (zoneLivre) zoneLivre.style.transform = "";
+  document.querySelectorAll(".zone-livre").forEach(el => el.style.transform = "");
+
+  // Adapter aussi le panneau couverture (même largeur/hauteur que page-livre)
+  const previewCouv = document.getElementById("previewCouv");
+  if (previewCouv) {
+    previewCouv.style.width  = largPx + "px";
+    previewCouv.style.height = hautPx + "px";
+  }
+  const paneau = document.querySelector(".paneau-edition-couv");
+  if (paneau) {
+    paneau.style.width  = largPx + "px";
+    paneau.style.height = hautPx + "px";
+    paneau.style.padding = "16px 20px";
+    paneau.style.boxSizing = "border-box";
+    paneau.style.overflowY = "auto";
+  }
 
   // Mettre à jour le mesureCachee
   const mesure = document.getElementById("mesureCachee");
@@ -386,6 +401,118 @@ async function sauvegarder() {
 function retourBibliotheque() {
   flushSpread();
   window.location.href = "bibliotheque.html";
+}
+
+// ----- Couverture -----
+
+function ouvrirCouverture(mode) {
+  flushSpread();
+  modeCouverture = mode;
+  const livre = livreActuel();
+  if (!livre.couverture) livre.couverture = { fond: "#1a1a2e", image: null, texte: "#ffffff" };
+  if (!livre.quatrieme) livre.quatrieme = { fond: "#2a2a2a", image: null, texte: "#ffffff", contenu: "" };
+
+  const data = mode === "couverture" ? livre.couverture : livre.quatrieme;
+
+  document.getElementById("titreModeCouv").textContent = mode === "couverture" ? "Couverture" : "4e de couverture";
+  document.getElementById("champTitreCouv").value = mode === "couverture" ? (livre.titre || "") : "";
+  document.getElementById("champAuteurCouv").value = livre.auteur || "";
+  document.getElementById("couleurLibre").value = data.fond || "#1a1a2e";
+  document.getElementById("couleurTexteLibre").value = data.texte || "#ffffff";
+
+  // Masquer champ titre pour la 4e
+  document.getElementById("champTitreCouv").closest("div")?.previousElementSibling;
+  const labelTitre = document.querySelector(".champs-couverture .label-couv");
+  const inputTitre = document.getElementById("champTitreCouv");
+  if (mode === "quatrieme") {
+    labelTitre.style.display = "none";
+    inputTitre.style.display = "none";
+  } else {
+    labelTitre.style.display = "";
+    inputTitre.style.display = "";
+  }
+
+  previewCouverture();
+
+  document.getElementById("vueEditeur").style.display = "none";
+  document.getElementById("vueCouverture").style.display = "flex";
+  document.getElementById("btnCouv").classList.toggle("actif", mode === "couverture");
+  document.getElementById("btnQuatr").classList.toggle("actif", mode === "quatrieme");
+
+  // Appliquer le bon format
+  appliquerFormatPage(livreActuel().format || "149x210");
+}
+
+function fermerCouverture() {
+  modeCouverture = null;
+  document.getElementById("vueCouverture").style.display = "none";
+  document.getElementById("vueEditeur").style.display = "flex";
+  document.getElementById("btnCouv").classList.remove("actif");
+  document.getElementById("btnQuatr").classList.remove("actif");
+  appliquerFormatPage(livreActuel().format || "149x210");
+}
+
+function previewCouverture() {
+  const livre = livreActuel();
+  const mode = modeCouverture;
+  const data = mode === "couverture" ? livre.couverture : livre.quatrieme;
+  if (!data) return;
+
+  const apercu = document.getElementById("previewCouverture");
+  apercu.style.background = data.image
+    ? `url(${data.image}) center/cover no-repeat`
+    : data.fond;
+
+  // Sauvegarder auteur dans le livre
+  livre.auteur = document.getElementById("champAuteurCouv").value;
+  if (mode === "couverture") {
+    livre.titre = document.getElementById("champTitreCouv").value;
+    document.getElementById("titreLivre").textContent = livre.titre || "Mon livre";
+  }
+
+  const couleurTexte = data.texte || "#ffffff";
+  apercu.innerHTML = `
+    ${mode === "couverture" ? `<div class="apercu-titre" style="color:${couleurTexte}">${livre.titre || "Titre"}</div>` : ""}
+    <div class="apercu-auteur" style="color:${couleurTexte}">${livre.auteur || "Auteur"}</div>
+  `;
+}
+
+function setCouleurFond(couleur) {
+  const livre = livreActuel();
+  const data = modeCouverture === "couverture" ? livre.couverture : livre.quatrieme;
+  data.fond = couleur;
+  data.image = null; // supprimer image si couleur choisie
+  document.getElementById("couleurLibre").value = couleur;
+  previewCouverture();
+}
+
+function setCouleurTexte(couleur) {
+  const livre = livreActuel();
+  const data = modeCouverture === "couverture" ? livre.couverture : livre.quatrieme;
+  data.texte = couleur;
+  document.getElementById("couleurTexteLibre").value = couleur;
+  previewCouverture();
+}
+
+function chargerImageFond(event) {
+  const fichier = event.target.files[0];
+  if (!fichier) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const livre = livreActuel();
+    const data = modeCouverture === "couverture" ? livre.couverture : livre.quatrieme;
+    data.image = e.target.result;
+    previewCouverture();
+  };
+  reader.readAsDataURL(fichier);
+}
+
+function supprimerImageFond() {
+  const livre = livreActuel();
+  const data = modeCouverture === "couverture" ? livre.couverture : livre.quatrieme;
+  data.image = null;
+  document.getElementById("inputImage").value = "";
+  previewCouverture();
 }
 
 function seDeconnecter() {
