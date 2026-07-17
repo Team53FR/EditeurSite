@@ -8,37 +8,55 @@ let indexSpread = 0;
 let coteActif = "gauche";
 let selectionSauvegardee = null;
 
+// Formats : dimensions en mm, marges en mm (haut/bas, gauche/droite)
 const FORMATS = {
-  "149x210": { larg: 149, haut: 210, padH: 20, padV: 20 },
-  "155x235": { larg: 155, haut: 235, padH: 20, padV: 22 },
-  "105x148": { larg: 105, haut: 148, padH: 14, padV: 14 },
-  "210x297": { larg: 210, haut: 297, padH: 25, padV: 25 },
+  "149x210": { larg: 149, haut: 210, margeV: 20, margeH: 20 },
+  "155x235": { larg: 155, haut: 235, margeV: 22, margeH: 20 },
+  "105x148": { larg: 105, haut: 148, margeV: 14, margeH: 14 },
+  "210x297": { larg: 210, haut: 297, margeV: 25, margeH: 25 },
 };
 
 function appliquerFormatPage(formatKey) {
   const f = FORMATS[formatKey] || FORMATS["149x210"];
-  const PX = 3.7795; // 1mm = 3.7795px
-  const lPx = Math.round(f.larg * PX);
-  const hPx = Math.round(f.haut * PX);
-  const padHPx = Math.round(f.padH * PX * 2); // padding gauche+droite
-  const padVPx = Math.round(f.padV * PX * 2); // padding haut+bas
-  const innerW = lPx - padHPx;
-  const innerH = hPx - padVPx - 30; // 30px pour le numéro de page
+  const MM = 3.7795; // 1mm = 3.7795px à 96dpi
 
+  const largPx   = Math.round(f.larg  * MM);
+  const hautPx   = Math.round(f.haut  * MM);
+  const margeVPx = Math.round(f.margeV * MM);
+  const margeHPx = Math.round(f.margeH * MM);
+  const numPageH = 24; // px réservés au numéro de page
+
+  // La page utilise box-sizing:border-box donc width/height = taille totale
+  // Le texte occupe tout l'espace restant après le padding (flex:1)
   document.querySelectorAll(".page-livre").forEach(el => {
-    el.style.width = lPx + "px";
-    el.style.height = hPx + "px";
-    el.style.padding = Math.round(f.padV * PX) + "px " + Math.round(f.padH * PX) + "px 20px";
+    el.style.width      = largPx + "px";
+    el.style.height     = hautPx + "px";
+    el.style.padding    = margeVPx + "px " + margeHPx + "px 0";
+    el.style.boxSizing  = "border-box";
   });
+
+  // Le texte prend toute la largeur/hauteur dispo via flex:1, on fixe juste overflow
   document.querySelectorAll(".texte-livre").forEach(el => {
-    el.style.width = innerW + "px";
-    el.style.height = innerH + "px";
+    el.style.width  = (largPx - margeHPx * 2) + "px";
+    el.style.height = (hautPx - margeVPx - numPageH) + "px";
   });
-  // Mettre à jour aussi le mesureCachee
-  const mesure = document.getElementById("mesureCachee");
-  if (mesure) {
-    mesure.style.width = innerW + "px";
-    mesure.style.height = innerH + "px";
+
+  // Zoom auto pour tenir dans la fenêtre visible
+  // Largeur totale : sommaire (220px) + gap (20px) + barre outils centrée sur les pages
+  // On zoom uniquement la zone-livre (pages + barre outils)
+  const sommaireLarg = 220; // largeur du sommaire + gap
+  const gapPages = 26;
+  const dispoPx = window.innerWidth - sommaireLarg - 40; // 40px marges extérieures
+  const dispoH  = window.innerHeight - 160; // barre outils + boutons + marges
+
+  const scaleW = dispoPx / (largPx * 2 + gapPages);
+  const scaleH = dispoH  / hautPx;
+  const scale  = Math.min(scaleW, scaleH, 1);
+
+  const zoneLivre = document.querySelector(".zone-livre");
+  if (zoneLivre) {
+    zoneLivre.style.transformOrigin = "top left";
+    zoneLivre.style.transform = scale < 1 ? `scale(${scale.toFixed(3)})` : "";
   }
 }
 
