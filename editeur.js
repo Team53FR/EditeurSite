@@ -493,10 +493,38 @@ function previewCouverture() {
   const data = mode === "couverture" ? livre.couverture : livre.quatrieme;
   if (!data) return;
 
-  const apercu = document.getElementById("previewCouverture");
-  apercu.style.background = data.image
-    ? `url(${data.image}) center/cover no-repeat`
-    : data.fond;
+  if (data.imgZoom === undefined) data.imgZoom = 1;
+  if (data.imgOffsetX === undefined) data.imgOffsetX = 0;
+  if (data.imgOffsetY === undefined) data.imgOffsetY = 0;
+
+  const fondDiv = document.getElementById("fondCouleurCouv");
+  const img = document.getElementById("imageFondCouverture");
+  const zoneZoom = document.getElementById("zoneZoomImage");
+  const aide = document.getElementById("aideDeplacement");
+  const slider = document.getElementById("sliderZoom");
+  const valeurZoom = document.getElementById("valeurZoom");
+
+  fondDiv.style.background = data.fond || "#1a1a2e";
+
+  if (data.image) {
+    img.src = data.image;
+    img.style.display = "block";
+
+    const conteneur = document.getElementById("previewCouv");
+    clampOffsetsCouv(data, conteneur.clientWidth, conteneur.clientHeight);
+    img.style.transform = `translate(${data.imgOffsetX}px, ${data.imgOffsetY}px) scale(${data.imgZoom})`;
+    img.style.cursor = data.imgZoom > 1 ? "grab" : "default";
+
+    zoneZoom.style.display = "flex";
+    aide.style.display = data.imgZoom > 1 ? "block" : "none";
+    slider.value = data.imgZoom;
+    valeurZoom.textContent = Math.round(data.imgZoom * 100) + "%";
+  } else {
+    img.style.display = "none";
+    img.removeAttribute("src");
+    zoneZoom.style.display = "none";
+    aide.style.display = "none";
+  }
 
   // Sauvegarder auteur dans le livre
   livre.auteur = document.getElementById("champAuteurCouv").value;
@@ -506,10 +534,92 @@ function previewCouverture() {
   }
 
   const couleurTexte = data.texte || "#ffffff";
+  const apercu = document.getElementById("previewCouverture");
   apercu.innerHTML = `
     ${mode === "couverture" ? `<div class="apercu-titre" style="color:${couleurTexte}">${livre.titre || "Titre"}</div>` : ""}
     <div class="apercu-auteur" style="color:${couleurTexte}">${livre.auteur || "Auteur"}</div>
   `;
+}
+
+function clampOffsetsCouv(data, largeurConteneur, hauteurConteneur) {
+  const maxX = largeurConteneur * (data.imgZoom - 1) / 2;
+  const maxY = hauteurConteneur * (data.imgZoom - 1) / 2;
+  data.imgOffsetX = Math.max(-maxX, Math.min(maxX, data.imgOffsetX || 0));
+  data.imgOffsetY = Math.max(-maxY, Math.min(maxY, data.imgOffsetY || 0));
+}
+
+function setZoomImage(val) {
+  const livre = livreActuel();
+  const data = modeCouverture === "couverture" ? livre.couverture : livre.quatrieme;
+  if (!data || !data.image) return;
+  data.imgZoom = Math.max(1, Math.min(3, parseFloat(val)));
+  previewCouverture();
+}
+
+// ----- Glisser-déposer de l'image de couverture -----
+
+let glissementActif = false;
+let glissementDepartX = 0;
+let glissementDepartY = 0;
+let glissementOffsetDepartX = 0;
+let glissementOffsetDepartY = 0;
+
+function initGlissementImageCouverture() {
+  const img = document.getElementById("imageFondCouverture");
+  if (!img) return;
+
+  img.addEventListener("pointerdown", (e) => {
+    const livre = livreActuel();
+    const data = modeCouverture === "couverture" ? livre.couverture : livre.quatrieme;
+    if (!data || !data.image || data.imgZoom <= 1) return;
+
+    glissementActif = true;
+    glissementDepartX = e.clientX;
+    glissementDepartY = e.clientY;
+    glissementOffsetDepartX = data.imgOffsetX || 0;
+    glissementOffsetDepartY = data.imgOffsetY || 0;
+    img.classList.add("en-glissement");
+    img.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+
+  img.addEventListener("pointermove", (e) => {
+    if (!glissementActif) return;
+    const livre = livreActuel();
+    const data = modeCouverture === "couverture" ? livre.couverture : livre.quatrieme;
+    if (!data) return;
+
+    const deltaX = e.clientX - glissementDepartX;
+    const deltaY = e.clientY - glissementDepartY;
+    data.imgOffsetX = glissementOffsetDepartX + deltaX;
+    data.imgOffsetY = glissementOffsetDepartY + deltaY;
+
+    const conteneur = document.getElementById("previewCouv");
+    clampOffsetsCouv(data, conteneur.clientWidth, conteneur.clientHeight);
+    img.style.transform = `translate(${data.imgOffsetX}px, ${data.imgOffsetY}px) scale(${data.imgZoom})`;
+  });
+
+  const finGlissement = (e) => {
+    if (!glissementActif) return;
+    glissementActif = false;
+    img.classList.remove("en-glissement");
+    if (e.pointerId !== undefined && img.hasPointerCapture(e.pointerId)) {
+      img.releasePointerCapture(e.pointerId);
+    }
+  };
+  img.addEventListener("pointerup", finGlissement);
+  img.addEventListener("pointercancel", finGlissement);
+
+  // Molette de la souris pour zoomer rapidement
+  img.addEventListener("wheel", (e) => {
+    const livre = livreActuel();
+    const data = modeCouverture === "couverture" ? livre.couverture : livre.quatrieme;
+    if (!data || !data.image) return;
+    e.preventDefault();
+    const pas = e.deltaY < 0 ? 0.05 : -0.05;
+    data.imgZoom = Math.max(1, Math.min(3, (data.imgZoom || 1) + pas));
+    previewCouverture();
+  }, { passive: false });
 }
 
 function setCouleurFond(couleur) {
@@ -537,6 +647,9 @@ function chargerImageFond(event) {
     const livre = livreActuel();
     const data = modeCouverture === "couverture" ? livre.couverture : livre.quatrieme;
     data.image = e.target.result;
+    data.imgZoom = 1;
+    data.imgOffsetX = 0;
+    data.imgOffsetY = 0;
     previewCouverture();
   };
   reader.readAsDataURL(fichier);
@@ -546,6 +659,9 @@ function supprimerImageFond() {
   const livre = livreActuel();
   const data = modeCouverture === "couverture" ? livre.couverture : livre.quatrieme;
   data.image = null;
+  data.imgZoom = 1;
+  data.imgOffsetX = 0;
+  data.imgOffsetY = 0;
   document.getElementById("inputImage").value = "";
   previewCouverture();
 }
@@ -557,3 +673,4 @@ function seDeconnecter() {
 }
 
 chargerLivre();
+initGlissementImageCouverture();
