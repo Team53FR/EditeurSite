@@ -571,7 +571,7 @@ function clampOffsetsCouv(data, largeurConteneur, hauteurConteneur) {
 function setZoomImage(val) {
   const livre = livreActuel();
   const data = modeCouverture === "couverture" ? livre.couverture : livre.quatrieme;
-  if (!data || !data.image) return;
+  if (!data || !data.imageChemin) return;
   data.imgZoom = Math.max(1, Math.min(3, parseFloat(val)));
   previewCouverture();
 }
@@ -591,7 +591,7 @@ function initGlissementImageCouverture() {
   img.addEventListener("pointerdown", (e) => {
     const livre = livreActuel();
     const data = modeCouverture === "couverture" ? livre.couverture : livre.quatrieme;
-    if (!data || !data.image || data.imgZoom <= 1) return;
+    if (!data || !data.imageChemin || data.imgZoom <= 1) return;
 
     glissementActif = true;
     glissementDepartX = e.clientX;
@@ -634,7 +634,7 @@ function initGlissementImageCouverture() {
   img.addEventListener("wheel", (e) => {
     const livre = livreActuel();
     const data = modeCouverture === "couverture" ? livre.couverture : livre.quatrieme;
-    if (!data || !data.image) return;
+    if (!data || !data.imageChemin) return;
     e.preventDefault();
     const pas = e.deltaY < 0 ? 0.05 : -0.05;
     data.imgZoom = Math.max(1, Math.min(3, (data.imgZoom || 1) + pas));
