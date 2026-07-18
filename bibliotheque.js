@@ -28,7 +28,37 @@ async function chargerBibliotheque() {
   }
 
   if (!bibliotheque.livres) bibliotheque.livres = [];
+
+  try {
+    const modifie = await migrerImagesEmbarquees(token);
+    if (modifie) {
+      message.textContent = "Optimisation des images de couverture en cours...";
+      shaBiblio = await ecrireFichierJSON(NOM_FICHIER_BIBLIO, bibliotheque, shaBiblio, token, "Migration des images de couverture vers des fichiers séparés");
+      message.textContent = "Images de couverture optimisées avec succès.";
+    }
+  } catch (erreur) {
+    message.textContent = "Attention : optimisation des images incomplète — " + erreur.message;
+  }
+
   afficherListeLivres();
+}
+
+async function migrerImagesEmbarquees(token) {
+  let modifie = false;
+  for (const livre of bibliotheque.livres) {
+    for (const cle of ["couverture", "quatrieme"]) {
+      const data = livre[cle];
+      if (data && typeof data.image === "string" && data.image.startsWith("data:")) {
+        const extension = extraireExtensionDataUrl(data.image);
+        const chemin = `images/${livre.id}_${cle}.${extension}`;
+        await uploaderImageBase64(chemin, data.image, token, `Migration de l'image ${chemin}`);
+        data.imageChemin = chemin;
+        delete data.image;
+        modifie = true;
+      }
+    }
+  }
+  return modifie;
 }
 
 function afficherListeLivres() {
@@ -93,35 +123,13 @@ async function creerLivre() {
     pages: [{ id: "p1", titre: "Page 1", contenu: "" }]
   });
 
-  const contenuEncode = btoa(unescape(encodeURIComponent(JSON.stringify(bibliotheque, null, 2))));
-  const url = `https://api.github.com/repos/${PROPRIETAIRE}/${DEPOT_BDD}/contents/${NOM_FICHIER_BIBLIO}`;
-
-  const corps = {
-    message: "Ajout d'un nouveau livre",
-    content: contenuEncode
-  };
-  if (shaBiblio) corps.sha = shaBiblio;
-
   try {
-    const reponse = await fetch(url, {
-      method: "PUT",
-      headers: {
-        "Authorization": `Bearer ${token}`,
-        "Accept": "application/vnd.github+json"
-      },
-      body: JSON.stringify(corps)
-    });
-
-    if (!reponse.ok) {
-      throw new Error("Échec de la création du livre. Vérifie ton token.");
-    }
-
-    const data = await reponse.json();
-    shaBiblio = data.content.sha;
+    shaBiblio = await ecrireFichierJSON(NOM_FICHIER_BIBLIO, bibliotheque, shaBiblio, token, "Ajout d'un nouveau livre");
     champTitre.value = "";
     afficherListeLivres();
     message.textContent = "Livre créé avec succès.";
   } catch (erreur) {
+    bibliotheque.livres.pop();
     message.textContent = erreur.message;
   }
 }
@@ -135,36 +143,20 @@ async function supprimerLivre(id) {
 
   bibliotheque.livres = bibliotheque.livres.filter(l => l.id !== id);
 
-  const contenuEncode = btoa(unescape(encodeURIComponent(JSON.stringify(bibliotheque, null, 2))));
-  const url = `https://api.github.com/repos/${PROPRIETAIRE}/${DEPOT_BDD}/contents/${NOM_FICHIER_BIBLIO}`;
-
-  const corps = {
-    message: "Suppression d'un livre",
-    content: contenuEncode,
-    sha: shaBiblio
-  };
-
   try {
-    const reponse = await fetch(url, {
-      method: "PUT",
-      headers: {
-        "Authorization": `Bearer ${token}`,
-        "Accept": "application/vnd.github+json"
-      },
-      body: JSON.stringify(corps)
-    });
-
-    if (!reponse.ok) {
-      throw new Error("Échec de la suppression. Vérifie ton token.");
-    }
-
-    const data = await reponse.json();
-    shaBiblio = data.content.sha;
+    shaBiblio = await ecrireFichierJSON(NOM_FICHIER_BIBLIO, bibliotheque, shaBiblio, token, "Suppression d'un livre");
     afficherListeLivres();
     message.textContent = "Livre supprimé.";
+
+    // Nettoyage des images associées (n'empêche pas la suppression si ça échoue)
+    for (const cle of ["couverture", "quatrieme"]) {
+      const data = livre[cle];
+      if (data && data.imageChemin) {
+        supprimerFichierGithub(data.imageChemin, token, "Suppression de l'image d'un livre supprimé").catch(() => {});
+      }
+    }
   } catch (erreur) {
     message.textContent = erreur.message;
-    // Remettre le livre en mémoire en cas d'échec de la sauvegarde
     bibliotheque.livres.push(livre);
   }
 }

@@ -444,8 +444,8 @@ function ouvrirCouverture(mode) {
   flushSpread();
   modeCouverture = mode;
   const livre = livreActuel();
-  if (!livre.couverture) livre.couverture = { fond: "#1a1a2e", image: null, texte: "#ffffff" };
-  if (!livre.quatrieme) livre.quatrieme = { fond: "#2a2a2a", image: null, texte: "#ffffff", contenu: "" };
+  if (!livre.couverture) livre.couverture = { fond: "#1a1a2e", image: null, imageChemin: null, texte: "#ffffff" };
+  if (!livre.quatrieme) livre.quatrieme = { fond: "#2a2a2a", image: null, imageChemin: null, texte: "#ffffff", contenu: "" };
 
   const data = mode === "couverture" ? livre.couverture : livre.quatrieme;
 
@@ -487,6 +487,9 @@ function fermerCouverture() {
   appliquerFormatPage(livreActuel().format || "149x210");
 }
 
+let cacheImagesURL = {};
+let requeteImageEnCours = 0;
+
 function previewCouverture() {
   const livre = livreActuel();
   const mode = modeCouverture;
@@ -506,19 +509,36 @@ function previewCouverture() {
 
   fondDiv.style.background = data.fond || "#1a1a2e";
 
-  if (data.image) {
-    img.src = data.image;
-    img.style.display = "block";
+  const cheminImage = data.imageChemin || null;
 
-    const conteneur = document.getElementById("previewCouv");
-    clampOffsetsCouv(data, conteneur.clientWidth, conteneur.clientHeight);
-    img.style.transform = `translate(${data.imgOffsetX}px, ${data.imgOffsetY}px) scale(${data.imgZoom})`;
-    img.style.cursor = data.imgZoom > 1 ? "grab" : "default";
-
+  if (cheminImage) {
     zoneZoom.style.display = "flex";
     aide.style.display = data.imgZoom > 1 ? "block" : "none";
     slider.value = data.imgZoom;
     valeurZoom.textContent = Math.round(data.imgZoom * 100) + "%";
+
+    const conteneur = document.getElementById("previewCouv");
+    clampOffsetsCouv(data, conteneur.clientWidth, conteneur.clientHeight);
+
+    if (cacheImagesURL[cheminImage]) {
+      img.src = cacheImagesURL[cheminImage];
+      img.style.display = "block";
+      img.style.transform = `translate(${data.imgOffsetX}px, ${data.imgOffsetY}px) scale(${data.imgZoom})`;
+      img.style.cursor = data.imgZoom > 1 ? "grab" : "default";
+    } else {
+      img.style.display = "none";
+      const token = sessionStorage.getItem("gh_token");
+      const requeteId = ++requeteImageEnCours;
+      obtenirUrlImage(cheminImage, token).then((urlImage) => {
+        cacheImagesURL[cheminImage] = urlImage;
+        if (requeteId === requeteImageEnCours) {
+          previewCouverture();
+        }
+      }).catch((erreur) => {
+        const messageCouv = document.getElementById("messageCouv");
+        if (messageCouv) messageCouv.textContent = erreur.message;
+      });
+    }
   } else {
     img.style.display = "none";
     img.removeAttribute("src");
@@ -625,8 +645,16 @@ function initGlissementImageCouverture() {
 function setCouleurFond(couleur) {
   const livre = livreActuel();
   const data = modeCouverture === "couverture" ? livre.couverture : livre.quatrieme;
+  const token = sessionStorage.getItem("gh_token");
+
+  if (data.imageChemin) {
+    supprimerFichierGithub(data.imageChemin, token, "Suppression de l'image de couverture (couleur choisie)").catch(() => {});
+    delete cacheImagesURL[data.imageChemin];
+  }
+
   data.fond = couleur;
-  data.image = null; // supprimer image si couleur choisie
+  data.image = null;
+  data.imageChemin = null;
   document.getElementById("couleurLibre").value = couleur;
   previewCouverture();
 }
@@ -642,15 +670,40 @@ function setCouleurTexte(couleur) {
 function chargerImageFond(event) {
   const fichier = event.target.files[0];
   if (!fichier) return;
+
+  const token = sessionStorage.getItem("gh_token");
+  const messageCouv = document.getElementById("messageCouv");
+  const livre = livreActuel();
+  const modeCourant = modeCouverture;
+  const data = modeCourant === "couverture" ? livre.couverture : livre.quatrieme;
+  const ancienChemin = data.imageChemin;
+
   const reader = new FileReader();
-  reader.onload = (e) => {
-    const livre = livreActuel();
-    const data = modeCouverture === "couverture" ? livre.couverture : livre.quatrieme;
-    data.image = e.target.result;
-    data.imgZoom = 1;
-    data.imgOffsetX = 0;
-    data.imgOffsetY = 0;
-    previewCouverture();
+  reader.onload = async (e) => {
+    const dataUrl = e.target.result;
+    const extension = extraireExtensionDataUrl(dataUrl);
+    const chemin = `images/${livre.id}_${modeCourant}.${extension}`;
+
+    messageCouv.textContent = "Envoi de l'image en cours...";
+    try {
+      await uploaderImageBase64(chemin, dataUrl, token, `Image de couverture — ${livre.titre || livre.id}`);
+
+      if (ancienChemin && ancienChemin !== chemin) {
+        supprimerFichierGithub(ancienChemin, token, "Remplacement de l'image de couverture").catch(() => {});
+        delete cacheImagesURL[ancienChemin];
+      }
+
+      data.imageChemin = chemin;
+      data.image = null;
+      data.imgZoom = 1;
+      data.imgOffsetX = 0;
+      data.imgOffsetY = 0;
+      cacheImagesURL[chemin] = dataUrl; // aperçu immédiat sans refaire de requête
+      messageCouv.textContent = "";
+      previewCouverture();
+    } catch (erreur) {
+      messageCouv.textContent = erreur.message;
+    }
   };
   reader.readAsDataURL(fichier);
 }
@@ -658,7 +711,15 @@ function chargerImageFond(event) {
 function supprimerImageFond() {
   const livre = livreActuel();
   const data = modeCouverture === "couverture" ? livre.couverture : livre.quatrieme;
+  const token = sessionStorage.getItem("gh_token");
+
+  if (data.imageChemin) {
+    supprimerFichierGithub(data.imageChemin, token, "Suppression de l'image de couverture").catch(() => {});
+    delete cacheImagesURL[data.imageChemin];
+  }
+
   data.image = null;
+  data.imageChemin = null;
   data.imgZoom = 1;
   data.imgOffsetX = 0;
   data.imgOffsetY = 0;
