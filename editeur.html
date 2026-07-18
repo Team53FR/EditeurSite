@@ -109,10 +109,10 @@
             <input type="file" id="inputImage" accept="image/*" onchange="chargerImageFond(event)" class="input-fichier">
             <div class="zoom-controle" id="zoneZoomImage" style="display:none;">
               <span style="font-size:14px;">🔍</span>
-              <input type="range" id="sliderZoom" min="1" max="3" step="0.01" value="1" oninput="setZoomImage(this.value)">
+              <input type="range" id="sliderZoom" min="0.3" max="3" step="0.01" value="1" oninput="setZoomImage(this.value)">
               <span id="valeurZoom">100%</span>
             </div>
-            <p class="aide-deplacement" id="aideDeplacement" style="display:none;">Zoomez puis faites glisser l'image pour la repositionner.</p>
+            <p class="aide-deplacement" id="aideDeplacement" style="display:none;">Faites glisser l'image pour la repositionner. Utilisez le curseur ou la molette pour zoomer/dézoomer.</p>
             <button onclick="supprimerImageFond()" class="secondaire petit" style="margin-top:4px;">✕ Supprimer l'image</button>
 
             <label class="label-couv">Couleur du texte</label>

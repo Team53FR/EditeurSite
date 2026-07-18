@@ -513,7 +513,7 @@ function previewCouverture() {
 
   if (cheminImage) {
     zoneZoom.style.display = "flex";
-    aide.style.display = data.imgZoom > 1 ? "block" : "none";
+    aide.style.display = "block";
     slider.value = data.imgZoom;
     valeurZoom.textContent = Math.round(data.imgZoom * 100) + "%";
 
@@ -524,7 +524,7 @@ function previewCouverture() {
       img.src = cacheImagesURL[cheminImage];
       img.style.display = "block";
       img.style.transform = `translate(${data.imgOffsetX}px, ${data.imgOffsetY}px) scale(${data.imgZoom})`;
-      img.style.cursor = data.imgZoom > 1 ? "grab" : "default";
+      img.style.cursor = "grab";
     } else {
       img.style.display = "none";
       const token = sessionStorage.getItem("gh_token");
@@ -562,17 +562,19 @@ function previewCouverture() {
 }
 
 function clampOffsetsCouv(data, largeurConteneur, hauteurConteneur) {
-  const maxX = largeurConteneur * (data.imgZoom - 1) / 2;
-  const maxY = hauteurConteneur * (data.imgZoom - 1) / 2;
-  data.imgOffsetX = Math.max(-maxX, Math.min(maxX, data.imgOffsetX || 0));
-  data.imgOffsetY = Math.max(-maxY, Math.min(maxY, data.imgOffsetY || 0));
+  // Limite large pour éviter de perdre complètement l'image hors du cadre,
+  // sans forcer l'image à toujours recouvrir tout le conteneur.
+  const limiteX = largeurConteneur * 1.2;
+  const limiteY = hauteurConteneur * 1.2;
+  data.imgOffsetX = Math.max(-limiteX, Math.min(limiteX, data.imgOffsetX || 0));
+  data.imgOffsetY = Math.max(-limiteY, Math.min(limiteY, data.imgOffsetY || 0));
 }
 
 function setZoomImage(val) {
   const livre = livreActuel();
   const data = modeCouverture === "couverture" ? livre.couverture : livre.quatrieme;
   if (!data || !data.imageChemin) return;
-  data.imgZoom = Math.max(1, Math.min(3, parseFloat(val)));
+  data.imgZoom = Math.max(0.3, Math.min(3, parseFloat(val)));
   previewCouverture();
 }
 
@@ -591,7 +593,7 @@ function initGlissementImageCouverture() {
   img.addEventListener("pointerdown", (e) => {
     const livre = livreActuel();
     const data = modeCouverture === "couverture" ? livre.couverture : livre.quatrieme;
-    if (!data || !data.imageChemin || data.imgZoom <= 1) return;
+    if (!data || !data.imageChemin) return;
 
     glissementActif = true;
     glissementDepartX = e.clientX;
@@ -637,7 +639,7 @@ function initGlissementImageCouverture() {
     if (!data || !data.imageChemin) return;
     e.preventDefault();
     const pas = e.deltaY < 0 ? 0.05 : -0.05;
-    data.imgZoom = Math.max(1, Math.min(3, (data.imgZoom || 1) + pas));
+    data.imgZoom = Math.max(0.3, Math.min(3, (data.imgZoom || 1) + pas));
     previewCouverture();
   }, { passive: false });
 }
