@@ -19,8 +19,30 @@ async function lireFichierJSON(nomFichier, token) {
   }
 
   const data = await reponse.json();
-  const contenuDecode = decodeURIComponent(escape(atob(data.content)));
-  return { contenu: JSON.parse(contenuDecode), sha: data.sha };
+
+  if (!data.content) {
+    throw new Error(
+      `Le fichier "${nomFichier}" est trop volumineux pour être lu via l'API GitHub (limite ≈ 1 Mo). ` +
+      `Les images de couverture intégrées en base64 font probablement dépasser cette limite : réduis leur taille ou supprime-les.`
+    );
+  }
+
+  let contenuDecode;
+  try {
+    contenuDecode = decodeURIComponent(escape(atob(data.content)));
+  } catch (e) {
+    throw new Error(`Le contenu de "${nomFichier}" n'a pas pu être décodé (encodage invalide).`);
+  }
+
+  if (!contenuDecode.trim()) {
+    throw new Error(`Le fichier "${nomFichier}" est vide.`);
+  }
+
+  try {
+    return { contenu: JSON.parse(contenuDecode), sha: data.sha };
+  } catch (e) {
+    throw new Error(`Le fichier "${nomFichier}" contient un JSON invalide : ${e.message}`);
+  }
 }
 
 async function seConnecter() {
