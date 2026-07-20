@@ -39,6 +39,27 @@
     break-after: auto;
   }
 
+  /* Mode livret : deux demi-pages côte à côte sur une même feuille */
+  .feuille-impression {
+    display: flex;
+    box-sizing: border-box;
+    overflow: hidden;
+    page-break-after: always;
+    break-after: page;
+    background: white;
+  }
+
+  .feuille-impression:last-child {
+    page-break-after: auto;
+    break-after: auto;
+  }
+
+  .feuille-impression .page-impression {
+    page-break-after: auto;
+    break-after: auto;
+    flex-shrink: 0;
+  }
+
   .texte-impression {
     font-size: 13pt;
     line-height: 1.45;

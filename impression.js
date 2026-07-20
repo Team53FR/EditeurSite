@@ -64,6 +64,80 @@ function exporterImpression() {
   });
 }
 
+// ----- Export livret à agrafer (imposition à cheval) -----
+//
+// Deux pages côte à côte par face de feuille (A4 paysage pour un livre A5),
+// dans l'ordre d'imposition : on imprime recto-verso, on plie la pile en
+// deux, on agrafe au pli, et toutes les pages tombent dans le bon ordre.
+
+function exporterLivret() {
+  flushSpread();
+  const livre = livreActuel();
+  const f = FORMATS[livre.format || "149x210"] || FORMATS["149x210"];
+
+  let stylePage = document.getElementById("stylePageImpression");
+  if (!stylePage) {
+    stylePage = document.createElement("style");
+    stylePage.id = "stylePageImpression";
+    document.head.appendChild(stylePage);
+  }
+  stylePage.textContent = `@page { size: ${f.larg * 2}mm ${f.haut}mm; margin: 0; }`;
+
+  let zone = document.getElementById("zoneImpression");
+  if (zone) zone.remove();
+  zone = document.createElement("div");
+  zone.id = "zoneImpression";
+  document.body.appendChild(zone);
+
+  const margeInt = f.margeH + DELTA_RELIURE_MM;
+  const margeExt = Math.max(6, f.margeH - DELTA_RELIURE_MM);
+  const promessesImages = [];
+
+  // Suite logique du livret : chaque entrée = une demi-feuille.
+  // Position 1 = couverture, position 2 = son verso blanc, puis le texte,
+  // des blanches de complément (total multiple de 4), et la 4e en dernier.
+  const suite = [];
+  suite.push({ type: "couverture" });
+  suite.push({ type: "blanche" });
+  (livre.pages || []).forEach((page, i) => suite.push({ type: "texte", page, numero: i + 1 }));
+  while ((suite.length + 2) % 4 !== 0) suite.push({ type: "blanche" });
+  suite.push({ type: "blanche" });
+  suite.push({ type: "quatrieme" });
+
+  const total = suite.length;
+
+  // Imposition : feuille k, recto = [dernière-2k | 2k+1], verso = [2k+2 | dernière-2k-1]
+  for (let k = 0; k < total / 4; k++) {
+    zone.appendChild(creerFaceLivret(suite[total - 2 * k - 1], suite[2 * k], livre, f, margeInt, margeExt, promessesImages));
+    zone.appendChild(creerFaceLivret(suite[2 * k + 1], suite[total - 2 * k - 2], livre, f, margeInt, margeExt, promessesImages));
+  }
+
+  const message = document.getElementById("message");
+  if (message) message.textContent = "Préparation de l'impression...";
+
+  Promise.all(promessesImages).finally(() => {
+    if (message) message.textContent = "";
+    window.print();
+  });
+}
+
+function creerFaceLivret(demiGauche, demiDroite, livre, f, margeInt, margeExt, promessesImages) {
+  const feuille = document.createElement("div");
+  feuille.className = "feuille-impression";
+  feuille.style.width = (f.larg * 2) + "mm";
+  feuille.style.height = f.haut + "mm";
+  feuille.appendChild(creerDemiPageLivret(demiGauche, livre, f, margeInt, margeExt, promessesImages));
+  feuille.appendChild(creerDemiPageLivret(demiDroite, livre, f, margeInt, margeExt, promessesImages));
+  return feuille;
+}
+
+function creerDemiPageLivret(demi, livre, f, margeInt, margeExt, promessesImages) {
+  if (!demi || demi.type === "blanche") return creerPageBlancheImpression(f);
+  if (demi.type === "couverture") return creerCouvertureImpression(livre, "couverture", f, promessesImages);
+  if (demi.type === "quatrieme") return creerCouvertureImpression(livre, "quatrieme", f, promessesImages);
+  return creerPageTexteImpression(demi.page, demi.numero, f, margeInt, margeExt);
+}
+
 function creerPageBlancheImpression(f) {
   const div = document.createElement("div");
   div.className = "page-impression";
