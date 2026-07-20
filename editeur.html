@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital@0;1&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="impression.css">
 </head>
 <body>
   <div class="conteneur-livre">
@@ -21,7 +22,8 @@
 
       <div class="sommaire-separateur"></div>
 
-      <button onclick="ouvrirApercu()" class="secondaire petit" style="width:100%;margin-bottom:10px;">👁 Mode aperçu</button>
+      <button onclick="ouvrirApercu()" class="secondaire petit" style="width:100%;margin-bottom:6px;">👁 Mode aperçu</button>
+      <button onclick="exporterImpression()" class="secondaire petit" style="width:100%;margin-bottom:10px;">🖨 Imprimer / PDF</button>
 
       <ul id="listePages"></ul>
 
@@ -175,5 +177,6 @@
 
   <script src="script.js"></script>
   <script src="editeur.js"></script>
+  <script src="impression.js"></script>
 </body>
 </html>

@@ -1,0 +1,104 @@
+/* ----- Export impression : visible uniquement à l'impression ----- */
+
+#zoneImpression {
+  display: none;
+}
+
+@media print {
+  body {
+    display: block;
+    height: auto;
+    overflow: visible;
+    background: white;
+    margin: 0;
+  }
+
+  .conteneur-livre,
+  #mesureCachee {
+    display: none !important;
+  }
+
+  #zoneImpression {
+    display: block;
+  }
+
+  .page-impression {
+    position: relative;
+    box-sizing: border-box;
+    overflow: hidden;
+    page-break-after: always;
+    break-after: page;
+    background: white;
+    font-family: "EB Garamond", Georgia, serif;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .page-impression:last-child {
+    page-break-after: auto;
+    break-after: auto;
+  }
+
+  .texte-impression {
+    font-size: 13pt;
+    line-height: 1.45;
+    color: #1a1a1a;
+    overflow: hidden;
+    text-align: justify;
+    hyphens: auto;
+    -webkit-hyphens: auto;
+  }
+
+  .texte-impression p {
+    margin: 0 0 6px 0;
+  }
+
+  .numero-impression {
+    position: absolute;
+    bottom: 6mm;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 10pt;
+    color: #333;
+  }
+
+  .couverture-impression {
+    overflow: hidden;
+  }
+
+  .image-couverture-impression {
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform-origin: center center;
+  }
+
+  .textes-couverture-impression {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    align-items: center;
+    padding: 18mm 12mm;
+    box-sizing: border-box;
+  }
+
+  .titre-impression {
+    font-size: 22pt;
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 6mm;
+    letter-spacing: 0.05em;
+    word-break: break-word;
+  }
+
+  .auteur-impression {
+    font-size: 12pt;
+    text-align: center;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    opacity: 0.85;
+  }
+}
