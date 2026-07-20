@@ -447,8 +447,8 @@ function ouvrirCouverture(mode) {
   flushSpread();
   modeCouverture = mode;
   const livre = livreActuel();
-  if (!livre.couverture) livre.couverture = { fond: "#1a1a2e", image: null, imageChemin: null, texte: "#ffffff" };
-  if (!livre.quatrieme) livre.quatrieme = { fond: "#2a2a2a", image: null, imageChemin: null, texte: "#ffffff", contenu: "" };
+  if (!livre.couverture) livre.couverture = { fond: "#1a1a2e", image: null, imageChemin: null, texte: "#ffffff", afficherTitre: true, afficherAuteur: true };
+  if (!livre.quatrieme) livre.quatrieme = { fond: "#2a2a2a", image: null, imageChemin: null, texte: "#ffffff", contenu: "", afficherAuteur: true };
 
   const data = mode === "couverture" ? livre.couverture : livre.quatrieme;
 
@@ -551,11 +551,30 @@ function previewCouverture() {
   }
 
   const couleurTexte = data.texte || "#ffffff";
+  const afficherTitre = data.afficherTitre !== false;
+  const afficherAuteur = data.afficherAuteur !== false;
+
+  const toggleTitreInput = document.getElementById("toggleTitre");
+  const toggleAuteurInput = document.getElementById("toggleAuteur");
+  const ligneToggleTitre = document.getElementById("ligneToggleTitre");
+  if (toggleTitreInput) toggleTitreInput.checked = afficherTitre;
+  if (toggleAuteurInput) toggleAuteurInput.checked = afficherAuteur;
+  if (ligneToggleTitre) ligneToggleTitre.style.display = mode === "couverture" ? "block" : "none";
+
   const apercu = document.getElementById("previewCouverture");
   apercu.innerHTML = `
-    ${mode === "couverture" ? `<div class="apercu-titre" style="color:${couleurTexte}">${livre.titre || "Titre"}</div>` : ""}
-    <div class="apercu-auteur" style="color:${couleurTexte}">${livre.auteur || "Auteur"}</div>
+    ${mode === "couverture" && afficherTitre ? `<div class="apercu-titre" style="color:${couleurTexte}">${livre.titre || "Titre"}</div>` : ""}
+    ${afficherAuteur ? `<div class="apercu-auteur" style="color:${couleurTexte}">${livre.auteur || "Auteur"}</div>` : ""}
   `;
+}
+
+function toggleAffichageTexte(champ, valeur) {
+  const livre = livreActuel();
+  const data = modeCouverture === "couverture" ? livre.couverture : livre.quatrieme;
+  if (!data) return;
+  if (champ === "titre") data.afficherTitre = valeur;
+  else if (champ === "auteur") data.afficherAuteur = valeur;
+  previewCouverture();
 }
 
 // Affiche l'image en s'assurant qu'elle est bien chargée avant de la positionner

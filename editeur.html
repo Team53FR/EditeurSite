@@ -93,6 +93,19 @@
             <label class="label-couv">Auteur</label>
             <input type="text" id="champAuteurCouv" placeholder="Nom de l'auteur" oninput="previewCouverture()">
 
+            <div class="ligne-toggle" id="ligneToggleTitre">
+              <label class="toggle-ligne">
+                <input type="checkbox" id="toggleTitre" onchange="toggleAffichageTexte('titre', this.checked)">
+                Afficher le titre sur la couverture
+              </label>
+            </div>
+            <div class="ligne-toggle">
+              <label class="toggle-ligne">
+                <input type="checkbox" id="toggleAuteur" onchange="toggleAffichageTexte('auteur', this.checked)">
+                Afficher l'auteur sur la couverture
+              </label>
+            </div>
+
             <label class="label-couv">Couleur de fond</label>
             <div class="choix-couleurs">
               <div class="pastille" style="background:#1a1a2e;" onclick="setCouleurFond('#1a1a2e')" title="Nuit"></div>
