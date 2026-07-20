@@ -527,7 +527,7 @@ function previewCouverture() {
     valeurZoom.textContent = Math.round(data.imgZoom * 100) + "%";
 
     if (cacheImagesURL[cheminImage]) {
-      afficherImageCouverture(cacheImagesURL[cheminImage]);
+      afficherImageCouverture(cacheImagesURL[cheminImage], cheminImage);
     } else {
       img.style.display = "none";
       const token = sessionStorage.getItem("gh_token");
@@ -585,15 +585,46 @@ function toggleAffichageTexte(champ, valeur) {
 
 // Affiche l'image en s'assurant qu'elle est bien chargée avant de la positionner
 // (naturalWidth/naturalHeight ne sont disponibles qu'une fois l'image chargée).
-function afficherImageCouverture(url) {
+// En cas d'échec (URL expirée, coupure réseau...), invalide le cache et retente
+// automatiquement quelques fois avant d'abandonner avec un message clair.
+let tentativesEchecImage = {};
+
+function afficherImageCouverture(url, chemin) {
   const img = document.getElementById("imageFondCouverture");
   img.style.display = "block";
+
   if (img.src === url && img.complete && img.naturalWidth) {
     repositionnerImageCouverture();
-  } else {
-    img.onload = () => repositionnerImageCouverture();
-    img.src = url;
+    return;
   }
+
+  img.onload = () => {
+    tentativesEchecImage[chemin] = 0;
+    const messageCouv = document.getElementById("messageCouv");
+    if (messageCouv && messageCouv.textContent.startsWith("Erreur de chargement")) {
+      messageCouv.textContent = "";
+    }
+    repositionnerImageCouverture();
+  };
+
+  img.onerror = () => {
+    delete cacheImagesURL[chemin];
+    const tentatives = (tentativesEchecImage[chemin] || 0) + 1;
+    tentativesEchecImage[chemin] = tentatives;
+    const messageCouv = document.getElementById("messageCouv");
+
+    if (tentatives <= 3) {
+      if (messageCouv) messageCouv.textContent = "Erreur de chargement de l'image, nouvelle tentative...";
+      previewCouverture();
+    } else {
+      if (messageCouv) {
+        messageCouv.textContent = "Impossible de charger l'image après plusieurs tentatives. Vérifie ta connexion, ou réimporte-la via \"Choisir un fichier\".";
+      }
+      img.style.display = "none";
+    }
+  };
+
+  img.src = url;
 }
 
 // Calcule la taille "image entière visible" (comme object-fit: contain) puis
@@ -926,11 +957,11 @@ function creerPageCouvertureApercu(mode) {
 
     const token = sessionStorage.getItem("gh_token");
     if (cacheImagesURL[data.imageChemin]) {
-      positionnerImageApercu(img, data, cacheImagesURL[data.imageChemin], page);
+      positionnerImageApercu(img, data, cacheImagesURL[data.imageChemin], page, data.imageChemin);
     } else {
       obtenirUrlImage(data.imageChemin, token).then((url) => {
         cacheImagesURL[data.imageChemin] = url;
-        positionnerImageApercu(img, data, url, page);
+        positionnerImageApercu(img, data, url, page, data.imageChemin);
       }).catch(() => {});
     }
   }
@@ -950,7 +981,7 @@ function creerPageCouvertureApercu(mode) {
   return page;
 }
 
-function positionnerImageApercu(img, data, url, page) {
+function positionnerImageApercu(img, data, url, page, chemin, dejaRetente) {
   img.onload = () => {
     const largeurConteneur = page.clientWidth;
     const hauteurConteneur = page.clientHeight;
@@ -964,6 +995,15 @@ function positionnerImageApercu(img, data, url, page) {
     img.style.width = largeurAffichee + "px";
     img.style.height = hauteurAffichee + "px";
     img.style.transform = `translate(${centreX + (data.imgOffsetX || 0)}px, ${centreY + (data.imgOffsetY || 0)}px) scale(${zoom})`;
+  };
+  img.onerror = () => {
+    if (dejaRetente) return; // on ne retente qu'une fois pour éviter une boucle
+    delete cacheImagesURL[chemin];
+    const token = sessionStorage.getItem("gh_token");
+    obtenirUrlImage(chemin, token).then((nouvelleUrl) => {
+      cacheImagesURL[chemin] = nouvelleUrl;
+      positionnerImageApercu(img, data, nouvelleUrl, page, chemin, true);
+    }).catch(() => {});
   };
   img.src = url;
 }
