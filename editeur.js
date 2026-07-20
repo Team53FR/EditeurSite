@@ -476,15 +476,16 @@ function ouvrirCouverture(mode) {
     inputTitre.style.display = "";
   }
 
-  previewCouverture();
-
   document.getElementById("vueEditeur").style.display = "none";
   document.getElementById("vueCouverture").style.display = "flex";
   document.getElementById("btnCouv").classList.toggle("actif", mode === "couverture");
   document.getElementById("btnQuatr").classList.toggle("actif", mode === "quatrieme");
 
-  // Appliquer le bon format
+  // Appliquer le bon format avant de positionner l'image, pour que le conteneur
+  // ait déjà ses dimensions réelles (sinon l'image se positionne sur une taille nulle).
   appliquerFormatPage(livreActuel().format || "149x210");
+
+  previewCouverture();
 }
 
 function fermerCouverture() {
