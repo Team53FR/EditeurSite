@@ -119,6 +119,7 @@ async function chargerLivre() {
     window.addEventListener("resize", () => {
       appliquerFormatPage(formatCourant);
       if (modeCouverture) repositionnerImageCouverture();
+      if (modeApercu) afficherApercu();
     });
     indexSpread = 0;
 
@@ -795,6 +796,177 @@ function seDeconnecter() {
   sessionStorage.removeItem("livre_id");
   window.location.href = "index.html";
 }
+
+// ----- Mode aperçu -----
+
+let modeApercu = false;
+let indexApercu = 0; // 0 = couverture ; 1..nbSpreads = pages intérieures ; nbSpreads+1 = 4e de couverture
+
+function nombreSpreadsApercu() {
+  const pages = livreActuel().pages;
+  return Math.max(1, Math.ceil(pages.length / 2));
+}
+
+function ouvrirApercu() {
+  flushSpread();
+  modeApercu = true;
+  indexApercu = 0;
+
+  document.getElementById("vueEditeur").style.display = "none";
+  document.getElementById("vueCouverture").style.display = "none";
+  document.getElementById("vueApercu").style.display = "flex";
+
+  afficherApercu();
+}
+
+function fermerApercu() {
+  modeApercu = false;
+  document.getElementById("vueApercu").style.display = "none";
+  document.getElementById("vueEditeur").style.display = "flex";
+  appliquerFormatPage(livreActuel().format || "149x210");
+  afficherSpread();
+  afficherSommaire();
+}
+
+function apercuSuivant() {
+  const derniere = nombreSpreadsApercu() + 1;
+  if (indexApercu < derniere) {
+    indexApercu++;
+    afficherApercu();
+  }
+}
+
+function apercuPrecedent() {
+  if (indexApercu > 0) {
+    indexApercu--;
+    afficherApercu();
+  }
+}
+
+function afficherApercu() {
+  const livre = livreActuel();
+  const conteneur = document.getElementById("conteneurApercu");
+  const indicateur = document.getElementById("indicateurApercu");
+  const btnPrec = document.getElementById("btnApercuPrec");
+  const btnSuiv = document.getElementById("btnApercuSuiv");
+  const nbSpreads = nombreSpreadsApercu();
+  const derniere = nbSpreads + 1;
+
+  conteneur.innerHTML = "";
+  btnPrec.disabled = indexApercu === 0;
+  btnSuiv.disabled = indexApercu === derniere;
+
+  if (indexApercu === 0) {
+    indicateur.textContent = "Couverture";
+    conteneur.appendChild(creerPageCouvertureApercu("couverture"));
+  } else if (indexApercu === derniere) {
+    indicateur.textContent = "4e de couverture";
+    conteneur.appendChild(creerPageCouvertureApercu("quatrieme"));
+  } else {
+    const iGauche = (indexApercu - 1) * 2;
+    const iDroite = iGauche + 1;
+    const pages = livre.pages;
+
+    indicateur.textContent = pages[iDroite] ? `Pages ${iGauche + 1} - ${iDroite + 1}` : `Page ${iGauche + 1}`;
+
+    conteneur.appendChild(creerPageTexteApercu(pages[iGauche], iGauche + 1));
+    conteneur.appendChild(creerPageTexteApercu(pages[iDroite], pages[iDroite] ? iDroite + 1 : ""));
+  }
+
+  appliquerFormatPage(livre.format || "149x210");
+}
+
+function creerPageTexteApercu(page, numero) {
+  const div = document.createElement("div");
+  div.className = "page-livre";
+
+  const texte = document.createElement("div");
+  texte.className = "texte-livre";
+  texte.innerHTML = page ? page.contenu : "";
+  div.appendChild(texte);
+
+  const num = document.createElement("div");
+  num.className = "numero-page";
+  num.textContent = numero;
+  div.appendChild(num);
+
+  return div;
+}
+
+function creerPageCouvertureApercu(mode) {
+  const livre = livreActuel();
+  const data = mode === "couverture" ? livre.couverture : livre.quatrieme;
+
+  const page = document.createElement("div");
+  page.className = "page-livre";
+  page.style.position = "relative";
+  page.style.overflow = "hidden";
+
+  const fond = document.createElement("div");
+  fond.style.position = "absolute";
+  fond.style.inset = "0";
+  fond.style.background = (data && data.fond) || "#1a1a2e";
+  page.appendChild(fond);
+
+  if (data && data.imageChemin) {
+    const img = document.createElement("img");
+    img.draggable = false;
+    img.style.position = "absolute";
+    img.style.top = "0";
+    img.style.left = "0";
+    img.style.userSelect = "none";
+    page.appendChild(img);
+
+    const token = sessionStorage.getItem("gh_token");
+    if (cacheImagesURL[data.imageChemin]) {
+      positionnerImageApercu(img, data, cacheImagesURL[data.imageChemin], page);
+    } else {
+      obtenirUrlImage(data.imageChemin, token).then((url) => {
+        cacheImagesURL[data.imageChemin] = url;
+        positionnerImageApercu(img, data, url, page);
+      }).catch(() => {});
+    }
+  }
+
+  const couche = document.createElement("div");
+  couche.className = "apercu-couverture";
+  couche.style.pointerEvents = "none";
+  const couleurTexte = (data && data.texte) || "#ffffff";
+  const afficherTitre = !data || data.afficherTitre !== false;
+  const afficherAuteur = !data || data.afficherAuteur !== false;
+  couche.innerHTML = `
+    ${mode === "couverture" && afficherTitre ? `<div class="apercu-titre" style="color:${couleurTexte}">${livre.titre || "Titre"}</div>` : ""}
+    ${afficherAuteur ? `<div class="apercu-auteur" style="color:${couleurTexte}">${livre.auteur || "Auteur"}</div>` : ""}
+  `;
+  page.appendChild(couche);
+
+  return page;
+}
+
+function positionnerImageApercu(img, data, url, page) {
+  img.onload = () => {
+    const largeurConteneur = page.clientWidth;
+    const hauteurConteneur = page.clientHeight;
+    if (!largeurConteneur || !hauteurConteneur) return;
+    const echelleBase = Math.min(largeurConteneur / img.naturalWidth, hauteurConteneur / img.naturalHeight);
+    const zoom = data.imgZoom || 1;
+    const largeurAffichee = img.naturalWidth * echelleBase;
+    const hauteurAffichee = img.naturalHeight * echelleBase;
+    const centreX = (largeurConteneur - largeurAffichee) / 2;
+    const centreY = (hauteurConteneur - hauteurAffichee) / 2;
+    img.style.width = largeurAffichee + "px";
+    img.style.height = hauteurAffichee + "px";
+    img.style.transform = `translate(${centreX + (data.imgOffsetX || 0)}px, ${centreY + (data.imgOffsetY || 0)}px) scale(${zoom})`;
+  };
+  img.src = url;
+}
+
+document.addEventListener("keydown", (e) => {
+  if (!modeApercu) return;
+  if (e.key === "ArrowRight") apercuSuivant();
+  else if (e.key === "ArrowLeft") apercuPrecedent();
+  else if (e.key === "Escape") fermerApercu();
+});
 
 chargerLivre();
 initGlissementImageCouverture();

@@ -21,6 +21,8 @@
 
       <div class="sommaire-separateur"></div>
 
+      <button onclick="ouvrirApercu()" class="secondaire petit" style="width:100%;margin-bottom:10px;">👁 Mode aperçu</button>
+
       <ul id="listePages"></ul>
 
       <div class="sommaire-actions">
@@ -147,6 +149,24 @@
       </div>
 
       <p id="messageCouv" class="message"></p>
+    </div>
+
+    <!-- Vue aperçu / lecture -->
+    <div class="zone-livre" id="vueApercu" style="display:none;">
+
+      <div class="barre-outils">
+        <span style="font-size:13px;color:#555;font-weight:600;">👁 Mode aperçu</span>
+      </div>
+
+      <div class="livre-ouvert" id="conteneurApercu"></div>
+
+      <div class="barre-actions">
+        <button onclick="apercuPrecedent()" id="btnApercuPrec">&#8592; Précédent</button>
+        <button onclick="fermerApercu()" class="secondaire">Fermer l'aperçu</button>
+        <button onclick="apercuSuivant()" id="btnApercuSuiv">Suivant &#8594;</button>
+      </div>
+
+      <p id="indicateurApercu" class="message" style="color:#666;"></p>
     </div>
 
   </div>
