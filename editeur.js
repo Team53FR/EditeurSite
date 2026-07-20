@@ -445,6 +445,11 @@ function retourBibliotheque() {
 // ----- Couverture -----
 
 function ouvrirCouverture(mode) {
+  if (modeApercu) {
+    modeApercu = false;
+    document.getElementById("vueApercu").style.display = "none";
+    document.querySelector(".sommaire").style.display = "";
+  }
   flushSpread();
   modeCouverture = mode;
   const livre = livreActuel();
@@ -815,6 +820,7 @@ function ouvrirApercu() {
   document.getElementById("vueEditeur").style.display = "none";
   document.getElementById("vueCouverture").style.display = "none";
   document.getElementById("vueApercu").style.display = "flex";
+  document.querySelector(".sommaire").style.display = "none";
 
   afficherApercu();
 }
@@ -823,6 +829,7 @@ function fermerApercu() {
   modeApercu = false;
   document.getElementById("vueApercu").style.display = "none";
   document.getElementById("vueEditeur").style.display = "flex";
+  document.querySelector(".sommaire").style.display = "";
   appliquerFormatPage(livreActuel().format || "149x210");
   afficherSpread();
   afficherSommaire();
