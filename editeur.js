@@ -1,7 +1,6 @@
-const NOM_FICHIER_BIBLIO = "bibliotheque.json";
-
 let bibliotheque = null;
 let shaBiblio = null;
+let nomFichierBiblio = null;
 let livreId = null;
 let indexLivre = -1;
 let indexSpread = 0;
@@ -91,14 +90,15 @@ async function chargerLivre() {
   const message = document.getElementById("message");
 
   livreId = sessionStorage.getItem("livre_id");
+  nomFichierBiblio = obtenirNomFichierBibliotheque();
 
-  if (!token || !livreId) {
+  if (!token || !livreId || !nomFichierBiblio) {
     window.location.href = "bibliotheque.html";
     return;
   }
 
   try {
-    const { contenu, sha } = await lireFichierJSON(NOM_FICHIER_BIBLIO, token);
+    const { contenu, sha } = await lireFichierJSON(nomFichierBiblio, token);
     bibliotheque = contenu;
     shaBiblio = sha;
 
@@ -408,29 +408,8 @@ async function sauvegarder() {
   afficherSpread();
   afficherSommaire();
 
-  const contenuEncode = btoa(unescape(encodeURIComponent(JSON.stringify(bibliotheque, null, 2))));
-  const url = `https://api.github.com/repos/${PROPRIETAIRE}/${DEPOT_BDD}/contents/${NOM_FICHIER_BIBLIO}`;
-
   try {
-    const reponse = await fetch(url, {
-      method: "PUT",
-      headers: {
-        "Authorization": `Bearer ${token}`,
-        "Accept": "application/vnd.github+json"
-      },
-      body: JSON.stringify({
-        message: "Mise à jour du livre",
-        content: contenuEncode,
-        sha: shaBiblio
-      })
-    });
-
-    if (!reponse.ok) {
-      throw new Error("Échec de la sauvegarde. Vérifie ton token.");
-    }
-
-    const data = await reponse.json();
-    shaBiblio = data.content.sha;
+    shaBiblio = await ecrireFichierJSON(nomFichierBiblio, bibliotheque, shaBiblio, token, "Mise à jour du livre");
     message.textContent = "Sauvegardé avec succès.";
   } catch (erreur) {
     message.textContent = erreur.message;
@@ -783,7 +762,7 @@ function chargerImageFond(event) {
   reader.onload = async (e) => {
     const dataUrl = e.target.result;
     const extension = extraireExtensionDataUrl(dataUrl);
-    const chemin = `images/${livre.id}_${modeCourant}.${extension}`;
+    const chemin = `${obtenirPrefixeImagesUtilisateur()}/${livre.id}_${modeCourant}.${extension}`;
 
     messageCouv.textContent = "Envoi de l'image en cours...";
     try {
@@ -830,6 +809,7 @@ function supprimerImageFond() {
 
 function seDeconnecter() {
   sessionStorage.removeItem("gh_token");
+  sessionStorage.removeItem("gh_login");
   sessionStorage.removeItem("livre_id");
   window.location.href = "index.html";
 }

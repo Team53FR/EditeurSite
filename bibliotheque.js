@@ -1,19 +1,20 @@
-const NOM_FICHIER_BIBLIO = "bibliotheque.json";
-
 let bibliotheque = null;
 let shaBiblio = null;
+let nomFichierBiblio = null;
 
 async function chargerBibliotheque() {
   const token = sessionStorage.getItem("gh_token");
   const message = document.getElementById("message");
 
-  if (!token) {
+  nomFichierBiblio = obtenirNomFichierBibliotheque();
+
+  if (!token || !nomFichierBiblio) {
     window.location.href = "index.html";
     return;
   }
 
   try {
-    const { contenu, sha } = await lireFichierJSON(NOM_FICHIER_BIBLIO, token);
+    const { contenu, sha } = await lireFichierJSON(nomFichierBiblio, token);
     bibliotheque = contenu;
     shaBiblio = sha;
   } catch (erreur) {
@@ -33,7 +34,7 @@ async function chargerBibliotheque() {
     const modifie = await migrerImagesEmbarquees(token);
     if (modifie) {
       message.textContent = "Optimisation des images de couverture en cours...";
-      shaBiblio = await ecrireFichierJSON(NOM_FICHIER_BIBLIO, bibliotheque, shaBiblio, token, "Migration des images de couverture vers des fichiers séparés");
+      shaBiblio = await ecrireFichierJSON(nomFichierBiblio, bibliotheque, shaBiblio, token, "Migration des images de couverture vers des fichiers séparés");
       message.textContent = "Images de couverture optimisées avec succès.";
     }
   } catch (erreur) {
@@ -45,12 +46,13 @@ async function chargerBibliotheque() {
 
 async function migrerImagesEmbarquees(token) {
   let modifie = false;
+  const prefixe = obtenirPrefixeImagesUtilisateur();
   for (const livre of bibliotheque.livres) {
     for (const cle of ["couverture", "quatrieme"]) {
       const data = livre[cle];
       if (data && typeof data.image === "string" && data.image.startsWith("data:")) {
         const extension = extraireExtensionDataUrl(data.image);
-        const chemin = `images/${livre.id}_${cle}.${extension}`;
+        const chemin = `${prefixe}/${livre.id}_${cle}.${extension}`;
         await uploaderImageBase64(chemin, data.image, token, `Migration de l'image ${chemin}`);
         data.imageChemin = chemin;
         delete data.image;
@@ -124,7 +126,7 @@ async function creerLivre() {
   });
 
   try {
-    shaBiblio = await ecrireFichierJSON(NOM_FICHIER_BIBLIO, bibliotheque, shaBiblio, token, "Ajout d'un nouveau livre");
+    shaBiblio = await ecrireFichierJSON(nomFichierBiblio, bibliotheque, shaBiblio, token, "Ajout d'un nouveau livre");
     champTitre.value = "";
     afficherListeLivres();
     message.textContent = "Livre créé avec succès.";
@@ -144,7 +146,7 @@ async function supprimerLivre(id) {
   bibliotheque.livres = bibliotheque.livres.filter(l => l.id !== id);
 
   try {
-    shaBiblio = await ecrireFichierJSON(NOM_FICHIER_BIBLIO, bibliotheque, shaBiblio, token, "Suppression d'un livre");
+    shaBiblio = await ecrireFichierJSON(nomFichierBiblio, bibliotheque, shaBiblio, token, "Suppression d'un livre");
     afficherListeLivres();
     message.textContent = "Livre supprimé.";
 
@@ -163,6 +165,7 @@ async function supprimerLivre(id) {
 
 function seDeconnecter() {
   sessionStorage.removeItem("gh_token");
+  sessionStorage.removeItem("gh_login");
   sessionStorage.removeItem("livre_id");
   window.location.href = "index.html";
 }

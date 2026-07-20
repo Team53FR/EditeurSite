@@ -153,6 +153,25 @@ async function obtenirUrlImage(chemin, token) {
   throw new Error(`Image "${chemin}" introuvable.`);
 }
 
+function slugifierLogin(login) {
+  return (login || "")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // enlever les accents
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9_-]+/g, "_");
+}
+
+function obtenirNomFichierBibliotheque() {
+  const login = sessionStorage.getItem("gh_login");
+  if (!login) return null;
+  return `bibliotheques/${slugifierLogin(login)}.json`;
+}
+
+function obtenirPrefixeImagesUtilisateur() {
+  const login = sessionStorage.getItem("gh_login");
+  return `images/${slugifierLogin(login)}`;
+}
+
 async function seConnecter() {
   const login = document.getElementById("login").value.trim();
   const password = document.getElementById("password").value;
@@ -176,6 +195,7 @@ async function seConnecter() {
     if (utilisateurValide) {
       // Le token reste UNIQUEMENT en mémoire de session (jamais écrit dans un fichier)
       sessionStorage.setItem("gh_token", token);
+      sessionStorage.setItem("gh_login", login);
       window.location.href = "bibliotheque.html";
     } else {
       message.textContent = "Identifiants incorrects.";
