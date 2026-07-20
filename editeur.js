@@ -116,7 +116,10 @@ async function chargerLivre() {
     document.getElementById("titreLivre").textContent = livre.titre || "Mon livre";
     const formatCourant = livre.format || "149x210";
     appliquerFormatPage(formatCourant);
-    window.addEventListener("resize", () => appliquerFormatPage(formatCourant));
+    window.addEventListener("resize", () => {
+      appliquerFormatPage(formatCourant);
+      if (modeCouverture) repositionnerImageCouverture();
+    });
     indexSpread = 0;
 
     document.execCommand("defaultParagraphSeparator", false, "p");
@@ -517,14 +520,8 @@ function previewCouverture() {
     slider.value = data.imgZoom;
     valeurZoom.textContent = Math.round(data.imgZoom * 100) + "%";
 
-    const conteneur = document.getElementById("previewCouv");
-    clampOffsetsCouv(data, conteneur.clientWidth, conteneur.clientHeight);
-
     if (cacheImagesURL[cheminImage]) {
-      img.src = cacheImagesURL[cheminImage];
-      img.style.display = "block";
-      img.style.transform = `translate(${data.imgOffsetX}px, ${data.imgOffsetY}px) scale(${data.imgZoom})`;
-      img.style.cursor = "grab";
+      afficherImageCouverture(cacheImagesURL[cheminImage]);
     } else {
       img.style.display = "none";
       const token = sessionStorage.getItem("gh_token");
@@ -561,6 +558,50 @@ function previewCouverture() {
   `;
 }
 
+// Affiche l'image en s'assurant qu'elle est bien chargée avant de la positionner
+// (naturalWidth/naturalHeight ne sont disponibles qu'une fois l'image chargée).
+function afficherImageCouverture(url) {
+  const img = document.getElementById("imageFondCouverture");
+  img.style.display = "block";
+  if (img.src === url && img.complete && img.naturalWidth) {
+    repositionnerImageCouverture();
+  } else {
+    img.onload = () => repositionnerImageCouverture();
+    img.src = url;
+  }
+}
+
+// Calcule la taille "image entière visible" (comme object-fit: contain) puis
+// applique le zoom et le déplacement choisis par-dessus, sans jamais perdre
+// de pixels de l'image d'origine.
+function repositionnerImageCouverture() {
+  const img = document.getElementById("imageFondCouverture");
+  const conteneur = document.getElementById("previewCouv");
+  if (!img.naturalWidth || !img.naturalHeight || !conteneur) return;
+
+  const livre = livreActuel();
+  const data = modeCouverture === "couverture" ? livre.couverture : livre.quatrieme;
+  if (!data) return;
+
+  clampOffsetsCouv(data, conteneur.clientWidth, conteneur.clientHeight);
+
+  const echelleBase = Math.min(
+    conteneur.clientWidth / img.naturalWidth,
+    conteneur.clientHeight / img.naturalHeight
+  );
+  const largeurAffichee = img.naturalWidth * echelleBase;
+  const hauteurAffichee = img.naturalHeight * echelleBase;
+
+  img.style.width = largeurAffichee + "px";
+  img.style.height = hauteurAffichee + "px";
+
+  const centreX = (conteneur.clientWidth - largeurAffichee) / 2;
+  const centreY = (conteneur.clientHeight - hauteurAffichee) / 2;
+
+  img.style.transform = `translate(${centreX + data.imgOffsetX}px, ${centreY + data.imgOffsetY}px) scale(${data.imgZoom})`;
+  img.style.cursor = "grab";
+}
+
 function clampOffsetsCouv(data, largeurConteneur, hauteurConteneur) {
   // Limite large pour éviter de perdre complètement l'image hors du cadre,
   // sans forcer l'image à toujours recouvrir tout le conteneur.
@@ -575,7 +616,8 @@ function setZoomImage(val) {
   const data = modeCouverture === "couverture" ? livre.couverture : livre.quatrieme;
   if (!data || !data.imageChemin) return;
   data.imgZoom = Math.max(0.3, Math.min(3, parseFloat(val)));
-  previewCouverture();
+  document.getElementById("valeurZoom").textContent = Math.round(data.imgZoom * 100) + "%";
+  repositionnerImageCouverture();
 }
 
 // ----- Glisser-déposer de l'image de couverture -----
@@ -616,9 +658,7 @@ function initGlissementImageCouverture() {
     data.imgOffsetX = glissementOffsetDepartX + deltaX;
     data.imgOffsetY = glissementOffsetDepartY + deltaY;
 
-    const conteneur = document.getElementById("previewCouv");
-    clampOffsetsCouv(data, conteneur.clientWidth, conteneur.clientHeight);
-    img.style.transform = `translate(${data.imgOffsetX}px, ${data.imgOffsetY}px) scale(${data.imgZoom})`;
+    repositionnerImageCouverture();
   });
 
   const finGlissement = (e) => {
@@ -632,7 +672,7 @@ function initGlissementImageCouverture() {
   img.addEventListener("pointerup", finGlissement);
   img.addEventListener("pointercancel", finGlissement);
 
-  // Molette de la souris pour zoomer rapidement
+  // Molette de la souris pour zoomer/dézoomer rapidement
   img.addEventListener("wheel", (e) => {
     const livre = livreActuel();
     const data = modeCouverture === "couverture" ? livre.couverture : livre.quatrieme;
@@ -640,7 +680,9 @@ function initGlissementImageCouverture() {
     e.preventDefault();
     const pas = e.deltaY < 0 ? 0.05 : -0.05;
     data.imgZoom = Math.max(0.3, Math.min(3, (data.imgZoom || 1) + pas));
-    previewCouverture();
+    document.getElementById("sliderZoom").value = data.imgZoom;
+    document.getElementById("valeurZoom").textContent = Math.round(data.imgZoom * 100) + "%";
+    repositionnerImageCouverture();
   }, { passive: false });
 }
 
