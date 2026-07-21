@@ -31,9 +31,19 @@
 
       <div class="sommaire-separateur"></div>
 
+      <label class="label-format" for="selectFormat">Format du livre</label>
+      <select id="selectFormat" class="select-format" onchange="changerFormat(this.value)">
+        <option value="149x210">Roman — 14,9 × 21,0 cm</option>
+        <option value="155x235">Grand roman — 15,5 × 23,5 cm</option>
+        <option value="105x148">Poche — 10,5 × 14,8 cm</option>
+        <option value="210x297">A4 — 21,0 × 29,7 cm</option>
+      </select>
+
+      <div class="sommaire-separateur"></div>
+
       <button onclick="ouvrirApercu()" class="secondaire petit" style="width:100%;margin-bottom:6px;">👁 Mode aperçu</button>
       <button onclick="exporterLivret()" class="secondaire petit" style="width:100%;margin-bottom:6px;">🖨 Livret à agrafer</button>
-      <button onclick="exporterImpression()" class="secondaire petit" style="width:100%;margin-bottom:10px;">🖨 Page à page (dos collé)</button>
+      <button onclick="exporterImpression()" class="secondaire petit" style="width:100%;margin-bottom:10px;display:none;">🖨 Page à page (dos collé)</button>
 
       <ul id="listePages"></ul>
 

@@ -159,8 +159,11 @@ async function chargerLivre() {
     if (btnOuvrir) btnOuvrir.style.display = sommaireReduite ? "flex" : "none";
 
     appliquerFormatPage(formatCourant);
+    const selFormat = document.getElementById("selectFormat");
+    if (selFormat) selFormat.value = formatCourant;
     window.addEventListener("resize", () => {
-      appliquerFormatPage(formatCourant);
+      // Lire le format courant du livre (il peut changer via le sélecteur)
+      appliquerFormatPage(livreActuel().format || "149x210");
       if (modeCouverture) repositionnerImageCouverture();
       if (modeApercu) afficherApercu();
     });
@@ -572,6 +575,40 @@ function pageSuivante() {
   indexSpread += 2;
   afficherSpread();
   afficherSommaire();
+}
+
+// Changer le format du livre existant : on ré-applique le format (nouvelles
+// dimensions de page) puis on re-paginate tout le texte, car la hauteur utile
+// d'une page change et le texte doit redéborder en conséquence.
+function changerFormat(nouveauFormat) {
+  if (!FORMATS[nouveauFormat]) return;
+  const livre = livreActuel();
+  if ((livre.format || "149x210") === nouveauFormat) return;
+
+  flushSpread();
+  livre.format = nouveauFormat;
+
+  // Met à jour hauteurTextePx et les dimensions du mesureur de pagination.
+  appliquerFormatPage(nouveauFormat);
+
+  // Repagination complète depuis la première page selon la nouvelle hauteur.
+  normaliserPagination(0);
+
+  // Se recaler sur une double-page valide (index pair, dans les bornes).
+  const pages = livre.pages;
+  if (indexSpread >= pages.length) {
+    indexSpread = Math.max(0, pages.length - 1);
+  }
+  indexSpread -= indexSpread % 2;
+
+  afficherSpread();
+  afficherSommaire();
+  majCompteurMots();
+  marquerModifie();
+  planifierBrouillon();
+
+  const selFormat = document.getElementById("selectFormat");
+  if (selFormat) selFormat.value = nouveauFormat;
 }
 
 // ----- Sauvegarde -----
@@ -1067,6 +1104,7 @@ function nombreSpreadsApercu() {
 function ouvrirApercu() {
   flushSpread();
   modeApercu = true;
+  animationEnCours = false;
   indexApercu = 0;
 
   document.getElementById("vueEditeur").style.display = "none";
@@ -1087,19 +1125,154 @@ function fermerApercu() {
   afficherSommaire();
 }
 
+let animationEnCours = false;
+
 function apercuSuivant() {
+  if (animationEnCours) return;
   const derniere = nombreSpreadsApercu() + 1;
-  if (indexApercu < derniere) {
-    indexApercu++;
-    afficherApercu();
-  }
+  if (indexApercu < derniere) animerTransition(1);
 }
 
 function apercuPrecedent() {
-  if (indexApercu > 0) {
-    indexApercu--;
+  if (animationEnCours) return;
+  if (indexApercu > 0) animerTransition(-1);
+}
+
+// ----- Animation de tournage de page -----
+
+// Type de vue à un index d'aperçu donné (couverture, intérieur, 4e de couv.)
+function typeVueApercu(idx) {
+  const derniere = nombreSpreadsApercu() + 1;
+  if (idx <= 0) return "couverture";
+  if (idx >= derniere) return "quatrieme";
+  return "interieur";
+}
+
+// Pages gauche/droite (et leurs numéros) d'une double-page intérieure
+function donneesInterieur(idx) {
+  const pages = livreActuel().pages;
+  const iGauche = (idx - 1) * 2;
+  const iDroite = iGauche + 1;
+  return {
+    gauche: pages[iGauche] || null,
+    droite: pages[iDroite] || null,
+    numG: iGauche + 1,
+    numD: pages[iDroite] ? iDroite + 1 : ""
+  };
+}
+
+function animerTransition(direction) {
+  animationEnCours = true;
+  const from = indexApercu;
+  const to = from + direction;
+
+  // Vrai « tourne-page » uniquement entre deux doubles-pages intérieures.
+  // Les transitions impliquant une couverture (page seule) font un fondu.
+  if (typeVueApercu(from) === "interieur" && typeVueApercu(to) === "interieur") {
+    animerFlip(direction, from, to);
+  } else {
+    indexApercu = to;
     afficherApercu();
+    animerFondu();
   }
+}
+
+function animerFondu() {
+  const conteneur = document.getElementById("conteneurApercu");
+  const anim = conteneur.animate(
+    [{ opacity: 0 }, { opacity: 1 }],
+    { duration: 260, easing: "ease" }
+  );
+  anim.onfinish = () => { animationEnCours = false; };
+  anim.oncancel = () => { animationEnCours = false; };
+}
+
+function positionnerPageAnim(pageEl, left) {
+  pageEl.style.position = "absolute";
+  pageEl.style.top = "0";
+  pageEl.style.left = left + "px";
+}
+
+// Feuille qui pivote autour de la reliure : la face avant montre la page qui
+// s'en va, la face arrière la nouvelle page ; en-dessous, la page révélée.
+function animerFlip(direction, from, to) {
+  const conteneur = document.getElementById("conteneurApercu");
+  const livre = livreActuel();
+  const f = FORMATS[livre.format || "149x210"] || FORMATS["149x210"];
+  const largPx = Math.round(f.larg * PX_PAR_MM);
+  const hautPx = Math.round(f.haut * PX_PAR_MM);
+  const gap = 26;
+
+  const vieux = donneesInterieur(from);
+  const neuf = donneesInterieur(to);
+
+  conteneur.innerHTML = "";
+  const wrap = document.createElement("div");
+  wrap.style.position = "relative";
+  wrap.style.width = (2 * largPx + gap) + "px";
+  wrap.style.height = hautPx + "px";
+  wrap.style.perspective = "1800px";
+  conteneur.appendChild(wrap);
+
+  // --- Pages de base (dessous la feuille qui tourne) ---
+  let baseG, baseD;
+  if (direction === 1) {
+    // Avance : gauche ancienne (reste), droite nouvelle (se révèle)
+    baseG = creerPageTexteApercu(vieux.gauche, vieux.numG);
+    baseD = creerPageTexteApercu(neuf.droite, neuf.numD);
+  } else {
+    // Recul : gauche nouvelle (se révèle), droite ancienne (reste)
+    baseG = creerPageTexteApercu(neuf.gauche, neuf.numG);
+    baseD = creerPageTexteApercu(vieux.droite, vieux.numD);
+  }
+  positionnerPageAnim(baseG, 0);
+  positionnerPageAnim(baseD, largPx + gap);
+  wrap.appendChild(baseG);
+  wrap.appendChild(baseD);
+
+  // --- Feuille qui tourne ---
+  const leaf = document.createElement("div");
+  leaf.className = "anim-leaf";
+  leaf.style.position = "absolute";
+  leaf.style.top = "0";
+  leaf.style.width = largPx + "px";
+  leaf.style.height = hautPx + "px";
+  leaf.style.transformStyle = "preserve-3d";
+
+  let faceAvant, faceArriere, transEnd;
+  if (direction === 1) {
+    leaf.style.left = (largPx + gap) + "px";
+    leaf.style.transformOrigin = "left center";
+    faceAvant   = creerPageTexteApercu(vieux.droite, vieux.numD); // recto : page droite actuelle
+    faceArriere = creerPageTexteApercu(neuf.gauche, neuf.numG);   // verso : nouvelle page gauche
+    transEnd = "rotateY(-180deg)";
+  } else {
+    leaf.style.left = "0px";
+    leaf.style.transformOrigin = "right center";
+    faceAvant   = creerPageTexteApercu(vieux.gauche, vieux.numG);
+    faceArriere = creerPageTexteApercu(neuf.droite, neuf.numD);
+    transEnd = "rotateY(180deg)";
+  }
+  faceAvant.classList.add("anim-leaf-face");
+  faceArriere.classList.add("anim-leaf-face", "dos");
+  leaf.appendChild(faceAvant);
+  leaf.appendChild(faceArriere);
+  wrap.appendChild(leaf);
+
+  // Dimensionne toutes les .page-livre et applique le zoom d'affichage.
+  appliquerFormatPage(livre.format || "149x210");
+
+  const anim = leaf.animate(
+    [{ transform: "rotateY(0deg)" }, { transform: transEnd }],
+    { duration: 700, easing: "cubic-bezier(.35,0,.25,1)" }
+  );
+  const terminer = () => {
+    indexApercu = to;
+    afficherApercu();
+    animationEnCours = false;
+  };
+  anim.onfinish = terminer;
+  anim.oncancel = terminer;
 }
 
 function afficherApercu() {

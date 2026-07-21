@@ -346,6 +346,23 @@ button.danger {
   padding: 6px 0 10px;
 }
 
+/* ---- Animation de tournage de page (mode aperçu) ---- */
+.anim-leaf {
+  will-change: transform;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.22);
+}
+
+.anim-leaf-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.anim-leaf-face.dos {
+  transform: rotateY(180deg);
+}
+
 .sommaire-actions {
   display: flex;
   flex-direction: column;
@@ -401,6 +418,27 @@ button.danger {
   height: 1px;
   background: #eee;
   margin: 6px 0;
+}
+
+.label-format {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+
+.select-format {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 12px;
+  background: #fff;
+  cursor: pointer;
+  box-sizing: border-box;
 }
 
 .apercu-couverture {
