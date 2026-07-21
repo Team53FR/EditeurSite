@@ -370,6 +370,13 @@ button.danger {
   opacity: 0;
 }
 
+/* Page de garde en vis-à-vis d'une couverture : occupe la place mais reste
+   invisible, pour que la couverture apparaisse seule sur son côté. */
+.page-livre.page-vierge-apercu {
+  background: transparent;
+  box-shadow: none;
+}
+
 .sommaire-actions {
   display: flex;
   flex-direction: column;

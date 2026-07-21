@@ -1179,129 +1179,34 @@ function animerTransition(direction) {
   animationEnCours = true;
   const from = indexApercu;
   const to = from + direction;
-
-  // Vrai « tourne-page » (feuille à deux faces) entre deux doubles-pages
-  // intérieures ; sinon, ouverture/fermeture façon couverture rigide.
-  if (typeVueApercu(from) === "interieur" && typeVueApercu(to) === "interieur") {
-    animerFlip(direction, from, to);
-  } else {
-    animerFlipCouverture(direction, from, to);
-  }
+  // Toutes les transitions utilisent le même tournage réaliste (feuille à deux
+  // faces, pivot sur la reliure) : la couverture est modélisée comme une page
+  // du livre, avec une page de garde en vis-à-vis.
+  animerFlip(direction, from, to);
 }
 
-// Construit le DOM d'une vue de l'aperçu (couverture seule ou double-page).
-function construireVueApercu(idx) {
+// Page de garde (vis-à-vis d'une couverture) : occupe la place mais reste
+// invisible, pour que la couverture apparaisse sur un côté comme un vrai livre.
+function creerPageViergeApercu() {
+  const div = document.createElement("div");
+  div.className = "page-livre page-vierge-apercu";
+  return div;
+}
+
+// Élément DOM d'un côté (gauche/droite) d'une vue de l'aperçu.
+// Couverture = [garde | couverture] ; 4e de couv. = [4e | garde].
+function pageCoteApercu(idx, cote) {
   const derniere = nombreSpreadsApercu() + 1;
-  if (idx <= 0) return creerPageCouvertureApercu("couverture");
-  if (idx >= derniere) return creerPageCouvertureApercu("quatrieme");
-
+  if (idx <= 0) {
+    return cote === "droite" ? creerPageCouvertureApercu("couverture") : creerPageViergeApercu();
+  }
+  if (idx >= derniere) {
+    return cote === "gauche" ? creerPageCouvertureApercu("quatrieme") : creerPageViergeApercu();
+  }
   const d = donneesInterieur(idx);
-  const f = FORMATS[livreActuel().format || "149x210"] || FORMATS["149x210"];
-  const spread = document.createElement("div");
-  spread.style.display = "flex";
-  spread.style.gap = "26px";
-  spread.style.width = (2 * Math.round(f.larg * PX_PAR_MM) + 26) + "px";
-  spread.appendChild(creerPageTexteApercu(d.gauche, d.numG));
-  spread.appendChild(creerPageTexteApercu(d.droite, d.numD));
-  return spread;
-}
-
-function centrerAbsolu(el) {
-  el.style.position = "absolute";
-  el.style.top = "0";
-  el.style.bottom = "0";
-  el.style.left = "0";
-  el.style.right = "0";
-  el.style.margin = "auto"; // centre horizontalement et verticalement
-}
-
-// Transition impliquant une couverture. Une SEULE page pivote :
-//  - à l'ouverture (depuis une couverture), c'est la couverture qui s'ouvre ;
-//  - à la fermeture (depuis une double-page), seule la page côté reliure
-//    tourne, l'autre page reste puis s'efface.
-// La nouvelle vue apparaît en fondu par-dessous.
-function animerFlipCouverture(direction, from, to) {
-  const conteneur = document.getElementById("conteneurApercu");
-  const f = FORMATS[livreActuel().format || "149x210"] || FORMATS["149x210"];
-  const largPx = Math.round(f.larg * PX_PAR_MM);
-  const hautPx = Math.round(f.haut * PX_PAR_MM);
-  const gap = 26;
-
-  conteneur.innerHTML = "";
-  const wrap = document.createElement("div");
-  wrap.style.position = "relative";
-  wrap.style.width = (2 * largPx + gap) + "px";
-  wrap.style.height = hautPx + "px";
-  wrap.style.perspective = "1800px";
-  conteneur.appendChild(wrap);
-
-  // Nouvelle vue (dessous), révélée en fondu.
-  const base = construireVueApercu(to);
-  centrerAbsolu(base);
-  base.style.opacity = "0";
-  wrap.appendChild(base);
-
-  // Feuille qui pivote (une seule page) et éventuelle page qui reste.
-  let leaf, reste = null;
-  if (typeVueApercu(from) !== "interieur") {
-    // Ouverture : la couverture entière (page seule) s'ouvre, centrée.
-    leaf = construireVueApercu(from);
-    centrerAbsolu(leaf);
-    leaf.style.transformOrigin = direction === 1 ? "left center" : "right center";
-  } else {
-    // Fermeture : une seule page de la double-page tourne, autour de la reliure.
-    const d = donneesInterieur(from);
-    if (direction === 1) {
-      leaf = creerPageTexteApercu(d.droite, d.numD);
-      positionnerPageAnim(leaf, largPx + gap);
-      leaf.style.transformOrigin = (-gap / 2) + "px center";
-      reste = creerPageTexteApercu(d.gauche, d.numG);
-      positionnerPageAnim(reste, 0);
-    } else {
-      leaf = creerPageTexteApercu(d.gauche, d.numG);
-      positionnerPageAnim(leaf, 0);
-      leaf.style.transformOrigin = (largPx + gap / 2) + "px center";
-      reste = creerPageTexteApercu(d.droite, d.numD);
-      positionnerPageAnim(reste, largPx + gap);
-    }
-  }
-  if (reste) wrap.appendChild(reste);
-  wrap.appendChild(leaf);
-
-  appliquerFormatPage(livreActuel().format || "149x210");
-
-  const transEnd = direction === 1 ? "rotateY(-105deg)" : "rotateY(105deg)";
-  const transMid = direction === 1 ? "rotateY(-70deg)" : "rotateY(70deg)";
-  const reglages = { duration: 650, easing: "cubic-bezier(.4,0,.3,1)" };
-
-  const anim = leaf.animate(
-    [
-      { transform: "rotateY(0deg)", opacity: 1, offset: 0 },
-      { transform: transMid, opacity: 1, offset: 0.55 },
-      { transform: transEnd, opacity: 0, offset: 1 }
-    ],
-    reglages
-  );
-  // La nouvelle vue se révèle progressivement et n'est complète qu'à la toute
-  // fin du tournage (elle n'apparaît pas d'un coup avant que la page ait fini).
-  base.animate(
-    [{ opacity: 0, offset: 0 }, { opacity: 0, offset: 0.45 }, { opacity: 1, offset: 1 }],
-    reglages
-  );
-  if (reste) {
-    reste.animate(
-      [{ opacity: 1, offset: 0 }, { opacity: 1, offset: 0.6 }, { opacity: 0, offset: 1 }],
-      reglages
-    );
-  }
-
-  const terminer = () => {
-    indexApercu = to;
-    afficherApercu();
-    animationEnCours = false;
-  };
-  anim.onfinish = terminer;
-  anim.oncancel = terminer;
+  return cote === "gauche"
+    ? creerPageTexteApercu(d.gauche, d.numG)
+    : creerPageTexteApercu(d.droite, d.numD);
 }
 
 function positionnerPageAnim(pageEl, left) {
@@ -1320,9 +1225,6 @@ function animerFlip(direction, from, to) {
   const hautPx = Math.round(f.haut * PX_PAR_MM);
   const gap = 26;
 
-  const vieux = donneesInterieur(from);
-  const neuf = donneesInterieur(to);
-
   conteneur.innerHTML = "";
   const wrap = document.createElement("div");
   wrap.style.position = "relative";
@@ -1331,16 +1233,21 @@ function animerFlip(direction, from, to) {
   wrap.style.perspective = "1800px";
   conteneur.appendChild(wrap);
 
-  // --- Pages de base (dessous la feuille qui tourne) ---
-  let baseG, baseD;
+  // Pages de base (dessous) + faces de la feuille qui tourne. La couverture est
+  // une page comme les autres (avec une page de garde en vis-à-vis).
+  let baseG, baseD, faceAvant, faceArriere, transEnd;
   if (direction === 1) {
-    // Avance : gauche ancienne (reste), droite nouvelle (se révèle)
-    baseG = creerPageTexteApercu(vieux.gauche, vieux.numG);
-    baseD = creerPageTexteApercu(neuf.droite, neuf.numD);
+    baseG       = pageCoteApercu(from, "gauche"); // reste à gauche
+    baseD       = pageCoteApercu(to, "droite");   // révélée à droite
+    faceAvant   = pageCoteApercu(from, "droite"); // recto : page qui s'en va
+    faceArriere = pageCoteApercu(to, "gauche");   // verso : nouvelle page gauche
+    transEnd = "rotateY(-180deg)";
   } else {
-    // Recul : gauche nouvelle (se révèle), droite ancienne (reste)
-    baseG = creerPageTexteApercu(neuf.gauche, neuf.numG);
-    baseD = creerPageTexteApercu(vieux.droite, vieux.numD);
+    baseG       = pageCoteApercu(to, "gauche");   // révélée à gauche
+    baseD       = pageCoteApercu(from, "droite"); // reste à droite
+    faceAvant   = pageCoteApercu(from, "gauche");
+    faceArriere = pageCoteApercu(to, "droite");
+    transEnd = "rotateY(180deg)";
   }
   positionnerPageAnim(baseG, 0);
   positionnerPageAnim(baseD, largPx + gap);
@@ -1356,21 +1263,13 @@ function animerFlip(direction, from, to) {
   leaf.style.height = hautPx + "px";
   leaf.style.transformStyle = "preserve-3d";
 
-  // L'axe de rotation est placé pile sur la reliure (milieu du creux entre les
-  // deux pages), pas sur le bord de la page, pour un pivot naturel.
-  let faceAvant, faceArriere, transEnd;
+  // Axe de rotation pile sur la reliure (milieu du creux entre les deux pages).
   if (direction === 1) {
     leaf.style.left = (largPx + gap) + "px";
     leaf.style.transformOrigin = (-gap / 2) + "px center";
-    faceAvant   = creerPageTexteApercu(vieux.droite, vieux.numD); // recto : page droite actuelle
-    faceArriere = creerPageTexteApercu(neuf.gauche, neuf.numG);   // verso : nouvelle page gauche
-    transEnd = "rotateY(-180deg)";
   } else {
     leaf.style.left = "0px";
     leaf.style.transformOrigin = (largPx + gap / 2) + "px center";
-    faceAvant   = creerPageTexteApercu(vieux.gauche, vieux.numG);
-    faceArriere = creerPageTexteApercu(neuf.droite, neuf.numD);
-    transEnd = "rotateY(180deg)";
   }
   faceAvant.classList.add("anim-leaf-face");
   faceArriere.classList.add("anim-leaf-face", "dos");
@@ -1429,20 +1328,19 @@ function afficherApercu() {
 
   if (indexApercu === 0) {
     indicateur.textContent = "Couverture";
-    conteneur.appendChild(creerPageCouvertureApercu("couverture"));
   } else if (indexApercu === derniere) {
     indicateur.textContent = "4e de couverture";
-    conteneur.appendChild(creerPageCouvertureApercu("quatrieme"));
   } else {
     const iGauche = (indexApercu - 1) * 2;
     const iDroite = iGauche + 1;
     const pages = livre.pages;
-
     indicateur.textContent = pages[iDroite] ? `Pages ${iGauche + 1} - ${iDroite + 1}` : `Page ${iGauche + 1}`;
-
-    conteneur.appendChild(creerPageTexteApercu(pages[iGauche], iGauche + 1));
-    conteneur.appendChild(creerPageTexteApercu(pages[iDroite], pages[iDroite] ? iDroite + 1 : ""));
   }
+
+  // Toujours deux pages : la couverture occupe un côté, une page de garde
+  // l'autre — comme un vrai livre, pour un tournage réaliste et sans à-coup.
+  conteneur.appendChild(pageCoteApercu(indexApercu, "gauche"));
+  conteneur.appendChild(pageCoteApercu(indexApercu, "droite"));
 
   appliquerFormatPage(livre.format || "149x210");
 }
