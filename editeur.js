@@ -583,7 +583,21 @@ function pageSuivante() {
 function changerFormat(nouveauFormat) {
   if (!FORMATS[nouveauFormat]) return;
   const livre = livreActuel();
-  if ((livre.format || "149x210") === nouveauFormat) return;
+  const ancienFormat = livre.format || "149x210";
+  if (ancienFormat === nouveauFormat) return;
+
+  // Les décalages de l'image de couverture sont stockés en pixels relatifs à la
+  // taille de page. Quand le format change, la page change de dimensions : on
+  // met les décalages à l'échelle pour conserver le même cadrage de l'image.
+  const fA = FORMATS[ancienFormat], fN = FORMATS[nouveauFormat];
+  const ratioX = fN.larg / fA.larg;
+  const ratioY = fN.haut / fA.haut;
+  ["couverture", "quatrieme"].forEach(cle => {
+    const d = livre[cle];
+    if (!d) return;
+    if (typeof d.imgOffsetX === "number") d.imgOffsetX *= ratioX;
+    if (typeof d.imgOffsetY === "number") d.imgOffsetY *= ratioY;
+  });
 
   flushSpread();
   livre.format = nouveauFormat;
@@ -1166,25 +1180,89 @@ function animerTransition(direction) {
   const from = indexApercu;
   const to = from + direction;
 
-  // Vrai « tourne-page » uniquement entre deux doubles-pages intérieures.
-  // Les transitions impliquant une couverture (page seule) font un fondu.
+  // Vrai « tourne-page » (feuille à deux faces) entre deux doubles-pages
+  // intérieures ; sinon, ouverture/fermeture façon couverture rigide.
   if (typeVueApercu(from) === "interieur" && typeVueApercu(to) === "interieur") {
     animerFlip(direction, from, to);
   } else {
-    indexApercu = to;
-    afficherApercu();
-    animerFondu();
+    animerFlipCouverture(direction, from, to);
   }
 }
 
-function animerFondu() {
+// Construit le DOM d'une vue de l'aperçu (couverture seule ou double-page).
+function construireVueApercu(idx) {
+  const derniere = nombreSpreadsApercu() + 1;
+  if (idx <= 0) return creerPageCouvertureApercu("couverture");
+  if (idx >= derniere) return creerPageCouvertureApercu("quatrieme");
+
+  const d = donneesInterieur(idx);
+  const f = FORMATS[livreActuel().format || "149x210"] || FORMATS["149x210"];
+  const spread = document.createElement("div");
+  spread.style.display = "flex";
+  spread.style.gap = "26px";
+  spread.style.width = (2 * Math.round(f.larg * PX_PAR_MM) + 26) + "px";
+  spread.appendChild(creerPageTexteApercu(d.gauche, d.numG));
+  spread.appendChild(creerPageTexteApercu(d.droite, d.numD));
+  return spread;
+}
+
+// Transition impliquant une couverture : la vue sortante pivote comme une
+// couverture rigide (charnière côté reliure) en s'effaçant, révélant la
+// nouvelle vue placée en dessous.
+function animerFlipCouverture(direction, from, to) {
   const conteneur = document.getElementById("conteneurApercu");
-  const anim = conteneur.animate(
-    [{ opacity: 0 }, { opacity: 1 }],
-    { duration: 260, easing: "ease" }
+  const f = FORMATS[livreActuel().format || "149x210"] || FORMATS["149x210"];
+  const largPx = Math.round(f.larg * PX_PAR_MM);
+  const hautPx = Math.round(f.haut * PX_PAR_MM);
+  const gap = 26;
+
+  conteneur.innerHTML = "";
+  const wrap = document.createElement("div");
+  wrap.style.position = "relative";
+  wrap.style.width = (2 * largPx + gap) + "px";
+  wrap.style.height = hautPx + "px";
+  wrap.style.perspective = "1800px";
+  conteneur.appendChild(wrap);
+
+  const base = construireVueApercu(to);   // nouvelle vue (dessous)
+  const leaf = construireVueApercu(from); // vue sortante (dessus, pivote)
+  [base, leaf].forEach(el => {
+    el.style.position = "absolute";
+    el.style.top = "0";
+    el.style.bottom = "0";
+    el.style.left = "0";
+    el.style.right = "0";
+    el.style.margin = "auto"; // centre horizontalement et verticalement
+  });
+  leaf.style.transformOrigin = direction === 1 ? "left center" : "right center";
+  wrap.appendChild(base);
+  wrap.appendChild(leaf);
+
+  appliquerFormatPage(livreActuel().format || "149x210");
+
+  const transEnd = direction === 1 ? "rotateY(-105deg)" : "rotateY(105deg)";
+  const reglages = { duration: 650, easing: "cubic-bezier(.4,0,.3,1)" };
+  const anim = leaf.animate(
+    [
+      { transform: "rotateY(0deg)", opacity: 1, offset: 0 },
+      { transform: "rotateY(" + (direction === 1 ? "-70deg" : "70deg") + ")", opacity: 1, offset: 0.55 },
+      { transform: transEnd, opacity: 0, offset: 1 }
+    ],
+    reglages
   );
-  anim.onfinish = () => { animationEnCours = false; };
-  anim.oncancel = () => { animationEnCours = false; };
+  // La nouvelle vue apparaît en fondu pendant que l'ancienne pivote (évite de
+  // voir dépasser une double-page plus large que la couverture qui la couvre).
+  base.animate(
+    [{ opacity: 0, offset: 0 }, { opacity: 0, offset: 0.25 }, { opacity: 1, offset: 0.8 }],
+    reglages
+  );
+  const terminer = () => {
+    indexApercu = to;
+    afficherApercu();
+    animationEnCours = false;
+  };
+  anim.onfinish = terminer;
+  anim.oncancel = terminer;
 }
 
 function positionnerPageAnim(pageEl, left) {
@@ -1255,6 +1333,22 @@ function animerFlip(direction, from, to) {
   }
   faceAvant.classList.add("anim-leaf-face");
   faceArriere.classList.add("anim-leaf-face", "dos");
+
+  // Ombre de pliure : dégradé plus sombre côté reliure, pour donner du relief.
+  // Une ombre par face ; leur opacité culmine au milieu du tournage.
+  const ombreAvant = document.createElement("div");
+  ombreAvant.className = "anim-leaf-ombre";
+  ombreAvant.style.background = direction === 1
+    ? "linear-gradient(to left, rgba(0,0,0,0) 55%, rgba(0,0,0,0.32) 100%)"
+    : "linear-gradient(to right, rgba(0,0,0,0) 55%, rgba(0,0,0,0.32) 100%)";
+  faceAvant.appendChild(ombreAvant);
+  const ombreArriere = document.createElement("div");
+  ombreArriere.className = "anim-leaf-ombre";
+  ombreArriere.style.background = direction === 1
+    ? "linear-gradient(to right, rgba(0,0,0,0) 55%, rgba(0,0,0,0.32) 100%)"
+    : "linear-gradient(to left, rgba(0,0,0,0) 55%, rgba(0,0,0,0.32) 100%)";
+  faceArriere.appendChild(ombreArriere);
+
   leaf.appendChild(faceAvant);
   leaf.appendChild(faceArriere);
   wrap.appendChild(leaf);
@@ -1262,9 +1356,13 @@ function animerFlip(direction, from, to) {
   // Dimensionne toutes les .page-livre et applique le zoom d'affichage.
   appliquerFormatPage(livre.format || "149x210");
 
+  const reglages = { duration: 750, easing: "cubic-bezier(.35,0,.25,1)" };
   const anim = leaf.animate(
     [{ transform: "rotateY(0deg)" }, { transform: transEnd }],
-    { duration: 700, easing: "cubic-bezier(.35,0,.25,1)" }
+    reglages
+  );
+  [ombreAvant, ombreArriere].forEach(o =>
+    o.animate([{ opacity: 0 }, { opacity: 0.85 }, { opacity: 0 }], reglages)
   );
   const terminer = () => {
     indexApercu = to;

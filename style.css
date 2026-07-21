@@ -363,6 +363,13 @@ button.danger {
   transform: rotateY(180deg);
 }
 
+.anim-leaf-ombre {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+}
+
 .sommaire-actions {
   display: flex;
   flex-direction: column;
