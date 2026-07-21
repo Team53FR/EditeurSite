@@ -1669,7 +1669,9 @@ function placerCaretAOffset(conteneur, offset) {
 }
 
 // Scinde un contenu HTML pour qu'il tienne dans la hauteur d'une page.
-// Renvoie { garde, deborde } : ce qui tient, et le reste (mots entiers).
+// Renvoie { garde, deborde }. Le découpage se fait UNIQUEMENT par
+// extractContents, qui préserve toute la mise en forme (italique, gras,
+// tailles, polices…) en clonant les balises de part et d'autre de la coupe.
 function mesurerScinder(html) {
   const mes = document.getElementById("mesureCachee");
   if (!mes || !hauteurTextePx) return { garde: html, deborde: "" };
@@ -1682,9 +1684,7 @@ function mesurerScinder(html) {
     return { garde: html, deborde: "" };
   }
 
-  const limiteY = mes.getBoundingClientRect().top + hauteurTextePx;
-  const coupure = trouverCoupure(mes, limiteY);
-
+  const coupure = trouverCoupure(mes);
   if (!coupure) { mes.innerHTML = ""; return { garde: html, deborde: "" }; }
 
   const range = document.createRange();
@@ -1695,71 +1695,49 @@ function mesurerScinder(html) {
   const boite = document.createElement("div");
   boite.appendChild(frag);
 
-  // Ajustement fin : la coupure au mot peut laisser la boîte de ligne dépasser
-  // de quelques pixels. On retire les derniers mots restants jusqu'à ce que ça
-  // tienne vraiment, en les renvoyant en tête du débordement.
-  let securite = 0;
-  while (mes.scrollHeight > hauteurTextePx + 1 && securite < 50) {
-    securite++;
-    const mot = retirerDernierMot(mes);
-    if (mot === null) break;
-    prependMot(boite, mot);
-  }
-
   const deborde = boite.innerHTML;
   const garde = mes.innerHTML;
   mes.innerHTML = "";
   return { garde, deborde };
 }
 
-// Retire et renvoie le dernier mot du dernier nœud texte d'un conteneur
-function retirerDernierMot(conteneur) {
+// Position (noeud texte, offset) du premier mot qui déborde la hauteur utile.
+// Trouvée par dichotomie sur la hauteur RÉELLE du contenu conservé (boîtes de
+// ligne comprises), sans jamais déplacer de texte : la coupe est ensuite faite
+// par extractContents, donc les styles sont intégralement préservés.
+function trouverCoupure(conteneur) {
+  // Positions de début de chaque mot, dans l'ordre du document
+  const positions = [];
   const walker = document.createTreeWalker(conteneur, NodeFilter.SHOW_TEXT);
-  let dernier = null, n;
-  while ((n = walker.nextNode())) dernier = n;
-  if (!dernier) return null;
-
-  const t = dernier.textContent.replace(/\s+$/, "");
-  const m = /(\s*)(\S+)$/.exec(t);
-  if (!m) return null;
-  dernier.textContent = t.slice(0, m.index);
-  return m[2];
-}
-
-// Insère un mot en tête du premier bloc d'un conteneur
-function prependMot(conteneur, mot) {
-  let cible = conteneur.firstElementChild;
-  if (!cible) {
-    cible = document.createElement("p");
-    conteneur.appendChild(cible);
-  }
-  const tn = document.createTextNode(mot + " ");
-  if (cible.firstChild) cible.insertBefore(tn, cible.firstChild);
-  else cible.appendChild(tn);
-}
-
-// Trouve la position (noeud texte, offset) du premier mot qui déborde la hauteur
-function trouverCoupure(conteneur, limiteY) {
-  const walker = document.createTreeWalker(conteneur, NodeFilter.SHOW_TEXT);
-  let nbMots = 0, noeud;
+  let noeud;
   while ((noeud = walker.nextNode())) {
     const texte = noeud.textContent;
     const regex = /\S+/g;
     let m;
-    while ((m = regex.exec(texte))) {
-      const debut = m.index;
-      const r = document.createRange();
-      r.setStart(noeud, debut);
-      r.setEnd(noeud, debut + m[0].length);
-      const rect = r.getBoundingClientRect();
-      if (rect.height > 0 && rect.bottom > limiteY + 1) {
-        if (nbMots === 0) return null; // même le 1er mot déborde : on ne peut rien couper
-        return { node: noeud, offset: debut };
-      }
-      nbMots++;
-    }
+    while ((m = regex.exec(texte))) positions.push({ node: noeud, offset: m.index });
   }
-  return null;
+  if (positions.length <= 1) return null; // rien à couper proprement
+
+  const haut = conteneur.getBoundingClientRect().top;
+  const limite = hauteurTextePx + 1;
+
+  // Le contenu situé AVANT positions[k] tient-il dans la hauteur ?
+  function tient(k) {
+    const r = document.createRange();
+    r.setStart(conteneur, 0);
+    r.setEnd(positions[k].node, positions[k].offset);
+    return (r.getBoundingClientRect().bottom - haut) <= limite;
+  }
+
+  // Plus grand k tel que les mots 0..k-1 tiennent ; on coupe alors au mot k.
+  let lo = 1, hi = positions.length - 1, kMax = 0;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (tient(mid)) { kMax = mid; lo = mid + 1; }
+    else hi = mid - 1;
+  }
+  if (kMax === 0) return null; // même le 1er mot ne tient pas
+  return positions[kMax];
 }
 
 // Concatène deux contenus HTML comme un flux continu, en fusionnant les blocs
