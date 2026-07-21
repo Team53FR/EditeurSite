@@ -145,6 +145,10 @@ function afficherListeLivres() {
     couvDiv.onclick = () => ouvrirLivre(livre.id);
     li.appendChild(couvDiv);
 
+    // Si la couverture a une image de fond, on l'affiche par-dessus la couleur.
+    // Sinon, on garde la couleur (ou le blanc) : rien à charger.
+    if (couv.imageChemin) chargerImageCouvVignette(couvDiv, couv.imageChemin);
+
     const meta = document.createElement("div");
     meta.className = "livre-meta";
     meta.innerHTML =
@@ -162,6 +166,24 @@ function afficherListeLivres() {
 
     liste.appendChild(li);
   });
+}
+
+// Cache des URL blob des images de couverture, pour ne pas les recharger
+// à chaque rendu de la liste.
+let cacheImagesCouvVignette = {};
+
+async function chargerImageCouvVignette(couvDiv, chemin) {
+  const token = sessionStorage.getItem("gh_token");
+  if (!token) return;
+  try {
+    if (!cacheImagesCouvVignette[chemin]) {
+      cacheImagesCouvVignette[chemin] = await obtenirUrlImage(chemin, token);
+    }
+    couvDiv.style.backgroundImage = `url("${cacheImagesCouvVignette[chemin]}")`;
+  } catch (erreur) {
+    // En cas d'échec, on invalide le cache et on laisse la couleur de fond.
+    delete cacheImagesCouvVignette[chemin];
+  }
 }
 
 function ouvrirLivre(id) {
