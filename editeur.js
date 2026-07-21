@@ -206,10 +206,10 @@ function surSaisie(e) {
   const suppression = e && e.inputType && e.inputType.indexOf("delete") !== -1;
 
   let doitReflow = deborde;
-  if (!doitReflow && suppression && actif) {
-    // Suppression : si la page a de la place et qu'il reste du texte après, on récupère (remonte)
-    const placeDispo = actif.scrollHeight <= actif.clientHeight - 2;
-    if (placeDispo && contenuSuivantNonVide()) doitReflow = true;
+  if (!doitReflow && suppression && actif && contenuSuivantNonVide()) {
+    // Suppression : on tente toujours de faire remonter le texte des pages
+    // suivantes. Si rien ne peut remonter, la repagination s'arrête aussitôt.
+    doitReflow = true;
   }
 
   if (doitReflow) reflowEtCurseur();
