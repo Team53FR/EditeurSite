@@ -7,6 +7,7 @@ let indexSpread = 0;
 let coteActif = "gauche";
 let selectionSauvegardee = null;
 let modeCouverture = null; // 'couverture' | 'quatrieme' | null
+let hauteurTextePx = 0;    // hauteur utile d'une page de texte (px), pour la pagination continue
 
 // Formats : dimensions en mm, marges en mm (haut/bas, gauche/droite)
 const FORMATS = {
@@ -53,6 +54,8 @@ function appliquerFormatPage(formatKey) {
     el.style.boxSizing = "border-box";
     el.style.flexShrink = "0";
   });
+
+  hauteurTextePx = hautPx - margeVPx - numPageH;
 
   document.querySelectorAll(".texte-livre").forEach(el => {
     el.style.width  = (largPx - margeHPx * 2) + "px";
@@ -128,8 +131,8 @@ async function chargerLivre() {
     const pageGauche = document.getElementById("pageGauche");
     const pageDroite = document.getElementById("pageDroite");
 
-    pageGauche.addEventListener("keydown", (e) => { intercepterEntree(e); bloquerSiPlein(e, pageGauche); });
-    pageDroite.addEventListener("keydown", (e) => { intercepterEntree(e); bloquerSiPlein(e, pageDroite); });
+    pageGauche.addEventListener("keydown", (e) => { intercepterEntree(e); });
+    pageDroite.addEventListener("keydown", (e) => { intercepterEntree(e); });
     pageGauche.addEventListener("focus", () => { coteActif = "gauche"; });
     pageDroite.addEventListener("focus", () => { coteActif = "droite"; });
     pageGauche.addEventListener("blur", sauvegarderSelection);
@@ -153,12 +156,38 @@ async function chargerLivre() {
   }
 }
 
-// Saisie dans une page : historique, brouillon local, compteur, état modifié
-function surSaisie() {
+// Saisie dans une page : pagination continue, historique, brouillon, compteur, état modifié
+function surSaisie(e) {
+  const actif = coteActif === "droite"
+    ? document.getElementById("pageDroite")
+    : document.getElementById("pageGauche");
+
+  const deborde = actif && actif.scrollHeight > actif.clientHeight + 1;
+  const suppression = e && e.inputType && e.inputType.indexOf("delete") !== -1;
+
+  let doitReflow = deborde;
+  if (!doitReflow && suppression && actif) {
+    // Suppression : si la page a de la place et qu'il reste du texte après, on récupère (remonte)
+    const placeDispo = actif.scrollHeight <= actif.clientHeight - 2;
+    if (placeDispo && contenuSuivantNonVide()) doitReflow = true;
+  }
+
+  if (doitReflow) reflowEtCurseur();
+
   planifierHistorique();
   planifierBrouillon();
   planifierCompteurMots();
   marquerModifie();
+}
+
+// Y a-t-il du texte sur une page située après la page en cours d'édition ?
+function contenuSuivantNonVide() {
+  const pages = livreActuel().pages;
+  const idxActive = coteActif === "droite" ? indexSpread + 1 : indexSpread;
+  for (let k = idxActive + 1; k < pages.length; k++) {
+    if (texteBrutPage(pages[k].contenu).trim() !== "") return true;
+  }
+  return false;
 }
 
 // Raccourcis clavier globaux de l'éditeur (mode texte uniquement)
@@ -286,13 +315,6 @@ function appliquerTaille(pt) {
   marquerModifie();
 }
 
-// ----- Blocage en fin de page -----
-
-function afficherPagePleine() {
-  document.getElementById("message").textContent = "Page pleine — utilisez Suivant → pour continuer sur la page suivante.";
-  setTimeout(() => { document.getElementById("message").textContent = ""; }, 3000);
-}
-
 function lireTailleCourrante() {
   const input = document.getElementById("inputTaille");
   // Ne pas écraser l'input si l'utilisateur est en train de le modifier
@@ -317,64 +339,6 @@ function intercepterEntree(e) {
   if (e.key !== "Enter" || e.shiftKey) return;
   e.preventDefault();
   document.execCommand("insertLineBreak");
-}
-
-function bloquerSiPlein(e, conteneur) {
-  // Touches qui ne rajoutent pas de contenu : on laisse toujours passer
-  const touchesAutorisees = [
-    "Backspace", "Delete", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown",
-    "Home", "End", "PageUp", "PageDown", "Tab", "Escape",
-    "F1","F2","F3","F4","F5","F6","F7","F8","F9","F10","F11","F12"
-  ];
-  if (touchesAutorisees.includes(e.key)) return;
-  if (e.ctrlKey || e.metaKey) return;
-
-  // Laisser le navigateur insérer le caractère, puis vérifier et annuler si ça déborde
-  const snapshotHTML = conteneur.innerHTML;
-
-  // Sauvegarde position curseur en offset texte absolu (résiste au innerHTML=)
-  const sel = window.getSelection();
-  let offsetSauvegarde = null;
-  if (sel && sel.rangeCount > 0) {
-    const r = sel.getRangeAt(0);
-    if (conteneur.contains(r.startContainer)) {
-      function compterOffset(noeudCible, offsetCible) {
-        let total = 0;
-        const walker = document.createTreeWalker(conteneur, NodeFilter.SHOW_TEXT);
-        while (walker.nextNode()) {
-          if (walker.currentNode === noeudCible) return total + offsetCible;
-          total += walker.currentNode.textContent.length;
-        }
-        return total;
-      }
-      offsetSauvegarde = compterOffset(r.startContainer, r.startOffset);
-    }
-  }
-
-  requestAnimationFrame(() => {
-    if (conteneur.scrollHeight > conteneur.clientHeight + 2) {
-      // Rollback
-      conteneur.innerHTML = snapshotHTML;
-      // Restaurer le curseur via offset texte
-      if (offsetSauvegarde !== null) {
-        let total = 0;
-        const walker = document.createTreeWalker(conteneur, NodeFilter.SHOW_TEXT);
-        while (walker.nextNode()) {
-          const len = walker.currentNode.textContent.length;
-          if (total + len >= offsetSauvegarde) {
-            const range = document.createRange();
-            range.setStart(walker.currentNode, offsetSauvegarde - total);
-            range.collapse(true);
-            sel.removeAllRanges();
-            sel.addRange(range);
-            break;
-          }
-          total += len;
-        }
-      }
-      afficherPagePleine();
-    }
-  });
 }
 
 // ----- Affichage -----
@@ -1615,6 +1579,268 @@ function remplacerInsensible(texte, recherche, remplacement) {
     }
   }
   return { texte: resultat, compte };
+}
+
+// =====================================================================
+//  Pagination continue : le texte déborde automatiquement d'une page
+//  à la suivante, en cascade (comme un traitement de texte).
+// =====================================================================
+
+// Position du curseur exprimée en nombre de caractères depuis le début d'un élément
+function offsetCaret(conteneur) {
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return null;
+  const r = sel.getRangeAt(0);
+  if (r.startContainer !== conteneur && !conteneur.contains(r.startContainer)) return null;
+  const avant = document.createRange();
+  avant.selectNodeContents(conteneur);
+  avant.setEnd(r.startContainer, r.startOffset);
+  return avant.toString().length;
+}
+
+// Place le curseur à une position caractère donnée dans un élément
+function placerCaretAOffset(conteneur, offset) {
+  const walker = document.createTreeWalker(conteneur, NodeFilter.SHOW_TEXT);
+  let total = 0, dernier = null, noeud;
+  while ((noeud = walker.nextNode())) {
+    dernier = noeud;
+    const len = noeud.textContent.length;
+    if (total + len >= offset) {
+      const range = document.createRange();
+      range.setStart(noeud, Math.max(0, Math.min(len, offset - total)));
+      range.collapse(true);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      return;
+    }
+    total += len;
+  }
+  // Au-delà du texte : fin du contenu
+  const range = document.createRange();
+  if (dernier) range.setStart(dernier, dernier.textContent.length);
+  else range.selectNodeContents(conteneur);
+  range.collapse(false);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
+// Scinde un contenu HTML pour qu'il tienne dans la hauteur d'une page.
+// Renvoie { garde, deborde } : ce qui tient, et le reste (mots entiers).
+function mesurerScinder(html) {
+  const mes = document.getElementById("mesureCachee");
+  if (!mes || !hauteurTextePx) return { garde: html, deborde: "" };
+
+  mes.style.height = "auto";
+  mes.innerHTML = html || "";
+
+  if (mes.scrollHeight <= hauteurTextePx + 1) {
+    mes.innerHTML = "";
+    return { garde: html, deborde: "" };
+  }
+
+  const limiteY = mes.getBoundingClientRect().top + hauteurTextePx;
+  const coupure = trouverCoupure(mes, limiteY);
+
+  if (!coupure) { mes.innerHTML = ""; return { garde: html, deborde: "" }; }
+
+  const range = document.createRange();
+  range.setStart(coupure.node, coupure.offset);
+  range.setEnd(mes, mes.childNodes.length);
+  const frag = range.extractContents();
+
+  const boite = document.createElement("div");
+  boite.appendChild(frag);
+
+  // Ajustement fin : la coupure au mot peut laisser la boîte de ligne dépasser
+  // de quelques pixels. On retire les derniers mots restants jusqu'à ce que ça
+  // tienne vraiment, en les renvoyant en tête du débordement.
+  let securite = 0;
+  while (mes.scrollHeight > hauteurTextePx + 1 && securite < 50) {
+    securite++;
+    const mot = retirerDernierMot(mes);
+    if (mot === null) break;
+    prependMot(boite, mot);
+  }
+
+  const deborde = boite.innerHTML;
+  const garde = mes.innerHTML;
+  mes.innerHTML = "";
+  return { garde, deborde };
+}
+
+// Retire et renvoie le dernier mot du dernier nœud texte d'un conteneur
+function retirerDernierMot(conteneur) {
+  const walker = document.createTreeWalker(conteneur, NodeFilter.SHOW_TEXT);
+  let dernier = null, n;
+  while ((n = walker.nextNode())) dernier = n;
+  if (!dernier) return null;
+
+  const t = dernier.textContent.replace(/\s+$/, "");
+  const m = /(\s*)(\S+)$/.exec(t);
+  if (!m) return null;
+  dernier.textContent = t.slice(0, m.index);
+  return m[2];
+}
+
+// Insère un mot en tête du premier bloc d'un conteneur
+function prependMot(conteneur, mot) {
+  let cible = conteneur.firstElementChild;
+  if (!cible) {
+    cible = document.createElement("p");
+    conteneur.appendChild(cible);
+  }
+  const tn = document.createTextNode(mot + " ");
+  if (cible.firstChild) cible.insertBefore(tn, cible.firstChild);
+  else cible.appendChild(tn);
+}
+
+// Trouve la position (noeud texte, offset) du premier mot qui déborde la hauteur
+function trouverCoupure(conteneur, limiteY) {
+  const walker = document.createTreeWalker(conteneur, NodeFilter.SHOW_TEXT);
+  let nbMots = 0, noeud;
+  while ((noeud = walker.nextNode())) {
+    const texte = noeud.textContent;
+    const regex = /\S+/g;
+    let m;
+    while ((m = regex.exec(texte))) {
+      const debut = m.index;
+      const r = document.createRange();
+      r.setStart(noeud, debut);
+      r.setEnd(noeud, debut + m[0].length);
+      const rect = r.getBoundingClientRect();
+      if (rect.height > 0 && rect.bottom > limiteY + 1) {
+        if (nbMots === 0) return null; // même le 1er mot déborde : on ne peut rien couper
+        return { node: noeud, offset: debut };
+      }
+      nbMots++;
+    }
+  }
+  return null;
+}
+
+// Concatène deux contenus HTML comme un flux continu, en fusionnant les blocs
+// de bordure de même nature (ex. deux <p> => un seul paragraphe qui continue).
+function fusionnerHTML(a, b) {
+  if (!a) return b || "";
+  if (!b) return a || "";
+
+  const da = document.createElement("div"); da.innerHTML = a;
+  const db = document.createElement("div"); db.innerHTML = b;
+
+  const dernier = da.lastElementChild;
+  const premier = db.firstElementChild;
+  const fusionnable = ["P", "H2", "H3", "DIV", "UL", "OL", "BLOCKQUOTE"];
+
+  if (dernier && premier && dernier.tagName === premier.tagName && fusionnable.includes(dernier.tagName)) {
+    // Éviter de coller deux mots pour les blocs de texte (pas pour les listes)
+    if (["P", "H2", "H3", "DIV", "BLOCKQUOTE"].includes(dernier.tagName)) {
+      const finTexte = dernier.textContent;
+      const debutTexte = premier.textContent;
+      if (finTexte && debutTexte && /\w$/.test(finTexte) && /^\w/.test(debutTexte)) {
+        dernier.appendChild(document.createTextNode(" "));
+      }
+    }
+    while (premier.firstChild) dernier.appendChild(premier.firstChild);
+    db.removeChild(premier);
+    while (db.firstChild) da.appendChild(db.firstChild);
+    return da.innerHTML;
+  }
+  return a + b;
+}
+
+// Recompose la pagination à partir de la page iDebut : chaque page est remplie
+// au maximum, le surplus part sur la suivante, en cascade.
+function normaliserPagination(iDebut) {
+  const pages = livreActuel().pages;
+  let i = Math.max(0, iDebut);
+  let securite = 0;
+
+  while (i < pages.length && securite < 2000) {
+    securite++;
+    const contenuI = pages[i].contenu || "";
+    const contenuSuiv = (i + 1 < pages.length) ? (pages[i + 1].contenu || "") : "";
+    const combine = fusionnerHTML(contenuI, contenuSuiv);
+
+    const { garde, deborde } = mesurerScinder(combine);
+
+    pages[i].contenu = garde;
+    const resteNonVide = deborde && deborde.trim() !== "";
+
+    if (resteNonVide) {
+      assurerPageExiste(i + 1);
+      pages[i + 1].contenu = deborde;
+    } else if (i + 1 < pages.length) {
+      pages[i + 1].contenu = "";
+    }
+
+    // Stabilité : rien n'a bougé sur cette paire. On ne s'arrête que si la page
+    // suivante ne déborde pas elle-même (sinon la cascade doit continuer).
+    if (garde === contenuI && (deborde || "") === contenuSuiv) {
+      if (i + 1 >= pages.length) break;
+      const suiv = mesurerScinder(pages[i + 1].contenu);
+      if (!suiv.deborde || suiv.deborde.trim() === "") break;
+    }
+
+    i++;
+  }
+
+  // Supprimer les pages vides en fin de livre (garder au moins une page)
+  while (pages.length > 1 && !texteBrutPage(pages[pages.length - 1].contenu).trim()) {
+    pages.pop();
+  }
+}
+
+// Applique la pagination continue puis replace le curseur au bon endroit
+function reflowEtCurseur() {
+  const pages = livreActuel().pages;
+  const cote = coteActif;
+  const idxActive = cote === "droite" ? indexSpread + 1 : indexSpread;
+  const actif = cote === "droite"
+    ? document.getElementById("pageDroite")
+    : document.getElementById("pageGauche");
+
+  // Offset absolu du curseur (depuis le début du livre), invariant par le reflow
+  const local = actif ? offsetCaret(actif) : null;
+  flushSpread();
+
+  let absOffset = null;
+  if (local !== null) {
+    absOffset = 0;
+    for (let k = 0; k < idxActive; k++) absOffset += texteBrutPage(pages[k].contenu).length;
+    absOffset += local;
+  }
+
+  normaliserPagination(indexSpread);
+
+  if (absOffset === null) {
+    afficherSpread();
+    afficherSommaire();
+    majCompteurMots();
+    return;
+  }
+
+  // Retrouver la page + offset local correspondant à l'offset absolu
+  let acc = 0, cible = 0, localCible = 0;
+  for (let k = 0; k < pages.length; k++) {
+    const len = texteBrutPage(pages[k].contenu).length;
+    if (absOffset <= acc + len) { cible = k; localCible = absOffset - acc; break; }
+    acc += len; cible = k; localCible = len;
+  }
+
+  indexSpread = cible - (cible % 2);
+  afficherSpread();
+  afficherSommaire();
+
+  const cibleEl = (cible % 2 === 0)
+    ? document.getElementById("pageGauche")
+    : document.getElementById("pageDroite");
+  cibleEl.focus();
+  coteActif = (cible % 2 === 0) ? "gauche" : "droite";
+  placerCaretAOffset(cibleEl, localCible);
+
+  majCompteurMots();
 }
 
 // Relancer la recherche quand on tape dans le champ (script chargé en fin de body :
