@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Connexion — Mon Éditeur De Livre</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+  <div class="page-centree">
+    <div class="carte-auth">
+
+      <!-- Panneau décoratif -->
+      <div class="auth-deco">
+        <div class="marque">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5.5C10.5 4.3 8.3 3.8 6 4c-1 .1-2 .3-3 .6v14c1-.3 2-.5 3-.6 2.3-.2 4.5.3 6 1.5 1.5-1.2 3.7-1.7 6-1.5 1 .1 2 .3 3 .6V4.6c-1-.3-2-.5-3-.6-2.3-.2-4.5.3-6 1.5Z"/><path d="M12 5.5v14"/></svg>
+          Mon Éditeur De Livre
+        </div>
+
+        <p class="citation">
+          « Un livre est un jardin que l'on transporte dans sa poche. »
+          <span>Proverbe arabe</span>
+        </p>
+
+        <svg width="150" height="150" viewBox="0 0 24 24" fill="none" stroke="#f3d9a8" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" opacity=".9">
+          <path d="M12 5.5C10.5 4.3 8.3 3.8 6 4c-1 .1-2 .3-3 .6v14c1-.3 2-.5 3-.6 2.3-.2 4.5.3 6 1.5 1.5-1.2 3.7-1.7 6-1.5 1 .1 2 .3 3 .6V4.6c-1-.3-2-.5-3-.6-2.3-.2-4.5.3-6 1.5Z"/><path d="M12 5.5v14"/>
+        </svg>
+      </div>
+
+      <!-- Formulaire -->
+      <div class="auth-form">
+        <h1>Connexion</h1>
+        <p class="intro">Retrouvez vos livres et continuez votre écriture.</p>
+
+        <div class="champ">
+          <label for="login">Identifiant</label>
+          <input type="text" id="login" placeholder="Votre identifiant" autocomplete="username">
+        </div>
+
+        <div class="champ">
+          <label for="password">Mot de passe</label>
+          <input type="password" id="password" placeholder="Votre mot de passe" autocomplete="current-password">
+        </div>
+
+        <div class="champ">
+          <label for="token">Token GitHub</label>
+          <input type="password" id="token" placeholder="ghp_xxxxxxxxxxxx" autocomplete="off"
+                 onkeydown="if(event.key==='Enter'){seConnecter();}">
+        </div>
+        <p class="aide-champ">Le token sert à enregistrer vos livres. Il reste uniquement dans cet onglet et n'est jamais stocké ailleurs.</p>
+
+        <button class="btn btn-primaire" style="justify-content:center" onclick="seConnecter()">Se connecter</button>
+
+        <p id="message" class="message"></p>
+
+        <p class="retour-accueil"><a href="index.html">← Retour à l'accueil</a></p>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>

@@ -2,27 +2,224 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<title>Connexion</title>
-<link rel="stylesheet" href="style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mon Éditeur De Livre — écrivez et imprimez votre livre</title>
+<meta name="description" content="Écrivez, mettez en page et imprimez votre propre livre : pagination réaliste, couvertures personnalisées, aperçu double-page et export prêt à imprimer.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="site.css">
 </head>
 <body>
-  <div class="carte">
-    <h1>Connexion</h1>
 
-    <label for="login">Identifiant</label>
-    <input type="text" id="login" placeholder="Identifiant">
+  <!-- ===== Navigation ===== -->
+  <nav class="nav">
+    <div class="contenu nav-in">
+      <div class="marque">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#8a4b38" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 5.5C10.5 4.3 8.3 3.8 6 4c-1 .1-2 .3-3 .6v14c1-.3 2-.5 3-.6 2.3-.2 4.5.3 6 1.5 1.5-1.2 3.7-1.7 6-1.5 1 .1 2 .3 3 .6V4.6c-1-.3-2-.5-3-.6-2.3-.2-4.5.3-6 1.5Z"/>
+          <path d="M12 5.5v14"/>
+        </svg>
+        Mon Éditeur De Livre
+      </div>
+      <div class="nav-actions">
+        <a href="#fonctionnalites" class="btn btn-secondaire">Découvrir</a>
+        <a href="connexion.html" id="ctaNav" class="btn btn-primaire">Se connecter</a>
+      </div>
+    </div>
+  </nav>
 
-    <label for="password">Mot de passe</label>
-    <input type="password" id="password" placeholder="Mot de passe">
+  <!-- ===== Hero ===== -->
+  <header class="hero">
+    <div class="contenu hero-grille">
+      <div class="hero-txt">
+        <span class="hero-badge">✦ Votre atelier d'écriture en ligne</span>
+        <h1>Écrivez, mettez en page et <span class="surligne">imprimez</span> votre livre.</h1>
+        <p class="hero-sous">Un éditeur pensé comme un vrai livre : le texte s'écoule de page en page, vous composez votre couverture, et vous exportez un fichier prêt à imprimer. Sans logiciel à installer.</p>
+        <div class="hero-cta">
+          <a href="connexion.html" id="ctaHero" class="btn btn-primaire">Commencer à écrire</a>
+          <a href="#comment" class="btn btn-fantome">Comment ça marche&nbsp;?</a>
+        </div>
+      </div>
+      <div class="hero-illus">
+        <!-- Livre ouvert stylisé -->
+        <svg viewBox="0 0 460 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Livre ouvert">
+          <defs>
+            <linearGradient id="pg" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#fffdf7"/><stop offset="1" stop-color="#f3ead6"/>
+            </linearGradient>
+            <linearGradient id="couvg" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#8a4b38"/><stop offset="1" stop-color="#6d3a2b"/>
+            </linearGradient>
+          </defs>
+          <!-- pile d'ombre -->
+          <ellipse cx="230" cy="330" rx="180" ry="20" fill="#d9ccb2" opacity=".55"/>
+          <!-- page gauche -->
+          <path d="M40 70 L225 96 L225 300 L40 286 Z" fill="url(#pg)" stroke="#e2d6bd"/>
+          <!-- page droite -->
+          <path d="M420 70 L235 96 L235 300 L420 286 Z" fill="url(#pg)" stroke="#e2d6bd"/>
+          <!-- reliure -->
+          <path d="M225 96 L235 96 L235 300 L225 300 Z" fill="#e7dcc4"/>
+          <!-- lignes de texte gauche -->
+          <g fill="#d8ccb2">
+            <rect x="62" y="120" width="140" height="6" rx="3"/><rect x="62" y="136" width="150" height="6" rx="3"/>
+            <rect x="62" y="152" width="120" height="6" rx="3"/><rect x="62" y="176" width="150" height="6" rx="3"/>
+            <rect x="62" y="192" width="140" height="6" rx="3"/><rect x="62" y="208" width="100" height="6" rx="3"/>
+            <rect x="62" y="232" width="150" height="6" rx="3"/><rect x="62" y="248" width="130" height="6" rx="3"/>
+          </g>
+          <!-- titre + lignes droite -->
+          <rect x="285" y="120" width="90" height="9" rx="4" fill="#8a4b38"/>
+          <g fill="#d8ccb2">
+            <rect x="258" y="150" width="140" height="6" rx="3"/><rect x="258" y="166" width="150" height="6" rx="3"/>
+            <rect x="258" y="182" width="120" height="6" rx="3"/><rect x="258" y="206" width="150" height="6" rx="3"/>
+            <rect x="258" y="222" width="135" height="6" rx="3"/><rect x="258" y="246" width="90" height="6" rx="3"/>
+          </g>
+          <!-- petit livre "couverture" posé devant -->
+          <g transform="rotate(-8 250 300)">
+            <rect x="188" y="250" width="96" height="120" rx="4" fill="url(#couvg)"/>
+            <rect x="200" y="322" width="60" height="6" rx="3" fill="#f3d9a8" opacity=".9"/>
+            <rect x="206" y="334" width="48" height="4" rx="2" fill="#f3d9a8" opacity=".6"/>
+            <circle cx="236" cy="288" r="16" fill="none" stroke="#f3d9a8" stroke-width="1.5" opacity=".8"/>
+          </g>
+        </svg>
+      </div>
+    </div>
+  </header>
 
-    <label for="token">Token GitHub</label>
-    <input type="password" id="token" placeholder="ghp_xxxxxxxxxxxx">
+  <!-- ===== Fonctionnalités ===== -->
+  <section id="fonctionnalites" class="bande-claire">
+    <div class="contenu">
+      <div class="section-titre">
+        <h2>Tout pour composer un vrai livre</h2>
+        <p>Des outils simples et soignés, du premier mot à la version imprimable.</p>
+      </div>
+      <div class="grille-cartes">
+        <div class="carte-f">
+          <div class="ico">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>
+          </div>
+          <h3>Écriture paginée</h3>
+          <p>Le texte remplit chaque page et s'écoule automatiquement sur la suivante, comme dans un livre relié.</p>
+        </div>
+        <div class="carte-f">
+          <div class="ico">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.8"/><path d="M21 15l-5-5L5 21"/></svg>
+          </div>
+          <h3>Couvertures sur mesure</h3>
+          <p>Couleur ou image de fond, titre et auteur, première et quatrième de couverture — le tout en quelques clics.</p>
+        </div>
+        <div class="carte-f">
+          <div class="ico">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </div>
+          <h3>Aperçu réaliste</h3>
+          <p>Feuilletez votre ouvrage en mode lecture double-page pour juger du rendu final avant d'imprimer.</p>
+        </div>
+        <div class="carte-f">
+          <div class="ico">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8" rx="1"/></svg>
+          </div>
+          <h3>Export imprimable</h3>
+          <p>À la taille réelle du livre : livret à agrafer ou pages à dos collé, prêtes pour l'impression.</p>
+        </div>
+      </div>
+    </div>
+  </section>
 
-    <button onclick="seConnecter()">Se connecter</button>
+  <!-- ===== Comment ça marche ===== -->
+  <section id="comment">
+    <div class="contenu">
+      <div class="section-titre">
+        <h2>Comment ça marche</h2>
+        <p>Trois étapes, et votre manuscrit prend la forme d'un livre.</p>
+      </div>
+      <div class="etapes">
+        <div class="etape">
+          <div class="num">1</div>
+          <h3>Créez votre livre</h3>
+          <p>Choisissez un format (roman, poche, A4…) et donnez-lui un titre.</p>
+        </div>
+        <div class="etape">
+          <div class="num">2</div>
+          <h3>Écrivez &amp; composez</h3>
+          <p>Rédigez, mettez en forme, ajoutez votre couverture. Tout est sauvegardé.</p>
+        </div>
+        <div class="etape">
+          <div class="num">3</div>
+          <h3>Imprimez ou partagez</h3>
+          <p>Exportez un fichier prêt à imprimer, à la taille exacte de votre livre.</p>
+        </div>
+      </div>
 
-    <p id="message" class="message"></p>
-  </div>
+      <!-- maquette double-page -->
+      <div class="maquette" aria-hidden="true">
+        <div class="maq-page">
+          <h4>Introduction</h4>
+          <div class="maq-ligne"></div><div class="maq-ligne"></div><div class="maq-ligne court"></div>
+          <div class="maq-ligne" style="margin-top:16px"></div><div class="maq-ligne"></div>
+          <div class="maq-ligne"></div><div class="maq-ligne court"></div>
+          <div class="maq-ligne" style="margin-top:16px"></div><div class="maq-ligne"></div><div class="maq-ligne court"></div>
+        </div>
+        <div class="maq-page">
+          <div class="maq-ligne" style="margin-top:6px"></div><div class="maq-ligne"></div><div class="maq-ligne court"></div>
+          <div class="maq-ligne" style="margin-top:16px"></div><div class="maq-ligne"></div><div class="maq-ligne"></div>
+          <div class="maq-ligne court"></div>
+          <div class="maq-ligne" style="margin-top:16px"></div><div class="maq-ligne"></div><div class="maq-ligne"></div><div class="maq-ligne court"></div>
+        </div>
+      </div>
+    </div>
+  </section>
 
-  <script src="script.js"></script>
+  <!-- ===== Formats ===== -->
+  <section class="bande-claire">
+    <div class="contenu">
+      <div class="section-titre">
+        <h2>Des formats de livre réels</h2>
+        <p>Chaque page respecte les proportions du format choisi.</p>
+      </div>
+      <div class="formats">
+        <div class="format"><div class="mini"></div><b>Roman</b><span>14,9 × 21 cm</span></div>
+        <div class="format"><div class="mini"></div><b>Grand roman</b><span>15,5 × 23,5 cm</span></div>
+        <div class="format"><div class="mini" style="width:36px;height:50px"></div><b>Poche</b><span>10,5 × 14,8 cm</span></div>
+        <div class="format"><div class="mini" style="width:42px;height:60px"></div><b>A4</b><span>21 × 29,7 cm</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Appel final ===== -->
+  <section>
+    <div class="contenu" style="text-align:center">
+      <h2 style="font-size:clamp(28px,3.6vw,40px);margin-bottom:14px">Prêt à écrire votre premier chapitre&nbsp;?</h2>
+      <p style="color:var(--ink-soft);font-size:17px;max-width:32em;margin:0 auto 24px">Connectez-vous pour retrouver vos livres ou en commencer un nouveau.</p>
+      <a href="connexion.html" id="ctaFin" class="btn btn-primaire">Se connecter</a>
+    </div>
+  </section>
+
+  <!-- ===== Pied ===== -->
+  <footer class="pied">
+    <div class="contenu pied-in">
+      <div class="marque">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#8a4b38" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5.5C10.5 4.3 8.3 3.8 6 4c-1 .1-2 .3-3 .6v14c1-.3 2-.5 3-.6 2.3-.2 4.5.3 6 1.5 1.5-1.2 3.7-1.7 6-1.5 1 .1 2 .3 3 .6V4.6c-1-.3-2-.5-3-.6-2.3-.2-4.5.3-6 1.5Z"/><path d="M12 5.5v14"/></svg>
+        Mon Éditeur De Livre
+      </div>
+      <small>Écrit, mis en page et imprimé, depuis votre navigateur.</small>
+    </div>
+  </footer>
+
+  <script>
+    // Si une session est déjà ouverte, on invite à rejoindre ses livres.
+    (function(){
+      try {
+        if (sessionStorage.getItem("gh_token")) {
+          document.querySelectorAll("#ctaNav, #ctaHero, #ctaFin").forEach(function(a){
+            a.setAttribute("href", "bibliotheque.html");
+          });
+          var nav = document.getElementById("ctaNav"); if (nav) nav.textContent = "Mes livres";
+          var hero = document.getElementById("ctaHero"); if (hero) hero.textContent = "Ouvrir mes livres";
+          var fin = document.getElementById("ctaFin"); if (fin) fin.textContent = "Ouvrir mes livres";
+        }
+      } catch (e) {}
+    })();
+  </script>
 </body>
 </html>

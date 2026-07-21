@@ -9,7 +9,7 @@ async function chargerBibliotheque() {
   nomFichierBiblio = obtenirNomFichierBibliotheque();
 
   if (!token || !nomFichierBiblio) {
-    window.location.href = "index.html";
+    window.location.href = "connexion.html";
     return;
   }
 
@@ -63,36 +63,83 @@ async function migrerImagesEmbarquees(token) {
   return modifie;
 }
 
+function echapper(txt) {
+  const d = document.createElement("div");
+  d.textContent = txt == null ? "" : String(txt);
+  return d.innerHTML;
+}
+
+function remplirProfil() {
+  const login = sessionStorage.getItem("gh_login") || "";
+  const initiales = (login.replace(/[^a-zA-Z0-9]/g, "").slice(0, 2) || "?").toUpperCase();
+
+  const elAvatar = document.getElementById("avatarInitiales");
+  const elNom = document.getElementById("profilNom");
+  const elLivres = document.getElementById("statLivres");
+  const elPages = document.getElementById("statPages");
+
+  if (elAvatar) elAvatar.textContent = initiales;
+  if (elNom) elNom.textContent = login || "Auteur";
+
+  const livres = (bibliotheque && bibliotheque.livres) || [];
+  const totalPages = livres.reduce((n, l) => n + (l.pages ? l.pages.length : 0), 0);
+  if (elLivres) elLivres.textContent = livres.length;
+  if (elPages) elPages.textContent = totalPages;
+}
+
 function afficherListeLivres() {
+  remplirProfil();
+
   const liste = document.getElementById("listeLivres");
   liste.innerHTML = "";
 
   if (bibliotheque.livres.length === 0) {
-    const li = document.createElement("li");
-    li.textContent = "Aucun livre pour l'instant. Crée ton premier livre ci-dessous.";
-    li.className = "vide";
-    liste.appendChild(li);
+    const vide = document.createElement("li");
+    vide.className = "livres-vide";
+    vide.innerHTML =
+      '<svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="#c9b98f" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5.5C10.5 4.3 8.3 3.8 6 4c-1 .1-2 .3-3 .6v14c1-.3 2-.5 3-.6 2.3-.2 4.5.3 6 1.5 1.5-1.2 3.7-1.7 6-1.5 1 .1 2 .3 3 .6V4.6c-1-.3-2-.5-3-.6-2.3-.2-4.5.3-6 1.5Z"/><path d="M12 5.5v14"/></svg>' +
+      "<div>Aucun livre pour l'instant.<br>Créez votre premier livre ci-dessous.</div>";
+    liste.appendChild(vide);
     return;
   }
 
+  const labels = { "149x210": "14,9×21", "155x235": "15,5×23,5", "105x148": "Poche", "210x297": "A4" };
+
   bibliotheque.livres.forEach((livre) => {
+    const nbPages = livre.pages ? livre.pages.length : 0;
+    const labelFormat = labels[livre.format] || "14,9×21";
+    const couv = livre.couverture || {};
+    const fond = couv.fond || "#1a1a2e";
+    const couleurTexte = couv.texte || "#ffffff";
+    const afficherTitre = couv.afficherTitre !== false;
+    const afficherAuteur = couv.afficherAuteur !== false && livre.auteur;
+
     const li = document.createElement("li");
+    li.className = "livre-carte";
 
-    const nomPages = livre.pages ? livre.pages.length : 0;
-    const labels = { "149x210": "14,9×21 cm", "155x235": "15,5×23,5 cm", "105x148": "Poche", "210x297": "A4" };
-    const labelFormat = labels[livre.format] || "14,9×21 cm";
+    const couvDiv = document.createElement("div");
+    couvDiv.className = "livre-couv";
+    couvDiv.style.background = fond;
+    couvDiv.style.color = couleurTexte;
+    couvDiv.title = "Ouvrir « " + (livre.titre || "") + " »";
+    couvDiv.innerHTML =
+      (afficherTitre ? `<div class="c-titre">${echapper(livre.titre || "Sans titre")}</div>` : "") +
+      (afficherAuteur ? `<div class="c-auteur">${echapper(livre.auteur)}</div>` : "");
+    couvDiv.onclick = () => ouvrirLivre(livre.id);
+    li.appendChild(couvDiv);
 
-    const infos = document.createElement("span");
-    infos.innerHTML = `<span class="titre-livre">${livre.titre}</span><span class="detail-livre">${labelFormat} · ${nomPages} page(s)</span>`;
-    infos.style.flex = "1";
-    infos.onclick = () => ouvrirLivre(livre.id);
-    li.appendChild(infos);
+    const meta = document.createElement("div");
+    meta.className = "livre-meta";
+    meta.innerHTML =
+      `<span class="l-titre">${echapper(livre.titre || "Sans titre")}</span>` +
+      `<span class="l-detail">${labelFormat} · ${nbPages} p.</span>`;
+    meta.querySelector(".l-titre").onclick = () => ouvrirLivre(livre.id);
+    li.appendChild(meta);
 
     const btnSuppr = document.createElement("button");
+    btnSuppr.className = "livre-suppr";
     btnSuppr.textContent = "✕";
-    btnSuppr.className = "secondaire petit danger";
     btnSuppr.title = "Supprimer ce livre";
-    btnSuppr.style.marginTop = "0";
     btnSuppr.onclick = (e) => { e.stopPropagation(); supprimerLivre(livre.id); };
     li.appendChild(btnSuppr);
 
