@@ -147,7 +147,7 @@ function afficherListeLivres() {
 
     // Si la couverture a une image de fond, on l'affiche par-dessus la couleur.
     // Sinon, on garde la couleur (ou le blanc) : rien à charger.
-    if (couv.imageChemin) chargerImageCouvVignette(couvDiv, couv.imageChemin);
+    if (couv.imageChemin) chargerImageCouvVignette(couvDiv, couv.imageChemin, livre.format, couv);
 
     const meta = document.createElement("div");
     meta.className = "livre-meta";
@@ -172,18 +172,88 @@ function afficherListeLivres() {
 // à chaque rendu de la liste.
 let cacheImagesCouvVignette = {};
 
-async function chargerImageCouvVignette(couvDiv, chemin) {
+// Dimensions (mm) des formats, pour recalculer la taille de page de l'éditeur
+// à laquelle les décalages (imgOffsetX/Y) ont été enregistrés.
+const FORMATS_VIGNETTE = {
+  "149x210": { larg: 149, haut: 210 },
+  "155x235": { larg: 155, haut: 235 },
+  "105x148": { larg: 105, haut: 148 },
+  "210x297": { larg: 210, haut: 297 },
+};
+
+// Reproduit le calcul de taille de page de l'éditeur (appliquerFormatPage),
+// car les décalages de l'image sont exprimés en pixels relatifs à cette taille.
+function dimensionsPageReference(formatKey) {
+  const f = FORMATS_VIGNETTE[formatKey] || FORMATS_VIGNETTE["149x210"];
+  const ratio = f.haut / f.larg;
+  const sommaireLarg = 240, margesH = 32, barresH = 56 + 52 + 10 + 32 + 10, gapPages = 26, margeV = 32;
+  const dispoW = window.innerWidth - sommaireLarg - margesH;
+  const dispoH = window.innerHeight - barresH - margeV;
+  let largPx = Math.floor((dispoW - gapPages) / 2);
+  let hautPx = Math.round(largPx * ratio);
+  if (hautPx > dispoH) { hautPx = dispoH; largPx = Math.round(hautPx / ratio); }
+  return { largPx, hautPx };
+}
+
+// Affiche l'image de couverture exactement comme dans l'éditeur : image entière
+// (comme object-fit: contain), avec le zoom et le décalage choisis, le tout
+// mis à l'échelle pour tenir dans la vignette.
+async function chargerImageCouvVignette(couvDiv, chemin, formatKey, data) {
   const token = sessionStorage.getItem("gh_token");
   if (!token) return;
+  let url;
   try {
     if (!cacheImagesCouvVignette[chemin]) {
       cacheImagesCouvVignette[chemin] = await obtenirUrlImage(chemin, token);
     }
-    couvDiv.style.backgroundImage = `url("${cacheImagesCouvVignette[chemin]}")`;
+    url = cacheImagesCouvVignette[chemin];
   } catch (erreur) {
-    // En cas d'échec, on invalide le cache et on laisse la couleur de fond.
     delete cacheImagesCouvVignette[chemin];
+    return; // on laisse la couleur de fond
   }
+
+  const ref = dimensionsPageReference(formatKey);
+  couvDiv.style.position = "relative";
+
+  // Conteneur à la taille de référence de l'éditeur, réduit dans la vignette.
+  const wrap = document.createElement("div");
+  wrap.style.position = "absolute";
+  wrap.style.top = "0";
+  wrap.style.left = "0";
+  wrap.style.width = ref.largPx + "px";
+  wrap.style.height = ref.hautPx + "px";
+  wrap.style.transformOrigin = "top left";
+  wrap.style.zIndex = "0"; // derrière le titre/auteur, devant la couleur de fond
+
+  const img = document.createElement("img");
+  img.draggable = false;
+  img.style.position = "absolute";
+  img.style.top = "0";
+  img.style.left = "0";
+  img.onload = () => {
+    const echelleBase = Math.min(ref.largPx / img.naturalWidth, ref.hautPx / img.naturalHeight);
+    const largeurAffichee = img.naturalWidth * echelleBase;
+    const hauteurAffichee = img.naturalHeight * echelleBase;
+    const centreX = (ref.largPx - largeurAffichee) / 2;
+    const centreY = (ref.hautPx - hauteurAffichee) / 2;
+    const zoom = data.imgZoom || 1;
+    img.style.width = largeurAffichee + "px";
+    img.style.height = hauteurAffichee + "px";
+    img.style.transform =
+      `translate(${centreX + (data.imgOffsetX || 0)}px, ${centreY + (data.imgOffsetY || 0)}px) scale(${zoom})`;
+    // Réduire l'ensemble à la largeur réelle de la vignette.
+    wrap.style.transform = `scale(${couvDiv.clientWidth / ref.largPx})`;
+  };
+  img.src = url;
+
+  wrap.appendChild(img);
+  couvDiv.insertBefore(wrap, couvDiv.firstChild);
+
+  // S'assurer que le titre/auteur restent au-dessus de l'image.
+  couvDiv.querySelectorAll(".c-titre, .c-auteur").forEach(el => {
+    el.style.position = "relative";
+    el.style.zIndex = "1";
+  });
 }
 
 function ouvrirLivre(id) {
