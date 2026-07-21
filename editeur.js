@@ -8,6 +8,7 @@ let coteActif = "gauche";
 let selectionSauvegardee = null;
 let modeCouverture = null; // 'couverture' | 'quatrieme' | null
 let hauteurTextePx = 0;    // hauteur utile d'une page de texte (px), pour la pagination continue
+let echelleAffichage = 1;  // zoom d'affichage courant (transform: scale) du livre
 
 // Formats : dimensions en mm, marges en mm (haut/bas, gauche/droite)
 const FORMATS = {
@@ -17,55 +18,39 @@ const FORMATS = {
   "210x297": { larg: 210, haut: 297, margeV: 25, margeH: 25 },
 };
 
+// 96 ppp : 1 mm ≈ 3,7795 px. Les pages ont une taille LOGIQUE fixe (dérivée
+// des mm du format) ; on adapte ensuite l'affichage à la fenêtre par un zoom
+// (transform: scale). Ainsi le texte garde toujours le bon rapport avec la
+// page, quelle que soit la taille de la fenêtre, et la pagination ne bouge pas.
+const PX_PAR_MM = 96 / 25.4;
+
 function appliquerFormatPage(formatKey) {
   const f = FORMATS[formatKey] || FORMATS["149x210"];
-  const ratio = f.haut / f.larg; // ratio hauteur/largeur du format
 
-  // Espace disponible (fenêtre - sommaire - paddings - barre outils - barre actions)
-  const sommaireLarg = 240; // sommaire 200px + gap 20px + marge 20px
-  const margesH      = 32;  // padding conteneur gauche+droite
-  const barresH      = 56 + 52 + 10 + 32 + 10; // barre outils + barre actions + gaps + message
-  const gapPages     = 26;
-  const margeV       = 32;  // padding conteneur haut+bas
-
-  const dispoW = window.innerWidth  - sommaireLarg - margesH;
-  const dispoH = window.innerHeight - barresH - margeV;
-
-  // Largeur d'une page = moitié de l'espace horizontal (deux pages côte à côte)
-  let largPx = Math.floor((dispoW - gapPages) / 2);
-  let hautPx = Math.round(largPx * ratio);
-
-  // Si ça dépasse en hauteur, on recalcule depuis la hauteur
-  if (hautPx > dispoH) {
-    hautPx = dispoH;
-    largPx = Math.round(hautPx / ratio);
-  }
-
-  // Marges internes proportionnelles au format réel (en mm)
-  const MM = largPx / f.larg;
-  const margeVPx = Math.round(f.margeV * MM);
-  const margeHPx = Math.round(f.margeH * MM);
-  const numPageH = 32; // 6px padding-top + ~16px texte + 10px padding-bottom
-
-  document.querySelectorAll(".page-livre").forEach(el => {
-    el.style.width     = largPx + "px";
-    el.style.height    = hautPx + "px";
-    el.style.padding   = margeVPx + "px " + margeHPx + "px 0";
-    el.style.boxSizing = "border-box";
-    el.style.flexShrink = "0";
-  });
+  // --- Dimensions LOGIQUES fixes (indépendantes de la fenêtre) ---
+  const largPx   = Math.round(f.larg * PX_PAR_MM);
+  const hautPx   = Math.round(f.haut * PX_PAR_MM);
+  const margeVPx = Math.round(f.margeV * PX_PAR_MM);
+  const margeHPx = Math.round(f.margeH * PX_PAR_MM);
+  const numPageH = 32; // zone du numéro de page (logique)
+  const gapPages = 26;
 
   hauteurTextePx = hautPx - margeVPx - numPageH;
+
+  document.querySelectorAll(".page-livre").forEach(el => {
+    el.style.width      = largPx + "px";
+    el.style.height     = hautPx + "px";
+    el.style.padding    = margeVPx + "px " + margeHPx + "px 0";
+    el.style.boxSizing  = "border-box";
+    el.style.flexShrink = "0";
+  });
 
   document.querySelectorAll(".texte-livre").forEach(el => {
     el.style.width  = (largPx - margeHPx * 2) + "px";
     el.style.height = (hautPx - margeVPx - numPageH) + "px";
   });
 
-  // Supprimer tout transform (on adapte directement la taille)
-  document.querySelectorAll(".zone-livre").forEach(el => el.style.transform = "");
-
-  // Adapter aussi le panneau couverture (même largeur/hauteur que page-livre)
+  // Panneau couverture (même taille logique qu'une page)
   const previewCouv = document.getElementById("previewCouv");
   if (previewCouv) {
     previewCouv.style.width  = largPx + "px";
@@ -73,19 +58,44 @@ function appliquerFormatPage(formatKey) {
   }
   const paneau = document.querySelector(".paneau-edition-couv");
   if (paneau) {
-    paneau.style.width  = largPx + "px";
-    paneau.style.height = hautPx + "px";
-    paneau.style.padding = "16px 20px";
+    paneau.style.width     = largPx + "px";
+    paneau.style.height    = hautPx + "px";
+    paneau.style.padding   = "16px 20px";
     paneau.style.boxSizing = "border-box";
     paneau.style.overflowY = "auto";
   }
 
-  // Mettre à jour le mesureCachee
+  // Le mesureur de pagination est en taille logique (hors zoom)
   const mesure = document.getElementById("mesureCachee");
   if (mesure) {
     mesure.style.width  = (largPx - margeHPx * 2) + "px";
     mesure.style.height = (hautPx - margeVPx - numPageH) + "px";
   }
+
+  // --- Zoom d'affichage pour tenir dans l'espace disponible ---
+  const sommaireLarg = 240; // sommaire + gap + marge
+  const margesH      = 32;
+  const barresH      = 56 + 52 + 10 + 32 + 10; // outils + actions + gaps + message
+  const margeV       = 32;
+
+  const bookLargLogique = 2 * largPx + gapPages;
+  const dispoW = window.innerWidth  - sommaireLarg - margesH;
+  const dispoH = window.innerHeight - barresH - margeV;
+
+  let echelle = Math.min(dispoW / bookLargLogique, dispoH / hautPx);
+  if (!isFinite(echelle) || echelle <= 0) echelle = 1;
+  echelle = Math.min(echelle, 1.6); // ne pas zoomer à l'excès sur grand écran
+  echelleAffichage = echelle;
+
+  document.querySelectorAll(".livre-ouvert").forEach(el => {
+    el.style.transform = `scale(${echelle})`;
+    el.style.transformOrigin = "center center";
+    // Marges compensatrices : la mise en page réserve la taille RÉELLE (zoomée),
+    // pour que le centrage et le défilement restent corrects.
+    const dLarg = (bookLargLogique * (echelle - 1)) / 2;
+    const dHaut = (hautPx * (echelle - 1)) / 2;
+    el.style.margin = `${dHaut}px ${dLarg}px`;
+  });
 }
 
 async function chargerLivre() {
@@ -831,8 +841,10 @@ function initGlissementImageCouverture() {
     const data = modeCouverture === "couverture" ? livre.couverture : livre.quatrieme;
     if (!data) return;
 
-    const deltaX = e.clientX - glissementDepartX;
-    const deltaY = e.clientY - glissementDepartY;
+    // Le livre est affiché avec un zoom : on ramène le déplacement écran en
+    // coordonnées logiques pour que l'image suive exactement le curseur.
+    const deltaX = (e.clientX - glissementDepartX) / (echelleAffichage || 1);
+    const deltaY = (e.clientY - glissementDepartY) / (echelleAffichage || 1);
     data.imgOffsetX = glissementOffsetDepartX + deltaX;
     data.imgOffsetY = glissementOffsetDepartY + deltaY;
 
