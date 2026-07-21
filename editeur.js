@@ -1049,6 +1049,7 @@ function supprimerImageFond() {
 function seDeconnecter() {
   sessionStorage.removeItem("gh_token");
   sessionStorage.removeItem("gh_login");
+  sessionStorage.removeItem("gh_role");
   sessionStorage.removeItem("livre_id");
   window.location.href = "index.html";
 }

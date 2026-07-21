@@ -217,14 +217,15 @@ async function seConnecter() {
   try {
     const { contenu: utilisateurs } = await lireFichierJSON("users.json", token);
 
-    const utilisateurValide = utilisateurs.some(
+    const utilisateur = utilisateurs.find(
       u => u.login === login && u.password === password
     );
 
-    if (utilisateurValide) {
+    if (utilisateur) {
       // Le token reste UNIQUEMENT en mémoire de session (jamais écrit dans un fichier)
       sessionStorage.setItem("gh_token", token);
       sessionStorage.setItem("gh_login", login);
+      sessionStorage.setItem("gh_role", utilisateur.role === "admin" ? "admin" : "user");
       window.location.href = "bibliotheque.html";
     } else {
       message.textContent = "Identifiants incorrects.";

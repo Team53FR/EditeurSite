@@ -81,6 +81,10 @@ function remplirProfil() {
   if (elAvatar) elAvatar.textContent = initiales;
   if (elNom) elNom.textContent = login || "Auteur";
 
+  // Bouton de gestion des utilisateurs réservé aux admins
+  const btnAdmin = document.getElementById("btnAdmin");
+  if (btnAdmin) btnAdmin.style.display = (sessionStorage.getItem("gh_role") === "admin") ? "" : "none";
+
   const livres = (bibliotheque && bibliotheque.livres) || [];
   const totalPages = livres.reduce((n, l) => n + (l.pages ? l.pages.length : 0), 0);
   if (elLivres) elLivres.textContent = livres.length;
@@ -213,6 +217,7 @@ async function supprimerLivre(id) {
 function seDeconnecter() {
   sessionStorage.removeItem("gh_token");
   sessionStorage.removeItem("gh_login");
+  sessionStorage.removeItem("gh_role");
   sessionStorage.removeItem("livre_id");
   window.location.href = "index.html";
 }
