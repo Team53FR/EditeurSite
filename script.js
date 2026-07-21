@@ -145,15 +145,40 @@ async function supprimerFichierGithub(chemin, token, messageCommit) {
   // Volontairement silencieux en cas d'échec : ne doit pas bloquer le reste du flux
 }
 
+function mimeDepuisChemin(chemin) {
+  const ext = (chemin.split(".").pop() || "").toLowerCase();
+  if (ext === "png") return "image/png";
+  if (ext === "gif") return "image/gif";
+  if (ext === "webp") return "image/webp";
+  if (ext === "svg") return "image/svg+xml";
+  return "image/jpeg";
+}
+
 async function obtenirUrlImage(chemin, token) {
   const url = `https://api.github.com/repos/${PROPRIETAIRE}/${DEPOT_BDD}/contents/${chemin}`;
+
+  // On récupère les OCTETS bruts, authentifiés par le token dans l'en-tête.
+  // (Le download_url de GitHub pour un dépôt privé est une URL signée à jeton
+  //  temporaire qui expire : chargée dans un <img>, elle finit par échouer.)
   const reponse = await fetch(url, {
+    headers: { "Authorization": `Bearer ${token}`, "Accept": "application/vnd.github.raw" }
+  });
+
+  if (reponse.ok) {
+    const brut = await reponse.blob();
+    const mime = mimeDepuisChemin(chemin);
+    const blob = (brut.type && brut.type.startsWith("image/")) ? brut : new Blob([brut], { type: mime });
+    return URL.createObjectURL(blob); // URL locale stable, sans expiration
+  }
+
+  // Repli : ancienne méthode (JSON + contenu base64 ou download_url)
+  const reponseJson = await fetch(url, {
     headers: { "Authorization": `Bearer ${token}`, "Accept": "application/vnd.github+json" }
   });
-  if (!reponse.ok) throw new Error(`Impossible de charger l'image "${chemin}".`);
-  const data = await reponse.json();
+  if (!reponseJson.ok) throw new Error(`Impossible de charger l'image "${chemin}".`);
+  const data = await reponseJson.json();
+  if (data.content) return `data:${mimeDepuisChemin(chemin)};base64,${data.content.replace(/\n/g, "")}`;
   if (data.download_url) return data.download_url;
-  if (data.content) return `data:image/jpeg;base64,${data.content.replace(/\n/g, "")}`;
   throw new Error(`Image "${chemin}" introuvable.`);
 }
 
