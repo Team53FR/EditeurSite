@@ -28,6 +28,11 @@
 
       <ul id="listePages"></ul>
 
+      <div class="sommaire-pied">
+        <div id="compteurMots" class="compteur-mots"></div>
+        <div id="etatSauvegarde" class="etat-sauvegarde enregistre">✓ Enregistré</div>
+      </div>
+
       <div class="sommaire-actions">
         <button onclick="retourBibliotheque()" class="secondaire petit">&#8592; Bibliothèque</button>
         <button onclick="seDeconnecter()" class="secondaire petit">Se déconnecter</button>
@@ -38,6 +43,9 @@
     <div class="zone-livre" id="vueEditeur">
 
       <div class="barre-outils">
+        <button onmousedown="event.preventDefault()" onclick="annuler()" title="Annuler (Ctrl+Z)">&#8630;</button>
+        <button onmousedown="event.preventDefault()" onclick="retablir()" title="Rétablir (Ctrl+Y)">&#8631;</button>
+        <span class="separateur-outils"></span>
         <button onmousedown="event.preventDefault()" onclick="formater('bold')" title="Gras"><b>G</b></button>
         <button onmousedown="event.preventDefault()" onclick="formater('italic')" title="Italique"><i>I</i></button>
         <button onmousedown="event.preventDefault()" onclick="formater('underline')" title="Souligné"><u>S</u></button>
@@ -45,6 +53,28 @@
         <button onmousedown="event.preventDefault()" onclick="formater('justifyLeft')" title="Gauche">&#8676;</button>
         <button onmousedown="event.preventDefault()" onclick="formater('justifyCenter')" title="Centrer">&#8633;</button>
         <button onmousedown="event.preventDefault()" onclick="formater('justifyRight')" title="Droite">&#8677;</button>
+        <button onmousedown="event.preventDefault()" onclick="formater('justifyFull')" title="Justifier">&#8803;</button>
+        <span class="separateur-outils"></span>
+        <button onmousedown="event.preventDefault()" onclick="formater('insertUnorderedList')" title="Liste à puces">&#8226;</button>
+        <button onmousedown="event.preventDefault()" onclick="formater('insertOrderedList')" title="Liste numérotée">1.</button>
+        <span class="separateur-outils"></span>
+        <select id="selectStyle" title="Style de paragraphe" onmousedown="sauvegarderSelection()" onchange="appliquerStyle(this.value)">
+          <option value="p">Paragraphe</option>
+          <option value="h2">Titre</option>
+          <option value="h3">Sous-titre</option>
+        </select>
+        <select id="selectPolice" title="Police" onmousedown="sauvegarderSelection()" onchange="appliquerPolice(this.value)">
+          <option value="">Garamond</option>
+          <option value="Georgia, serif">Georgia</option>
+          <option value="'Times New Roman', serif">Times</option>
+          <option value="Arial, sans-serif">Arial</option>
+          <option value="'Courier New', monospace">Courier</option>
+        </select>
+        <select id="selectInterligne" title="Interligne" onmousedown="sauvegarderSelection()" onchange="appliquerInterligne(this.value)">
+          <option value="1.15">Interligne 1</option>
+          <option value="1.45" selected>Interligne 1,5</option>
+          <option value="1.8">Interligne 2</option>
+        </select>
         <span class="separateur-outils"></span>
         <input type="number" id="inputTaille" value="18" min="6" max="72" title="Taille (pt)"
           class="input-taille"
@@ -52,6 +82,19 @@
           onchange="appliquerTaille(this.value)"
           onkeydown="if(event.key==='Enter'){appliquerTaille(this.value);event.preventDefault();}">
         <span style="font-size:12px;color:#666;">pt</span>
+        <span class="separateur-outils"></span>
+        <button onmousedown="event.preventDefault()" onclick="basculerRecherche()" title="Rechercher / Remplacer (Ctrl+F)">&#128269;</button>
+      </div>
+
+      <div class="panneau-recherche" id="panneauRecherche" style="display:none;">
+        <input type="text" id="champRecherche" placeholder="Rechercher…" onkeydown="if(event.key==='Enter'){event.preventDefault();allerMatch(event.shiftKey?-1:1);}">
+        <input type="text" id="champRemplacer" placeholder="Remplacer par…">
+        <button class="petit secondaire" onclick="allerMatch(-1)" title="Précédent">&#8593;</button>
+        <button class="petit secondaire" onclick="allerMatch(1)" title="Suivant">&#8595;</button>
+        <span id="compteurRecherche" class="compteur-recherche">0/0</span>
+        <button class="petit secondaire" onclick="remplacerCourant()">Remplacer</button>
+        <button class="petit secondaire" onclick="remplacerTout()">Tout</button>
+        <button class="petit secondaire" onclick="basculerRecherche()" title="Fermer">&#10005;</button>
       </div>
 
       <div class="livre-ouvert">
@@ -93,10 +136,10 @@
           <div class="champs-couverture">
 
             <label class="label-couv">Titre</label>
-            <input type="text" id="champTitreCouv" placeholder="Titre du livre" oninput="previewCouverture()">
+            <input type="text" id="champTitreCouv" placeholder="Titre du livre" oninput="previewCouverture(); marquerModifie();">
 
             <label class="label-couv">Auteur</label>
-            <input type="text" id="champAuteurCouv" placeholder="Nom de l'auteur" oninput="previewCouverture()">
+            <input type="text" id="champAuteurCouv" placeholder="Nom de l'auteur" oninput="previewCouverture(); marquerModifie();">
 
             <div class="ligne-toggle" id="ligneToggleTitre">
               <label class="toggle-ligne">

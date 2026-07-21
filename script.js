@@ -70,7 +70,11 @@ async function ecrireFichierJSON(nomFichier, contenu, sha, token, messageCommit)
   if (!reponse.ok) {
     let details = "";
     try { const err = await reponse.json(); if (err.message) details = ` (${err.message})`; } catch (e) {}
-    throw new Error(`Échec de l'écriture de "${nomFichier}"${details}.`);
+    const erreur = new Error(`Échec de l'écriture de "${nomFichier}"${details}.`);
+    erreur.status = reponse.status;
+    // 409 = le SHA fourni ne correspond plus à la version distante (modifié ailleurs).
+    if (reponse.status === 409) erreur.conflit = true;
+    throw erreur;
   }
 
   const data = await reponse.json();

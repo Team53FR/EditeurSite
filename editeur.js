@@ -134,13 +134,43 @@ async function chargerLivre() {
     pageDroite.addEventListener("focus", () => { coteActif = "droite"; });
     pageGauche.addEventListener("blur", sauvegarderSelection);
     pageDroite.addEventListener("blur", sauvegarderSelection);
+    pageGauche.addEventListener("input", surSaisie);
+    pageDroite.addEventListener("input", surSaisie);
     document.addEventListener("selectionchange", lireTailleCourrante);
+    document.addEventListener("keydown", raccourcisClavier);
+    window.addEventListener("beforeunload", (e) => {
+      if (modifie) { e.preventDefault(); e.returnValue = ""; }
+    });
+
+    // Proposer de restaurer un éventuel brouillon local non enregistré
+    verifierBrouillon();
 
     afficherSpread();
     afficherSommaire();
+    majCompteurMots();
   } catch (erreur) {
     message.textContent = erreur.message;
   }
+}
+
+// Saisie dans une page : historique, brouillon local, compteur, état modifié
+function surSaisie() {
+  planifierHistorique();
+  planifierBrouillon();
+  planifierCompteurMots();
+  marquerModifie();
+}
+
+// Raccourcis clavier globaux de l'éditeur (mode texte uniquement)
+function raccourcisClavier(e) {
+  if (modeApercu || modeCouverture) return;
+  const ctrl = e.ctrlKey || e.metaKey;
+  if (!ctrl) return;
+  const touche = e.key.toLowerCase();
+  if (touche === "z" && !e.shiftKey) { e.preventDefault(); annuler(); }
+  else if ((touche === "z" && e.shiftKey) || touche === "y") { e.preventDefault(); retablir(); }
+  else if (touche === "f") { e.preventDefault(); basculerRecherche(true); }
+  else if (touche === "s") { e.preventDefault(); sauvegarder(); }
 }
 
 function livreActuel() {
@@ -149,6 +179,61 @@ function livreActuel() {
 
 function formater(commande, valeur) {
   document.execCommand(commande, false, valeur || null);
+  enregistrerHistorique();
+  marquerModifie();
+}
+
+// Style de paragraphe : Paragraphe / Titre / Sous-titre (#7)
+function appliquerStyle(baliseKey) {
+  restaurerSelection();
+  const balise = baliseKey === "h2" ? "H2" : baliseKey === "h3" ? "H3" : "P";
+  document.execCommand("formatBlock", false, balise);
+  enregistrerHistorique();
+  marquerModifie();
+}
+
+// Police de caractères de la sélection (#7)
+function appliquerPolice(police) {
+  restaurerSelection();
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
+  const range = sel.getRangeAt(0);
+  const fragment = range.extractContents();
+  fragment.querySelectorAll("span[style]").forEach(el => {
+    el.style.fontFamily = "";
+    if (!el.getAttribute("style")) el.removeAttribute("style");
+  });
+  const span = document.createElement("span");
+  // Chaîne vide = police par défaut (Garamond héritée de .texte-livre)
+  span.style.fontFamily = police || "";
+  span.appendChild(fragment);
+  range.insertNode(span);
+  const nouvelRange = document.createRange();
+  nouvelRange.selectNodeContents(span);
+  sel.removeAllRanges();
+  sel.addRange(nouvelRange);
+  enregistrerHistorique();
+  marquerModifie();
+}
+
+// Interligne appliqué aux paragraphes touchés par la sélection (#7)
+function appliquerInterligne(valeur) {
+  restaurerSelection();
+  const conteneur = coteActif === "droite"
+    ? document.getElementById("pageDroite")
+    : document.getElementById("pageGauche");
+  const sel = window.getSelection();
+  let cibles = [];
+  if (sel && sel.rangeCount > 0) {
+    const range = sel.getRangeAt(0);
+    conteneur.querySelectorAll("p, h2, h3, li").forEach(bloc => {
+      if (range.intersectsNode(bloc)) cibles.push(bloc);
+    });
+  }
+  if (cibles.length === 0) cibles = [conteneur];
+  cibles.forEach(bloc => { bloc.style.lineHeight = valeur; });
+  enregistrerHistorique();
+  marquerModifie();
 }
 
 function sauvegarderSelection() {
@@ -197,6 +282,8 @@ function appliquerTaille(pt) {
   nouvelRange.selectNodeContents(span);
   sel.removeAllRanges();
   sel.addRange(nouvelRange);
+  enregistrerHistorique();
+  marquerModifie();
 }
 
 // ----- Blocage en fin de page -----
@@ -313,6 +400,8 @@ function afficherSpread() {
   document.getElementById("pageDroite").innerHTML = pages[indexSpread + 1] ? pages[indexSpread + 1].contenu : "";
   document.getElementById("numeroGauche").textContent = indexSpread + 1;
   document.getElementById("numeroDroite").textContent = pages[indexSpread + 1] ? indexSpread + 2 : "";
+  // L'historique annuler/rétablir est propre à chaque double-page affichée
+  reinitialiserHistorique();
 }
 
 function afficherSommaire() {
@@ -323,6 +412,14 @@ function afficherSommaire() {
   pages.forEach((page, i) => {
     const li = document.createElement("li");
     li.className = (i === indexSpread || i === indexSpread + 1) ? "actif" : "";
+    li.draggable = true;
+    li.dataset.index = i;
+
+    const poignee = document.createElement("span");
+    poignee.className = "poignee-page";
+    poignee.textContent = "⠿";
+    poignee.title = "Glisser pour réorganiser";
+    li.appendChild(poignee);
 
     const libelle = document.createElement("span");
     libelle.textContent = "Page " + (i + 1);
@@ -339,8 +436,47 @@ function afficherSommaire() {
       li.appendChild(btnSuppr);
     }
 
+    li.addEventListener("dragstart", (e) => {
+      indexPageGlissee = i;
+      li.classList.add("en-deplacement");
+      e.dataTransfer.effectAllowed = "move";
+    });
+    li.addEventListener("dragend", () => {
+      li.classList.remove("en-deplacement");
+      liste.querySelectorAll("li").forEach(el => el.classList.remove("glisse-dessus"));
+    });
+    li.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      li.classList.add("glisse-dessus");
+    });
+    li.addEventListener("dragleave", () => li.classList.remove("glisse-dessus"));
+    li.addEventListener("drop", (e) => {
+      e.preventDefault();
+      li.classList.remove("glisse-dessus");
+      deplacerPage(indexPageGlissee, i);
+    });
+
     liste.appendChild(li);
   });
+}
+
+// Réorganisation des pages par glisser-déposer (#10)
+let indexPageGlissee = null;
+
+function deplacerPage(depuis, vers) {
+  if (depuis === null || depuis === vers) return;
+  flushSpread();
+  const pages = livreActuel().pages;
+  if (depuis < 0 || depuis >= pages.length || vers < 0 || vers >= pages.length) return;
+  const [page] = pages.splice(depuis, 1);
+  pages.splice(vers, 0, page);
+  // Se recaler sur la double-page contenant la page déplacée
+  indexSpread = vers - (vers % 2);
+  afficherSpread();
+  afficherSommaire();
+  marquerModifie();
+  planifierBrouillon();
 }
 
 function supprimerPage(i) {
@@ -362,6 +498,8 @@ function supprimerPage(i) {
 
   afficherSpread();
   afficherSommaire();
+  marquerModifie();
+  planifierBrouillon();
 }
 
 function allerAPage(i) {
@@ -411,8 +549,44 @@ async function sauvegarder() {
   try {
     shaBiblio = await ecrireFichierJSON(nomFichierBiblio, bibliotheque, shaBiblio, token, "Mise à jour du livre");
     message.textContent = "Sauvegardé avec succès.";
+    marquerSauvegarde();
+    effacerBrouillon();
   } catch (erreur) {
+    if (erreur.conflit) { gererConflitSauvegarde(); return; }
     message.textContent = erreur.message;
+  }
+}
+
+// Résolution d'un conflit d'écriture GitHub (le livre a été modifié ailleurs) (#3)
+async function gererConflitSauvegarde() {
+  const token = sessionStorage.getItem("gh_token");
+  const message = document.getElementById("message");
+
+  const ecraser = confirm(
+    "Ce livre a été modifié depuis un autre onglet ou appareil.\n\n" +
+    "OK = écraser la version distante avec la vôtre.\n" +
+    "Annuler = recharger la version distante (vos modifications non enregistrées seront perdues)."
+  );
+
+  if (ecraser) {
+    try {
+      // Récupérer le SHA à jour puis réécrire par-dessus
+      const { sha } = await lireFichierJSON(nomFichierBiblio, token);
+      shaBiblio = sha;
+      shaBiblio = await ecrireFichierJSON(
+        nomFichierBiblio, bibliotheque, shaBiblio, token,
+        "Mise à jour du livre (résolution de conflit)"
+      );
+      message.textContent = "Sauvegardé (version distante écrasée).";
+      marquerSauvegarde();
+      effacerBrouillon();
+    } catch (erreur) {
+      message.textContent = erreur.message;
+    }
+  } else {
+    // On garde le brouillon local au cas où, mais on recharge la version distante
+    modifie = false; // éviter l'avertissement beforeunload
+    window.location.reload();
   }
 }
 
@@ -561,6 +735,8 @@ function toggleAffichageTexte(champ, valeur) {
   if (champ === "titre") data.afficherTitre = valeur;
   else if (champ === "auteur") data.afficherAuteur = valeur;
   previewCouverture();
+  marquerModifie();
+  planifierBrouillon();
 }
 
 // Affiche l'image en s'assurant qu'elle est bien chargée avant de la positionner
@@ -654,6 +830,8 @@ function setZoomImage(val) {
   data.imgZoom = Math.max(0.3, Math.min(3, parseFloat(val)));
   document.getElementById("valeurZoom").textContent = Math.round(data.imgZoom * 100) + "%";
   repositionnerImageCouverture();
+  marquerModifie();
+  planifierBrouillon();
 }
 
 // ----- Glisser-déposer de l'image de couverture -----
@@ -704,6 +882,8 @@ function initGlissementImageCouverture() {
     if (e.pointerId !== undefined && img.hasPointerCapture(e.pointerId)) {
       img.releasePointerCapture(e.pointerId);
     }
+    marquerModifie();
+    planifierBrouillon();
   };
   img.addEventListener("pointerup", finGlissement);
   img.addEventListener("pointercancel", finGlissement);
@@ -719,6 +899,8 @@ function initGlissementImageCouverture() {
     document.getElementById("sliderZoom").value = data.imgZoom;
     document.getElementById("valeurZoom").textContent = Math.round(data.imgZoom * 100) + "%";
     repositionnerImageCouverture();
+    marquerModifie();
+    planifierBrouillon();
   }, { passive: false });
 }
 
@@ -737,6 +919,8 @@ function setCouleurFond(couleur) {
   data.imageChemin = null;
   document.getElementById("couleurLibre").value = couleur;
   previewCouverture();
+  marquerModifie();
+  planifierBrouillon();
 }
 
 function setCouleurTexte(couleur) {
@@ -745,6 +929,8 @@ function setCouleurTexte(couleur) {
   data.texte = couleur;
   document.getElementById("couleurTexteLibre").value = couleur;
   previewCouverture();
+  marquerModifie();
+  planifierBrouillon();
 }
 
 function chargerImageFond(event) {
@@ -781,6 +967,8 @@ function chargerImageFond(event) {
       cacheImagesURL[chemin] = dataUrl; // aperçu immédiat sans refaire de requête
       messageCouv.textContent = "";
       previewCouverture();
+      marquerModifie();
+      planifierBrouillon();
     } catch (erreur) {
       messageCouv.textContent = erreur.message;
     }
@@ -805,6 +993,8 @@ function supprimerImageFond() {
   data.imgOffsetY = 0;
   document.getElementById("inputImage").value = "";
   previewCouverture();
+  marquerModifie();
+  planifierBrouillon();
 }
 
 function seDeconnecter() {
@@ -995,6 +1185,450 @@ document.addEventListener("keydown", (e) => {
   else if (e.key === "ArrowLeft") apercuPrecedent();
   else if (e.key === "Escape") fermerApercu();
 });
+
+// =====================================================================
+//  État de sauvegarde (#9) et protection contre la perte de travail (#2)
+// =====================================================================
+
+let modifie = false;
+
+function marquerModifie() {
+  modifie = true;
+  majIndicateur();
+}
+
+function marquerSauvegarde() {
+  modifie = false;
+  majIndicateur();
+}
+
+function majIndicateur() {
+  const el = document.getElementById("etatSauvegarde");
+  if (!el) return;
+  if (modifie) {
+    el.textContent = "● Modifications non enregistrées";
+    el.className = "etat-sauvegarde non-enregistre";
+  } else {
+    el.textContent = "✓ Enregistré";
+    el.className = "etat-sauvegarde enregistre";
+  }
+}
+
+// ----- Brouillon local (localStorage) -----
+
+let timerBrouillon = null;
+
+function cleBrouillon() {
+  return `brouillon_${sessionStorage.getItem("gh_login")}_${livreId}`;
+}
+
+function planifierBrouillon() {
+  clearTimeout(timerBrouillon);
+  timerBrouillon = setTimeout(sauvegarderBrouillon, 1500);
+}
+
+function sauvegarderBrouillon() {
+  if (indexLivre === -1) return;
+  flushSpread();
+  try {
+    localStorage.setItem(cleBrouillon(), JSON.stringify({ t: Date.now(), livre: livreActuel() }));
+  } catch (e) { /* quota dépassé ou stockage indisponible : on ignore */ }
+}
+
+function effacerBrouillon() {
+  try { localStorage.removeItem(cleBrouillon()); } catch (e) {}
+}
+
+function verifierBrouillon() {
+  let brut;
+  try { brut = localStorage.getItem(cleBrouillon()); } catch (e) { return; }
+  if (!brut) return;
+
+  let data;
+  try { data = JSON.parse(brut); } catch (e) { effacerBrouillon(); return; }
+  if (!data || !data.livre) { effacerBrouillon(); return; }
+
+  // Brouillon identique à la version distante : rien à restaurer
+  if (JSON.stringify(data.livre) === JSON.stringify(livreActuel())) { effacerBrouillon(); return; }
+
+  const date = new Date(data.t).toLocaleString("fr-FR");
+  const restaurer = confirm(
+    `Un brouillon non enregistré de ce livre a été trouvé (${date}).\n\n` +
+    "OK = restaurer ce brouillon.\n" +
+    "Annuler = ignorer et garder la dernière version enregistrée."
+  );
+  if (restaurer) {
+    bibliotheque.livres[indexLivre] = data.livre;
+    indexSpread = 0;
+    marquerModifie();
+  } else {
+    effacerBrouillon();
+  }
+}
+
+// =====================================================================
+//  Historique annuler / rétablir par double-page (#4)
+// =====================================================================
+
+let historique = { undo: [], redo: [] };
+let dernierSnapshot = { g: "", d: "" };
+let timerHisto = null;
+
+function snapshotActuel() {
+  return {
+    g: document.getElementById("pageGauche").innerHTML,
+    d: document.getElementById("pageDroite").innerHTML
+  };
+}
+
+function reinitialiserHistorique() {
+  historique = { undo: [], redo: [] };
+  dernierSnapshot = snapshotActuel();
+  if (timerHisto) { clearTimeout(timerHisto); timerHisto = null; }
+}
+
+function planifierHistorique() {
+  clearTimeout(timerHisto);
+  timerHisto = setTimeout(() => { timerHisto = null; enregistrerHistorique(); }, 500);
+}
+
+function enregistrerHistorique() {
+  const actuel = snapshotActuel();
+  if (actuel.g === dernierSnapshot.g && actuel.d === dernierSnapshot.d) return;
+  historique.undo.push(dernierSnapshot);
+  if (historique.undo.length > 100) historique.undo.shift();
+  historique.redo = [];
+  dernierSnapshot = actuel;
+}
+
+function flushHistorique() {
+  if (timerHisto) { clearTimeout(timerHisto); timerHisto = null; }
+  enregistrerHistorique();
+}
+
+function annuler() {
+  if (modeApercu || modeCouverture) return;
+  flushHistorique();
+  if (historique.undo.length === 0) return;
+  historique.redo.push(dernierSnapshot);
+  const precedent = historique.undo.pop();
+  restaurerSnapshot(precedent);
+  dernierSnapshot = precedent;
+  marquerModifie();
+  planifierBrouillon();
+  planifierCompteurMots();
+}
+
+function retablir() {
+  if (modeApercu || modeCouverture) return;
+  if (historique.redo.length === 0) return;
+  historique.undo.push(dernierSnapshot);
+  const suivant = historique.redo.pop();
+  restaurerSnapshot(suivant);
+  dernierSnapshot = suivant;
+  marquerModifie();
+  planifierBrouillon();
+  planifierCompteurMots();
+}
+
+function restaurerSnapshot(etat) {
+  const pageGauche = document.getElementById("pageGauche");
+  const pageDroite = document.getElementById("pageDroite");
+  pageGauche.innerHTML = etat.g;
+  pageDroite.innerHTML = etat.d;
+  // Replacer le curseur en fin de la page active
+  const cible = coteActif === "droite" ? pageDroite : pageGauche;
+  cible.focus();
+  const range = document.createRange();
+  range.selectNodeContents(cible);
+  range.collapse(false);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
+// =====================================================================
+//  Compteur de mots (#10)
+// =====================================================================
+
+let timerCompteur = null;
+
+function planifierCompteurMots() {
+  clearTimeout(timerCompteur);
+  timerCompteur = setTimeout(majCompteurMots, 600);
+}
+
+function majCompteurMots() {
+  if (indexLivre === -1) return;
+  flushSpread();
+  const pages = livreActuel().pages;
+  let mots = 0;
+  const tmp = document.createElement("div");
+  pages.forEach(p => {
+    tmp.innerHTML = p.contenu || "";
+    const txt = (tmp.textContent || "").trim();
+    if (txt) mots += txt.split(/\s+/).length;
+  });
+  const el = document.getElementById("compteurMots");
+  if (el) el.textContent = `${mots} mot${mots > 1 ? "s" : ""} · ${pages.length} page${pages.length > 1 ? "s" : ""}`;
+}
+
+// =====================================================================
+//  Recherche et remplacement (#5)
+// =====================================================================
+
+let rechercheMatches = [];   // { page: index de page, offset: position dans le texte }
+let rechercheCourante = -1;
+
+function basculerRecherche(forcerOuverture) {
+  const panneau = document.getElementById("panneauRecherche");
+  if (!panneau) return;
+  const ouvrir = forcerOuverture || panneau.style.display === "none";
+  panneau.style.display = ouvrir ? "flex" : "none";
+  if (ouvrir) {
+    const champ = document.getElementById("champRecherche");
+    champ.focus();
+    champ.select();
+    if (champ.value) lancerRecherche();
+  } else {
+    rechercheMatches = [];
+    rechercheCourante = -1;
+  }
+}
+
+// Texte brut d'une page (sans balises HTML)
+function texteBrutPage(contenu) {
+  const tmp = document.createElement("div");
+  tmp.innerHTML = contenu || "";
+  return tmp.textContent || "";
+}
+
+function lancerRecherche() {
+  flushSpread();
+  const requete = document.getElementById("champRecherche").value;
+  rechercheMatches = [];
+  rechercheCourante = -1;
+
+  if (requete) {
+    const req = requete.toLowerCase();
+    const pages = livreActuel().pages;
+    pages.forEach((p, iPage) => {
+      const texte = texteBrutPage(p.contenu).toLowerCase();
+      let pos = texte.indexOf(req);
+      while (pos !== -1) {
+        rechercheMatches.push({ page: iPage, offset: pos });
+        pos = texte.indexOf(req, pos + Math.max(1, req.length));
+      }
+    });
+  }
+
+  majCompteurRecherche();
+  if (rechercheMatches.length > 0) allerMatch(1);
+}
+
+function majCompteurRecherche() {
+  const el = document.getElementById("compteurRecherche");
+  if (!el) return;
+  el.textContent = rechercheMatches.length === 0
+    ? "0/0"
+    : `${rechercheCourante + 1}/${rechercheMatches.length}`;
+}
+
+function allerMatch(direction) {
+  // (Re)lancer si la requête a changé depuis le dernier calcul
+  const requete = document.getElementById("champRecherche").value;
+  if (requete && rechercheMatches.length === 0 && rechercheCourante === -1) {
+    lancerRecherche();
+    return;
+  }
+  if (rechercheMatches.length === 0) { majCompteurRecherche(); return; }
+
+  rechercheCourante = (rechercheCourante + direction + rechercheMatches.length) % rechercheMatches.length;
+  surlignerMatch(rechercheMatches[rechercheCourante]);
+  majCompteurRecherche();
+}
+
+function surlignerMatch(match) {
+  const longueur = document.getElementById("champRecherche").value.length;
+  if (!longueur) return;
+
+  // Naviguer vers la double-page contenant le résultat
+  const spreadCible = match.page - (match.page % 2);
+  if (spreadCible !== indexSpread) {
+    flushSpread();
+    indexSpread = spreadCible;
+    afficherSpread();
+    afficherSommaire();
+  }
+
+  const pageEl = (match.page % 2 === 0)
+    ? document.getElementById("pageGauche")
+    : document.getElementById("pageDroite");
+
+  const pos = positionDansElement(pageEl, match.offset, longueur);
+  if (!pos) return;
+
+  const range = document.createRange();
+  range.setStart(pos.debutNoeud, pos.debutOffset);
+  range.setEnd(pos.finNoeud, pos.finOffset);
+
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+  pageEl.focus();
+  coteActif = (match.page % 2 === 0) ? "gauche" : "droite";
+
+  const rectParent = pageEl.getBoundingClientRect();
+  const rectSel = range.getBoundingClientRect();
+  if (rectSel.bottom > rectParent.bottom || rectSel.top < rectParent.top) {
+    const noeudParent = pos.debutNoeud.parentElement;
+    if (noeudParent && noeudParent.scrollIntoView) noeudParent.scrollIntoView({ block: "nearest" });
+  }
+}
+
+// Convertit un offset texte (+ longueur) en positions de nœuds pour un Range
+function positionDansElement(el, offset, longueur) {
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  let total = 0;
+  let debutNoeud = null, debutOffset = 0, finNoeud = null, finOffset = 0;
+  const fin = offset + longueur;
+
+  while (walker.nextNode()) {
+    const noeud = walker.currentNode;
+    const len = noeud.textContent.length;
+    if (debutNoeud === null && total + len > offset) {
+      debutNoeud = noeud;
+      debutOffset = offset - total;
+    }
+    if (debutNoeud !== null && total + len >= fin) {
+      finNoeud = noeud;
+      finOffset = fin - total;
+      break;
+    }
+    total += len;
+  }
+
+  if (!debutNoeud || !finNoeud) return null;
+  return { debutNoeud, debutOffset, finNoeud, finOffset };
+}
+
+function remplacerCourant() {
+  if (rechercheCourante < 0 || rechercheCourante >= rechercheMatches.length) return;
+  const remplacement = document.getElementById("champRemplacer").value;
+  surlignerMatch(rechercheMatches[rechercheCourante]);
+
+  const sel = window.getSelection();
+  if (sel.rangeCount === 0) return;
+  const range = sel.getRangeAt(0);
+  range.deleteContents();
+  range.insertNode(document.createTextNode(remplacement));
+
+  flushSpread();
+  marquerModifie();
+  planifierBrouillon();
+  planifierCompteurMots();
+
+  // Recalculer les positions et se placer sur le résultat suivant
+  const indexPrecedent = rechercheCourante;
+  lancerRechercheEnConservant(indexPrecedent);
+}
+
+// Relance la recherche puis se positionne près de l'ancien index
+function lancerRechercheEnConservant(indexSouhaite) {
+  const requete = document.getElementById("champRecherche").value;
+  rechercheMatches = [];
+  rechercheCourante = -1;
+  if (requete) {
+    const req = requete.toLowerCase();
+    livreActuel().pages.forEach((p, iPage) => {
+      const texte = texteBrutPage(p.contenu).toLowerCase();
+      let pos = texte.indexOf(req);
+      while (pos !== -1) {
+        rechercheMatches.push({ page: iPage, offset: pos });
+        pos = texte.indexOf(req, pos + Math.max(1, req.length));
+      }
+    });
+  }
+  if (rechercheMatches.length > 0) {
+    rechercheCourante = Math.min(indexSouhaite, rechercheMatches.length - 1) - 1;
+    allerMatch(1);
+  } else {
+    majCompteurRecherche();
+  }
+}
+
+function remplacerTout() {
+  const requete = document.getElementById("champRecherche").value;
+  if (!requete) return;
+  const remplacement = document.getElementById("champRemplacer").value;
+  const message = document.getElementById("message");
+
+  flushSpread();
+  let total = 0;
+  const pages = livreActuel().pages;
+
+  pages.forEach(p => {
+    const conteneur = document.createElement("div");
+    conteneur.innerHTML = p.contenu || "";
+    const walker = document.createTreeWalker(conteneur, NodeFilter.SHOW_TEXT);
+    const noeuds = [];
+    while (walker.nextNode()) noeuds.push(walker.currentNode);
+    noeuds.forEach(noeud => {
+      const res = remplacerInsensible(noeud.textContent, requete, remplacement);
+      if (res.compte > 0) { noeud.textContent = res.texte; total += res.compte; }
+    });
+    p.contenu = conteneur.innerHTML;
+  });
+
+  afficherSpread();
+  afficherSommaire();
+  majCompteurMots();
+
+  if (total > 0) {
+    marquerModifie();
+    planifierBrouillon();
+  }
+  rechercheMatches = [];
+  rechercheCourante = -1;
+  majCompteurRecherche();
+  message.textContent = total > 0
+    ? `${total} remplacement${total > 1 ? "s" : ""} effectué${total > 1 ? "s" : ""}.`
+    : "Aucune occurrence trouvée.";
+  setTimeout(() => { if (message.textContent.includes("remplacement") || message.textContent.includes("occurrence")) message.textContent = ""; }, 3000);
+}
+
+// Remplacement insensible à la casse dans une chaîne, avec comptage
+function remplacerInsensible(texte, recherche, remplacement) {
+  const rechercheBas = recherche.toLowerCase();
+  const texteBas = texte.toLowerCase();
+  let resultat = "";
+  let compte = 0;
+  let i = 0;
+  while (i < texte.length) {
+    if (texteBas.startsWith(rechercheBas, i)) {
+      resultat += remplacement;
+      i += recherche.length;
+      compte++;
+    } else {
+      resultat += texte[i];
+      i++;
+    }
+  }
+  return { texte: resultat, compte };
+}
+
+// Relancer la recherche quand on tape dans le champ (script chargé en fin de body :
+// l'élément existe déjà, on branche directement)
+(function brancherChampRecherche() {
+  const champ = document.getElementById("champRecherche");
+  if (champ) {
+    champ.addEventListener("input", () => {
+      rechercheCourante = -1;
+      rechercheMatches = [];
+      lancerRecherche();
+    });
+  }
+})();
 
 chargerLivre();
 initGlissementImageCouverture();
