@@ -179,6 +179,8 @@ async function chargerLivre() {
     pageDroite.addEventListener("blur", sauvegarderSelection);
     pageGauche.addEventListener("input", surSaisie);
     pageDroite.addEventListener("input", surSaisie);
+    pageGauche.addEventListener("paste", gererCollage);
+    pageDroite.addEventListener("paste", gererCollage);
     document.addEventListener("selectionchange", lireTailleCourrante);
     document.addEventListener("keydown", raccourcisClavier);
     window.addEventListener("beforeunload", (e) => {
@@ -194,6 +196,47 @@ async function chargerLivre() {
   } catch (erreur) {
     message.textContent = erreur.message;
   }
+}
+
+// Collage : on force le TEXTE BRUT (sans les polices/tailles/couleurs de la
+// source, ex. Google Docs), pour que le texte collé prenne le style du livre.
+// Les sauts de ligne deviennent des <br>, comme la touche Entrée. On insère des
+// nœuds texte à la main (pas execCommand, qui ajoute des <span> de style).
+function gererCollage(e) {
+  e.preventDefault();
+  const donnees = e.clipboardData || window.clipboardData;
+  if (!donnees) return;
+
+  let texte = donnees.getData("text/plain");
+  if (texte == null || texte === "") return;
+  texte = texte.replace(/\r\n?/g, "\n");
+
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return;
+  const range = sel.getRangeAt(0);
+  range.deleteContents(); // remplacer la sélection éventuelle
+
+  const frag = document.createDocumentFragment();
+  const lignes = texte.split("\n");
+  lignes.forEach((ligne, i) => {
+    if (i > 0) frag.appendChild(document.createElement("br"));
+    if (ligne) frag.appendChild(document.createTextNode(ligne));
+  });
+
+  const dernier = frag.lastChild;
+  range.insertNode(frag);
+
+  // Replacer le curseur après le texte collé
+  if (dernier) {
+    range.setStartAfter(dernier);
+    range.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+
+  // insertNode ne déclenche pas 'input' : on enchaîne manuellement
+  // (pagination continue, historique, brouillon, compteur, état modifié).
+  surSaisie({ inputType: "insertFromPaste" });
 }
 
 // Saisie dans une page : pagination continue, historique, brouillon, compteur, état modifié
