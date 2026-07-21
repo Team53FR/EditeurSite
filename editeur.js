@@ -1249,18 +1249,18 @@ function animerFlipCouverture(direction, from, to) {
     centrerAbsolu(leaf);
     leaf.style.transformOrigin = direction === 1 ? "left center" : "right center";
   } else {
-    // Fermeture : une seule page de la double-page tourne.
+    // Fermeture : une seule page de la double-page tourne, autour de la reliure.
     const d = donneesInterieur(from);
     if (direction === 1) {
       leaf = creerPageTexteApercu(d.droite, d.numD);
       positionnerPageAnim(leaf, largPx + gap);
-      leaf.style.transformOrigin = "left center";
+      leaf.style.transformOrigin = (-gap / 2) + "px center";
       reste = creerPageTexteApercu(d.gauche, d.numG);
       positionnerPageAnim(reste, 0);
     } else {
       leaf = creerPageTexteApercu(d.gauche, d.numG);
       positionnerPageAnim(leaf, 0);
-      leaf.style.transformOrigin = "right center";
+      leaf.style.transformOrigin = (largPx + gap / 2) + "px center";
       reste = creerPageTexteApercu(d.droite, d.numD);
       positionnerPageAnim(reste, largPx + gap);
     }
@@ -1282,13 +1282,15 @@ function animerFlipCouverture(direction, from, to) {
     ],
     reglages
   );
+  // La nouvelle vue se révèle progressivement et n'est complète qu'à la toute
+  // fin du tournage (elle n'apparaît pas d'un coup avant que la page ait fini).
   base.animate(
-    [{ opacity: 0, offset: 0 }, { opacity: 0, offset: 0.25 }, { opacity: 1, offset: 0.8 }],
+    [{ opacity: 0, offset: 0 }, { opacity: 0, offset: 0.45 }, { opacity: 1, offset: 1 }],
     reglages
   );
   if (reste) {
     reste.animate(
-      [{ opacity: 1, offset: 0 }, { opacity: 1, offset: 0.5 }, { opacity: 0, offset: 1 }],
+      [{ opacity: 1, offset: 0 }, { opacity: 1, offset: 0.6 }, { opacity: 0, offset: 1 }],
       reglages
     );
   }
@@ -1354,16 +1356,18 @@ function animerFlip(direction, from, to) {
   leaf.style.height = hautPx + "px";
   leaf.style.transformStyle = "preserve-3d";
 
+  // L'axe de rotation est placé pile sur la reliure (milieu du creux entre les
+  // deux pages), pas sur le bord de la page, pour un pivot naturel.
   let faceAvant, faceArriere, transEnd;
   if (direction === 1) {
     leaf.style.left = (largPx + gap) + "px";
-    leaf.style.transformOrigin = "left center";
+    leaf.style.transformOrigin = (-gap / 2) + "px center";
     faceAvant   = creerPageTexteApercu(vieux.droite, vieux.numD); // recto : page droite actuelle
     faceArriere = creerPageTexteApercu(neuf.gauche, neuf.numG);   // verso : nouvelle page gauche
     transEnd = "rotateY(-180deg)";
   } else {
     leaf.style.left = "0px";
-    leaf.style.transformOrigin = "right center";
+    leaf.style.transformOrigin = (largPx + gap / 2) + "px center";
     faceAvant   = creerPageTexteApercu(vieux.gauche, vieux.numG);
     faceArriere = creerPageTexteApercu(neuf.droite, neuf.numD);
     transEnd = "rotateY(180deg)";
