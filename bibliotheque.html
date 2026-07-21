@@ -31,7 +31,16 @@
       <div class="avatar" id="avatarInitiales">—</div>
       <div class="profil-txt">
         <div class="salut">Bon retour parmi nous,</div>
-        <h1 id="profilNom">…</h1>
+        <div class="nom-ligne">
+          <h1 id="profilNom">…</h1>
+          <button id="btnModifNom" class="btn-icone-nom" onclick="modifierNom()" title="Modifier mon nom d'affichage">✎</button>
+        </div>
+        <div id="editionNom" class="edition-nom" style="display:none">
+          <input type="text" id="champNom" maxlength="40" placeholder="Votre nom d'affichage"
+                 onkeydown="if(event.key==='Enter'){enregistrerNom();}else if(event.key==='Escape'){annulerNom();}">
+          <button class="btn-mini" onclick="enregistrerNom()">Enregistrer</button>
+          <button class="btn-mini" onclick="annulerNom()">Annuler</button>
+        </div>
         <div class="profil-stats">
           <div class="stat"><b id="statLivres">0</b><span>livre(s)</span></div>
           <div class="stat"><b id="statPages">0</b><span>page(s) au total</span></div>

@@ -69,17 +69,30 @@ function echapper(txt) {
   return d.innerHTML;
 }
 
-function remplirProfil() {
+function nomAffiche() {
   const login = sessionStorage.getItem("gh_login") || "";
-  const initiales = (login.replace(/[^a-zA-Z0-9]/g, "").slice(0, 2) || "?").toUpperCase();
+  const perso = bibliotheque && bibliotheque.nomAffichage ? String(bibliotheque.nomAffichage).trim() : "";
+  return perso || login || "Auteur";
+}
+
+function initialesDe(nom) {
+  const mots = (nom || "").trim().split(/\s+/).filter(Boolean);
+  let ini;
+  if (mots.length >= 2) ini = mots[0][0] + mots[1][0];
+  else ini = (nom || "").replace(/[^a-zA-Z0-9]/g, "").slice(0, 2);
+  return (ini || "?").toUpperCase();
+}
+
+function remplirProfil() {
+  const nom = nomAffiche();
 
   const elAvatar = document.getElementById("avatarInitiales");
   const elNom = document.getElementById("profilNom");
   const elLivres = document.getElementById("statLivres");
   const elPages = document.getElementById("statPages");
 
-  if (elAvatar) elAvatar.textContent = initiales;
-  if (elNom) elNom.textContent = login || "Auteur";
+  if (elAvatar) elAvatar.textContent = initialesDe(nom);
+  if (elNom) elNom.textContent = nom;
 
   // Bouton de gestion des utilisateurs réservé aux admins
   const btnAdmin = document.getElementById("btnAdmin");
@@ -211,6 +224,57 @@ async function supprimerLivre(id) {
   } catch (erreur) {
     message.textContent = erreur.message;
     bibliotheque.livres.push(livre);
+  }
+}
+
+// ----- Nom d'affichage (libre-service, stocké dans la bibliothèque de l'utilisateur) -----
+
+function modifierNom() {
+  const edition = document.getElementById("editionNom");
+  const champ = document.getElementById("champNom");
+  if (!edition || !champ) return;
+  champ.value = (bibliotheque && bibliotheque.nomAffichage) ? bibliotheque.nomAffichage : "";
+  edition.style.display = "flex";
+  const btn = document.getElementById("btnModifNom");
+  if (btn) btn.style.display = "none";
+  champ.focus();
+  champ.select();
+}
+
+function annulerNom() {
+  const edition = document.getElementById("editionNom");
+  if (edition) edition.style.display = "none";
+  const btn = document.getElementById("btnModifNom");
+  if (btn) btn.style.display = "";
+  const message = document.getElementById("message");
+  if (message) message.textContent = "";
+}
+
+async function enregistrerNom() {
+  const token = sessionStorage.getItem("gh_token");
+  const message = document.getElementById("message");
+  const champ = document.getElementById("champNom");
+  if (!champ) return;
+
+  const nouveau = champ.value.trim();
+  const ancien = bibliotheque.nomAffichage || "";
+  if (nouveau === ancien) { annulerNom(); return; }
+
+  // Un nom vide = revenir à l'identifiant
+  if (nouveau) bibliotheque.nomAffichage = nouveau;
+  else delete bibliotheque.nomAffichage;
+
+  try {
+    shaBiblio = await ecrireFichierJSON(nomFichierBiblio, bibliotheque, shaBiblio, token, "Mise à jour du nom d'affichage");
+    annulerNom();
+    remplirProfil();
+    message.textContent = "Nom mis à jour.";
+    setTimeout(() => { if (message.textContent === "Nom mis à jour.") message.textContent = ""; }, 2500);
+  } catch (erreur) {
+    // Rétablir l'ancienne valeur en cas d'échec
+    if (ancien) bibliotheque.nomAffichage = ancien;
+    else delete bibliotheque.nomAffichage;
+    message.textContent = erreur.message;
   }
 }
 
