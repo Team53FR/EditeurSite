@@ -9,6 +9,7 @@ let selectionSauvegardee = null;
 let modeCouverture = null; // 'couverture' | 'quatrieme' | null
 let hauteurTextePx = 0;    // hauteur utile d'une page de texte (px), pour la pagination continue
 let echelleAffichage = 1;  // zoom d'affichage courant (transform: scale) du livre
+let sommaireReduite = false; // panneau de gauche replié ?
 
 // Formats : dimensions en mm, marges en mm (haut/bas, gauche/droite)
 const FORMATS = {
@@ -73,7 +74,8 @@ function appliquerFormatPage(formatKey) {
   }
 
   // --- Zoom d'affichage pour tenir dans l'espace disponible ---
-  const sommaireLarg = 240; // sommaire + gap + marge
+  const reduit = document.querySelector(".conteneur-livre")?.classList.contains("sommaire-reduite");
+  const sommaireLarg = reduit ? 8 : 240; // sommaire + gap + marge (0 si replié)
   const margesH      = 32;
   const barresH      = 56 + 52 + 10 + 32 + 10; // outils + actions + gaps + message
   const margeV       = 32;
@@ -96,6 +98,26 @@ function appliquerFormatPage(formatKey) {
     const dHaut = (hautPx * (echelle - 1)) / 2;
     el.style.margin = `${dHaut}px ${dLarg}px`;
   });
+}
+
+// Replier / déplier le panneau de gauche (comme la barre latérale de Claude)
+function basculerSommaire() {
+  sommaireReduite = !sommaireReduite;
+  appliquerReductionSommaire();
+  try { localStorage.setItem("sommaire_reduite", sommaireReduite ? "1" : "0"); } catch (e) {}
+}
+
+function appliquerReductionSommaire() {
+  const conteneur = document.querySelector(".conteneur-livre");
+  if (conteneur) conteneur.classList.toggle("sommaire-reduite", sommaireReduite);
+  const btnOuvrir = document.getElementById("boutonOuvrirSommaire");
+  if (btnOuvrir) btnOuvrir.style.display = sommaireReduite ? "flex" : "none";
+
+  // Re-zoomer le livre pour occuper l'espace libéré (ou rendu)
+  const format = (indexLivre !== -1 && livreActuel()) ? (livreActuel().format || "149x210") : "149x210";
+  appliquerFormatPage(format);
+  if (modeCouverture) repositionnerImageCouverture();
+  if (modeApercu) afficherApercu();
 }
 
 async function chargerLivre() {
@@ -128,6 +150,14 @@ async function chargerLivre() {
 
     document.getElementById("titreLivre").textContent = livre.titre || "Mon livre";
     const formatCourant = livre.format || "149x210";
+
+    // Restaurer l'état replié/déplié du panneau de gauche
+    try { sommaireReduite = localStorage.getItem("sommaire_reduite") === "1"; } catch (e) {}
+    const conteneur = document.querySelector(".conteneur-livre");
+    if (conteneur) conteneur.classList.toggle("sommaire-reduite", sommaireReduite);
+    const btnOuvrir = document.getElementById("boutonOuvrirSommaire");
+    if (btnOuvrir) btnOuvrir.style.display = sommaireReduite ? "flex" : "none";
+
     appliquerFormatPage(formatCourant);
     window.addEventListener("resize", () => {
       appliquerFormatPage(formatCourant);
