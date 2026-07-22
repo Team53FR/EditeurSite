@@ -586,10 +586,19 @@ function changerFormat(nouveauFormat) {
   const ancienFormat = livre.format || "149x210";
   if (ancienFormat === nouveauFormat) return;
 
-  // Le recadrage de l'image de couverture (zoom + décalage) est réadapté
-  // automatiquement à la nouvelle taille de page par adapterCadrageImage()
-  // lors du prochain rendu de la couverture ou de l'aperçu, afin que l'image
-  // occupe visuellement la même place qu'avant.
+  // Le recadrage de l'image de couverture (zoom + décalage) est réadapté par
+  // adapterCadrageImage() au prochain rendu de la couverture ou de l'aperçu.
+  // Pour que cette adaptation parte de la BONNE base même si la couverture
+  // n'a pas encore été affichée à ce format, on fixe dès maintenant sa taille
+  // de page de référence sur le format ACTUEL (avant changement), calculée
+  // directement depuis les mm (sans dépendre du DOM).
+  const fA = FORMATS[ancienFormat];
+  const baseW = Math.round(fA.larg * PX_PAR_MM);
+  const baseH = Math.round(fA.haut * PX_PAR_MM);
+  ["couverture", "quatrieme"].forEach(cle => {
+    const d = livre[cle];
+    if (d && d.imageChemin) { d.imgBaseW = baseW; d.imgBaseH = baseH; }
+  });
 
   flushSpread();
   livre.format = nouveauFormat;
