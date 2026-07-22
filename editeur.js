@@ -881,7 +881,8 @@ function afficherImageCouverture(url, chemin) {
 // on mémorise la taille de page pour laquelle le cadrage a été réglé
 // (imgBaseW/imgBaseH) et on préserve le taux de recouvrement le plus serré
 // (une image qui couvrait toute la couverture continue de la couvrir) ainsi
-// que la position relative du centre.
+// que le POINT de l'image affiché au centre de la couverture (une image
+// centrée reste centrée ; un point choisi reste au centre du nouveau format).
 function adapterCadrageImage(data, img, cw, ch) {
   if (!data || !cw || !ch || !img || !img.naturalWidth || !img.naturalHeight) return;
 
@@ -892,13 +893,20 @@ function adapterCadrageImage(data, img, cw, ch) {
     // taux de recouvrement de la dimension la moins couverte (0..1 = bandes, >=1 = couvre)
     const recOld = Math.min(img.naturalWidth * sOld / bw, img.naturalHeight * sOld / bh);
     const recNew = Math.min(img.naturalWidth * sNew / cw, img.naturalHeight * sNew / ch);
+
+    const zOld = data.imgZoom || 1;
+    let zNew = zOld;
     if (recOld > 0 && recNew > 0) {
-      const z = data.imgZoom || 1;
-      data.imgZoom = Math.max(0.3, Math.min(3, z * (recOld / recNew)));
+      zNew = Math.max(0.3, Math.min(3, zOld * (recOld / recNew)));
+      data.imgZoom = zNew;
     }
-    // conserver la position relative du centre
-    if (typeof data.imgOffsetX === "number") data.imgOffsetX *= cw / bw;
-    if (typeof data.imgOffsetY === "number") data.imgOffsetY *= ch / bh;
+
+    // Le décalage suit l'échelle d'affichage TOTALE (contain × zoom) : ainsi le
+    // point de l'image qui était au centre de la couverture y reste, centré
+    // dans le nouveau format.
+    const ratioEchelle = (sOld > 0 && zOld > 0) ? (sNew * zNew) / (sOld * zOld) : 1;
+    if (typeof data.imgOffsetX === "number") data.imgOffsetX *= ratioEchelle;
+    if (typeof data.imgOffsetY === "number") data.imgOffsetY *= ratioEchelle;
   }
 
   data.imgBaseW = cw;
