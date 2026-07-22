@@ -462,6 +462,7 @@ main.contenu { padding-top: 40px; padding-bottom: 60px; }
 }
 .user-nom { flex: 1; font-weight: 600; color: var(--ink); }
 .user-nom .moi { font-weight: 400; color: var(--ink-soft); font-size: 13px; }
+.user-date { font-weight: 400; color: var(--ink-soft); font-size: 12px; margin-top: 2px; }
 
 .role-badge {
   font-size: 12px; font-weight: 600;

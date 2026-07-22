@@ -215,7 +215,7 @@ async function seConnecter() {
   message.textContent = "Vérification en cours...";
 
   try {
-    const { contenu: utilisateurs } = await lireFichierJSON("users.json", token);
+    const { contenu: utilisateurs, sha } = await lireFichierJSON("users.json", token);
 
     const utilisateur = utilisateurs.find(
       u => u.login === login && u.password === password
@@ -226,6 +226,14 @@ async function seConnecter() {
       sessionStorage.setItem("gh_token", token);
       sessionStorage.setItem("gh_login", login);
       sessionStorage.setItem("gh_role", utilisateur.role === "admin" ? "admin" : "user");
+
+      // Enregistrer la date de dernière connexion dans users.json (best-effort :
+      // ne doit jamais empêcher la connexion en cas d'échec d'écriture).
+      try {
+        utilisateur.derniereConnexion = new Date().toISOString();
+        await ecrireFichierJSON("users.json", utilisateurs, sha, token, `Dernière connexion de ${login}`);
+      } catch (e) { /* on ignore : la connexion se poursuit */ }
+
       window.location.href = "bibliotheque.html";
     } else {
       message.textContent = "Identifiants incorrects.";

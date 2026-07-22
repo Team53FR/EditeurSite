@@ -11,6 +11,15 @@ function echapper(txt) {
   return d.innerHTML;
 }
 
+function formaterDateConnexion(iso) {
+  if (!iso) return "Jamais connecté";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "Jamais connecté";
+  return "Dernière connexion : " + d.toLocaleString("fr-FR", {
+    day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit"
+  });
+}
+
 function seDeconnecter() {
   sessionStorage.removeItem("gh_token");
   sessionStorage.removeItem("gh_login");
@@ -61,7 +70,10 @@ function afficherUtilisateurs() {
     const initiale = (u.login || "?").slice(0, 2).toUpperCase();
     li.innerHTML =
       `<div class="user-ava">${echapper(initiale)}</div>` +
-      `<div class="user-nom">${echapper(u.login)}${estMoi ? ' <span class="moi">(vous)</span>' : ""}</div>` +
+      `<div class="user-nom">` +
+        `<div>${echapper(u.login)}${estMoi ? ' <span class="moi">(vous)</span>' : ""}</div>` +
+        `<div class="user-date">${echapper(formaterDateConnexion(u.derniereConnexion))}</div>` +
+      `</div>` +
       `<span class="role-badge ${role}">${role === "admin" ? "Administrateur" : "Utilisateur"}</span>` +
       `<div class="user-actions"></div>`;
 
