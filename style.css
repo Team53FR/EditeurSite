@@ -330,6 +330,33 @@ button.danger {
   flex-shrink: 0;
 }
 
+/* ---- Zone d'édition : une seule zone, deux colonnes (= deux pages) ---- */
+.spread-edition {
+  position: relative;
+  flex-shrink: 0;
+  /* largeur / hauteur définies par appliquerFormatPage */
+}
+
+.page-fond {
+  position: absolute;
+  top: 0;
+  background: #faf6ec;
+  border-radius: 2px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1), 0 10px 30px rgba(0,0,0,0.15);
+}
+
+.editeur-spread {
+  position: absolute;
+  column-count: 2;
+  column-fill: auto;
+  outline: none;
+}
+
+.num-spread {
+  position: absolute;
+  pointer-events: none;
+}
+
 .texte-livre p {
   margin: 0 0 6px 0;
 }

@@ -9,6 +9,7 @@ let selectionSauvegardee = null;
 let modeCouverture = null; // 'couverture' | 'quatrieme' | null
 let hauteurTextePx = 0;    // hauteur utile d'une page de texte (px), pour la pagination continue
 let echelleAffichage = 1;  // zoom d'affichage courant (transform: scale) du livre
+let geomEdition = null;    // géométrie logique des colonnes de la zone d'édition
 let sommaireReduite = false; // panneau de gauche replié ?
 
 // Formats : dimensions en mm, marges en mm (haut/bas, gauche/droite)
@@ -71,6 +72,50 @@ function appliquerFormatPage(formatKey) {
   if (mesure) {
     mesure.style.width  = (largPx - margeHPx * 2) + "px";
     mesure.style.height = (hautPx - margeVPx - numPageH) + "px";
+  }
+
+  // --- Zone d'édition : une seule zone en deux colonnes (= deux pages) ---
+  // Mémorisée pour les mesures de colonnes (voir geometrieEdition()).
+  geomEdition = {
+    largPx, hautPx, margeVPx, margeHPx, numPageH, gapPages,
+    largeurColonne: largPx - 2 * margeHPx,
+    gouttiere: gapPages + 2 * margeHPx
+  };
+
+  const spreadEd = document.getElementById("spreadEdition");
+  if (spreadEd) {
+    const largeurSpread = 2 * largPx + gapPages;
+    spreadEd.style.width  = largeurSpread + "px";
+    spreadEd.style.height = hautPx + "px";
+
+    const fg = document.getElementById("fondGauche");
+    const fd = document.getElementById("fondDroite");
+    if (fg) { fg.style.left = "0px";                     fg.style.width = largPx + "px"; fg.style.height = hautPx + "px"; }
+    if (fd) { fd.style.left = (largPx + gapPages) + "px"; fd.style.width = largPx + "px"; fd.style.height = hautPx + "px"; }
+
+    // La zone d'édition ET le mesureur caché partagent exactement la même
+    // géométrie de colonnes (indispensable pour que les coupes soient justes).
+    [document.getElementById("editeurSpread"), document.getElementById("mesureSpread")]
+      .forEach(ed => {
+        if (!ed) return;
+        ed.style.width     = (largeurSpread - 2 * margeHPx) + "px";
+        ed.style.height    = (hautPx - margeVPx - numPageH) + "px";
+        // Gouttière = marge droite (page gauche) + gap central + marge gauche (page droite)
+        ed.style.columnGap = geomEdition.gouttiere + "px";
+        ed.style.padding   = "0";
+        ed.style.boxSizing = "border-box";
+      });
+
+    const ed = document.getElementById("editeurSpread");
+    if (ed) {
+      ed.style.left = margeHPx + "px";
+      ed.style.top  = margeVPx + "px";
+    }
+
+    const nG = document.getElementById("numeroGauche");
+    const nD = document.getElementById("numeroDroite");
+    if (nG) { nG.style.left = "0px";                     nG.style.width = largPx + "px"; nG.style.top = (hautPx - numPageH) + "px"; }
+    if (nD) { nD.style.left = (largPx + gapPages) + "px"; nD.style.width = largPx + "px"; nD.style.top = (hautPx - numPageH) + "px"; }
   }
 
   // --- Zoom d'affichage pour tenir dans l'espace disponible ---
@@ -171,19 +216,12 @@ async function chargerLivre() {
 
     document.execCommand("defaultParagraphSeparator", false, "p");
 
-    const pageGauche = document.getElementById("pageGauche");
-    const pageDroite = document.getElementById("pageDroite");
-
-    pageGauche.addEventListener("keydown", (e) => { intercepterEntree(e); });
-    pageDroite.addEventListener("keydown", (e) => { intercepterEntree(e); });
-    pageGauche.addEventListener("focus", () => { coteActif = "gauche"; });
-    pageDroite.addEventListener("focus", () => { coteActif = "droite"; });
-    pageGauche.addEventListener("blur", sauvegarderSelection);
-    pageDroite.addEventListener("blur", sauvegarderSelection);
-    pageGauche.addEventListener("input", surSaisie);
-    pageDroite.addEventListener("input", surSaisie);
-    pageGauche.addEventListener("paste", gererCollage);
-    pageDroite.addEventListener("paste", gererCollage);
+    // Zone d'édition UNIQUE : la sélection, l'annuler/rétablir et la
+    // typographie sont gérés nativement par le navigateur.
+    const zoneEd = document.getElementById("editeurSpread");
+    zoneEd.addEventListener("blur", sauvegarderSelection);
+    zoneEd.addEventListener("input", surSaisie);
+    zoneEd.addEventListener("paste", gererCollage);
     document.addEventListener("selectionchange", lireTailleCourrante);
     document.addEventListener("keydown", raccourcisClavier);
     window.addEventListener("beforeunload", (e) => {
@@ -2170,6 +2208,537 @@ function reflowEtCurseur() {
     });
   }
 })();
+
+// =====================================================================
+//  MOTEUR D'ÉDITION (v2) — zone unique à deux colonnes
+//
+//  Principe de sûreté : le texte est stocké EN CONTINU par double-page
+//  (livre.spreads[]). On ne le coupe QU'aux frontières de double-page, et
+//  cette coupe est une partition stricte (aucun texte perdu ni réordonné).
+//  Le découpage page par page (livre.pages[]) est seulement DÉRIVÉ, en
+//  lecture seule, pour le sommaire, l'aperçu et l'impression.
+//
+//  Ces définitions remplacent volontairement les versions précédentes.
+// =====================================================================
+
+let pagesObsoletes = true;
+let timerFlux = null;
+
+function editeurEl() { return document.getElementById("editeurSpread"); }
+function mesureEl()  { return document.getElementById("mesureSpread"); }
+function numSpread() { return Math.floor(indexSpread / 2); }
+
+// ----- Modèle : doubles-pages continues -----
+
+function spreadsLivre() {
+  const livre = livreActuel();
+  if (!Array.isArray(livre.spreads)) migrerVersSpreads(livre);
+  return livre.spreads;
+}
+
+// Migration NON DESTRUCTIVE : livre.pages est conservé tel quel (secours).
+// On reconstruit le texte continu en recollant les pages deux par deux.
+function migrerVersSpreads(livre) {
+  const pages = Array.isArray(livre.pages) ? livre.pages : [];
+  const spreads = [];
+  for (let i = 0; i < pages.length; i += 2) {
+    const a = (pages[i] && pages[i].contenu) || "";
+    const b = (pages[i + 1] && pages[i + 1].contenu) || "";
+    spreads.push(fusionnerSuite(a, b));
+  }
+  if (spreads.length === 0) spreads.push("");
+  livre.spreads = spreads;
+}
+
+function assurerSpread(i) {
+  const spreads = spreadsLivre();
+  while (spreads.length <= i) spreads.push("");
+}
+
+// ----- Découpe géométrique (toujours sur le mesureur caché, jamais sur
+//       la zone d'édition : ni le curseur ni le zoom ne sont perturbés) -----
+
+function seuilsColonnes(el) {
+  const g = geomEdition;
+  const gauche = el.getBoundingClientRect().left;
+  return {
+    col2: gauche + g.largeurColonne + g.gouttiere / 2,
+    col3: gauche + 2 * g.largeurColonne + g.gouttiere * 1.5
+  };
+}
+
+// Premier caractère (en ordre du document) situé au-delà d'un seuil horizontal.
+function pointCoupe(el, seuilX) {
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  let n;
+  while ((n = walker.nextNode())) {
+    const len = n.textContent.length;
+    for (let i = 0; i < len; i++) {
+      const r = document.createRange();
+      r.setStart(n, i);
+      r.setEnd(n, i + 1);
+      const rect = r.getBoundingClientRect();
+      if (rect.width === 0 && rect.height === 0) continue;
+      if (rect.left >= seuilX - 0.5) return { node: n, offset: i };
+    }
+  }
+  return null;
+}
+
+function blocAncetre(node) {
+  let b = node;
+  while (b && b.nodeType === Node.TEXT_NODE) b = b.parentNode;
+  while (b && !/^(P|H1|H2|H3|LI|BLOCKQUOTE|DIV)$/.test(b.tagName || "")) b = b.parentNode;
+  return b;
+}
+
+// Le point est-il au tout début de son bloc ? (sinon, couper le bloc crée
+// une suite : on la marque pour pouvoir la recoller sans faux paragraphe)
+function estDebutDeBloc(node, offset) {
+  const b = blocAncetre(node);
+  if (!b) return true;
+  const r = document.createRange();
+  r.setStart(b, 0);
+  r.setEnd(node, offset);
+  return r.toString() === "";
+}
+
+function htmlEntre(el, a, b, marquerSuite) {
+  const r = document.createRange();
+  if (a) r.setStart(a.node, a.offset); else r.setStart(el, 0);
+  if (b) r.setEnd(b.node, b.offset);   else r.setEnd(el, el.childNodes.length);
+  const d = document.createElement("div");
+  d.appendChild(r.cloneContents());
+  if (marquerSuite && a && !estDebutDeBloc(a.node, a.offset) && d.firstElementChild) {
+    d.firstElementChild.setAttribute("data-suite", "1");
+  }
+  return d.innerHTML;
+}
+
+// Recolle deux morceaux : si le 1er bloc de b est marqué « suite », il
+// prolonge le dernier bloc de a (pas de faux saut de paragraphe).
+function fusionnerSuite(a, b) {
+  if (!a) return b || "";
+  if (!b) return a || "";
+  const da = document.createElement("div"); da.innerHTML = a;
+  const db = document.createElement("div"); db.innerHTML = b;
+  const dernier = da.lastElementChild;
+  const premier = db.firstElementChild;
+  if (dernier && premier && premier.getAttribute("data-suite") === "1" && dernier.tagName === premier.tagName) {
+    premier.removeAttribute("data-suite");
+    while (premier.firstChild) dernier.appendChild(premier.firstChild);
+    db.removeChild(premier);
+    while (db.firstChild) da.appendChild(db.firstChild);
+    return da.innerHTML;
+  }
+  if (premier && premier.getAttribute("data-suite")) premier.removeAttribute("data-suite");
+  return da.innerHTML + db.innerHTML;
+}
+
+// Partition stricte d'un contenu : ce qui tient dans la double-page, et le reste.
+function calculerPartition(html) {
+  const mes = mesureEl();
+  if (!mes || !geomEdition) return { garde: html || "", overflow: "" };
+  mes.innerHTML = html || "";
+  const p3 = pointCoupe(mes, seuilsColonnes(mes).col3);
+  const res = {
+    garde: htmlEntre(mes, null, p3, false),
+    overflow: p3 ? htmlEntre(mes, p3, null, true) : ""
+  };
+  mes.innerHTML = "";
+  return res;
+}
+
+// Découpe (lecture seule) d'une double-page en ses deux pages.
+function calculerDeuxPages(html) {
+  const mes = mesureEl();
+  if (!mes || !geomEdition) return { gauche: html || "", droite: "" };
+  mes.innerHTML = html || "";
+  const p2 = pointCoupe(mes, seuilsColonnes(mes).col2);
+  const res = {
+    gauche: htmlEntre(mes, null, p2, false),
+    droite: p2 ? htmlEntre(mes, p2, null, true) : ""
+  };
+  mes.innerHTML = "";
+  return res;
+}
+
+// ----- pages[] dérivé (sommaire, aperçu, impression) -----
+
+function regenererPagesSpread(s) {
+  const livre = livreActuel();
+  const spreads = spreadsLivre();
+  if (s < 0 || s >= spreads.length) return;
+  if (!Array.isArray(livre.pages)) livre.pages = [];
+  const d = calculerDeuxPages(spreads[s]);
+  livre.pages[2 * s]     = { id: "p" + (2 * s + 1), contenu: d.gauche };
+  livre.pages[2 * s + 1] = { id: "p" + (2 * s + 2), contenu: d.droite };
+}
+
+function regenererToutesPages() {
+  const livre = livreActuel();
+  const spreads = spreadsLivre();
+  const pages = [];
+  spreads.forEach((html, s) => {
+    const d = calculerDeuxPages(html);
+    pages.push({ id: "p" + (2 * s + 1), contenu: d.gauche });
+    pages.push({ id: "p" + (2 * s + 2), contenu: d.droite });
+  });
+  // Retirer les pages vides en fin de livre (en gardant au moins une page)
+  while (pages.length > 1 && !texteBrutPage(pages[pages.length - 1].contenu).trim()) pages.pop();
+  livre.pages = pages.length ? pages : [{ id: "p1", contenu: "" }];
+  pagesObsoletes = false;
+}
+
+function assurerPagesAJour() {
+  if (pagesObsoletes) regenererToutesPages();
+}
+
+// ----- Affichage / enregistrement de la double-page courante -----
+
+function afficherSpread() {
+  const ed = editeurEl();
+  if (!ed) return;
+  const s = numSpread();
+  assurerSpread(s);
+  const spreads = spreadsLivre();
+  ed.innerHTML = spreads[s] || "";
+  const nG = document.getElementById("numeroGauche");
+  const nD = document.getElementById("numeroDroite");
+  if (nG) nG.textContent = indexSpread + 1;
+  if (nD) nD.textContent = indexSpread + 2;
+}
+
+function flushSpread() {
+  const ed = editeurEl();
+  if (!ed || indexLivre === -1) return;
+  const s = numSpread();
+  assurerSpread(s);
+  const spreads = spreadsLivre();
+
+  const part = calculerPartition(ed.innerHTML);
+  spreads[s] = part.garde;
+  if (part.overflow && texteBrutPage(part.overflow).trim() !== "") {
+    assurerSpread(s + 1);
+    spreads[s + 1] = fusionnerSuite(part.overflow, spreads[s + 1] || "");
+    regenererPagesSpread(s + 1);
+  }
+  regenererPagesSpread(s);
+  pagesObsoletes = true;
+}
+
+// ----- Saisie : auto-flow du débordement (le texte continue tout seul) -----
+
+function surSaisie() {
+  marquerModifie();
+  planifierBrouillon();
+  planifierCompteurMots();
+  clearTimeout(timerFlux);
+  timerFlux = setTimeout(gererFlux, 350);
+}
+
+function gererFlux() {
+  const ed = editeurEl();
+  if (!ed || indexLivre === -1) return;
+  const s = numSpread();
+  assurerSpread(s);
+  const spreads = spreadsLivre();
+
+  // Pas de débordement : on enregistre sans rien réécrire — l'annuler/rétablir
+  // natif et la position du curseur sont donc intacts.
+  if (ed.scrollWidth <= ed.clientWidth + 2) {
+    spreads[s] = ed.innerHTML;
+    regenererPagesSpread(s);
+    pagesObsoletes = true;
+    afficherSommaire();
+    return;
+  }
+
+  // Débordement : coupe propre, report sur la double-page suivante.
+  const offset = offsetCaret(ed);
+  const part = calculerPartition(ed.innerHTML);
+  spreads[s] = part.garde;
+  assurerSpread(s + 1);
+  spreads[s + 1] = fusionnerSuite(part.overflow, spreads[s + 1] || "");
+  pagesObsoletes = true;
+
+  const longueurGarde = texteBrutPage(part.garde).length;
+  if (offset !== null && offset > longueurGarde) {
+    // Le curseur est dans le texte reporté : on suit sur la double-page suivante.
+    indexSpread += 2;
+    afficherSpread();
+    afficherSommaire();
+    const cible = editeurEl();
+    cible.focus();
+    placerCaretAOffset(cible, offset - longueurGarde);
+  } else {
+    afficherSpread();
+    afficherSommaire();
+    if (offset !== null) {
+      const cible = editeurEl();
+      cible.focus();
+      placerCaretAOffset(cible, offset);
+    }
+  }
+}
+
+// ----- Historique : désormais NATIF -----
+// Les anciennes fonctions d'historique maison sont neutralisées (elles lisaient
+// des éléments qui n'existent plus). enregistrerHistorique() est conservée comme
+// point d'accroche : les fonctions de formatage l'appellent déjà, on s'en sert
+// pour planifier l'enregistrement du texte.
+
+function snapshotActuel() { const ed = editeurEl(); return { g: ed ? ed.innerHTML : "", d: "" }; }
+function reinitialiserHistorique() {}
+function planifierHistorique() {}
+function flushHistorique() {}
+function enregistrerHistorique() {
+  clearTimeout(timerFlux);
+  timerFlux = setTimeout(gererFlux, 350);
+}
+
+// ----- Annuler / rétablir : natifs -----
+
+function annuler() {
+  if (modeApercu || modeCouverture) return;
+  const ed = editeurEl();
+  if (ed) ed.focus();
+  document.execCommand("undo");
+  surSaisie();
+}
+
+function retablir() {
+  if (modeApercu || modeCouverture) return;
+  const ed = editeurEl();
+  if (ed) ed.focus();
+  document.execCommand("redo");
+  surSaisie();
+}
+
+// ----- Interligne : s'applique dans la zone unique -----
+
+function appliquerInterligne(valeur) {
+  restaurerSelection();
+  const conteneur = editeurEl();
+  if (!conteneur) return;
+  const sel = window.getSelection();
+  let cibles = [];
+  if (sel && sel.rangeCount > 0) {
+    const range = sel.getRangeAt(0);
+    conteneur.querySelectorAll("p, h2, h3, li").forEach(bloc => {
+      if (range.intersectsNode(bloc)) cibles.push(bloc);
+    });
+  }
+  if (cibles.length === 0) cibles = [conteneur];
+  cibles.forEach(bloc => { bloc.style.lineHeight = valeur; });
+  marquerModifie();
+  surSaisie();
+}
+
+// ----- Navigation -----
+
+function allerAPage(i) {
+  flushSpread();
+  indexSpread = i - (i % 2);
+  afficherSpread();
+  afficherSommaire();
+}
+
+function pagePrecedente() {
+  flushSpread();
+  if (indexSpread - 2 >= 0) {
+    indexSpread -= 2;
+    afficherSpread();
+    afficherSommaire();
+  }
+}
+
+function pageSuivante() {
+  flushSpread();
+  assurerSpread(numSpread() + 1);
+  indexSpread += 2;
+  afficherSpread();
+  afficherSommaire();
+}
+
+// ----- Sommaire : navigation uniquement -----
+// (Avec un texte continu, supprimer ou déplacer « une page » n'a plus de sens :
+//  on ne propose donc que la navigation, pour ne jamais abîmer le texte.)
+function afficherSommaire() {
+  assurerPagesAJour();
+  const pages = livreActuel().pages;
+  const liste = document.getElementById("listePages");
+  if (!liste) return;
+  liste.innerHTML = "";
+
+  pages.forEach((page, i) => {
+    const li = document.createElement("li");
+    li.className = (i === indexSpread || i === indexSpread + 1) ? "actif" : "";
+    const libelle = document.createElement("span");
+    libelle.textContent = "Page " + (i + 1);
+    libelle.className = "libelle-page";
+    libelle.onclick = () => allerAPage(i);
+    li.appendChild(libelle);
+    liste.appendChild(li);
+  });
+}
+
+// ----- Changement de format : on re-paginate tout le texte continu -----
+
+function changerFormat(nouveauFormat) {
+  if (!FORMATS[nouveauFormat]) return;
+  const livre = livreActuel();
+  const ancienFormat = livre.format || "149x210";
+  if (ancienFormat === nouveauFormat) return;
+
+  flushSpread();
+
+  // Les décalages de l'image de couverture sont en pixels relatifs à la taille
+  // de page : on les met à l'échelle pour conserver le même cadrage.
+  const fA = FORMATS[ancienFormat], fN = FORMATS[nouveauFormat];
+  const ratioX = fN.larg / fA.larg, ratioY = fN.haut / fA.haut;
+  ["couverture", "quatrieme"].forEach(cle => {
+    const d = livre[cle];
+    if (!d) return;
+    if (typeof d.imgOffsetX === "number") d.imgOffsetX *= ratioX;
+    if (typeof d.imgOffsetY === "number") d.imgOffsetY *= ratioY;
+  });
+
+  livre.format = nouveauFormat;
+  appliquerFormatPage(nouveauFormat); // met à jour la géométrie des colonnes
+  repaginerTout();
+
+  const spreads = spreadsLivre();
+  if (numSpread() >= spreads.length) indexSpread = Math.max(0, (spreads.length - 1) * 2);
+  afficherSpread();
+  afficherSommaire();
+  majCompteurMots();
+  marquerModifie();
+  planifierBrouillon();
+
+  const sel = document.getElementById("selectFormat");
+  if (sel) sel.value = nouveauFormat;
+}
+
+// Recolle tout le livre puis le redécoupe en doubles-pages pour la géométrie
+// courante. La recomposition est une partition stricte : aucun texte perdu.
+function repaginerTout() {
+  const livre = livreActuel();
+  const spreads = spreadsLivre();
+  let tout = "";
+  for (const s of spreads) tout = fusionnerSuite(tout, s);
+
+  const nouveaux = [];
+  let reste = tout;
+  let securite = 0;
+  while (texteBrutPage(reste).trim() !== "" && securite < 5000) {
+    securite++;
+    const part = calculerPartition(reste);
+    nouveaux.push(part.garde);
+    reste = part.overflow || "";
+    if (texteBrutPage(reste).trim() === "") break;
+  }
+  livre.spreads = nouveaux.length ? nouveaux : [""];
+  pagesObsoletes = true;
+  regenererToutesPages();
+}
+
+// ----- Compteur de mots (sur le texte continu) -----
+
+function majCompteurMots() {
+  if (indexLivre === -1) return;
+  flushSpread();
+  const spreads = spreadsLivre();
+  let mots = 0;
+  const tmp = document.createElement("div");
+  spreads.forEach(html => {
+    tmp.innerHTML = html || "";
+    const txt = (tmp.textContent || "").trim();
+    if (txt) mots += txt.split(/\s+/).length;
+  });
+  assurerPagesAJour();
+  const nbPages = livreActuel().pages.length;
+  const el = document.getElementById("compteurMots");
+  if (el) el.textContent = `${mots} mot${mots > 1 ? "s" : ""} · ${nbPages} page${nbPages > 1 ? "s" : ""}`;
+}
+
+// ----- Recherche : positionner dans la zone unique -----
+
+function surlignerMatch(match) {
+  const longueur = document.getElementById("champRecherche").value.length;
+  if (!longueur) return;
+  assurerPagesAJour();
+  const pages = livreActuel().pages;
+
+  const spreadCible = match.page - (match.page % 2);
+  if (spreadCible !== indexSpread) {
+    flushSpread();
+    indexSpread = spreadCible;
+    afficherSpread();
+    afficherSommaire();
+  }
+
+  // Offset dans la double-page = (page gauche complète si le résultat est à droite) + offset
+  let offset = match.offset;
+  if (match.page % 2 === 1) {
+    offset += texteBrutPage(pages[match.page - 1] ? pages[match.page - 1].contenu : "").length;
+  }
+
+  const ed = editeurEl();
+  const pos = positionDansElement(ed, offset, longueur);
+  if (!pos) return;
+  const range = document.createRange();
+  range.setStart(pos.debutNoeud, pos.debutOffset);
+  range.setEnd(pos.finNoeud, pos.finOffset);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+  ed.focus();
+}
+
+// ----- Sauvegarde : on régénère les pages dérivées avant d'écrire -----
+
+async function sauvegarder() {
+  const token = sessionStorage.getItem("gh_token");
+  const message = document.getElementById("message");
+
+  flushSpread();
+  regenererToutesPages();
+
+  // Retirer les doubles-pages vides en fin de livre (au moins une)
+  const spreads = spreadsLivre();
+  while (spreads.length > 1 && !texteBrutPage(spreads[spreads.length - 1]).trim()) spreads.pop();
+  if (numSpread() >= spreads.length) indexSpread = Math.max(0, (spreads.length - 1) * 2);
+  afficherSpread();
+  afficherSommaire();
+
+  try {
+    shaBiblio = await ecrireFichierJSON(nomFichierBiblio, bibliotheque, shaBiblio, token, "Mise à jour du livre");
+    message.textContent = "Sauvegardé avec succès.";
+    marquerSauvegarde();
+    effacerBrouillon();
+  } catch (erreur) {
+    if (erreur.conflit) { gererConflitSauvegarde(); return; }
+    message.textContent = erreur.message;
+  }
+}
+
+// ----- Aperçu : s'assurer que les pages dérivées sont à jour -----
+
+function ouvrirApercu() {
+  flushSpread();
+  regenererToutesPages();
+  modeApercu = true;
+  animationEnCours = false;
+  indexApercu = 0;
+
+  document.getElementById("vueEditeur").style.display = "none";
+  document.getElementById("vueCouverture").style.display = "none";
+  document.getElementById("vueApercu").style.display = "flex";
+  document.querySelector(".sommaire").style.display = "none";
+
+  afficherApercu();
+}
 
 chargerLivre();
 initGlissementImageCouverture();

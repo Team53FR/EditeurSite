@@ -15,6 +15,7 @@ const PIED_PAGE_MM = 12;    // zone réservée au numéro de page
 
 function exporterImpression() {
   flushSpread();
+  regenererToutesPages(); // pages dérivées à jour pour l'impression
   const livre = livreActuel();
   const f = FORMATS[livre.format || "149x210"] || FORMATS["149x210"];
 
@@ -72,6 +73,7 @@ function exporterImpression() {
 
 function exporterLivret() {
   flushSpread();
+  regenererToutesPages(); // pages dérivées à jour pour l'impression
   const livre = livreActuel();
   const f = FORMATS[livre.format || "149x210"] || FORMATS["149x210"];
 

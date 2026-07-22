@@ -117,13 +117,14 @@
       </div>
 
       <div class="livre-ouvert">
-        <div class="page-livre">
-          <div id="pageGauche" class="texte-livre" contenteditable="true"></div>
-          <div class="numero-page" id="numeroGauche"></div>
-        </div>
-        <div class="page-livre">
-          <div id="pageDroite" class="texte-livre" contenteditable="true"></div>
-          <div class="numero-page" id="numeroDroite"></div>
+        <!-- UNE SEULE zone éditable rendue en deux colonnes (= deux pages).
+             Sélection, annuler/rétablir et typographie sont donc natifs. -->
+        <div class="spread-edition" id="spreadEdition">
+          <div class="page-fond" id="fondGauche"></div>
+          <div class="page-fond" id="fondDroite"></div>
+          <div id="editeurSpread" class="texte-livre editeur-spread" contenteditable="true"></div>
+          <div class="numero-page num-spread" id="numeroGauche"></div>
+          <div class="numero-page num-spread" id="numeroDroite"></div>
         </div>
       </div>
 
@@ -237,6 +238,9 @@
   </div>
 
   <div id="mesureCachee" class="texte-livre" style="position:absolute; visibility:hidden; left:-9999px; top:0;"></div>
+  <!-- Mesureur à deux colonnes (hors zoom) : sert à calculer les coupes de page
+       sans jamais toucher à la zone d'édition ni au curseur. -->
+  <div id="mesureSpread" class="texte-livre editeur-spread" style="position:absolute; visibility:hidden; left:-99999px; top:0;"></div>
 
   <script src="script.js"></script>
   <script src="editeur.js"></script>
