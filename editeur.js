@@ -586,18 +586,10 @@ function changerFormat(nouveauFormat) {
   const ancienFormat = livre.format || "149x210";
   if (ancienFormat === nouveauFormat) return;
 
-  // Les décalages de l'image de couverture sont stockés en pixels relatifs à la
-  // taille de page. Quand le format change, la page change de dimensions : on
-  // met les décalages à l'échelle pour conserver le même cadrage de l'image.
-  const fA = FORMATS[ancienFormat], fN = FORMATS[nouveauFormat];
-  const ratioX = fN.larg / fA.larg;
-  const ratioY = fN.haut / fA.haut;
-  ["couverture", "quatrieme"].forEach(cle => {
-    const d = livre[cle];
-    if (!d) return;
-    if (typeof d.imgOffsetX === "number") d.imgOffsetX *= ratioX;
-    if (typeof d.imgOffsetY === "number") d.imgOffsetY *= ratioY;
-  });
+  // Le recadrage de l'image de couverture (zoom + décalage) est réadapté
+  // automatiquement à la nouvelle taille de page par adapterCadrageImage()
+  // lors du prochain rendu de la couverture ou de l'aperçu, afin que l'image
+  // occupe visuellement la même place qu'avant.
 
   flushSpread();
   livre.format = nouveauFormat;
@@ -884,6 +876,35 @@ function afficherImageCouverture(url, chemin) {
 // Calcule la taille "image entière visible" (comme object-fit: contain) puis
 // applique le zoom et le déplacement choisis par-dessus, sans jamais perdre
 // de pixels de l'image d'origine.
+// Adapte zoom + décalage quand la taille de page change (ex. changement de
+// format) pour que l'image occupe VISUELLEMENT la même place qu'avant :
+// on mémorise la taille de page pour laquelle le cadrage a été réglé
+// (imgBaseW/imgBaseH) et on préserve le taux de recouvrement le plus serré
+// (une image qui couvrait toute la couverture continue de la couvrir) ainsi
+// que la position relative du centre.
+function adapterCadrageImage(data, img, cw, ch) {
+  if (!data || !cw || !ch || !img || !img.naturalWidth || !img.naturalHeight) return;
+
+  const bw = data.imgBaseW, bh = data.imgBaseH;
+  if (bw && bh && (bw !== cw || bh !== ch)) {
+    const sOld = Math.min(bw / img.naturalWidth, bh / img.naturalHeight);
+    const sNew = Math.min(cw / img.naturalWidth, ch / img.naturalHeight);
+    // taux de recouvrement de la dimension la moins couverte (0..1 = bandes, >=1 = couvre)
+    const recOld = Math.min(img.naturalWidth * sOld / bw, img.naturalHeight * sOld / bh);
+    const recNew = Math.min(img.naturalWidth * sNew / cw, img.naturalHeight * sNew / ch);
+    if (recOld > 0 && recNew > 0) {
+      const z = data.imgZoom || 1;
+      data.imgZoom = Math.max(0.3, Math.min(3, z * (recOld / recNew)));
+    }
+    // conserver la position relative du centre
+    if (typeof data.imgOffsetX === "number") data.imgOffsetX *= cw / bw;
+    if (typeof data.imgOffsetY === "number") data.imgOffsetY *= ch / bh;
+  }
+
+  data.imgBaseW = cw;
+  data.imgBaseH = ch;
+}
+
 function repositionnerImageCouverture() {
   const img = document.getElementById("imageFondCouverture");
   const conteneur = document.getElementById("previewCouv");
@@ -893,6 +914,7 @@ function repositionnerImageCouverture() {
   const data = modeCouverture === "couverture" ? livre.couverture : livre.quatrieme;
   if (!data) return;
 
+  adapterCadrageImage(data, img, conteneur.clientWidth, conteneur.clientHeight);
   clampOffsetsCouv(data, conteneur.clientWidth, conteneur.clientHeight);
 
   const echelleBase = Math.min(
@@ -1417,6 +1439,7 @@ function positionnerImageApercu(img, data, url, page, chemin, dejaRetente) {
     const largeurConteneur = page.clientWidth;
     const hauteurConteneur = page.clientHeight;
     if (!largeurConteneur || !hauteurConteneur) return;
+    adapterCadrageImage(data, img, largeurConteneur, hauteurConteneur);
     const echelleBase = Math.min(largeurConteneur / img.naturalWidth, hauteurConteneur / img.naturalHeight);
     const zoom = data.imgZoom || 1;
     const largeurAffichee = img.naturalWidth * echelleBase;
