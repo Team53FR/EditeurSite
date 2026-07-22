@@ -24,6 +24,7 @@ function seDeconnecter() {
   sessionStorage.removeItem("gh_token");
   sessionStorage.removeItem("gh_login");
   sessionStorage.removeItem("gh_role");
+  sessionStorage.removeItem("gh_nom");
   sessionStorage.removeItem("livre_id");
   window.location.href = "index.html";
 }

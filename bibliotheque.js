@@ -71,7 +71,7 @@ function echapper(txt) {
 
 function nomAffiche() {
   const login = sessionStorage.getItem("gh_login") || "";
-  const perso = bibliotheque && bibliotheque.nomAffichage ? String(bibliotheque.nomAffichage).trim() : "";
+  const perso = (sessionStorage.getItem("gh_nom") || "").trim();
   return perso || login || "Auteur";
 }
 
@@ -319,13 +319,13 @@ async function supprimerLivre(id) {
   }
 }
 
-// ----- Nom d'affichage (libre-service, stocké dans la bibliothèque de l'utilisateur) -----
+// ----- Nom d'affichage (libre-service, stocké dans users.json) -----
 
 function modifierNom() {
   const edition = document.getElementById("editionNom");
   const champ = document.getElementById("champNom");
   if (!edition || !champ) return;
-  champ.value = (bibliotheque && bibliotheque.nomAffichage) ? bibliotheque.nomAffichage : "";
+  champ.value = sessionStorage.getItem("gh_nom") || "";
   edition.style.display = "flex";
   const btn = document.getElementById("btnModifNom");
   if (btn) btn.style.display = "none";
@@ -344,29 +344,35 @@ function annulerNom() {
 
 async function enregistrerNom() {
   const token = sessionStorage.getItem("gh_token");
+  const login = sessionStorage.getItem("gh_login");
   const message = document.getElementById("message");
   const champ = document.getElementById("champNom");
   if (!champ) return;
 
   const nouveau = champ.value.trim();
-  const ancien = bibliotheque.nomAffichage || "";
+  const ancien = sessionStorage.getItem("gh_nom") || "";
   if (nouveau === ancien) { annulerNom(); return; }
 
-  // Un nom vide = revenir à l'identifiant
-  if (nouveau) bibliotheque.nomAffichage = nouveau;
-  else delete bibliotheque.nomAffichage;
-
   try {
-    shaBiblio = await ecrireFichierJSON(nomFichierBiblio, bibliotheque, shaBiblio, token, "Mise à jour du nom d'affichage");
+    // Le nom d'affichage est stocké dans users.json (champ nomAffichage du compte)
+    const { contenu: utilisateurs, sha } = await lireFichierJSON("users.json", token);
+    const u = Array.isArray(utilisateurs) ? utilisateurs.find(x => x.login === login) : null;
+    if (!u) { message.textContent = "Compte introuvable dans users.json."; return; }
+
+    if (nouveau) u.nomAffichage = nouveau;
+    else delete u.nomAffichage; // un nom vide = revenir à l'identifiant
+
+    await ecrireFichierJSON("users.json", utilisateurs, sha, token, "Mise à jour du nom d'affichage");
+
+    sessionStorage.setItem("gh_nom", nouveau);
     annulerNom();
     remplirProfil();
     message.textContent = "Nom mis à jour.";
     setTimeout(() => { if (message.textContent === "Nom mis à jour.") message.textContent = ""; }, 2500);
   } catch (erreur) {
-    // Rétablir l'ancienne valeur en cas d'échec
-    if (ancien) bibliotheque.nomAffichage = ancien;
-    else delete bibliotheque.nomAffichage;
-    message.textContent = erreur.message;
+    message.textContent = erreur.conflit
+      ? "La liste des comptes a été modifiée ailleurs. Rechargez la page avant de réessayer."
+      : erreur.message;
   }
 }
 
@@ -374,6 +380,7 @@ function seDeconnecter() {
   sessionStorage.removeItem("gh_token");
   sessionStorage.removeItem("gh_login");
   sessionStorage.removeItem("gh_role");
+  sessionStorage.removeItem("gh_nom");
   sessionStorage.removeItem("livre_id");
   window.location.href = "index.html";
 }

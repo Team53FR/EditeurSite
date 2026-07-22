@@ -226,6 +226,7 @@ async function seConnecter() {
       sessionStorage.setItem("gh_token", token);
       sessionStorage.setItem("gh_login", login);
       sessionStorage.setItem("gh_role", utilisateur.role === "admin" ? "admin" : "user");
+      sessionStorage.setItem("gh_nom", utilisateur.nomAffichage ? String(utilisateur.nomAffichage) : "");
 
       // Enregistrer la date de dernière connexion dans users.json (best-effort :
       // ne doit jamais empêcher la connexion en cas d'échec d'écriture).
