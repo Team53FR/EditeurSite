@@ -2747,30 +2747,71 @@ function lancerTutorielEditeur(forcer) {
   if (typeof lancerTutoriel !== "function") return;
   lancerTutoriel([
     { cible: null, titre: "L'éditeur 📖",
-      texte: "Voici l'atelier d'écriture. Votre livre s'affiche en double-page, comme un vrai livre ouvert. Découvrons les outils." },
-    { cible: "#editeurSpread", titre: "Écrire",
-      texte: "Écrivez directement dans les deux pages. Quand une page est pleine, le texte passe tout seul à la suivante. Le copier-coller, la sélection et l'annuler (Ctrl+Z) fonctionnent comme dans un traitement de texte." },
-    { cible: ".barre-outils", titre: "La barre d'outils",
-      texte: "Gras, italique, souligné, alignement, listes… Sélectionnez du texte puis cliquez sur un bouton pour le mettre en forme." },
-    { cible: "#selectStyle", titre: "Styles & typographie",
-      texte: "Style de paragraphe (titre, sous-titre), police, interligne et taille en points : tout pour soigner la mise en page." },
+      texte: "Bienvenue dans l'atelier d'écriture. Votre livre s'affiche en double-page, exactement comme un vrai livre ouvert : page de gauche et page de droite. Ce guide détaillé passe en revue chaque outil. (Flèches ← → ou boutons ci-dessous.)" },
+
+    { cible: "#editeurSpread", titre: "La zone d'écriture",
+      texte: "Écrivez directement dans les deux pages. Le texte est CONTINU : dès qu'une page est pleine, la suite passe toute seule sur la page suivante — vous n'avez jamais à gérer les coupures. La sélection, le copier-coller et l'annuler fonctionnent comme dans Word ou Google Docs. Astuce : un texte collé prend automatiquement la mise en forme du livre." },
+
+    { cible: 'button[title^="Annuler"]', titre: "Annuler / Rétablir",
+      texte: "Revenez en arrière avec ↶ (ou Ctrl+Z) et rétablissez avec ↷ (ou Ctrl+Y). Rien n'est jamais perdu." },
+
+    { cible: 'button[title="Gras"]', titre: "Gras, italique, souligné",
+      texte: "Sélectionnez d'abord le texte, puis cliquez : G pour gras, I pour italique, S pour souligné. Idéal pour les emphases et les pensées d'un personnage." },
+
+    { cible: 'button[title="Justifier"]', titre: "Alignement",
+      texte: "Gauche, centré, droite, et surtout « justifié » (≡) : le texte s'aligne des deux côtés pour un rendu net et professionnel, comme dans les romans imprimés." },
+
+    { cible: 'button[title="Liste à puces"]', titre: "Listes",
+      texte: "Créez des listes à puces ou numérotées, utiles pour des énumérations ou des notes." },
+
+    { cible: "#selectStyle", titre: "Style de paragraphe",
+      texte: "Transformez une ligne en « Titre » ou « Sous-titre ». Ces styles servent notamment aux titres de chapitres et sont mis en valeur automatiquement dans la mise en page." },
+
+    { cible: "#selectPolice", titre: "La police",
+      texte: "Changez la police du texte sélectionné (Garamond par défaut, une police élégante et lisible pensée pour les livres)." },
+
+    { cible: "#selectInterligne", titre: "L'interligne",
+      texte: "Réglez l'espace entre les lignes (simple, 1,5, double) pour aérer plus ou moins votre texte." },
+
+    { cible: "#inputTaille", titre: "La taille du texte",
+      texte: "Sélectionnez du texte puis choisissez sa taille en points (pt). Pratique pour agrandir un titre ou réduire une note." },
+
+    { cible: "#sliderEspaceTitre", titre: "Espace au-dessus des titres",
+      texte: "Ce curseur règle la hauteur de « blanc » laissée au-dessus des titres de chapitre, pour qu'ils respirent joliment en haut de page." },
+
     { cible: 'button[title^="Rechercher"]', titre: "Rechercher / Remplacer",
-      texte: "Retrouvez et remplacez un mot dans tout le livre (raccourci Ctrl+F)." },
+      texte: "Trouvez un mot dans tout le livre et remplacez-le en un clic, un par un ou partout à la fois (raccourci Ctrl+F)." },
+
+    { cible: ".btn-chapitre", titre: "Ajouter un chapitre",
+      texte: "« + Chapitre » démarre un nouveau chapitre sur une nouvelle page. Les chapitres apparaissent dans le sommaire à gauche pour naviguer rapidement dans votre livre." },
+
+    { cible: "#listePages", titre: "Le sommaire",
+      texte: "La liste de vos pages (et chapitres). Cliquez sur une entrée pour sauter directement à cet endroit du livre." },
+
     { cible: ".sommaire-couvertures", titre: "Les couvertures",
-      texte: "Composez la 1re et la 4e de couverture : couleur de fond, image, titre et auteur." },
+      texte: "Composez votre 1re et votre 4e de couverture : couleur ou image de fond, titre et auteur — avec réglages de police, de taille et de position du texte pour un rendu soigné." },
+
     { cible: "#selectFormat", titre: "Le format du livre",
-      texte: "Changez le format à tout moment : le texte se re-répartit automatiquement sur les pages." },
+      texte: "Changez le format (Roman, Poche, A4…) à tout moment : tout le texte se re-répartit automatiquement sur les pages, sans rien perdre." },
+
     { cible: 'button[onclick="ouvrirApercu()"]', titre: "Mode aperçu",
-      texte: "Feuilletez votre livre avec une vraie animation de pages qui se tournent, couverture comprise." },
-    { cible: 'button[onclick="exporterLivret()"]', titre: "Imprimer",
-      texte: "Exportez en PDF ou imprimez au vrai format, en livret à agrafer, pour fabriquer votre livre papier." },
+      texte: "Feuilletez votre livre comme en vrai, avec une animation de pages qui se tournent — couverture et 4e de couverture comprises. Parfait pour se rendre compte du résultat final." },
+
+    { cible: 'button[onclick="exporterLivret()"]', titre: "Imprimer / PDF",
+      texte: "Exportez en PDF ou imprimez au vrai format physique, en « livret à agrafer » : il suffit de plier et d'agrafer au centre pour fabriquer votre livre papier." },
+
     { cible: ".barre-actions", titre: "Naviguer & sauvegarder",
-      texte: "Passez d'une double-page à l'autre, et surtout cliquez sur « Sauvegarder » pour enregistrer votre travail." },
-    { cible: "#etatSauvegarde", titre: "Suivi",
-      texte: "Nombre de mots, de pages, et indication des modifications non encore enregistrées." },
+      texte: "« Précédent » et « Suivant » tournent les doubles-pages. Et surtout : cliquez régulièrement sur « Sauvegarder » (ou Ctrl+S) pour enregistrer votre travail en ligne." },
+
+    { cible: ".sommaire-pied", titre: "Mots, pages & sauvegarde",
+      texte: "En bas du panneau : le nombre de mots et de pages, et un indicateur qui vous prévient s'il reste des modifications non enregistrées." },
+
+    { cible: ".bouton-toggle-sommaire", titre: "Plus de place pour écrire",
+      texte: "Ce bouton replie le panneau de gauche pour agrandir la zone d'écriture. Cliquez à nouveau pour le rouvrir." },
+
     { cible: null, titre: "C'est parti ! 🎉",
-      texte: "Vous avez tout en main. Ce guide reste accessible à tout moment via le bouton « ? » en haut du panneau." }
-  ], { cle: forcer ? null : "tuto_editeur_v1", forcer: forcer });
+      texte: "Vous connaissez maintenant tous les outils. Écrivez, mettez en forme, prévisualisez, puis imprimez votre livre. Ce guide reste accessible à tout moment via le bouton « ? » en haut du panneau. Bonne écriture !" }
+  ], { cle: forcer ? null : "tuto_editeur_v2", forcer: forcer });
 }
 
 chargerLivre();
