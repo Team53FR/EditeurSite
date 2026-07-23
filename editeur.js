@@ -206,6 +206,14 @@ async function chargerLivre() {
     appliquerFormatPage(formatCourant);
     const selFormat = document.getElementById("selectFormat");
     if (selFormat) selFormat.value = formatCourant;
+
+    // Espace au-dessus des titres de chapitre (réglable dans la barre d'outils)
+    const espaceTitre = (typeof livre.espaceTitre === "number") ? livre.espaceTitre : ESPACE_TITRE_DEFAUT;
+    appliquerEspaceTitre(espaceTitre);
+    const slEspace = document.getElementById("sliderEspaceTitre");
+    if (slEspace) slEspace.value = espaceTitre;
+    const valEspace = document.getElementById("valeurEspaceTitre");
+    if (valEspace) valEspace.textContent = espaceTitre;
     window.addEventListener("resize", () => {
       // Lire le format courant du livre (il peut changer via le sélecteur)
       appliquerFormatPage(livreActuel().format || "149x210");
@@ -2863,6 +2871,51 @@ function ouvrirApercu() {
   document.querySelector(".sommaire").style.display = "none";
 
   afficherApercu();
+}
+
+// ----- Espace au-dessus des titres de chapitre (curseur de la barre d'outils) -----
+// La valeur est posée sur :root, donc héritée par la zone d'édition, par le
+// MESUREUR de pagination et par l'aperçu/impression : la coupe des pages reste
+// cohérente avec ce qui est affiché.
+
+const ESPACE_TITRE_DEFAUT = 65;
+let timerEspaceTitre = null;
+
+function appliquerEspaceTitre(px) {
+  document.documentElement.style.setProperty("--espace-titre", px + "px");
+}
+
+function setEspaceTitre(px) {
+  const val = Math.max(0, Math.min(400, parseInt(px, 10) || 0));
+
+  appliquerEspaceTitre(val);
+  const aff = document.getElementById("valeurEspaceTitre");
+  if (aff) aff.textContent = val;
+
+  if (indexLivre === -1) return;
+  livreActuel().espaceTitre = val;
+  marquerModifie();
+  planifierBrouillon();
+
+  // Le curseur émet beaucoup d'événements : on repagine une fois posé.
+  clearTimeout(timerEspaceTitre);
+  timerEspaceTitre = setTimeout(repaginerApresEspaceTitre, 250);
+}
+
+function repaginerApresEspaceTitre() {
+  if (indexLivre === -1 || modeApercu || modeCouverture) return;
+
+  flushSpread();
+  repaginerTout();          // l'espace change ce qui tient dans une page
+
+  const spreads = spreadsLivre();
+  if (numSpread() >= spreads.length) {
+    indexSpread = Math.max(0, (spreads.length - 1) * 2);
+  }
+
+  afficherSpread();
+  afficherSommaire();
+  majCompteurMots();
 }
 
 chargerLivre();

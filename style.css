@@ -1226,5 +1226,27 @@ button.danger {
    padding est conservé. Les pages qui ne commencent pas par un titre ne sont
    donc pas décalées. */
 .texte-livre h2 {
-  padding-top: 2.5em;
+  padding-top: var(--espace-titre, 65px);
+}
+
+/* Réglage de l'espace au-dessus des titres, dans la barre d'outils */
+.etiquette-espace {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--s-ink-soft);
+  letter-spacing: .04em;
+}
+
+.slider-espace {
+  width: 78px;
+  accent-color: var(--s-accent);
+  cursor: pointer;
+}
+
+.valeur-espace {
+  font-size: 11px;
+  color: var(--s-ink-soft);
+  min-width: 24px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }

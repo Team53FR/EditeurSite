@@ -115,6 +115,13 @@
           onkeydown="if(event.key==='Enter'){appliquerTaille(this.value);event.preventDefault();}">
         <span style="font-size:12px;color:#666;">pt</span>
         <span class="separateur-outils"></span>
+        <span class="etiquette-espace" title="Espace au-dessus des titres de chapitre">Titre</span>
+        <input type="range" id="sliderEspaceTitre" class="slider-espace"
+          min="0" max="160" step="5" value="65"
+          title="Espace au-dessus des titres de chapitre"
+          oninput="setEspaceTitre(this.value)">
+        <span id="valeurEspaceTitre" class="valeur-espace">65</span>
+        <span class="separateur-outils"></span>
         <button onmousedown="event.preventDefault()" onclick="basculerRecherche()" title="Rechercher / Remplacer (Ctrl+F)">&#128269;</button>
       </div>
 
@@ -223,7 +230,7 @@
       </div>
 
       <div class="barre-actions">
-        <button onclick="fermerCouverture()" class="secondaire">&#8592; Retour au texte</button>
+        <button onclick="fermerCouverture()" class="secondaire">Retour au texte</button>
         <button onclick="sauvegarder()" class="principal">Sauvegarder</button>
       </div>
 
