@@ -2552,26 +2552,118 @@ function pageSuivante() {
   afficherSommaire();
 }
 
-// ----- Sommaire : navigation uniquement -----
-// (Avec un texte continu, supprimer ou déplacer « une page » n'a plus de sens :
-//  on ne propose donc que la navigation, pour ne jamais abîmer le texte.)
-function afficherSommaire() {
+// ----- Sommaire : liste des CHAPITRES -----
+// Un chapitre est un titre (h2) dans le texte continu. On les retrouve dans
+// les pages dérivées, ce qui donne directement le numéro de page de chacun.
+
+function listerChapitres() {
   assurerPagesAJour();
-  const pages = livreActuel().pages;
+  const pages = livreActuel().pages || [];
+  const chapitres = [];
+  const boite = document.createElement("div");
+  pages.forEach((page, i) => {
+    boite.innerHTML = page.contenu || "";
+    boite.querySelectorAll("h2").forEach(h => {
+      const titre = (h.textContent || "").trim();
+      // Un titre vide = fragment laissé par la coupe entre deux pages
+      // (le saut de page duplique le bloc à cheval) : on l'ignore.
+      if (!titre) return;
+      chapitres.push({ titre, page: i });
+    });
+  });
+  return chapitres;
+}
+
+function afficherSommaire() {
   const liste = document.getElementById("listePages");
   if (!liste) return;
   liste.innerHTML = "";
 
-  pages.forEach((page, i) => {
+  const chapitres = listerChapitres();
+
+  if (chapitres.length === 0) {
     const li = document.createElement("li");
-    li.className = (i === indexSpread || i === indexSpread + 1) ? "actif" : "";
+    li.className = "sommaire-vide";
+    li.textContent = "Aucun chapitre pour l'instant.";
+    liste.appendChild(li);
+    return;
+  }
+
+  chapitres.forEach(ch => {
+    const li = document.createElement("li");
+    li.className = (ch.page === indexSpread || ch.page === indexSpread + 1) ? "actif" : "";
+
     const libelle = document.createElement("span");
-    libelle.textContent = "Page " + (i + 1);
     libelle.className = "libelle-page";
-    libelle.onclick = () => allerAPage(i);
+    libelle.textContent = ch.titre;
+    libelle.title = ch.titre;
+    libelle.onclick = () => allerAPage(ch.page);
     li.appendChild(libelle);
+
+    const num = document.createElement("span");
+    num.className = "num-chapitre";
+    num.textContent = "p." + (ch.page + 1);
+    li.appendChild(num);
+
     liste.appendChild(li);
   });
+}
+
+// Ajoute un chapitre : un titre qui DÉMARRE SUR UNE NOUVELLE PAGE
+// (saut de colonne forcé — une colonne = une page dans cette mise en page).
+function ajouterChapitre() {
+  if (modeApercu || modeCouverture) return;
+
+  flushSpread();
+
+  // Se placer sur la dernière double-page, à la toute fin du texte
+  const spreads = spreadsLivre();
+  indexSpread = Math.max(0, spreads.length - 1) * 2;
+  afficherSpread();
+
+  const ed = editeurEl();
+  if (!ed) return;
+  ed.focus();
+
+  const range = document.createRange();
+  range.selectNodeContents(ed);
+  range.collapse(false);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+
+  // insertHTML : opération unique, donc annulable nativement (Ctrl+Z)
+  document.execCommand(
+    "insertHTML", false,
+    '<h2 class="chapitre" style="break-before:column;">Nouveau chapitre</h2><p><br></p>'
+  );
+
+  marquerModifie();
+
+  // Laisser le texte s'écouler : gererFlux enregistre, découpe si ça déborde,
+  // re-rend la double-page ET suit le curseur (donc on arrive déjà sur la page
+  // du nouveau chapitre — inutile de re-naviguer, ce qui dupliquerait le texte).
+  gererFlux();
+
+  // Sélectionner le titre pour pouvoir le renommer immédiatement
+  selectionnerDernierTitre();
+  afficherSommaire();
+}
+
+// Sélectionne le dernier titre de chapitre non vide de la double-page affichée
+function selectionnerDernierTitre() {
+  const ed = editeurEl();
+  if (!ed) return;
+  const titres = [...ed.querySelectorAll("h2")].filter(h => (h.textContent || "").trim());
+  const cible = titres[titres.length - 1];
+  if (!cible) return;
+  ed.focus();
+  const r = document.createRange();
+  r.selectNodeContents(cible);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(r);
+  sauvegarderSelection();
 }
 
 // ----- Changement de format : on re-paginate tout le texte continu -----

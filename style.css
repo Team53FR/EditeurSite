@@ -170,6 +170,39 @@ button.secondaire {
 
 .libelle-page {
   flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- Sommaire des chapitres ---- */
+
+.btn-chapitre {
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.num-chapitre {
+  font-size: 11px;
+  color: #999;
+  flex-shrink: 0;
+  margin-left: 6px;
+}
+
+.sommaire li.actif .num-chapitre {
+  color: #bbb;
+}
+
+.sommaire li.sommaire-vide {
+  color: #999;
+  font-size: 12px;
+  font-style: italic;
+  cursor: default;
+  justify-content: center;
+}
+
+.sommaire li.sommaire-vide:hover {
+  background: none;
 }
 
 .supprimer-page {
