@@ -2544,12 +2544,44 @@ function pagePrecedente() {
   }
 }
 
+// « Suivant » NE CRÉE PLUS de page : le texte étant continu, les doubles-pages
+// naissent uniquement du débordement (gererFlux). Créer une page à chaque clic
+// laissait des doubles-pages vides — visibles comme des pages blanches dans
+// l'aperçu et à l'impression.
 function pageSuivante() {
   flushSpread();
-  assurerSpread(numSpread() + 1);
+  const spreads = spreadsLivre();
+  if (numSpread() + 1 >= spreads.length) return; // déjà à la fin
   indexSpread += 2;
   afficherSpread();
   afficherSommaire();
+}
+
+// Supprime les doubles-pages entièrement vides (héritées des anciens clics sur
+// « Suivant »), en recalant la double-page affichée.
+function nettoyerSpreadsVides() {
+  const livre = livreActuel();
+  const spreads = spreadsLivre();
+  if (!Array.isArray(spreads) || spreads.length <= 1) return false;
+
+  const courant = numSpread();
+  const gardes = [];
+  let nouveauCourant = 0;
+
+  spreads.forEach((html, i) => {
+    if (texteBrutPage(html || "").trim()) {
+      if (i <= courant) nouveauCourant = gardes.length;
+      gardes.push(html);
+    }
+  });
+
+  if (gardes.length === 0) gardes.push("");
+  if (gardes.length === spreads.length) return false; // rien à nettoyer
+
+  livre.spreads = gardes;
+  indexSpread = Math.min(nouveauCourant, gardes.length - 1) * 2;
+  pagesObsoletes = true;
+  return true;
 }
 
 // ----- Sommaire : liste des CHAPITRES -----
@@ -2615,6 +2647,7 @@ function ajouterChapitre() {
   if (modeApercu || modeCouverture) return;
 
   flushSpread();
+  nettoyerSpreadsVides();   // ne pas ajouter le chapitre après des pages vides
 
   // Se placer sur la dernière double-page, à la toute fin du texte
   const spreads = spreadsLivre();
@@ -2786,12 +2819,12 @@ async function sauvegarder() {
   const message = document.getElementById("message");
 
   flushSpread();
+
+  // Retirer TOUTES les doubles-pages vides (y compris au milieu du livre),
+  // sinon elles ressortent en pages blanches à l'aperçu et à l'impression.
+  nettoyerSpreadsVides();
   regenererToutesPages();
 
-  // Retirer les doubles-pages vides en fin de livre (au moins une)
-  const spreads = spreadsLivre();
-  while (spreads.length > 1 && !texteBrutPage(spreads[spreads.length - 1]).trim()) spreads.pop();
-  if (numSpread() >= spreads.length) indexSpread = Math.max(0, (spreads.length - 1) * 2);
   afficherSpread();
   afficherSommaire();
 
@@ -2810,6 +2843,7 @@ async function sauvegarder() {
 
 function ouvrirApercu() {
   flushSpread();
+  nettoyerSpreadsVides();   // pas de pages blanches parasites dans l'aperçu
   regenererToutesPages();
   modeApercu = true;
   animationEnCours = false;
