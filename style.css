@@ -596,7 +596,7 @@ button.danger {
 
 .apercu-titre {
   font-family: "EB Garamond", Georgia, serif;
-  font-size: 22px;
+  font-size: calc(22px * var(--mult-titre, 1));
   font-weight: bold;
   text-align: center;
   margin-bottom: 10px;
@@ -606,7 +606,7 @@ button.danger {
 
 .apercu-auteur {
   font-family: "EB Garamond", Georgia, serif;
-  font-size: 14px;
+  font-size: calc(14px * var(--mult-auteur, 1));
   text-align: center;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -1391,4 +1391,23 @@ button.danger {
   font-family: var(--s-serif);
   font-size: 16px !important;
   color: var(--s-ink) !important;
+}
+
+/* Sélecteur de police dans le panneau de couverture */
+.select-couv {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--s-line);
+  border-radius: 9px;
+  background: var(--s-cream);
+  color: var(--s-ink);
+  font-size: 12.5px;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.select-couv:focus {
+  outline: none;
+  border-color: var(--s-accent);
+  box-shadow: 0 0 0 3px rgba(138,75,56,.14);
 }

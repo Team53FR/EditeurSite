@@ -861,8 +861,8 @@ function previewCouverture() {
 
   const apercu = document.getElementById("previewCouverture");
   apercu.innerHTML = `
-    ${mode === "couverture" && afficherTitre ? `<div class="apercu-titre" style="color:${couleurTexte};${decalageTexteCouv(data,'titre')}">${livre.titre || "Titre"}</div>` : ""}
-    ${afficherAuteur ? `<div class="apercu-auteur" style="color:${couleurTexte};${decalageTexteCouv(data,'auteur')}">${livre.auteur || "Auteur"}</div>` : ""}
+    ${mode === "couverture" && afficherTitre ? `<div class="apercu-titre" style="color:${couleurTexte};${styleTexteCouv(data,'titre')}">${livre.titre || "Titre"}</div>` : ""}
+    ${afficherAuteur ? `<div class="apercu-auteur" style="color:${couleurTexte};${styleTexteCouv(data,'auteur')}">${livre.auteur || "Auteur"}</div>` : ""}
   `;
 }
 
@@ -1483,8 +1483,8 @@ function creerPageCouvertureApercu(mode) {
   const afficherTitre = !data || data.afficherTitre !== false;
   const afficherAuteur = !data || data.afficherAuteur !== false;
   couche.innerHTML = `
-    ${mode === "couverture" && afficherTitre ? `<div class="apercu-titre" style="color:${couleurTexte};${decalageTexteCouv(data,'titre')}">${livre.titre || "Titre"}</div>` : ""}
-    ${afficherAuteur ? `<div class="apercu-auteur" style="color:${couleurTexte};${decalageTexteCouv(data,'auteur')}">${livre.auteur || "Auteur"}</div>` : ""}
+    ${mode === "couverture" && afficherTitre ? `<div class="apercu-titre" style="color:${couleurTexte};${styleTexteCouv(data,'titre')}">${livre.titre || "Titre"}</div>` : ""}
+    ${afficherAuteur ? `<div class="apercu-auteur" style="color:${couleurTexte};${styleTexteCouv(data,'auteur')}">${livre.auteur || "Auteur"}</div>` : ""}
   `;
   page.appendChild(couche);
 
@@ -2926,13 +2926,6 @@ function repaginerApresEspaceTitre() {
 //   Y :   0 (bas, position par défaut) .. 100 (haut)
 // Utilisé par l'éditeur de couverture, l'aperçu ET l'impression.
 
-function decalageTexteCouv(data, cle) {
-  const x = (data && typeof data[cle + "X"] === "number") ? data[cle + "X"] : 0;
-  const y = (data && typeof data[cle + "Y"] === "number") ? data[cle + "Y"] : 0;
-  if (!x && !y) return "";
-  return `position:relative;left:${x}%;bottom:${y}%;`;
-}
-
 function setPositionTexteCouv(cle, axe, valeur) {
   if (indexLivre === -1) return;
   const livre = livreActuel();
@@ -2953,8 +2946,23 @@ function setPositionTexteCouv(cle, axe, valeur) {
 
 // Recale les curseurs sur les valeurs de la couverture affichée
 function synchroniserCurseursPosition(data, mode) {
-  const blocTitre = document.getElementById("blocPosTitre");
-  if (blocTitre) blocTitre.style.display = mode === "couverture" ? "block" : "none";
+  // Le titre n'existe pas sur la 4e de couverture : on masque ses réglages.
+  const visible = mode === "couverture" ? "block" : "none";
+  ["blocPosTitre", "blocPoliceTitre"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = visible;
+  });
+
+  // Police et taille
+  [["titre", "Titre"], ["auteur", "Auteur"]].forEach(([cle, Cle]) => {
+    const selP = document.getElementById("police" + Cle);
+    if (selP) selP.value = (data && data[cle + "Police"]) || "";
+    const t = (data && typeof data[cle + "Taille"] === "number") ? data[cle + "Taille"] : 100;
+    const slT = document.getElementById("taillePos" + Cle);
+    if (slT) slT.value = t;
+    const affT = document.getElementById("valTaille" + Cle);
+    if (affT) affT.textContent = t;
+  });
 
   [["titre", "Titre"], ["auteur", "Auteur"]].forEach(([cle, Cle]) => {
     ["X", "Y"].forEach(axe => {
@@ -2965,6 +2973,36 @@ function synchroniserCurseursPosition(data, mode) {
       if (aff) aff.textContent = v;
     });
   });
+}
+
+function couvCourante() {
+  if (indexLivre === -1) return null;
+  const livre = livreActuel();
+  return modeCouverture === "couverture" ? livre.couverture : livre.quatrieme;
+}
+
+function setPoliceTexteCouv(cle, police) {
+  const data = couvCourante();
+  if (!data) return;
+  if (police) data[cle + "Police"] = police;
+  else delete data[cle + "Police"];   // vide = police par défaut du livre
+  previewCouverture();
+  marquerModifie();
+  planifierBrouillon();
+}
+
+function setTailleTexteCouv(cle, valeur) {
+  const data = couvCourante();
+  if (!data) return;
+  const val = Math.max(50, Math.min(250, parseInt(valeur, 10) || 100));
+  data[cle + "Taille"] = val;
+
+  const aff = document.getElementById("valTaille" + cle.charAt(0).toUpperCase() + cle.slice(1));
+  if (aff) aff.textContent = val;
+
+  previewCouverture();
+  marquerModifie();
+  planifierBrouillon();
 }
 
 chargerLivre();

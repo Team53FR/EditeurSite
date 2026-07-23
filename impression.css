@@ -107,7 +107,7 @@
   }
 
   .titre-impression {
-    font-size: 22pt;
+    font-size: calc(22pt * var(--mult-titre, 1));
     font-weight: bold;
     text-align: center;
     margin-bottom: 6mm;
@@ -116,7 +116,7 @@
   }
 
   .auteur-impression {
-    font-size: 12pt;
+    font-size: calc(12pt * var(--mult-auteur, 1));
     text-align: center;
     letter-spacing: 0.1em;
     text-transform: uppercase;

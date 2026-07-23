@@ -194,6 +194,42 @@
               </label>
             </div>
 
+            <div id="blocPoliceTitre">
+              <label class="label-couv">Titre — police et taille</label>
+              <select id="policeTitre" class="select-couv" onchange="setPoliceTexteCouv('titre', this.value)">
+          <option value="">Garamond (défaut)</option>
+          <option value="Georgia, serif">Georgia</option>
+          <option value="'Times New Roman', serif">Times</option>
+          <option value="Arial, sans-serif">Arial</option>
+          <option value="'Courier New', monospace">Courier</option>
+          <option value="'Trebuchet MS', sans-serif">Trebuchet</option>
+          <option value="Impact, sans-serif">Impact</option>
+              </select>
+              <div class="reglage-pos">
+                <span class="ico-pos" title="Taille">A</span>
+                <input type="range" id="taillePosTitre" min="50" max="250" step="5" value="100"
+                       oninput="setTailleTexteCouv('titre', this.value)">
+                <span class="val-pos" id="valTailleTitre">100</span>
+              </div>
+            </div>
+
+            <label class="label-couv">Auteur — police et taille</label>
+            <select id="policeAuteur" class="select-couv" onchange="setPoliceTexteCouv('auteur', this.value)">
+          <option value="">Garamond (défaut)</option>
+          <option value="Georgia, serif">Georgia</option>
+          <option value="'Times New Roman', serif">Times</option>
+          <option value="Arial, sans-serif">Arial</option>
+          <option value="'Courier New', monospace">Courier</option>
+          <option value="'Trebuchet MS', sans-serif">Trebuchet</option>
+          <option value="Impact, sans-serif">Impact</option>
+            </select>
+            <div class="reglage-pos">
+              <span class="ico-pos" title="Taille">A</span>
+              <input type="range" id="taillePosAuteur" min="50" max="250" step="5" value="100"
+                     oninput="setTailleTexteCouv('auteur', this.value)">
+              <span class="val-pos" id="valTailleAuteur">100</span>
+            </div>
+
             <div id="blocPosTitre">
               <label class="label-couv">Position du titre</label>
               <div class="reglage-pos">

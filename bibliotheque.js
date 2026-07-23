@@ -140,8 +140,8 @@ function afficherListeLivres() {
     couvDiv.style.color = couleurTexte;
     couvDiv.title = "Ouvrir « " + (livre.titre || "") + " »";
     couvDiv.innerHTML =
-      (afficherTitre ? `<div class="c-titre">${echapper(livre.titre || "Sans titre")}</div>` : "") +
-      (afficherAuteur ? `<div class="c-auteur">${echapper(livre.auteur)}</div>` : "");
+      (afficherTitre ? `<div class="c-titre" style="${styleTexteCouv(couv, 'titre')}">${echapper(livre.titre || "Sans titre")}</div>` : "") +
+      (afficherAuteur ? `<div class="c-auteur" style="${styleTexteCouv(couv, 'auteur')}">${echapper(livre.auteur)}</div>` : "");
     couvDiv.onclick = () => ouvrirLivre(livre.id);
     li.appendChild(couvDiv);
 

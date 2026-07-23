@@ -256,3 +256,31 @@ async function seConnecter() {
     message.textContent = erreur.message;
   }
 }
+
+// ===== Mise en forme du titre / de l'auteur sur une couverture =====
+// Partagé par l'éditeur, l'aperçu, l'impression ET la vignette de la
+// bibliothèque, pour que les quatre rendus ne divergent jamais.
+//
+//  - position : en % de la PAGE (donc conservée si le format change)
+//      X : -50 (gauche) .. 0 .. 50 (droite)   Y : 0 (bas) .. 100 (haut)
+//  - police   : pile de polices CSS
+//  - taille   : en % (100 = taille par défaut). Exposée comme MULTIPLICATEUR
+//      CSS, car chaque contexte a sa propre taille de base (page, vignette,
+//      impression) : le réglage s'y adapte au lieu d'être figé en pixels.
+function styleTexteCouv(data, cle) {
+  if (!data) return "";
+  let css = "";
+
+  const x = typeof data[cle + "X"] === "number" ? data[cle + "X"] : 0;
+  const y = typeof data[cle + "Y"] === "number" ? data[cle + "Y"] : 0;
+  if (x || y) css += `position:relative;left:${x}%;bottom:${y}%;`;
+
+  const police = data[cle + "Police"];
+  if (police) css += `font-family:${police};`;
+
+  const taille = data[cle + "Taille"];
+  if (typeof taille === "number" && taille !== 100) {
+    css += `--mult-${cle}:${taille / 100};`;
+  }
+  return css;
+}
