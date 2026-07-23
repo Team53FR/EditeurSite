@@ -1,10 +1,23 @@
 // ===== A MODIFIER avec tes informations =====
 const PROPRIETAIRE = "Team53FR";
 const DEPOT_BDD = "BDD";
+// Dossier du dépôt qui contient toute la base (users.json, bibliotheques/, images/).
+// Laisser "" pour revenir à la racine du dépôt.
+const DOSSIER_BDD = "EditeurLivre";
 // =============================================
 
+// Construit l'URL de l'API GitHub pour un chemin RELATIF à la base.
+// Ex. "users.json" -> .../contents/EditeurLivre/users.json
+// Ainsi le reste du code continue de manipuler des chemins courts
+// ("users.json", "bibliotheques/x.json", "images/x/y.png").
+function urlContenuBDD(chemin) {
+  const base = (DOSSIER_BDD || "").replace(/^\/+|\/+$/g, "");
+  const prefixe = base ? base + "/" : "";
+  return `https://api.github.com/repos/${PROPRIETAIRE}/${DEPOT_BDD}/contents/${prefixe}${chemin}`;
+}
+
 async function lireFichierJSON(nomFichier, token) {
-  const url = `https://api.github.com/repos/${PROPRIETAIRE}/${DEPOT_BDD}/contents/${nomFichier}`;
+  const url = urlContenuBDD(nomFichier);
   const reponse = await fetch(url, {
     headers: {
       "Authorization": `Bearer ${token}`,
@@ -52,7 +65,7 @@ async function lireFichierJSON(nomFichier, token) {
 }
 
 async function ecrireFichierJSON(nomFichier, contenu, sha, token, messageCommit) {
-  const url = `https://api.github.com/repos/${PROPRIETAIRE}/${DEPOT_BDD}/contents/${nomFichier}`;
+  const url = urlContenuBDD(nomFichier);
   const contenuEncode = btoa(unescape(encodeURIComponent(JSON.stringify(contenu, null, 2))));
 
   const corps = { message: messageCommit || `Mise à jour de ${nomFichier}`, content: contenuEncode };
@@ -82,7 +95,7 @@ async function ecrireFichierJSON(nomFichier, contenu, sha, token, messageCommit)
 }
 
 async function obtenirShaFichier(chemin, token) {
-  const url = `https://api.github.com/repos/${PROPRIETAIRE}/${DEPOT_BDD}/contents/${chemin}`;
+  const url = urlContenuBDD(chemin);
   const reponse = await fetch(url, {
     headers: { "Authorization": `Bearer ${token}`, "Accept": "application/vnd.github+json" }
   });
@@ -108,7 +121,7 @@ async function uploaderImageBase64(chemin, dataUrl, token, messageCommit) {
 
   const shaExistant = await obtenirShaFichier(chemin, token);
 
-  const url = `https://api.github.com/repos/${PROPRIETAIRE}/${DEPOT_BDD}/contents/${chemin}`;
+  const url = urlContenuBDD(chemin);
   const corps = { message: messageCommit || `Ajout de l'image ${chemin}`, content: contenuBase64 };
   if (shaExistant) corps.sha = shaExistant;
 
@@ -133,7 +146,7 @@ async function uploaderImageBase64(chemin, dataUrl, token, messageCommit) {
 async function supprimerFichierGithub(chemin, token, messageCommit) {
   const sha = await obtenirShaFichier(chemin, token);
   if (!sha) return;
-  const url = `https://api.github.com/repos/${PROPRIETAIRE}/${DEPOT_BDD}/contents/${chemin}`;
+  const url = urlContenuBDD(chemin);
   await fetch(url, {
     method: "DELETE",
     headers: {
@@ -155,7 +168,7 @@ function mimeDepuisChemin(chemin) {
 }
 
 async function obtenirUrlImage(chemin, token) {
-  const url = `https://api.github.com/repos/${PROPRIETAIRE}/${DEPOT_BDD}/contents/${chemin}`;
+  const url = urlContenuBDD(chemin);
 
   // On récupère les OCTETS bruts, authentifiés par le token dans l'en-tête.
   // (Le download_url de GitHub pour un dépôt privé est une URL signée à jeton
@@ -242,4 +255,32 @@ async function seConnecter() {
   } catch (erreur) {
     message.textContent = erreur.message;
   }
+}
+
+// ===== Mise en forme du titre / de l'auteur sur une couverture =====
+// Partagé par l'éditeur, l'aperçu, l'impression ET la vignette de la
+// bibliothèque, pour que les quatre rendus ne divergent jamais.
+//
+//  - position : en % de la PAGE (donc conservée si le format change)
+//      X : -50 (gauche) .. 0 .. 50 (droite)   Y : 0 (bas) .. 100 (haut)
+//  - police   : pile de polices CSS
+//  - taille   : en % (100 = taille par défaut). Exposée comme MULTIPLICATEUR
+//      CSS, car chaque contexte a sa propre taille de base (page, vignette,
+//      impression) : le réglage s'y adapte au lieu d'être figé en pixels.
+function styleTexteCouv(data, cle) {
+  if (!data) return "";
+  let css = "";
+
+  const x = typeof data[cle + "X"] === "number" ? data[cle + "X"] : 0;
+  const y = typeof data[cle + "Y"] === "number" ? data[cle + "Y"] : 0;
+  if (x || y) css += `position:relative;left:${x}%;bottom:${y}%;`;
+
+  const police = data[cle + "Police"];
+  if (police) css += `font-family:${police};`;
+
+  const taille = data[cle + "Taille"];
+  if (typeof taille === "number" && taille !== 100) {
+    css += `--mult-${cle}:${taille / 100};`;
+  }
+  return css;
 }

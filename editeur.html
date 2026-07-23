@@ -43,9 +43,22 @@
 
       <div class="sommaire-separateur"></div>
 
-      <button onclick="ouvrirApercu()" class="secondaire petit" style="width:100%;margin-bottom:6px;">👁 Mode aperçu</button>
-      <button onclick="exporterLivret()" class="secondaire petit" style="width:100%;margin-bottom:6px;">🖨 Livret à agrafer</button>
-      <button onclick="exporterImpression()" class="secondaire petit" style="width:100%;margin-bottom:10px;display:none;">🖨 Page à page (dos collé)</button>
+      <div class="sommaire-outils">
+        <button onclick="ouvrirApercu()" class="btn-icone" title="Mode aperçu" aria-label="Mode aperçu">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+        <button onclick="exporterLivret()" class="btn-icone" title="Livret à agrafer" aria-label="Livret à agrafer">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8" rx="1"/></svg>
+        </button>
+        <button onclick="exporterImpression()" class="btn-icone" title="Page à page (dos collé)" aria-label="Page à page (dos collé)" style="display:none;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8" rx="1"/></svg>
+        </button>
+      </div>
+
+      <div class="sommaire-separateur"></div>
+
+      <div class="sommaire-section">Chapitres</div>
+      <button onclick="ajouterChapitre()" class="secondaire petit btn-chapitre" title="Ajouter un chapitre (démarre sur une nouvelle page)">+ Chapitre</button>
 
       <ul id="listePages"></ul>
 
@@ -85,7 +98,7 @@
           <option value="h3">Sous-titre</option>
         </select>
         <select id="selectPolice" title="Police" onmousedown="sauvegarderSelection()" onchange="appliquerPolice(this.value)">
-          <option value="">Garamond</option>
+          <option value="'EB Garamond', Georgia, serif">Garamond</option>
           <option value="Georgia, serif">Georgia</option>
           <option value="'Times New Roman', serif">Times</option>
           <option value="Arial, sans-serif">Arial</option>
@@ -103,6 +116,13 @@
           onchange="appliquerTaille(this.value)"
           onkeydown="if(event.key==='Enter'){appliquerTaille(this.value);event.preventDefault();}">
         <span style="font-size:12px;color:#666;">pt</span>
+        <span class="separateur-outils"></span>
+        <span class="etiquette-espace" title="Espace au-dessus des titres de chapitre">Titre</span>
+        <input type="range" id="sliderEspaceTitre" class="slider-espace"
+          min="0" max="160" step="5" value="65"
+          title="Espace au-dessus des titres de chapitre"
+          oninput="setEspaceTitre(this.value)">
+        <span id="valeurEspaceTitre" class="valeur-espace">65</span>
         <span class="separateur-outils"></span>
         <button onmousedown="event.preventDefault()" onclick="basculerRecherche()" title="Rechercher / Remplacer (Ctrl+F)">&#128269;</button>
       </div>
@@ -131,9 +151,9 @@
       </div>
 
       <div class="barre-actions">
-        <button onclick="pagePrecedente()">&#8592; Précédent</button>
-        <button onclick="sauvegarder()">Sauvegarder</button>
-        <button onclick="pageSuivante()">Suivant &#8594;</button>
+        <button onclick="pagePrecedente()">Précédent</button>
+        <button onclick="sauvegarder()" class="principal">Sauvegarder</button>
+        <button onclick="pageSuivante()">Suivant</button>
       </div>
 
       <p id="message" class="message"></p>
@@ -176,6 +196,72 @@
               </label>
             </div>
 
+            <div id="blocPoliceTitre">
+              <label class="label-couv">Titre — police et taille</label>
+              <select id="policeTitre" class="select-couv" onchange="setPoliceTexteCouv('titre', this.value)">
+          <option value="">Garamond (défaut)</option>
+          <option value="Georgia, serif">Georgia</option>
+          <option value="'Times New Roman', serif">Times</option>
+          <option value="Arial, sans-serif">Arial</option>
+          <option value="'Courier New', monospace">Courier</option>
+          <option value="'Trebuchet MS', sans-serif">Trebuchet</option>
+          <option value="Impact, sans-serif">Impact</option>
+              </select>
+              <div class="reglage-pos">
+                <span class="ico-pos" title="Taille">A</span>
+                <input type="range" id="taillePosTitre" min="50" max="250" step="5" value="100"
+                       oninput="setTailleTexteCouv('titre', this.value)">
+                <span class="val-pos" id="valTailleTitre">100</span>
+              </div>
+            </div>
+
+            <label class="label-couv">Auteur — police et taille</label>
+            <select id="policeAuteur" class="select-couv" onchange="setPoliceTexteCouv('auteur', this.value)">
+          <option value="">Garamond (défaut)</option>
+          <option value="Georgia, serif">Georgia</option>
+          <option value="'Times New Roman', serif">Times</option>
+          <option value="Arial, sans-serif">Arial</option>
+          <option value="'Courier New', monospace">Courier</option>
+          <option value="'Trebuchet MS', sans-serif">Trebuchet</option>
+          <option value="Impact, sans-serif">Impact</option>
+            </select>
+            <div class="reglage-pos">
+              <span class="ico-pos" title="Taille">A</span>
+              <input type="range" id="taillePosAuteur" min="50" max="250" step="5" value="100"
+                     oninput="setTailleTexteCouv('auteur', this.value)">
+              <span class="val-pos" id="valTailleAuteur">100</span>
+            </div>
+
+            <div id="blocPosTitre">
+              <label class="label-couv">Position du titre</label>
+              <div class="reglage-pos">
+                <span class="ico-pos" title="Gauche / droite">↔</span>
+                <input type="range" id="posTitreX" min="-50" max="50" step="1" value="0"
+                       oninput="setPositionTexteCouv('titre','X',this.value)">
+                <span class="val-pos" id="valPosTitreX">0</span>
+              </div>
+              <div class="reglage-pos">
+                <span class="ico-pos" title="Bas / haut">↕</span>
+                <input type="range" id="posTitreY" min="0" max="100" step="1" value="0"
+                       oninput="setPositionTexteCouv('titre','Y',this.value)">
+                <span class="val-pos" id="valPosTitreY">0</span>
+              </div>
+            </div>
+
+            <label class="label-couv">Position de l'auteur</label>
+            <div class="reglage-pos">
+              <span class="ico-pos" title="Gauche / droite">↔</span>
+              <input type="range" id="posAuteurX" min="-50" max="50" step="1" value="0"
+                     oninput="setPositionTexteCouv('auteur','X',this.value)">
+              <span class="val-pos" id="valPosAuteurX">0</span>
+            </div>
+            <div class="reglage-pos">
+              <span class="ico-pos" title="Bas / haut">↕</span>
+              <input type="range" id="posAuteurY" min="0" max="100" step="1" value="0"
+                     oninput="setPositionTexteCouv('auteur','Y',this.value)">
+              <span class="val-pos" id="valPosAuteurY">0</span>
+            </div>
+
             <label class="label-couv">Couleur de fond</label>
             <div class="choix-couleurs">
               <div class="pastille" style="background:#1a1a2e;" onclick="setCouleurFond('#1a1a2e')" title="Nuit"></div>
@@ -212,8 +298,8 @@
       </div>
 
       <div class="barre-actions">
-        <button onclick="fermerCouverture()" class="secondaire">&#8592; Retour au texte</button>
-        <button onclick="sauvegarder()">Sauvegarder</button>
+        <button onclick="fermerCouverture()" class="secondaire">Retour au texte</button>
+        <button onclick="sauvegarder()" class="principal">Sauvegarder</button>
       </div>
 
       <p id="messageCouv" class="message"></p>
@@ -229,9 +315,9 @@
       <div class="livre-ouvert" id="conteneurApercu"></div>
 
       <div class="barre-actions">
-        <button onclick="apercuPrecedent()" id="btnApercuPrec">&#8592; Précédent</button>
+        <button onclick="apercuPrecedent()" id="btnApercuPrec">Précédent</button>
         <button onclick="fermerApercu()" class="secondaire">Fermer l'aperçu</button>
-        <button onclick="apercuSuivant()" id="btnApercuSuiv">Suivant &#8594;</button>
+        <button onclick="apercuSuivant()" id="btnApercuSuiv">Suivant</button>
       </div>
 
       <p id="indicateurApercu" class="message" style="color:#666;"></p>

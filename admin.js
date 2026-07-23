@@ -72,7 +72,10 @@ function afficherUtilisateurs() {
     li.innerHTML =
       `<div class="user-ava">${echapper(initiale)}</div>` +
       `<div class="user-nom">` +
-        `<div>${echapper(u.login)}${estMoi ? ' <span class="moi">(vous)</span>' : ""}</div>` +
+        `<div>${echapper(u.login)}` +
+          (u.nomAffichage ? ` <span class="nom-affichage">(${echapper(u.nomAffichage)})</span>` : "") +
+          (estMoi ? ' <span class="moi">(vous)</span>' : "") +
+        `</div>` +
         `<div class="user-date">${echapper(formaterDateConnexion(u.derniereConnexion))}</div>` +
       `</div>` +
       `<span class="role-badge ${role}">${role === "admin" ? "Administrateur" : "Utilisateur"}</span>` +

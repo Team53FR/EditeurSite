@@ -170,6 +170,39 @@ button.secondaire {
 
 .libelle-page {
   flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- Sommaire des chapitres ---- */
+
+.btn-chapitre {
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.num-chapitre {
+  font-size: 11px;
+  color: #999;
+  flex-shrink: 0;
+  margin-left: 6px;
+}
+
+.sommaire li.actif .num-chapitre {
+  color: #bbb;
+}
+
+.sommaire li.sommaire-vide {
+  color: #999;
+  font-size: 12px;
+  font-style: italic;
+  cursor: default;
+  justify-content: center;
+}
+
+.sommaire li.sommaire-vide:hover {
+  background: none;
 }
 
 .supprimer-page {
@@ -328,6 +361,12 @@ button.danger {
   overflow: hidden;
   box-sizing: border-box;
   flex-shrink: 0;
+  /* Par défaut le navigateur applique orphans/widows = 2 : il refuse de laisser
+     une ligne seule et pousse DEUX lignes d'un coup dans la colonne suivante.
+     En passant à 1, seule la suite qui ne tient plus bascule sur la page
+     suivante — ligne par ligne. */
+  orphans: 1;
+  widows: 1;
 }
 
 /* ---- Zone d'édition : une seule zone, deux colonnes (= deux pages) ---- */
@@ -557,7 +596,7 @@ button.danger {
 
 .apercu-titre {
   font-family: "EB Garamond", Georgia, serif;
-  font-size: 22px;
+  font-size: calc(22px * var(--mult-titre, 1));
   font-weight: bold;
   text-align: center;
   margin-bottom: 10px;
@@ -567,7 +606,7 @@ button.danger {
 
 .apercu-auteur {
   font-family: "EB Garamond", Georgia, serif;
-  font-size: 14px;
+  font-size: calc(14px * var(--mult-auteur, 1));
   text-align: center;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -748,4 +787,627 @@ button.danger {
 
 .sommaire li.actif .poignee-page {
   color: #888;
+}
+/* =====================================================================
+   REFONTE VISUELLE DU SOMMAIRE (panneau de gauche de l'éditeur)
+   Reprend la palette chaleureuse du reste du site (crème / sépia /
+   terracotta, EB Garamond). N'affecte QUE le panneau : la géométrie des
+   pages et de la zone de texte est inchangée.
+   ===================================================================== */
+
+:root {
+  --s-cream:      #f6efe0;
+  --s-paper:      #fffdf8;
+  --s-ink:        #2b2622;
+  --s-ink-soft:   #6f6455;
+  --s-accent:     #8a4b38;
+  --s-accent-deep:#6d3a2b;
+  --s-line:       #e6ddc9;
+  --s-serif: "EB Garamond", Georgia, serif;
+}
+
+.sommaire {
+  width: 236px;
+  padding: 18px 16px;
+  background: var(--s-paper);
+  border: 1px solid var(--s-line);
+  border-radius: 14px;
+  box-shadow: 0 1px 3px rgba(60,42,20,.05), 0 8px 24px rgba(60,42,20,.08);
+}
+
+/* --- En-tête : titre du livre --- */
+.sommaire h2 {
+  font-family: var(--s-serif);
+  font-size: 19px;
+  font-weight: 600;
+  color: var(--s-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sommaire .bouton-toggle-sommaire { color: #b3a690; }
+.sommaire .bouton-toggle-sommaire:hover {
+  background: rgba(138,75,56,.10);
+  color: var(--s-accent);
+}
+
+.sommaire-separateur {
+  height: 1px;
+  background: var(--s-line);
+  margin: 12px 0;
+}
+
+/* --- Intitulé de section --- */
+.sommaire-section {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--s-ink-soft);
+  text-transform: uppercase;
+  letter-spacing: .09em;
+  margin-bottom: 8px;
+}
+
+/* --- Boutons génériques du panneau --- */
+.sommaire button.secondaire,
+.sommaire .btn-couv {
+  background: var(--s-cream);
+  color: var(--s-ink);
+  border: 1px solid var(--s-line);
+  border-radius: 9px;
+  font-family: system-ui, sans-serif;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 8px 11px;
+  transition: background .12s ease, border-color .12s ease, color .12s ease;
+}
+
+.sommaire button.secondaire:hover,
+.sommaire .btn-couv:hover {
+  background: #fff;
+  border-color: var(--s-accent);
+  color: var(--s-accent-deep);
+}
+
+/* Couverture / 4e de couverture : côte à côte pour gagner de la place */
+.sommaire-couvertures {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 0;
+}
+
+.sommaire .btn-couv {
+  text-align: center;
+  font-size: 11.5px;
+  padding: 8px 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Aperçu / impression : boutons-icônes compacts */
+.sommaire-outils {
+  display: flex;
+  gap: 6px;
+  margin: 10px 0;
+}
+
+.sommaire .btn-icone {
+  flex: 1;
+  height: 36px;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--s-cream);
+  border: 1px solid var(--s-line);
+  border-radius: 9px;
+  color: var(--s-ink-soft);
+  cursor: pointer;
+  transition: background .12s ease, border-color .12s ease, color .12s ease;
+}
+
+.sommaire .btn-icone:hover {
+  background: #fff;
+  border-color: var(--s-accent);
+  color: var(--s-accent-deep);
+}
+
+.sommaire .btn-couv.actif,
+.sommaire .btn-couv.actif:hover {
+  background: var(--s-accent);
+  border-color: var(--s-accent);
+  color: #fff;
+}
+
+/* Format du livre */
+.label-format {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--s-ink-soft);
+  letter-spacing: .09em;
+  margin-bottom: 6px;
+}
+
+.select-format {
+  padding: 8px 10px;
+  border: 1px solid var(--s-line);
+  border-radius: 9px;
+  font-size: 12.5px;
+  background: var(--s-cream);
+  color: var(--s-ink);
+}
+
+.select-format:focus {
+  outline: none;
+  border-color: var(--s-accent);
+  box-shadow: 0 0 0 3px rgba(138,75,56,.14);
+}
+
+/* Bouton « + Chapitre » : action principale du panneau */
+.sommaire button.btn-chapitre,
+.sommaire button.btn-chapitre.secondaire {
+  background: var(--s-accent);
+  border: 1px solid var(--s-accent);
+  color: #fff;
+  font-weight: 700;
+  border-radius: 9px;
+  padding: 9px 11px;
+  margin-bottom: 10px;
+  box-shadow: 0 3px 10px rgba(138,75,56,.22);
+}
+
+.sommaire button.btn-chapitre:hover,
+.sommaire button.btn-chapitre.secondaire:hover {
+  background: var(--s-accent-deep);
+  border-color: var(--s-accent-deep);
+  color: #fff;
+}
+
+/* --- Liste des chapitres --- */
+.sommaire ul { gap: 2px; margin-bottom: 10px; }
+
+.sommaire li {
+  position: relative;
+  padding: 8px 10px 8px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--s-ink);
+  gap: 8px;
+}
+
+.sommaire li:hover { background: var(--s-cream); }
+
+/* Chapitre courant : fond teinté + filet accent (plus doux que le noir) */
+.sommaire li.actif,
+.sommaire li.actif:hover {
+  background: rgba(138,75,56,.10);
+  color: var(--s-accent-deep);
+}
+
+.sommaire li.actif::before {
+  content: "";
+  position: absolute;
+  left: 3px; top: 7px; bottom: 7px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--s-accent);
+}
+
+.sommaire li .libelle-page {
+  font-family: var(--s-serif);
+  font-size: 15px;
+}
+
+.sommaire li.actif .libelle-page { font-weight: 600; }
+
+.sommaire .num-chapitre {
+  font-size: 11px;
+  color: #b3a690;
+  font-variant-numeric: tabular-nums;
+}
+
+.sommaire li.actif .num-chapitre { color: var(--s-accent); }
+
+.sommaire li.sommaire-vide {
+  color: var(--s-ink-soft);
+  border: 1px dashed var(--s-line);
+  border-radius: 9px;
+  padding: 14px 10px;
+  font-size: 12px;
+}
+
+/* --- Pied : compteur + état d'enregistrement --- */
+.sommaire-pied {
+  border-top: 1px solid var(--s-line);
+  padding-top: 12px;
+}
+
+.compteur-mots { color: var(--s-ink-soft); }
+.etat-sauvegarde.enregistre { color: #2e7d32; }
+.etat-sauvegarde.non-enregistre { color: #c77700; }
+
+/* --- Actions du bas --- */
+.sommaire-actions {
+  border-top: 1px solid var(--s-line);
+  padding-top: 12px;
+  gap: 6px;
+}
+
+.sommaire-actions button.secondaire {
+  background: transparent;
+  border-color: transparent;
+  color: var(--s-ink-soft);
+  font-weight: 600;
+}
+
+.sommaire-actions button.secondaire:hover {
+  background: var(--s-cream);
+  border-color: var(--s-line);
+  color: var(--s-accent-deep);
+}
+
+/* Bouton flottant de réouverture du panneau */
+.bouton-ouvrir-sommaire {
+  background: var(--s-paper);
+  border: 1px solid var(--s-line);
+  color: var(--s-ink-soft);
+  box-shadow: 0 2px 8px rgba(60,42,20,.14);
+}
+
+.bouton-ouvrir-sommaire:hover {
+  background: #fff;
+  color: var(--s-accent);
+}
+
+/* La liste des chapitres doit occuper toute la hauteur restante.
+   Les marges « auto » du pied absorbaient l'espace libre AVANT que
+   flex:1 ne puisse l'utiliser : la liste restait écrasée. */
+.sommaire ul {
+  flex: 1 1 auto;
+  min-height: 80px;
+}
+
+.sommaire-pied,
+.sommaire-actions {
+  margin-top: 0;
+}
+
+/* =====================================================================
+   HARMONISATION : barre d'outils d'édition + barre d'actions
+   Même palette chaleureuse que le sommaire (crème / sépia / terracotta).
+   ===================================================================== */
+
+/* --- Barre d'outils (haut) --- */
+.barre-outils {
+  background: var(--s-paper);
+  border: 1px solid var(--s-line);
+  border-radius: 12px;
+  padding: 8px 10px;
+  box-shadow: 0 1px 3px rgba(60,42,20,.05), 0 6px 18px rgba(60,42,20,.07);
+  flex-wrap: wrap;
+}
+
+.barre-outils button {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--s-cream);
+  border: 1px solid var(--s-line);
+  border-radius: 8px;
+  color: var(--s-ink);
+  font-family: var(--s-serif);
+  font-size: 14px;
+  transition: background .12s ease, border-color .12s ease, color .12s ease;
+}
+
+.barre-outils button:hover {
+  background: #fff;
+  border-color: var(--s-accent);
+  color: var(--s-accent-deep);
+}
+
+.barre-outils select,
+.barre-outils .input-taille {
+  background: var(--s-cream);
+  border: 1px solid var(--s-line);
+  border-radius: 8px;
+  color: var(--s-ink);
+  font-size: 12.5px;
+  padding: 6px 8px;
+}
+
+.barre-outils select:focus,
+.barre-outils .input-taille:focus {
+  outline: none;
+  border-color: var(--s-accent);
+  box-shadow: 0 0 0 3px rgba(138,75,56,.14);
+}
+
+.separateur-outils { background: var(--s-line); }
+
+/* --- Barre d'actions (sous le livre) --- */
+.barre-actions button {
+  background: var(--s-cream);
+  border: 1px solid var(--s-line);
+  border-radius: 10px;
+  color: var(--s-ink);
+  font-family: system-ui, sans-serif;
+  font-size: 13.5px;
+  font-weight: 600;
+  padding: 10px 14px;
+  margin-top: 0;
+  transition: background .12s ease, border-color .12s ease, color .12s ease;
+}
+
+.barre-actions button:hover:not(:disabled) {
+  background: #fff;
+  border-color: var(--s-accent);
+  color: var(--s-accent-deep);
+}
+
+/* Action principale : Sauvegarder */
+.barre-actions button.principal,
+.barre-actions button.principal:hover {
+  background: var(--s-accent);
+  border-color: var(--s-accent);
+  color: #fff;
+  box-shadow: 0 3px 10px rgba(138,75,56,.22);
+}
+
+.barre-actions button.principal:hover {
+  background: var(--s-accent-deep);
+  border-color: var(--s-accent-deep);
+}
+
+/* Actions discrètes : Retour au texte, Fermer l'aperçu */
+.barre-actions button.secondaire {
+  background: transparent;
+  border-color: transparent;
+  color: var(--s-ink-soft);
+}
+
+.barre-actions button.secondaire:hover {
+  background: var(--s-cream);
+  border-color: var(--s-line);
+  color: var(--s-accent-deep);
+}
+
+.barre-actions button:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+/* --- Panneau Rechercher / Remplacer (sous la barre d'outils) --- */
+.panneau-recherche {
+  background: var(--s-paper);
+  border: 1px solid var(--s-line);
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(60,42,20,.05), 0 6px 18px rgba(60,42,20,.07);
+}
+
+.panneau-recherche input[type="text"] {
+  background: var(--s-cream);
+  border: 1px solid var(--s-line);
+  border-radius: 8px;
+  color: var(--s-ink);
+  padding: 7px 10px;
+}
+
+.panneau-recherche input[type="text"]:focus {
+  outline: none;
+  border-color: var(--s-accent);
+  box-shadow: 0 0 0 3px rgba(138,75,56,.14);
+}
+
+.panneau-recherche button.secondaire {
+  background: var(--s-cream);
+  border: 1px solid var(--s-line);
+  border-radius: 8px;
+  color: var(--s-ink);
+  font-weight: 600;
+}
+
+.panneau-recherche button.secondaire:hover {
+  background: #fff;
+  border-color: var(--s-accent);
+  color: var(--s-accent-deep);
+}
+
+.compteur-recherche { color: var(--s-ink-soft); }
+
+/* Respiration au-dessus d'un titre de chapitre.
+   On utilise PADDING et non margin : dans une mise en page en colonnes, les
+   marges en tête de colonne sont supprimées par le navigateur, alors que le
+   padding est conservé. Les pages qui ne commencent pas par un titre ne sont
+   donc pas décalées. */
+.texte-livre h2 {
+  padding-top: var(--espace-titre, 65px);
+}
+
+/* Réglage de l'espace au-dessus des titres, dans la barre d'outils */
+.etiquette-espace {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--s-ink-soft);
+  letter-spacing: .04em;
+}
+
+.slider-espace {
+  width: 78px;
+  accent-color: var(--s-accent);
+  cursor: pointer;
+}
+
+.valeur-espace {
+  font-size: 11px;
+  color: var(--s-ink-soft);
+  min-width: 24px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* =====================================================================
+   HARMONISATION : panneau d'édition Couverture / 4e de couverture
+   ===================================================================== */
+
+/* Le panneau est un .page-livre : on le transforme en carte "papier" */
+.paneau-edition-couv {
+  background: var(--s-paper);
+  border: 1px solid var(--s-line);
+  border-radius: 14px;
+  box-shadow: 0 1px 3px rgba(60,42,20,.05), 0 8px 24px rgba(60,42,20,.08);
+}
+
+.champs-couverture { gap: 7px; }
+
+.label-couv {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--s-ink-soft);
+  letter-spacing: .09em;
+  margin-top: 12px;
+}
+
+.champs-couverture input[type="text"] {
+  background: var(--s-cream);
+  border: 1px solid var(--s-line);
+  border-radius: 9px;
+  color: var(--s-ink);
+  font-size: 13.5px;
+  padding: 9px 11px;
+}
+
+.champs-couverture input[type="text"]:focus {
+  outline: none;
+  border-color: var(--s-accent);
+  box-shadow: 0 0 0 3px rgba(138,75,56,.14);
+}
+
+/* Cases à cocher */
+.toggle-ligne {
+  font-size: 12.5px;
+  color: var(--s-ink);
+}
+
+.toggle-ligne input[type="checkbox"] { accent-color: var(--s-accent); }
+
+/* Pastilles de couleur */
+.pastille {
+  width: 22px;
+  height: 22px;
+  border: 1px solid rgba(60,42,20,.18);
+  box-shadow: 0 1px 2px rgba(60,42,20,.10);
+}
+
+.pastille:hover { border-color: var(--s-accent); transform: scale(1.08); }
+
+.input-couleur-libre {
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--s-line);
+}
+
+/* Choix de fichier image */
+.input-fichier {
+  font-size: 11.5px;
+  color: var(--s-ink-soft);
+}
+
+.input-fichier::file-selector-button {
+  background: var(--s-cream);
+  border: 1px solid var(--s-line);
+  border-radius: 8px;
+  color: var(--s-ink);
+  font-family: system-ui, sans-serif;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 6px 10px;
+  margin-right: 8px;
+  cursor: pointer;
+}
+
+.input-fichier::file-selector-button:hover {
+  background: #fff;
+  border-color: var(--s-accent);
+  color: var(--s-accent-deep);
+}
+
+/* Zoom de l'image + curseurs de position : même présentation */
+.zoom-controle input[type="range"],
+.reglage-pos input[type="range"] {
+  flex: 1;
+  accent-color: var(--s-accent);
+  cursor: pointer;
+}
+
+.zoom-controle span#valeurZoom { color: var(--s-ink-soft); }
+
+.reglage-pos {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ico-pos {
+  font-size: 13px;
+  color: var(--s-ink-soft);
+  width: 14px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.val-pos {
+  font-size: 11px;
+  color: var(--s-ink-soft);
+  min-width: 26px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.aide-deplacement { color: var(--s-ink-soft); }
+
+/* Bouton « Supprimer l'image » */
+.champs-couverture button.secondaire {
+  background: var(--s-cream);
+  border: 1px solid var(--s-line);
+  border-radius: 9px;
+  color: var(--s-ink);
+  font-weight: 600;
+}
+
+.champs-couverture button.secondaire:hover {
+  background: #fff;
+  border-color: #a33;
+  color: #a33;
+}
+
+/* Intitulé « Couverture » / « 4e de couverture » dans la barre d'outils */
+#titreModeCouv {
+  font-family: var(--s-serif);
+  font-size: 16px !important;
+  color: var(--s-ink) !important;
+}
+
+/* Sélecteur de police dans le panneau de couverture */
+.select-couv {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--s-line);
+  border-radius: 9px;
+  background: var(--s-cream);
+  color: var(--s-ink);
+  font-size: 12.5px;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.select-couv:focus {
+  outline: none;
+  border-color: var(--s-accent);
+  box-shadow: 0 0 0 3px rgba(138,75,56,.14);
 }
