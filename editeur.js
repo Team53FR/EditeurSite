@@ -857,10 +857,12 @@ function previewCouverture() {
   if (toggleAuteurInput) toggleAuteurInput.checked = afficherAuteur;
   if (ligneToggleTitre) ligneToggleTitre.style.display = mode === "couverture" ? "block" : "none";
 
+  synchroniserCurseursPosition(data, mode);
+
   const apercu = document.getElementById("previewCouverture");
   apercu.innerHTML = `
-    ${mode === "couverture" && afficherTitre ? `<div class="apercu-titre" style="color:${couleurTexte}">${livre.titre || "Titre"}</div>` : ""}
-    ${afficherAuteur ? `<div class="apercu-auteur" style="color:${couleurTexte}">${livre.auteur || "Auteur"}</div>` : ""}
+    ${mode === "couverture" && afficherTitre ? `<div class="apercu-titre" style="color:${couleurTexte};${decalageTexteCouv(data,'titre')}">${livre.titre || "Titre"}</div>` : ""}
+    ${afficherAuteur ? `<div class="apercu-auteur" style="color:${couleurTexte};${decalageTexteCouv(data,'auteur')}">${livre.auteur || "Auteur"}</div>` : ""}
   `;
 }
 
@@ -1481,8 +1483,8 @@ function creerPageCouvertureApercu(mode) {
   const afficherTitre = !data || data.afficherTitre !== false;
   const afficherAuteur = !data || data.afficherAuteur !== false;
   couche.innerHTML = `
-    ${mode === "couverture" && afficherTitre ? `<div class="apercu-titre" style="color:${couleurTexte}">${livre.titre || "Titre"}</div>` : ""}
-    ${afficherAuteur ? `<div class="apercu-auteur" style="color:${couleurTexte}">${livre.auteur || "Auteur"}</div>` : ""}
+    ${mode === "couverture" && afficherTitre ? `<div class="apercu-titre" style="color:${couleurTexte};${decalageTexteCouv(data,'titre')}">${livre.titre || "Titre"}</div>` : ""}
+    ${afficherAuteur ? `<div class="apercu-auteur" style="color:${couleurTexte};${decalageTexteCouv(data,'auteur')}">${livre.auteur || "Auteur"}</div>` : ""}
   `;
   page.appendChild(couche);
 
@@ -2916,6 +2918,53 @@ function repaginerApresEspaceTitre() {
   afficherSpread();
   afficherSommaire();
   majCompteurMots();
+}
+
+// ----- Position du titre / de l'auteur sur la couverture -----
+// Décalage exprimé en % de la PAGE (donc conservé si le format change) :
+//   X : -50 (gauche) .. 0 (centré) .. 50 (droite)
+//   Y :   0 (bas, position par défaut) .. 100 (haut)
+// Utilisé par l'éditeur de couverture, l'aperçu ET l'impression.
+
+function decalageTexteCouv(data, cle) {
+  const x = (data && typeof data[cle + "X"] === "number") ? data[cle + "X"] : 0;
+  const y = (data && typeof data[cle + "Y"] === "number") ? data[cle + "Y"] : 0;
+  if (!x && !y) return "";
+  return `position:relative;left:${x}%;bottom:${y}%;`;
+}
+
+function setPositionTexteCouv(cle, axe, valeur) {
+  if (indexLivre === -1) return;
+  const livre = livreActuel();
+  const data = modeCouverture === "couverture" ? livre.couverture : livre.quatrieme;
+  if (!data) return;
+
+  const min = axe === "X" ? -50 : 0;
+  const val = Math.max(min, Math.min(100, parseInt(valeur, 10) || 0));
+  data[cle + axe] = val;
+
+  const aff = document.getElementById("valPos" + cle.charAt(0).toUpperCase() + cle.slice(1) + axe);
+  if (aff) aff.textContent = val;
+
+  previewCouverture();
+  marquerModifie();
+  planifierBrouillon();
+}
+
+// Recale les curseurs sur les valeurs de la couverture affichée
+function synchroniserCurseursPosition(data, mode) {
+  const blocTitre = document.getElementById("blocPosTitre");
+  if (blocTitre) blocTitre.style.display = mode === "couverture" ? "block" : "none";
+
+  [["titre", "Titre"], ["auteur", "Auteur"]].forEach(([cle, Cle]) => {
+    ["X", "Y"].forEach(axe => {
+      const v = (data && typeof data[cle + axe] === "number") ? data[cle + axe] : 0;
+      const sl = document.getElementById("pos" + Cle + axe);
+      if (sl) sl.value = v;
+      const aff = document.getElementById("valPos" + Cle + axe);
+      if (aff) aff.textContent = v;
+    });
+  });
 }
 
 chargerLivre();

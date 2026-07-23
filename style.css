@@ -1250,3 +1250,145 @@ button.danger {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
+
+/* =====================================================================
+   HARMONISATION : panneau d'édition Couverture / 4e de couverture
+   ===================================================================== */
+
+/* Le panneau est un .page-livre : on le transforme en carte "papier" */
+.paneau-edition-couv {
+  background: var(--s-paper);
+  border: 1px solid var(--s-line);
+  border-radius: 14px;
+  box-shadow: 0 1px 3px rgba(60,42,20,.05), 0 8px 24px rgba(60,42,20,.08);
+}
+
+.champs-couverture { gap: 7px; }
+
+.label-couv {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--s-ink-soft);
+  letter-spacing: .09em;
+  margin-top: 12px;
+}
+
+.champs-couverture input[type="text"] {
+  background: var(--s-cream);
+  border: 1px solid var(--s-line);
+  border-radius: 9px;
+  color: var(--s-ink);
+  font-size: 13.5px;
+  padding: 9px 11px;
+}
+
+.champs-couverture input[type="text"]:focus {
+  outline: none;
+  border-color: var(--s-accent);
+  box-shadow: 0 0 0 3px rgba(138,75,56,.14);
+}
+
+/* Cases à cocher */
+.toggle-ligne {
+  font-size: 12.5px;
+  color: var(--s-ink);
+}
+
+.toggle-ligne input[type="checkbox"] { accent-color: var(--s-accent); }
+
+/* Pastilles de couleur */
+.pastille {
+  width: 22px;
+  height: 22px;
+  border: 1px solid rgba(60,42,20,.18);
+  box-shadow: 0 1px 2px rgba(60,42,20,.10);
+}
+
+.pastille:hover { border-color: var(--s-accent); transform: scale(1.08); }
+
+.input-couleur-libre {
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--s-line);
+}
+
+/* Choix de fichier image */
+.input-fichier {
+  font-size: 11.5px;
+  color: var(--s-ink-soft);
+}
+
+.input-fichier::file-selector-button {
+  background: var(--s-cream);
+  border: 1px solid var(--s-line);
+  border-radius: 8px;
+  color: var(--s-ink);
+  font-family: system-ui, sans-serif;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 6px 10px;
+  margin-right: 8px;
+  cursor: pointer;
+}
+
+.input-fichier::file-selector-button:hover {
+  background: #fff;
+  border-color: var(--s-accent);
+  color: var(--s-accent-deep);
+}
+
+/* Zoom de l'image + curseurs de position : même présentation */
+.zoom-controle input[type="range"],
+.reglage-pos input[type="range"] {
+  flex: 1;
+  accent-color: var(--s-accent);
+  cursor: pointer;
+}
+
+.zoom-controle span#valeurZoom { color: var(--s-ink-soft); }
+
+.reglage-pos {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ico-pos {
+  font-size: 13px;
+  color: var(--s-ink-soft);
+  width: 14px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.val-pos {
+  font-size: 11px;
+  color: var(--s-ink-soft);
+  min-width: 26px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.aide-deplacement { color: var(--s-ink-soft); }
+
+/* Bouton « Supprimer l'image » */
+.champs-couverture button.secondaire {
+  background: var(--s-cream);
+  border: 1px solid var(--s-line);
+  border-radius: 9px;
+  color: var(--s-ink);
+  font-weight: 600;
+}
+
+.champs-couverture button.secondaire:hover {
+  background: #fff;
+  border-color: #a33;
+  color: #a33;
+}
+
+/* Intitulé « Couverture » / « 4e de couverture » dans la barre d'outils */
+#titreModeCouv {
+  font-family: var(--s-serif);
+  font-size: 16px !important;
+  color: var(--s-ink) !important;
+}

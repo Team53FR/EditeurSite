@@ -194,6 +194,36 @@
               </label>
             </div>
 
+            <div id="blocPosTitre">
+              <label class="label-couv">Position du titre</label>
+              <div class="reglage-pos">
+                <span class="ico-pos" title="Gauche / droite">↔</span>
+                <input type="range" id="posTitreX" min="-50" max="50" step="1" value="0"
+                       oninput="setPositionTexteCouv('titre','X',this.value)">
+                <span class="val-pos" id="valPosTitreX">0</span>
+              </div>
+              <div class="reglage-pos">
+                <span class="ico-pos" title="Bas / haut">↕</span>
+                <input type="range" id="posTitreY" min="0" max="100" step="1" value="0"
+                       oninput="setPositionTexteCouv('titre','Y',this.value)">
+                <span class="val-pos" id="valPosTitreY">0</span>
+              </div>
+            </div>
+
+            <label class="label-couv">Position de l'auteur</label>
+            <div class="reglage-pos">
+              <span class="ico-pos" title="Gauche / droite">↔</span>
+              <input type="range" id="posAuteurX" min="-50" max="50" step="1" value="0"
+                     oninput="setPositionTexteCouv('auteur','X',this.value)">
+              <span class="val-pos" id="valPosAuteurX">0</span>
+            </div>
+            <div class="reglage-pos">
+              <span class="ico-pos" title="Bas / haut">↕</span>
+              <input type="range" id="posAuteurY" min="0" max="100" step="1" value="0"
+                     oninput="setPositionTexteCouv('auteur','Y',this.value)">
+              <span class="val-pos" id="valPosAuteurY">0</span>
+            </div>
+
             <label class="label-couv">Couleur de fond</label>
             <div class="choix-couleurs">
               <div class="pastille" style="background:#1a1a2e;" onclick="setCouleurFond('#1a1a2e')" title="Nuit"></div>

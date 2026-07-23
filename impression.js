@@ -214,8 +214,8 @@ function creerCouvertureImpression(livre, mode, f, promessesImages) {
   const afficherTitre = !data || data.afficherTitre !== false;
   const afficherAuteur = !data || data.afficherAuteur !== false;
   couche.innerHTML = `
-    ${mode === "couverture" && afficherTitre ? `<div class="titre-impression" style="color:${couleurTexte}">${livre.titre || ""}</div>` : ""}
-    ${afficherAuteur ? `<div class="auteur-impression" style="color:${couleurTexte}">${livre.auteur || ""}</div>` : ""}
+    ${mode === "couverture" && afficherTitre ? `<div class="titre-impression" style="color:${couleurTexte};${decalageTexteCouv(data,'titre')}">${livre.titre || ""}</div>` : ""}
+    ${afficherAuteur ? `<div class="auteur-impression" style="color:${couleurTexte};${decalageTexteCouv(data,'auteur')}">${livre.auteur || ""}</div>` : ""}
   `;
   div.appendChild(couche);
 
