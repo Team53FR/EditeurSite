@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="site.css">
+<link rel="stylesheet" href="tutoriel.css">
 </head>
 <body>
 
@@ -19,6 +20,7 @@
         Mon Éditeur De Livre
       </a>
       <div class="nav-actions">
+        <button class="btn-aide-tuto" onclick="lancerTutorielBiblio(true)" title="Revoir le tutoriel">?</button>
         <a href="utilisateurs.html" id="btnAdmin" class="btn btn-secondaire" style="display:none">⚙ Gestion des utilisateurs</a>
         <button class="btn btn-fantome" onclick="seDeconnecter()">Se déconnecter</button>
       </div>
@@ -76,6 +78,7 @@
   </main>
 
   <script src="script.js"></script>
+  <script src="tutoriel.js"></script>
   <script src="bibliotheque.js"></script>
 </body>
 </html>

@@ -42,6 +42,29 @@ async function chargerBibliotheque() {
   }
 
   afficherListeLivres();
+
+  // Tutoriel de bienvenue au tout premier lancement (une seule fois).
+  setTimeout(() => lancerTutorielBiblio(false), 500);
+}
+
+function lancerTutorielBiblio(forcer) {
+  if (typeof lancerTutoriel !== "function") return;
+  lancerTutoriel([
+    { cible: null, titre: "Bienvenue 👋",
+      texte: "Voici votre bibliothèque. Ce petit guide vous montre comment créer votre premier livre et où trouver les outils. Utilisez « Suivant » (ou la flèche →)." },
+    { cible: ".profil-in", titre: "Votre profil",
+      texte: "Votre nom d'affichage et vos statistiques (nombre de livres et de pages). Le crayon ✎ permet de changer votre nom." },
+    { cible: ".creer-livre", titre: "Créer un livre",
+      texte: "Tout part d'ici : un titre, un format, et le bouton « Créer un livre »." },
+    { cible: "#titreNouveauLivre", titre: "Le titre",
+      texte: "Saisissez le titre de votre nouveau livre." },
+    { cible: "#formatNouveauLivre", titre: "Le format",
+      texte: "Choisissez la taille des pages (Roman, Grand roman, Poche, A4). Vous pourrez la changer plus tard dans l'éditeur." },
+    { cible: "#listeLivres", titre: "Vos livres",
+      texte: "Vos livres s'afficheront ici avec leur couverture. Cliquez sur l'un d'eux pour l'ouvrir dans l'éditeur." },
+    { cible: null, titre: "À vous de jouer ✍️",
+      texte: "Créez votre premier livre, puis ouvrez-le : un second guide vous présentera tous les outils d'écriture. Bonne écriture !" }
+  ], { cle: forcer ? null : "tuto_biblio_v1", forcer: forcer });
 }
 
 async function migrerImagesEmbarquees(token) {

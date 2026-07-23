@@ -1,0 +1,108 @@
+/* ===== Visite guidée / tutoriel ===== */
+
+.tuto-bloqueur {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  cursor: default;
+}
+
+/* La zone mise en avant : un rectangle transparent entouré d'un voile sombre
+   (via une ombre portée géante) + un liseré doré. */
+.tuto-spot {
+  position: fixed;
+  z-index: 10001;
+  border-radius: 10px;
+  box-shadow: 0 0 0 9999px rgba(24, 18, 12, 0.66);
+  outline: 2px solid #c9a96e;
+  outline-offset: 3px;
+  pointer-events: none;
+  transition: left .28s ease, top .28s ease, width .28s ease, height .28s ease;
+}
+
+.tuto-carte {
+  position: fixed;
+  z-index: 10002;
+  width: 320px;
+  max-width: calc(100vw - 28px);
+  background: #fffdf8;
+  border: 1px solid #eaddc7;
+  border-radius: 14px;
+  box-shadow: 0 16px 48px rgba(40, 25, 15, 0.34);
+  padding: 18px 18px 14px;
+  font-family: system-ui, -apple-system, sans-serif;
+  animation: tuto-apparait .22s ease;
+}
+
+@keyframes tuto-apparait {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.tuto-carte .tuto-titre {
+  margin: 0 0 8px;
+  font-family: "EB Garamond", Georgia, serif;
+  font-size: 19px;
+  font-weight: 600;
+  color: #3a2a1e;
+}
+
+.tuto-carte .tuto-texte {
+  margin: 0 0 16px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: #4a4038;
+}
+
+.tuto-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tuto-compteur {
+  font-size: 12px;
+  color: #a99;
+  margin-right: auto;
+  letter-spacing: .03em;
+}
+
+.tuto-btn {
+  padding: 8px 14px;
+  border: none;
+  border-radius: 9px;
+  cursor: pointer;
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.tuto-btn.primaire {
+  background: #8a4b38;
+  color: #fff;
+}
+.tuto-btn.primaire:hover { background: #763d2d; }
+
+.tuto-btn.fantome {
+  background: transparent;
+  color: #9a8f85;
+  padding: 8px 8px;
+}
+.tuto-btn.fantome:hover { color: #6a5f55; }
+
+/* Bouton d'aide « ? » réutilisable pour relancer le tutoriel */
+.btn-aide-tuto {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid #d8c7ac;
+  background: #fff;
+  color: #8a4b38;
+  font-weight: 700;
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+}
+.btn-aide-tuto:hover { background: #f6efe4; }

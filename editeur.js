@@ -234,6 +234,9 @@ async function chargerLivre() {
     afficherSpread();
     afficherSommaire();
     majCompteurMots();
+
+    // Tutoriel des outils au tout premier passage dans l'éditeur (une seule fois).
+    setTimeout(() => lancerTutorielEditeur(false), 600);
   } catch (erreur) {
     message.textContent = erreur.message;
   }
@@ -2738,6 +2741,36 @@ function ouvrirApercu() {
   document.querySelector(".sommaire").style.display = "none";
 
   afficherApercu();
+}
+
+function lancerTutorielEditeur(forcer) {
+  if (typeof lancerTutoriel !== "function") return;
+  lancerTutoriel([
+    { cible: null, titre: "L'éditeur 📖",
+      texte: "Voici l'atelier d'écriture. Votre livre s'affiche en double-page, comme un vrai livre ouvert. Découvrons les outils." },
+    { cible: "#editeurSpread", titre: "Écrire",
+      texte: "Écrivez directement dans les deux pages. Quand une page est pleine, le texte passe tout seul à la suivante. Le copier-coller, la sélection et l'annuler (Ctrl+Z) fonctionnent comme dans un traitement de texte." },
+    { cible: ".barre-outils", titre: "La barre d'outils",
+      texte: "Gras, italique, souligné, alignement, listes… Sélectionnez du texte puis cliquez sur un bouton pour le mettre en forme." },
+    { cible: "#selectStyle", titre: "Styles & typographie",
+      texte: "Style de paragraphe (titre, sous-titre), police, interligne et taille en points : tout pour soigner la mise en page." },
+    { cible: 'button[title^="Rechercher"]', titre: "Rechercher / Remplacer",
+      texte: "Retrouvez et remplacez un mot dans tout le livre (raccourci Ctrl+F)." },
+    { cible: ".sommaire-couvertures", titre: "Les couvertures",
+      texte: "Composez la 1re et la 4e de couverture : couleur de fond, image, titre et auteur." },
+    { cible: "#selectFormat", titre: "Le format du livre",
+      texte: "Changez le format à tout moment : le texte se re-répartit automatiquement sur les pages." },
+    { cible: 'button[onclick="ouvrirApercu()"]', titre: "Mode aperçu",
+      texte: "Feuilletez votre livre avec une vraie animation de pages qui se tournent, couverture comprise." },
+    { cible: 'button[onclick="exporterLivret()"]', titre: "Imprimer",
+      texte: "Exportez en PDF ou imprimez au vrai format, en livret à agrafer, pour fabriquer votre livre papier." },
+    { cible: ".barre-actions", titre: "Naviguer & sauvegarder",
+      texte: "Passez d'une double-page à l'autre, et surtout cliquez sur « Sauvegarder » pour enregistrer votre travail." },
+    { cible: "#etatSauvegarde", titre: "Suivi",
+      texte: "Nombre de mots, de pages, et indication des modifications non encore enregistrées." },
+    { cible: null, titre: "C'est parti ! 🎉",
+      texte: "Vous avez tout en main. Ce guide reste accessible à tout moment via le bouton « ? » en haut du panneau." }
+  ], { cle: forcer ? null : "tuto_editeur_v1", forcer: forcer });
 }
 
 chargerLivre();
