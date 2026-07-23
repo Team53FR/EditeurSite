@@ -127,13 +127,28 @@
     const cw = carte.offsetWidth, ch = carte.offsetHeight, m = 14;
     const vw = window.innerWidth, vh = window.innerHeight;
 
-    let top;
-    if (r.bottom + m + ch <= vh) top = r.bottom + m;           // sous la cible
-    else if (r.top - m - ch >= 0) top = r.top - m - ch;         // au-dessus
-    else top = Math.max(m, Math.min(r.top, vh - ch - m));       // à côté / clampé
+    // Ordre d'essai : sous la cible, au-dessus, à droite, à gauche, sinon
+    // par-dessus (cas d'une cible qui occupe presque tout l'écran).
+    let top, left;
+    if (r.bottom + m + ch <= vh) {
+      top = r.bottom + m;
+      left = r.left + r.width / 2 - cw / 2;
+    } else if (r.top - m - ch >= 0) {
+      top = r.top - m - ch;
+      left = r.left + r.width / 2 - cw / 2;
+    } else if (r.right + m + cw <= vw) {
+      left = r.right + m;
+      top = r.top + r.height / 2 - ch / 2;
+    } else if (r.left - m - cw >= 0) {
+      left = r.left - m - cw;
+      top = r.top + r.height / 2 - ch / 2;
+    } else {
+      left = r.left + r.width / 2 - cw / 2;
+      top = r.top + r.height / 2 - ch / 2;
+    }
 
-    let left = r.left + r.width / 2 - cw / 2;
     left = Math.max(m, Math.min(left, vw - cw - m));
+    top = Math.max(m, Math.min(top, vh - ch - m));
 
     carte.style.left = left + "px";
     carte.style.top = top + "px";
