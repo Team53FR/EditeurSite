@@ -1074,3 +1074,148 @@ button.danger {
 .sommaire-actions {
   margin-top: 0;
 }
+
+/* =====================================================================
+   HARMONISATION : barre d'outils d'édition + barre d'actions
+   Même palette chaleureuse que le sommaire (crème / sépia / terracotta).
+   ===================================================================== */
+
+/* --- Barre d'outils (haut) --- */
+.barre-outils {
+  background: var(--s-paper);
+  border: 1px solid var(--s-line);
+  border-radius: 12px;
+  padding: 8px 10px;
+  box-shadow: 0 1px 3px rgba(60,42,20,.05), 0 6px 18px rgba(60,42,20,.07);
+  flex-wrap: wrap;
+}
+
+.barre-outils button {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--s-cream);
+  border: 1px solid var(--s-line);
+  border-radius: 8px;
+  color: var(--s-ink);
+  font-family: var(--s-serif);
+  font-size: 14px;
+  transition: background .12s ease, border-color .12s ease, color .12s ease;
+}
+
+.barre-outils button:hover {
+  background: #fff;
+  border-color: var(--s-accent);
+  color: var(--s-accent-deep);
+}
+
+.barre-outils select,
+.barre-outils .input-taille {
+  background: var(--s-cream);
+  border: 1px solid var(--s-line);
+  border-radius: 8px;
+  color: var(--s-ink);
+  font-size: 12.5px;
+  padding: 6px 8px;
+}
+
+.barre-outils select:focus,
+.barre-outils .input-taille:focus {
+  outline: none;
+  border-color: var(--s-accent);
+  box-shadow: 0 0 0 3px rgba(138,75,56,.14);
+}
+
+.separateur-outils { background: var(--s-line); }
+
+/* --- Barre d'actions (sous le livre) --- */
+.barre-actions button {
+  background: var(--s-cream);
+  border: 1px solid var(--s-line);
+  border-radius: 10px;
+  color: var(--s-ink);
+  font-family: system-ui, sans-serif;
+  font-size: 13.5px;
+  font-weight: 600;
+  padding: 10px 14px;
+  margin-top: 0;
+  transition: background .12s ease, border-color .12s ease, color .12s ease;
+}
+
+.barre-actions button:hover:not(:disabled) {
+  background: #fff;
+  border-color: var(--s-accent);
+  color: var(--s-accent-deep);
+}
+
+/* Action principale : Sauvegarder */
+.barre-actions button.principal,
+.barre-actions button.principal:hover {
+  background: var(--s-accent);
+  border-color: var(--s-accent);
+  color: #fff;
+  box-shadow: 0 3px 10px rgba(138,75,56,.22);
+}
+
+.barre-actions button.principal:hover {
+  background: var(--s-accent-deep);
+  border-color: var(--s-accent-deep);
+}
+
+/* Actions discrètes : Retour au texte, Fermer l'aperçu */
+.barre-actions button.secondaire {
+  background: transparent;
+  border-color: transparent;
+  color: var(--s-ink-soft);
+}
+
+.barre-actions button.secondaire:hover {
+  background: var(--s-cream);
+  border-color: var(--s-line);
+  color: var(--s-accent-deep);
+}
+
+.barre-actions button:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+/* --- Panneau Rechercher / Remplacer (sous la barre d'outils) --- */
+.panneau-recherche {
+  background: var(--s-paper);
+  border: 1px solid var(--s-line);
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(60,42,20,.05), 0 6px 18px rgba(60,42,20,.07);
+}
+
+.panneau-recherche input[type="text"] {
+  background: var(--s-cream);
+  border: 1px solid var(--s-line);
+  border-radius: 8px;
+  color: var(--s-ink);
+  padding: 7px 10px;
+}
+
+.panneau-recherche input[type="text"]:focus {
+  outline: none;
+  border-color: var(--s-accent);
+  box-shadow: 0 0 0 3px rgba(138,75,56,.14);
+}
+
+.panneau-recherche button.secondaire {
+  background: var(--s-cream);
+  border: 1px solid var(--s-line);
+  border-radius: 8px;
+  color: var(--s-ink);
+  font-weight: 600;
+}
+
+.panneau-recherche button.secondaire:hover {
+  background: #fff;
+  border-color: var(--s-accent);
+  color: var(--s-accent-deep);
+}
+
+.compteur-recherche { color: var(--s-ink-soft); }
