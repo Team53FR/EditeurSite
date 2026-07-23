@@ -345,28 +345,48 @@ function appliquerStyle(baliseKey) {
   marquerModifie();
 }
 
-// Police de caractères de la sélection (#7)
-function appliquerPolice(police) {
+// Applique une propriété CSS à la sélection en UNE opération insertHTML.
+// Important : insertHTML passe par execCommand, donc l'opération entre dans la
+// pile d'annulation NATIVE du navigateur (Ctrl+Z / Ctrl+Y fonctionnent).
+// L'ancienne méthode (extractContents + insertNode) modifiait le DOM
+// directement et restait invisible pour l'annulation.
+function appliquerStyleSelection(propriete, valeur) {
+  const ed = editeurEl();
+  if (ed) ed.focus();
   restaurerSelection();
+
   const sel = window.getSelection();
-  if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
+  if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return false;
   const range = sel.getRangeAt(0);
-  const fragment = range.extractContents();
-  fragment.querySelectorAll("span[style]").forEach(el => {
-    el.style.fontFamily = "";
+  if (ed && !ed.contains(range.commonAncestorContainer)) return false;
+
+  const boite = document.createElement("div");
+  boite.appendChild(range.cloneContents());
+
+  // Neutraliser la même propriété déjà posée à l'intérieur de la sélection,
+  // sinon elle l'emporterait sur celle qu'on applique.
+  boite.querySelectorAll("[style]").forEach(el => {
+    el.style[propriete] = "";
     if (!el.getAttribute("style")) el.removeAttribute("style");
   });
+  boite.querySelectorAll("font").forEach(f => {
+    f.removeAttribute("face");
+    f.removeAttribute("size");
+  });
+
   const span = document.createElement("span");
-  // Chaîne vide = police par défaut (Garamond héritée de .texte-livre)
-  span.style.fontFamily = police || "";
-  span.appendChild(fragment);
-  range.insertNode(span);
-  const nouvelRange = document.createRange();
-  nouvelRange.selectNodeContents(span);
-  sel.removeAllRanges();
-  sel.addRange(nouvelRange);
-  enregistrerHistorique();
+  span.style[propriete] = valeur;
+  span.innerHTML = boite.innerHTML;
+
+  document.execCommand("insertHTML", false, span.outerHTML);
   marquerModifie();
+  surSaisie();
+  return true;
+}
+
+// Police de caractères de la sélection
+function appliquerPolice(police) {
+  appliquerStyleSelection("fontFamily", police || "");
 }
 
 // Interligne appliqué aux paragraphes touchés par la sélection (#7)
@@ -407,36 +427,7 @@ function restaurerSelection() {
 function appliquerTaille(pt) {
   const val = parseInt(pt);
   if (!val || val < 6 || val > 72) return;
-
-  restaurerSelection();
-  const sel = window.getSelection();
-  if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
-
-  const range = sel.getRangeAt(0);
-
-  // Extraire le contenu sélectionné
-  const fragment = range.extractContents();
-
-  // Supprimer les font-size existants dans la sélection pour éviter les conflits
-  fragment.querySelectorAll("span[style]").forEach(el => {
-    el.style.fontSize = "";
-    if (!el.getAttribute("style")) el.removeAttribute("style");
-  });
-
-  // Envelopper dans un span avec la nouvelle taille
-  const span = document.createElement("span");
-  span.style.fontSize = val + "pt";
-  span.appendChild(fragment);
-
-  range.insertNode(span);
-
-  // Replacer la sélection sur le span inséré
-  const nouvelRange = document.createRange();
-  nouvelRange.selectNodeContents(span);
-  sel.removeAllRanges();
-  sel.addRange(nouvelRange);
-  enregistrerHistorique();
-  marquerModifie();
+  appliquerStyleSelection("fontSize", val + "pt");
 }
 
 function lireTailleCourrante() {
