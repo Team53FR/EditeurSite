@@ -1219,3 +1219,12 @@ button.danger {
 }
 
 .compteur-recherche { color: var(--s-ink-soft); }
+
+/* Respiration au-dessus d'un titre de chapitre.
+   On utilise PADDING et non margin : dans une mise en page en colonnes, les
+   marges en tête de colonne sont supprimées par le navigateur, alors que le
+   padding est conservé. Les pages qui ne commencent pas par un titre ne sont
+   donc pas décalées. */
+.texte-livre h2 {
+  padding-top: 2.5em;
+}

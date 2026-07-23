@@ -2849,6 +2849,14 @@ function ouvrirApercu() {
   animationEnCours = false;
   indexApercu = 0;
 
+  // On quitte l'édition de couverture : désélectionner ses boutons, sinon ils
+  // restent surlignés une fois l'aperçu refermé.
+  modeCouverture = null;
+  const bC = document.getElementById("btnCouv");
+  const bQ = document.getElementById("btnQuatr");
+  if (bC) bC.classList.remove("actif");
+  if (bQ) bQ.classList.remove("actif");
+
   document.getElementById("vueEditeur").style.display = "none";
   document.getElementById("vueCouverture").style.display = "none";
   document.getElementById("vueApercu").style.display = "flex";
