@@ -203,6 +203,9 @@ async function chargerLivre() {
     const btnOuvrir = document.getElementById("boutonOuvrirSommaire");
     if (btnOuvrir) btnOuvrir.style.display = sommaireReduite ? "flex" : "none";
 
+    // Espace au-dessus des titres de chapitre (curseur « Titre »)
+    initEspaceTitre();
+
     appliquerFormatPage(formatCourant);
     const selFormat = document.getElementById("selectFormat");
     if (selFormat) selFormat.value = formatCourant;
@@ -756,6 +759,7 @@ function ouvrirCouverture(mode) {
   document.getElementById("champAuteurCouv").value = livre.auteur || "";
   document.getElementById("couleurLibre").value = data.fond || "#1a1a2e";
   document.getElementById("couleurTexteLibre").value = data.texte || "#ffffff";
+  synchroniserControlesCouv(data);
 
   // Masquer champ titre pour la 4e
   document.getElementById("champTitreCouv").closest("div")?.previousElementSibling;
@@ -863,8 +867,8 @@ function previewCouverture() {
 
   const apercu = document.getElementById("previewCouverture");
   apercu.innerHTML = `
-    ${mode === "couverture" && afficherTitre ? `<div class="apercu-titre" style="color:${couleurTexte}">${livre.titre || "Titre"}</div>` : ""}
-    ${afficherAuteur ? `<div class="apercu-auteur" style="color:${couleurTexte}">${livre.auteur || "Auteur"}</div>` : ""}
+    ${mode === "couverture" && afficherTitre ? `<div class="apercu-titre" style="color:${couleurTexte};${styleTexteCouv(data, "titre")}">${livre.titre || "Titre"}</div>` : ""}
+    ${afficherAuteur ? `<div class="apercu-auteur" style="color:${couleurTexte};${styleTexteCouv(data, "auteur")}">${livre.auteur || "Auteur"}</div>` : ""}
   `;
 }
 
@@ -1485,8 +1489,8 @@ function creerPageCouvertureApercu(mode) {
   const afficherTitre = !data || data.afficherTitre !== false;
   const afficherAuteur = !data || data.afficherAuteur !== false;
   couche.innerHTML = `
-    ${mode === "couverture" && afficherTitre ? `<div class="apercu-titre" style="color:${couleurTexte}">${livre.titre || "Titre"}</div>` : ""}
-    ${afficherAuteur ? `<div class="apercu-auteur" style="color:${couleurTexte}">${livre.auteur || "Auteur"}</div>` : ""}
+    ${mode === "couverture" && afficherTitre ? `<div class="apercu-titre" style="color:${couleurTexte};${styleTexteCouv(data, "titre")}">${livre.titre || "Titre"}</div>` : ""}
+    ${afficherAuteur ? `<div class="apercu-auteur" style="color:${couleurTexte};${styleTexteCouv(data, "auteur")}">${livre.auteur || "Auteur"}</div>` : ""}
   `;
   page.appendChild(couche);
 
@@ -2741,6 +2745,127 @@ function ouvrirApercu() {
   document.querySelector(".sommaire").style.display = "none";
 
   afficherApercu();
+}
+
+// =====================================================================
+//  Espace au-dessus des titres de chapitre (curseur « Titre »)
+//
+//  Pilote la variable CSS --espace-titre, utilisée par « .texte-livre h2 ».
+//  Elle s'applique donc partout à la fois : zone d'édition, mesureur de
+//  pagination, aperçu et impression.
+// =====================================================================
+
+const ESPACE_TITRE_DEFAUT = 65;
+let timerEspaceTitre = null;
+
+function appliquerEspaceTitre(px) {
+  document.documentElement.style.setProperty("--espace-titre", px + "px");
+}
+
+function initEspaceTitre() {
+  const livre = livreActuel();
+  let px = livre && typeof livre.espaceTitre === "number" ? livre.espaceTitre : ESPACE_TITRE_DEFAUT;
+  px = Math.max(0, Math.min(160, px));
+  appliquerEspaceTitre(px);
+  const slider = document.getElementById("sliderEspaceTitre");
+  if (slider) slider.value = px;
+  const valeur = document.getElementById("valeurEspaceTitre");
+  if (valeur) valeur.textContent = px;
+}
+
+function setEspaceTitre(valeur) {
+  const px = Math.max(0, Math.min(160, parseInt(valeur, 10) || 0));
+  const livre = livreActuel();
+  if (livre) livre.espaceTitre = px;
+
+  // Retour visuel immédiat pendant le glissement du curseur.
+  appliquerEspaceTitre(px);
+  const etiquette = document.getElementById("valeurEspaceTitre");
+  if (etiquette) etiquette.textContent = px;
+  marquerModifie();
+
+  // L'espace change la hauteur occupée : on re-répartit le texte, mais
+  // seulement une fois le curseur relâché (sinon on repaginerait à chaque pixel).
+  clearTimeout(timerEspaceTitre);
+  timerEspaceTitre = setTimeout(() => {
+    flushSpread();
+    repaginerTout();
+    const spreads = spreadsLivre();
+    if (numSpread() >= spreads.length) indexSpread = Math.max(0, (spreads.length - 1) * 2);
+    afficherSpread();
+    afficherSommaire();
+    majCompteurMots();
+    planifierBrouillon();
+  }, 350);
+}
+
+// =====================================================================
+//  Réglages du texte des couvertures (police, taille, position)
+//
+//  Les valeurs sont stockées avec les mêmes clés que styleTexteCouv()
+//  (script.js) : <cle>Police, <cle>Taille, <cle>X, <cle>Y — ce qui garantit
+//  un rendu identique dans l'éditeur, la bibliothèque et à l'impression.
+// =====================================================================
+
+function donneesCouvCourante() {
+  if (indexLivre === -1 || !modeCouverture) return null;
+  const livre = livreActuel();
+  return modeCouverture === "couverture" ? livre.couverture : livre.quatrieme;
+}
+
+function setPoliceTexteCouv(cle, valeur) {
+  const data = donneesCouvCourante();
+  if (!data) return;
+  data[cle + "Police"] = valeur || "";
+  previewCouverture();
+  marquerModifie();
+  planifierBrouillon();
+}
+
+function setTailleTexteCouv(cle, valeur) {
+  const data = donneesCouvCourante();
+  if (!data) return;
+  const v = Math.max(50, Math.min(250, parseInt(valeur, 10) || 100));
+  data[cle + "Taille"] = v;
+  const etiquette = document.getElementById(cle === "titre" ? "valTailleTitre" : "valTailleAuteur");
+  if (etiquette) etiquette.textContent = v;
+  previewCouverture();
+  marquerModifie();
+  planifierBrouillon();
+}
+
+function setPositionTexteCouv(cle, axe, valeur) {
+  const data = donneesCouvCourante();
+  if (!data) return;
+  const A = (axe === "Y") ? "Y" : "X";
+  const brut = parseInt(valeur, 10) || 0;
+  const v = (A === "X") ? Math.max(-50, Math.min(50, brut)) : Math.max(0, Math.min(100, brut));
+  data[cle + A] = v;
+  const etiquette = document.getElementById(
+    "valPos" + (cle === "titre" ? "Titre" : "Auteur") + A
+  );
+  if (etiquette) etiquette.textContent = v;
+  previewCouverture();
+  marquerModifie();
+  planifierBrouillon();
+}
+
+// Recale les contrôles du panneau sur les valeurs enregistrées.
+function synchroniserControlesCouv(data) {
+  if (!data) return;
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
+  const txt = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+
+  ["titre", "auteur"].forEach(cle => {
+    const suffixe = cle === "titre" ? "Titre" : "Auteur";
+    const taille = typeof data[cle + "Taille"] === "number" ? data[cle + "Taille"] : 100;
+    const x = typeof data[cle + "X"] === "number" ? data[cle + "X"] : 0;
+    const y = typeof data[cle + "Y"] === "number" ? data[cle + "Y"] : 0;
+    set("police" + suffixe, data[cle + "Police"] || "");
+    set("taillePos" + suffixe, taille);   txt("valTaille" + suffixe, taille);
+    set("pos" + suffixe + "X", x);        txt("valPos" + suffixe + "X", x);
+    set("pos" + suffixe + "Y", y);        txt("valPos" + suffixe + "Y", y);
+  });
 }
 
 function lancerTutorielEditeur(forcer) {

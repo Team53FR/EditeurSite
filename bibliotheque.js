@@ -51,7 +51,7 @@ function lancerTutorielBiblio(forcer) {
   if (typeof lancerTutoriel !== "function") return;
   lancerTutoriel([
     { cible: null, titre: "Bienvenue 👋",
-      texte: "Voici votre bibliothèque. Ce petit guide vous montre comment créer votre premier livre et où trouver les outils. Utilisez « Suivant » (ou la flèche →)." },
+      texte: "Voici votre bibliothèque. Ce petit guide vous montre comment créer votre premier livre et où trouver les outils. Utilisez « Suivant »." },
     { cible: ".profil-in", titre: "Votre profil",
       texte: "Votre nom d'affichage et vos statistiques (nombre de livres et de pages). Le crayon ✎ permet de changer votre nom." },
     { cible: ".creer-livre", titre: "Créer un livre",
