@@ -361,6 +361,12 @@ button.danger {
   overflow: hidden;
   box-sizing: border-box;
   flex-shrink: 0;
+  /* Par défaut le navigateur applique orphans/widows = 2 : il refuse de laisser
+     une ligne seule et pousse DEUX lignes d'un coup dans la colonne suivante.
+     En passant à 1, seule la suite qui ne tient plus bascule sur la page
+     suivante — ligne par ligne. */
+  orphans: 1;
+  widows: 1;
 }
 
 /* ---- Zone d'édition : une seule zone, deux colonnes (= deux pages) ---- */
