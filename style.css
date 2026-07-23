@@ -869,8 +869,51 @@ button.danger {
   color: var(--s-accent-deep);
 }
 
-/* Couverture / 4e de couverture */
-.sommaire-couvertures { gap: 6px; margin-bottom: 0; }
+/* Couverture / 4e de couverture : côte à côte pour gagner de la place */
+.sommaire-couvertures {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 0;
+}
+
+.sommaire .btn-couv {
+  text-align: center;
+  font-size: 11.5px;
+  padding: 8px 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Aperçu / impression : boutons-icônes compacts */
+.sommaire-outils {
+  display: flex;
+  gap: 6px;
+  margin: 10px 0;
+}
+
+.sommaire .btn-icone {
+  flex: 1;
+  height: 36px;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--s-cream);
+  border: 1px solid var(--s-line);
+  border-radius: 9px;
+  color: var(--s-ink-soft);
+  cursor: pointer;
+  transition: background .12s ease, border-color .12s ease, color .12s ease;
+}
+
+.sommaire .btn-icone:hover {
+  background: #fff;
+  border-color: var(--s-accent);
+  color: var(--s-accent-deep);
+}
 
 .sommaire .btn-couv.actif,
 .sommaire .btn-couv.actif:hover {
