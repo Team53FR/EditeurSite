@@ -3003,5 +3003,62 @@ function lancerTutorielEditeur(forcer) {
   ], { cle: forcer ? null : "tuto_editeur_v4", forcer: forcer });
 }
 
+// ----- Réinitialiser les tailles de texte de TOUT le livre -----
+// Retire les tailles de police posées à la main (spans/font avec font-size),
+// sans toucher au reste (gras, italique, police, couleur) : chaque élément
+// retrouve ainsi sa taille par défaut selon son type — titre (h2), sous-titre
+// (h3) ou paragraphe — définie en CSS.
+
+function nettoyerTaillesHtml(html) {
+  const d = document.createElement("div");
+  d.innerHTML = html || "";
+
+  d.querySelectorAll("[style]").forEach(el => {
+    if (el.style && el.style.fontSize) {
+      el.style.fontSize = "";
+      if (!el.getAttribute("style")) el.removeAttribute("style");
+    }
+  });
+  d.querySelectorAll("font[size]").forEach(f => f.removeAttribute("size"));
+
+  // Déballer les <span> devenus sans aucun attribut (issus d'anciennes tailles)
+  d.querySelectorAll("span").forEach(sp => {
+    if (sp.attributes.length === 0) {
+      while (sp.firstChild) sp.parentNode.insertBefore(sp.firstChild, sp);
+      sp.remove();
+    }
+  });
+
+  return d.innerHTML;
+}
+
+function reinitialiserTailles() {
+  if (indexLivre === -1 || modeApercu || modeCouverture) return;
+  if (!confirm("Remettre tout le texte du livre aux tailles par défaut (titre, sous-titre, paragraphe) ?\n\nLes tailles de police que vous avez réglées à la main seront perdues.")) return;
+
+  flushSpread();
+
+  const spreads = spreadsLivre();
+  for (let i = 0; i < spreads.length; i++) spreads[i] = nettoyerTaillesHtml(spreads[i]);
+
+  // Les tailles changent : on repagine tout le texte continu.
+  repaginerTout();
+
+  const n = spreadsLivre();
+  if (numSpread() >= n.length) indexSpread = Math.max(0, (n.length - 1) * 2);
+
+  afficherSpread();
+  afficherSommaire();
+  majCompteurMots();
+  marquerModifie();
+  planifierBrouillon();
+
+  const message = document.getElementById("message");
+  if (message) {
+    message.textContent = "Tailles remises par défaut sur tout le livre.";
+    setTimeout(() => { if (message.textContent.startsWith("Tailles remises")) message.textContent = ""; }, 2500);
+  }
+}
+
 chargerLivre();
 initGlissementImageCouverture();
