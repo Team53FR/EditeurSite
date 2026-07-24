@@ -57,9 +57,18 @@
     <div class="barre-section" style="margin-top:36px">
       <h2>Utilisateurs</h2>
     </div>
+    <p style="color:var(--ink-soft);font-size:13px;margin:-8px 0 16px">Cliquez sur un utilisateur pour voir ses statistiques.</p>
     <ul id="listeUtilisateurs" class="user-liste"></ul>
 
   </main>
+
+  <!-- Fiche statistiques d'un utilisateur (admin) -->
+  <div id="modalStats" class="modal-fond" style="display:none" onclick="fermerStats(event)">
+    <div class="modal-carte" role="dialog" aria-modal="true" onclick="event.stopPropagation()">
+      <button class="modal-fermer" onclick="fermerStats()" aria-label="Fermer">&#10005;</button>
+      <div id="statsContenu"></div>
+    </div>
+  </div>
 
   <script src="script.js"></script>
   <script src="admin.js"></script>
