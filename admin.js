@@ -245,18 +245,26 @@ function dateComplete(date) {
   return date.toLocaleString("fr-FR", { day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
-// Statut approché à partir de la DERNIÈRE CONNEXION (pas de présence temps réel).
-function statutConnexion(iso) {
-  if (!iso) return { classe: "hors", pastille: "hors", texte: "Jamais connecté", detail: "" };
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return { classe: "hors", pastille: "hors", texte: "Jamais connecté", detail: "" };
-  const minutes = (Date.now() - d.getTime()) / 60000;
-  const recent = minutes < 10;
+// Statut approché à partir de la DERNIÈRE CONNEXION (pas de présence temps réel),
+// SAUF pour le compte qui consulte la page : il est forcément connecté.
+function statutConnexion(iso, estMoi) {
+  const valide = iso && !isNaN(new Date(iso).getTime());
+  const base = valide ? "Dernière connexion " + tempsRelatif(new Date(iso)) + " · " + dateComplete(new Date(iso)) : "";
+
+  if (estMoi) {
+    return {
+      classe: "en-ligne", pastille: "en-ligne", texte: "En ligne",
+      detail: "Vous êtes connecté en ce moment." + (base ? " " + base : "")
+    };
+  }
+  if (!valide) return { classe: "hors", pastille: "hors", texte: "Jamais connecté", detail: "" };
+
+  const recent = (Date.now() - new Date(iso).getTime()) / 60000 < 10;
   return {
     classe: recent ? "en-ligne" : "hors",
     pastille: recent ? "en-ligne" : "hors",
     texte: recent ? "Connecté récemment" : "Hors ligne",
-    detail: "Dernière connexion " + tempsRelatif(d) + " · " + dateComplete(d)
+    detail: base
   };
 }
 
@@ -397,7 +405,8 @@ function basculerDetailLivre(tr) {
 function rendreStats(u, livres, erreur) {
   const role = u.role === "admin" ? "admin" : "user";
   const initiale = (u.login || "?").slice(0, 2).toUpperCase();
-  const st = statutConnexion(u.derniereConnexion);
+  const estMoi = u.login === sessionStorage.getItem("gh_login");
+  const st = statutConnexion(u.derniereConnexion, estMoi);
 
   const agg = livres.reduce((a, l) => {
     const s = statsLivre(l);
@@ -502,7 +511,7 @@ function rendreStats(u, livres, erreur) {
     html += `<div class="stats-vide">Cet utilisateur n'a pas encore créé de livre.</div>`;
   }
 
-  html += `<p class="stats-note">« Connecté récemment » est déduit de la dernière connexion (moins de 10 min), pas d'une présence en temps réel.</p>`;
+  html += `<p class="stats-note">« En ligne » n'est en temps réel que pour le compte que vous utilisez. Pour les autres, « Connecté récemment » est déduit de la dernière connexion (moins de 10 min).</p>`;
   return html;
 }
 
