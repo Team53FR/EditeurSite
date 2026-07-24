@@ -355,7 +355,7 @@ button.danger {
 
 .texte-livre {
   font-family: "EB Garamond", Georgia, serif;
-  font-size: 13pt;
+  font-size: 11pt;   /* taille par défaut du texte des paragraphes */
   line-height: 1.45;
   color: #2a2a2a;
   overflow: hidden;
@@ -748,14 +748,14 @@ button.danger {
 /* Styles de paragraphe dans les pages (#7) */
 
 .texte-livre h2 {
-  font-size: 1.5em;
+  font-size: 20pt;   /* taille par défaut d'un titre de chapitre */
   font-weight: bold;
   margin: 0 0 8px 0;
   line-height: 1.2;
 }
 
 .texte-livre h3 {
-  font-size: 1.2em;
+  font-size: 13pt;   /* taille par défaut d'un sous-titre */
   font-weight: bold;
   margin: 0 0 6px 0;
   line-height: 1.25;

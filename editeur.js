@@ -2583,26 +2583,116 @@ function pageSuivante() {
   }
 }
 
-// ----- Sommaire : navigation uniquement -----
-// (Avec un texte continu, supprimer ou déplacer « une page » n'a plus de sens :
-//  on ne propose donc que la navigation, pour ne jamais abîmer le texte.)
-function afficherSommaire() {
+// ----- Sommaire : liste des CHAPITRES -----
+// Un chapitre = un titre (h2) dans le texte continu. On les retrouve dans les
+// pages dérivées, ce qui donne directement le numéro de page de chacun.
+
+function listerChapitres() {
   assurerPagesAJour();
-  const pages = livreActuel().pages;
+  const pages = livreActuel().pages || [];
+  const chapitres = [];
+  const boite = document.createElement("div");
+  pages.forEach((page, i) => {
+    boite.innerHTML = (page && page.contenu) || "";
+    boite.querySelectorAll("h2").forEach(h => {
+      const titre = (h.textContent || "").trim();
+      // Un titre vide = fragment laissé par la coupe entre deux pages : on l'ignore.
+      if (!titre) return;
+      chapitres.push({ titre, page: i });
+    });
+  });
+  return chapitres;
+}
+
+function afficherSommaire() {
   const liste = document.getElementById("listePages");
   if (!liste) return;
   liste.innerHTML = "";
 
-  pages.forEach((page, i) => {
+  const chapitres = listerChapitres();
+
+  if (chapitres.length === 0) {
     const li = document.createElement("li");
-    li.className = (i === indexSpread || i === indexSpread + 1) ? "actif" : "";
+    li.className = "sommaire-vide";
+    li.textContent = "Aucun chapitre pour l'instant.";
+    liste.appendChild(li);
+    return;
+  }
+
+  chapitres.forEach(ch => {
+    const li = document.createElement("li");
+    li.className = (ch.page === indexSpread || ch.page === indexSpread + 1) ? "actif" : "";
+
     const libelle = document.createElement("span");
-    libelle.textContent = "Page " + (i + 1);
     libelle.className = "libelle-page";
-    libelle.onclick = () => allerAPage(i);
+    libelle.textContent = ch.titre;
+    libelle.title = ch.titre;
+    libelle.onclick = () => allerAPage(ch.page);
     li.appendChild(libelle);
+
+    const num = document.createElement("span");
+    num.className = "num-chapitre";
+    num.textContent = "p." + (ch.page + 1);
+    li.appendChild(num);
+
     liste.appendChild(li);
   });
+}
+
+// Ajoute un chapitre : un titre qui DÉMARRE SUR UNE NOUVELLE PAGE
+// (saut de colonne forcé — une colonne = une page dans cette mise en page).
+function ajouterChapitre() {
+  if (modeApercu || modeCouverture) return;
+
+  flushSpread();
+
+  // Se placer sur la dernière double-page, à la toute fin du texte
+  const spreads = spreadsLivre();
+  indexSpread = Math.max(0, spreads.length - 1) * 2;
+  afficherSpread();
+
+  const ed = editeurEl();
+  if (!ed) return;
+  ed.focus();
+
+  const range = document.createRange();
+  range.selectNodeContents(ed);
+  range.collapse(false);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+
+  // insertHTML : opération unique, donc annulable nativement (Ctrl+Z)
+  document.execCommand(
+    "insertHTML", false,
+    '<h2 class="chapitre" style="break-before:column;">Nouveau chapitre</h2><p><br></p>'
+  );
+
+  marquerModifie();
+
+  // gererFlux enregistre, découpe si ça déborde, re-rend la double-page ET suit
+  // le curseur : on arrive déjà sur la page du nouveau chapitre.
+  gererFlux();
+
+  // Sélectionner le titre pour pouvoir le renommer immédiatement
+  selectionnerDernierTitre();
+  afficherSommaire();
+}
+
+// Sélectionne le dernier titre de chapitre non vide de la double-page affichée
+function selectionnerDernierTitre() {
+  const ed = editeurEl();
+  if (!ed) return;
+  const titres = [...ed.querySelectorAll("h2")].filter(h => (h.textContent || "").trim());
+  const cible = titres[titres.length - 1];
+  if (!cible) return;
+  ed.focus();
+  const r = document.createRange();
+  r.selectNodeContents(cible);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(r);
+  sauvegarderSelection();
 }
 
 // ----- Changement de format : on re-paginate tout le texte continu -----
@@ -2926,6 +3016,63 @@ function lancerTutorielEditeur(forcer) {
     { cible: 'button[onclick="retourBibliotheque()"]', titre: "10. Retour à la bibliothèque",
       texte: "Revenez à votre bibliothèque pour ouvrir un autre livre ou en créer un nouveau. Pensez à sauvegarder avant de quitter cette page." }
   ], { cle: forcer ? null : "tuto_editeur_v4", forcer: forcer });
+}
+
+// ----- Réinitialiser les tailles de texte de TOUT le livre -----
+// Retire les tailles de police posées à la main (spans/font avec font-size),
+// sans toucher au reste (gras, italique, police, couleur) : chaque élément
+// retrouve ainsi sa taille par défaut selon son type — titre (h2), sous-titre
+// (h3) ou paragraphe — définie en CSS.
+
+function nettoyerTaillesHtml(html) {
+  const d = document.createElement("div");
+  d.innerHTML = html || "";
+
+  d.querySelectorAll("[style]").forEach(el => {
+    if (el.style && el.style.fontSize) {
+      el.style.fontSize = "";
+      if (!el.getAttribute("style")) el.removeAttribute("style");
+    }
+  });
+  d.querySelectorAll("font[size]").forEach(f => f.removeAttribute("size"));
+
+  // Déballer les <span> devenus sans aucun attribut (issus d'anciennes tailles)
+  d.querySelectorAll("span").forEach(sp => {
+    if (sp.attributes.length === 0) {
+      while (sp.firstChild) sp.parentNode.insertBefore(sp.firstChild, sp);
+      sp.remove();
+    }
+  });
+
+  return d.innerHTML;
+}
+
+function reinitialiserTailles() {
+  if (indexLivre === -1 || modeApercu || modeCouverture) return;
+  if (!confirm("Remettre tout le texte du livre aux tailles par défaut (titre, sous-titre, paragraphe) ?\n\nLes tailles de police que vous avez réglées à la main seront perdues.")) return;
+
+  flushSpread();
+
+  const spreads = spreadsLivre();
+  for (let i = 0; i < spreads.length; i++) spreads[i] = nettoyerTaillesHtml(spreads[i]);
+
+  // Les tailles changent : on repagine tout le texte continu.
+  repaginerTout();
+
+  const n = spreadsLivre();
+  if (numSpread() >= n.length) indexSpread = Math.max(0, (n.length - 1) * 2);
+
+  afficherSpread();
+  afficherSommaire();
+  majCompteurMots();
+  marquerModifie();
+  planifierBrouillon();
+
+  const message = document.getElementById("message");
+  if (message) {
+    message.textContent = "Tailles remises par défaut sur tout le livre.";
+    setTimeout(() => { if (message.textContent.startsWith("Tailles remises")) message.textContent = ""; }, 2500);
+  }
 }
 
 chargerLivre();
