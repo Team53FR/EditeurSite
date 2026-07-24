@@ -271,15 +271,15 @@ function longueursChapitres(html) {
   const boite = document.createElement("div");
   boite.innerHTML = html || "";
   const longueurs = [];
-  let courant = 0;
+  let courant = null; // reste null tant qu'aucun titre de chapitre n'a été vu
   boite.childNodes.forEach(n => {
     if (n.nodeType === 1 && n.tagName === "H2" && (n.textContent || "").trim()) {
-      longueurs.push(courant);
+      if (courant !== null) longueurs.push(courant);
       courant = 0;
     }
-    courant += compterMots(n.textContent || "");
+    if (courant !== null) courant += compterMots(n.textContent || "");
   });
-  longueurs.push(courant);
+  if (courant !== null) longueurs.push(courant);
   return longueurs.filter(x => x > 0);
 }
 
@@ -367,6 +367,31 @@ function fermerStats(e) {
 
 function tuile(valeur, libelle) {
   return `<div class="stat-tuile"><b>${valeur}</b><span>${libelle}</span></div>`;
+}
+
+// Détail (mêmes stats que le résumé, mais pour UN livre)
+function resumeLivreHtml(s) {
+  const lignes = [
+    ["Temps de lecture", "≈ " + tempsLecture(s.mots)],
+    ["Signes (espaces compris)", s.signes.toLocaleString("fr-FR")],
+    ["Chapitres", String(s.chapitres)]
+  ];
+  if (s.chapMax) lignes.push(["Chapitre le plus long", s.chapMax.toLocaleString("fr-FR") + " mots"]);
+  if (s.pages) lignes.push(["Densité", Math.round(s.mots / s.pages).toLocaleString("fr-FR") + " mots/page"]);
+  lignes.push(["Couverture illustrée", s.aImageCouv ? "Oui" : "Non"]);
+  lignes.push(["4e de couv. illustrée", s.aQuatrImage ? "Oui" : "Non"]);
+  lignes.push(["Auteur renseigné", s.aAuteur ? "Oui" : "Non"]);
+  return `<dl class="stats-resume livre-resume">` +
+    lignes.map(([k, v]) => `<div><dt>${echapper(k)}</dt><dd>${echapper(String(v))}</dd></div>`).join("") +
+    `</dl>`;
+}
+
+function basculerDetailLivre(tr) {
+  const detail = tr.nextElementSibling;
+  if (!detail || !detail.classList.contains("livre-detail")) return;
+  const ouvert = !detail.hidden;
+  detail.hidden = ouvert;
+  tr.classList.toggle("ouvert", !ouvert);
 }
 
 function rendreStats(u, livres, erreur) {
@@ -458,18 +483,20 @@ function rendreStats(u, livres, erreur) {
       `</div></div>`;
   }
 
-  // Liste des livres
+  // Liste des livres : chaque ligne se déplie pour montrer ses stats détaillées
   if (livres.length) {
     const details = agg.details.slice().sort((a, b) => (b.cree ? b.cree.getTime() : 0) - (a.cree ? a.cree.getTime() : 0));
-    html += `<div class="stats-bloc"><h4>Livres</h4><table class="stats-table"><thead><tr>
-      <th>Titre</th><th>Format</th><th>Pages</th><th>Mots</th><th>Créé</th></tr></thead><tbody>` +
-      details.map(s => `<tr>
-        <td>${echapper(s.titre)}</td>
+    html += `<div class="stats-bloc"><h4>Livres <span class="h4-aide">— cliquez une ligne pour le détail</span></h4>` +
+      `<table class="stats-table"><thead><tr>
+        <th>Titre</th><th>Format</th><th>Pages</th><th>Mots</th><th>Créé</th></tr></thead><tbody>` +
+      details.map(s => `<tr class="livre-row" onclick="basculerDetailLivre(this)">
+        <td><span class="chevron">&#9656;</span>${echapper(s.titre)}</td>
         <td>${LABELS_FORMAT[s.format] || s.format}</td>
         <td>${s.pages}</td>
         <td>${s.mots.toLocaleString("fr-FR")}</td>
         <td>${s.cree ? s.cree.toLocaleDateString("fr-FR") : "—"}</td>
-      </tr>`).join("") +
+      </tr>
+      <tr class="livre-detail" hidden><td colspan="5">${resumeLivreHtml(s)}</td></tr>`).join("") +
       `</tbody></table></div>`;
   } else {
     html += `<div class="stats-vide">Cet utilisateur n'a pas encore créé de livre.</div>`;

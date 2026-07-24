@@ -646,3 +646,26 @@ main.contenu { padding-top: 40px; padding-bottom: 60px; }
 .stats-resume dt { color: var(--ink-soft); margin: 0; }
 .stats-resume dd { color: var(--ink); margin: 0; font-weight: 600; text-align: right; }
 @media (max-width: 480px) { .stats-resume { grid-template-columns: 1fr; } }
+
+/* Lignes de livres dépliables dans la fiche statistiques */
+.h4-aide { font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--ink-soft); font-size: 11px; }
+
+.stats-table .livre-row { cursor: pointer; }
+.stats-table .livre-row:hover td { background: var(--cream); }
+.stats-table .livre-row td:first-child { font-weight: 600; }
+.stats-table .chevron {
+  display: inline-block;
+  color: var(--ink-soft);
+  font-size: 9px;
+  margin-right: 6px;
+  transition: transform .12s ease;
+}
+.stats-table .livre-row.ouvert .chevron { transform: rotate(90deg); color: var(--accent); }
+.stats-table .livre-row.ouvert td { background: var(--cream); }
+
+.stats-table .livre-detail > td {
+  background: var(--cream);
+  padding: 12px 14px 14px;
+}
+.livre-resume { gap: 0 24px; }
+.livre-resume > div { border-bottom-color: rgba(60,42,20,.08); }
