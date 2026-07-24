@@ -2414,6 +2414,17 @@ function afficherSpread() {
   const nD = document.getElementById("numeroDroite");
   if (nG) nG.textContent = indexSpread + 1;
   if (nD) nD.textContent = indexSpread + 2;
+  majBoutonsNavigation();
+}
+
+// Grise « Précédent » sur la première double-page et « Suivant » sur la dernière,
+// pour bien montrer qu'on ne peut pas aller au-delà (et ne pas créer de page vide).
+function majBoutonsNavigation() {
+  const spreads = spreadsLivre();
+  const btnPrec = document.querySelector('button[onclick="pagePrecedente()"]');
+  const btnSuiv = document.querySelector('button[onclick="pageSuivante()"]');
+  if (btnPrec) btnPrec.disabled = numSpread() <= 0;
+  if (btnSuiv) btnSuiv.disabled = numSpread() >= spreads.length - 1;
 }
 
 function flushSpread() {
@@ -2562,10 +2573,14 @@ function pagePrecedente() {
 
 function pageSuivante() {
   flushSpread();
-  assurerSpread(numSpread() + 1);
-  indexSpread += 2;
-  afficherSpread();
-  afficherSommaire();
+  // Ne crée PAS de nouvelle page : on ne fait qu'avancer si une double-page
+  // suivante existe déjà. (Les pages naissent uniquement du débordement du texte.)
+  const spreads = spreadsLivre();
+  if (numSpread() + 1 < spreads.length) {
+    indexSpread += 2;
+    afficherSpread();
+    afficherSommaire();
+  }
 }
 
 // ----- Sommaire : navigation uniquement -----
