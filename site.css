@@ -626,3 +626,23 @@ main.contenu { padding-top: 40px; padding-bottom: 60px; }
   .stats-tuiles { grid-template-columns: repeat(2, 1fr); }
   .modal-carte { padding: 22px 18px; }
 }
+
+/* Bloc « Résumé » de la fiche statistiques */
+.stats-resume {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 24px;
+}
+.stats-resume > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 13.5px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--cream-2);
+}
+.stats-resume dt { color: var(--ink-soft); margin: 0; }
+.stats-resume dd { color: var(--ink); margin: 0; font-weight: 600; text-align: right; }
+@media (max-width: 480px) { .stats-resume { grid-template-columns: 1fr; } }

@@ -260,6 +260,38 @@ function statutConnexion(iso) {
   };
 }
 
+function compterMots(txt) {
+  const t = (txt || "").trim();
+  return t ? t.split(/\s+/).length : 0;
+}
+
+// Longueur (en mots) de chaque chapitre : chaque titre h2 non vide démarre
+// un nouveau chapitre.
+function longueursChapitres(html) {
+  const boite = document.createElement("div");
+  boite.innerHTML = html || "";
+  const longueurs = [];
+  let courant = 0;
+  boite.childNodes.forEach(n => {
+    if (n.nodeType === 1 && n.tagName === "H2" && (n.textContent || "").trim()) {
+      longueurs.push(courant);
+      courant = 0;
+    }
+    courant += compterMots(n.textContent || "");
+  });
+  longueurs.push(courant);
+  return longueurs.filter(x => x > 0);
+}
+
+// Temps de lecture estimé (~200 mots/min)
+function tempsLecture(mots) {
+  const min = Math.round(mots / 200);
+  if (min < 1) return "moins d'1 min";
+  if (min < 60) return min + " min";
+  const h = Math.floor(min / 60), m = min % 60;
+  return h + " h" + (m ? " " + m : "");
+}
+
 // Statistiques d'un livre
 function statsLivre(livre) {
   const contenu = (Array.isArray(livre.spreads) && livre.spreads.length)
@@ -269,9 +301,12 @@ function statsLivre(livre) {
   const boite = document.createElement("div");
   boite.innerHTML = contenu;
   const txt = (boite.textContent || "").trim();
-  const mots = txt ? txt.split(/\s+/).length : 0;
+  const mots = compterMots(txt);
   let chapitres = 0;
   boite.querySelectorAll("h2").forEach(h => { if ((h.textContent || "").trim()) chapitres++; });
+
+  const longueurs = longueursChapitres(contenu);
+  const chapMax = longueurs.length ? Math.max.apply(null, longueurs) : 0;
 
   const pages = (livre.pages && livre.pages.length)
     ? livre.pages.length
@@ -281,7 +316,19 @@ function statsLivre(livre) {
   const m = /^l(\d{12,})$/.exec(livre.id || "");
   if (m) { const t = Number(m[1]); if (!isNaN(t)) cree = new Date(t); }
 
-  return { titre: livre.titre || "Sans titre", format: livre.format || "149x210", pages, mots, chapitres, cree };
+  const couv = livre.couverture || {};
+  const quatr = livre.quatrieme || {};
+
+  return {
+    titre: livre.titre || "Sans titre",
+    format: livre.format || "149x210",
+    pages, mots, chapitres, cree,
+    signes: txt.length,
+    chapMax,
+    aImageCouv: !!couv.imageChemin,
+    aQuatrImage: !!quatr.imageChemin,
+    aAuteur: !!(livre.auteur && String(livre.auteur).trim())
+  };
 }
 
 const LABELS_FORMAT = { "149x210": "Roman", "155x235": "Grand roman", "105x148": "Poche", "210x297": "A4" };
@@ -330,6 +377,12 @@ function rendreStats(u, livres, erreur) {
   const agg = livres.reduce((a, l) => {
     const s = statsLivre(l);
     a.pages += s.pages; a.mots += s.mots; a.chapitres += s.chapitres;
+    a.signes += s.signes;
+    if (s.mots > 0) a.avecContenu++;
+    if (s.aImageCouv) a.avecImageCouv++;
+    if (s.aQuatrImage) a.avecQuatrImage++;
+    if (s.aAuteur) a.avecAuteur++;
+    if (s.chapMax > a.chapMax) { a.chapMax = s.chapMax; a.chapMaxLivre = s.titre; }
     a.formats[s.format] = (a.formats[s.format] || 0) + 1;
     if (s.cree) {
       if (!a.premier || s.cree < a.premier) a.premier = s.cree;
@@ -337,7 +390,9 @@ function rendreStats(u, livres, erreur) {
     }
     a.details.push(s);
     return a;
-  }, { pages: 0, mots: 0, chapitres: 0, formats: {}, premier: null, dernier: null, details: [] });
+  }, { pages: 0, mots: 0, chapitres: 0, signes: 0, avecContenu: 0, avecImageCouv: 0,
+       avecQuatrImage: 0, avecAuteur: 0, chapMax: 0, chapMaxLivre: "",
+       formats: {}, premier: null, dernier: null, details: [] });
 
   // En-tête
   let html = `
@@ -366,6 +421,25 @@ function rendreStats(u, livres, erreur) {
     ${tuile(agg.mots.toLocaleString("fr-FR"), "mot" + (agg.mots > 1 ? "s" : ""))}
     ${tuile(agg.chapitres, "chapitre" + (agg.chapitres > 1 ? "s" : ""))}
   </div>`;
+
+  // Résumé (uniquement s'il y a au moins un livre)
+  if (livres.length) {
+    const brouillons = livres.length - agg.avecContenu;
+    const resume = [
+      ["Temps de lecture estimé", "≈ " + tempsLecture(agg.mots)],
+      ["Signes (espaces compris)", agg.signes.toLocaleString("fr-FR")],
+      ["Moyenne par livre", Math.round(agg.mots / livres.length).toLocaleString("fr-FR") + " mots"],
+      ["Livres aboutis", agg.avecContenu + " / " + livres.length + (brouillons ? " · " + brouillons + " brouillon" + (brouillons > 1 ? "s" : "") : "")],
+      ["Couvertures illustrées", agg.avecImageCouv + " / " + livres.length],
+      ["Auteur renseigné", agg.avecAuteur + " / " + livres.length]
+    ];
+    if (agg.chapMax) {
+      resume.push(["Chapitre le plus long", agg.chapMax.toLocaleString("fr-FR") + " mots" + (agg.chapMaxLivre ? " · " + agg.chapMaxLivre : "")]);
+    }
+    html += `<div class="stats-bloc"><h4>Résumé</h4><dl class="stats-resume">` +
+      resume.map(([k, v]) => `<div><dt>${echapper(k)}</dt><dd>${echapper(String(v))}</dd></div>`).join("") +
+      `</dl></div>`;
+  }
 
   // Dates d'activité (déduites de la création des livres)
   const lignesActivite = [];
