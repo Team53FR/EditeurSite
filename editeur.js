@@ -237,6 +237,7 @@ async function chargerLivre() {
     afficherSpread();
     afficherSommaire();
     majCompteurMots();
+    majBoutonPublier();
 
     // Tutoriel des outils au tout premier passage dans l'éditeur (une seule fois).
     setTimeout(() => lancerTutorielEditeur(false), 600);
@@ -2973,6 +2974,104 @@ function synchroniserControlesCouv(data) {
   });
 }
 
+// Persiste « tutoriel éditeur vu » dans le JSON de l'utilisateur (sa
+// bibliothèque), pour qu'il ne réapparaisse jamais, même sur un autre appareil.
+async function marquerTutoEditeurVu() {
+  if (!bibliotheque || bibliotheque.tutoEditeurVu) return;
+  bibliotheque.tutoEditeurVu = true;
+  try {
+    flushSpread(); // enregistrer aussi l'état courant du texte, par cohérence
+    const token = sessionStorage.getItem("gh_token");
+    shaBiblio = await ecrireFichierJSON(nomFichierBiblio, bibliotheque, shaBiblio, token, "Tutoriel éditeur vu");
+    marquerSauvegarde();
+    effacerBrouillon();
+  } catch (e) {
+    // Best-effort : on réessaiera à la prochaine sauvegarde ou au prochain lancement.
+    bibliotheque.tutoEditeurVu = false;
+  }
+}
+
+// =====================================================================
+//  Publication d'un livre (lecture seule pour les autres utilisateurs)
+//
+//  - livre.publie : drapeau dans la bibliothèque du propriétaire.
+//  - publies.json : index central { id, titre, auteur, format, proprietaire,
+//    publieLe, couverture } pour la galerie. Le contenu réel du livre reste
+//    dans la bibliothèque du propriétaire (lisible par tout compte connecté).
+// =====================================================================
+
+function majBoutonPublier() {
+  const btn = document.getElementById("btnPublier");
+  if (!btn || indexLivre === -1) return;
+  const publie = !!livreActuel().publie;
+  btn.textContent = publie ? "🌐 Publié — dépublier" : "🌐 Publier";
+  btn.classList.toggle("actif", publie);
+}
+
+async function basculerPublication() {
+  if (indexLivre === -1) return;
+  const livre = livreActuel();
+  const token = sessionStorage.getItem("gh_token");
+  const login = sessionStorage.getItem("gh_login");
+  const message = document.getElementById("message");
+  const btn = document.getElementById("btnPublier");
+  const publier = !livre.publie;
+
+  if (publier && !confirm(
+      "Publier « " + (livre.titre || "ce livre") + " » ?\n\n" +
+      "Les autres utilisateurs connectés pourront le LIRE (sans le modifier). " +
+      "Vous pourrez le dépublier à tout moment.")) {
+    return;
+  }
+
+  if (btn) btn.disabled = true;
+  if (message) message.textContent = publier ? "Publication en cours..." : "Dépublication en cours...";
+
+  try {
+    // 1) Drapeau + enregistrement de la bibliothèque du propriétaire.
+    //    On régénère TOUTES les pages dérivées pour que le lecteur les ait à jour.
+    flushSpread();
+    regenererToutesPages();
+    livre.publie = publier;
+    if (publier) livre.publieLe = new Date().toISOString();
+    shaBiblio = await ecrireFichierJSON(nomFichierBiblio, bibliotheque, shaBiblio, token,
+      publier ? "Publication d'un livre" : "Dépublication d'un livre");
+    marquerSauvegarde();
+    effacerBrouillon();
+
+    // 2) Mise à jour de l'index central publies.json.
+    const { contenu: liste, sha } = await lireIndexPublies(token);
+    const i = liste.findIndex(e => e.proprietaire === login && e.id === livre.id);
+    if (publier) {
+      const entree = {
+        id: livre.id,
+        titre: livre.titre || "",
+        auteur: livre.auteur || "",
+        format: livre.format || "149x210",
+        proprietaire: login,
+        publieLe: livre.publieLe,
+        couverture: livre.couverture || {}
+      };
+      if (i >= 0) liste[i] = entree; else liste.push(entree);
+    } else if (i >= 0) {
+      liste.splice(i, 1);
+    }
+    await ecrireFichierJSON("publies.json", liste, sha, token,
+      publier ? "Ajout à l'index des publications" : "Retrait de l'index des publications");
+
+    if (message) message.textContent = publier
+      ? "Livre publié : les autres pourront le lire."
+      : "Livre dépublié.";
+  } catch (erreur) {
+    // Revenir sur le drapeau en cas d'échec, pour rester cohérent.
+    livre.publie = !publier;
+    if (message) message.textContent = "Échec : " + erreur.message;
+  } finally {
+    if (btn) btn.disabled = false;
+    majBoutonPublier();
+  }
+}
+
 function lancerTutorielEditeur(forcer) {
   if (typeof lancerTutoriel !== "function") return;
   lancerTutoriel([
@@ -3015,7 +3114,11 @@ function lancerTutorielEditeur(forcer) {
     // 10 — Retour à la bibliothèque
     { cible: 'button[onclick="retourBibliotheque()"]', titre: "10. Retour à la bibliothèque",
       texte: "Revenez à votre bibliothèque pour ouvrir un autre livre ou en créer un nouveau. Pensez à sauvegarder avant de quitter cette page." }
-  ], { cle: forcer ? null : "tuto_editeur_v4", forcer: forcer });
+  ], {
+    forcer: forcer,
+    dejaVu: !!(bibliotheque && bibliotheque.tutoEditeurVu),
+    onTermine: () => marquerTutoEditeurVu()
+  });
 }
 
 // ----- Réinitialiser les tailles de texte de TOUT le livre -----

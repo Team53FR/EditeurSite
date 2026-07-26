@@ -1,0 +1,99 @@
+/* ===== Lecteur de livre publié (lecture seule) ===== */
+
+.lecture-body {
+  /* Neutralise la mise en page « éditeur » de style.css */
+  display: block !important;
+  height: auto !important;
+  min-height: 100vh;
+  overflow: auto !important;
+  background: #ece5d8;
+  /* Anti-copie « facile » : pas de sélection de texte */
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
+}
+
+.lecture-entete {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 20px;
+  background: #fffdf8;
+  border-bottom: 1px solid #e6dcc8;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.lecture-retour {
+  color: #8a4b38;
+  text-decoration: none;
+  font-family: system-ui, sans-serif;
+  font-size: 14px;
+  white-space: nowrap;
+}
+.lecture-retour:hover { text-decoration: underline; }
+
+.lecture-titre {
+  flex: 1;
+  text-align: center;
+  font-family: "EB Garamond", Georgia, serif;
+  font-size: 18px;
+  font-weight: 600;
+  color: #3a2a1e;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lecture-badge {
+  font-size: 11px;
+  color: #9a8f85;
+  border: 1px solid #e0d3bd;
+  border-radius: 999px;
+  padding: 3px 10px;
+  white-space: nowrap;
+}
+
+.lecture-scene {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px 12px 4px;
+  min-height: 60vh;
+}
+
+.lecture-nav {
+  width: 46px;
+  height: 46px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1px solid #d8c7ac;
+  background: #fffdf8;
+  color: #8a4b38;
+  font-size: 26px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,.1);
+}
+.lecture-nav:hover:not(:disabled) { background: #f6efe4; }
+.lecture-nav:disabled { opacity: .35; cursor: default; }
+
+.lecture-indicateur {
+  text-align: center;
+  color: #6a5f55;
+  font-family: system-ui, sans-serif;
+  font-size: 13px;
+  min-height: 18px;
+}
+
+.lecture-message {
+  text-align: center;
+}
+
+/* Les images de couverture ne doivent pas être « enregistrables » d'un glisser */
+.lecture-body img { -webkit-user-drag: none; user-drag: none; pointer-events: none; }

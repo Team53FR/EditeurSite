@@ -209,6 +209,21 @@ function obtenirNomFichierBibliotheque() {
   return `bibliotheques/${slugifierLogin(login)}.json`;
 }
 
+function cheminBibliothequeDe(login) {
+  return `bibliotheques/${slugifierLogin(login)}.json`;
+}
+
+// Index central des livres publiés (lisible par tout utilisateur connecté).
+// Renvoie { contenu: [...], sha } ; liste vide si le fichier n'existe pas encore.
+async function lireIndexPublies(token) {
+  try {
+    return await lireFichierJSON("publies.json", token);
+  } catch (e) {
+    if (e.status === 404) return { contenu: [], sha: null };
+    throw e;
+  }
+}
+
 function obtenirPrefixeImagesUtilisateur() {
   const login = sessionStorage.getItem("gh_login");
   return `images/${slugifierLogin(login)}`;

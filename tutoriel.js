@@ -18,12 +18,14 @@
     try { return document.querySelector(sel); } catch (e) { return null; }
   }
 
+  // options :
+  //   forcer   : rejoue le tutoriel même s'il a déjà été vu (bouton « ? »)
+  //   dejaVu   : true si l'utilisateur l'a déjà terminé (persisté ailleurs)
+  //   onTermine: appelé à la fin/fermeture, pour mémoriser qu'il a été vu
   window.lancerTutoriel = function (etapes, options) {
     options = options || {};
     if (!etapes || !etapes.length) return;
-    if (options.cle && !options.forcer) {
-      try { if (localStorage.getItem(options.cle) === "1") return; } catch (e) {}
-    }
+    if (options.dejaVu && !options.forcer) return;
     fermer();
     etat = { etapes, options, i: 0, els: construire() };
     montrer(0);
@@ -169,9 +171,10 @@
   }
 
   function fermerEtMarquer() {
-    if (etat && etat.options && etat.options.cle) {
-      try { localStorage.setItem(etat.options.cle, "1"); } catch (e) {}
-    }
+    const opt = etat && etat.options;
     fermer();
+    if (opt && typeof opt.onTermine === "function") {
+      try { opt.onTermine(); } catch (e) {}
+    }
   }
 })();

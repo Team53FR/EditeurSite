@@ -47,6 +47,20 @@ async function chargerBibliotheque() {
   setTimeout(() => lancerTutorielBiblio(false), 500);
 }
 
+// Persiste « tutoriel vu » dans le JSON de l'utilisateur (sa bibliothèque),
+// pour qu'il ne réapparaisse jamais, même sur un autre appareil.
+async function marquerTutoVu(champ) {
+  if (!bibliotheque || bibliotheque[champ]) return; // déjà marqué : rien à faire
+  bibliotheque[champ] = true;
+  try {
+    const token = sessionStorage.getItem("gh_token");
+    shaBiblio = await ecrireFichierJSON(nomFichierBiblio, bibliotheque, shaBiblio, token, "Tutoriel vu");
+  } catch (e) {
+    // Best-effort : en cas d'échec réseau, on réessaiera à la prochaine occasion.
+    bibliotheque[champ] = false;
+  }
+}
+
 function lancerTutorielBiblio(forcer) {
   if (typeof lancerTutoriel !== "function") return;
   lancerTutoriel([
@@ -64,7 +78,11 @@ function lancerTutorielBiblio(forcer) {
       texte: "Vos livres s'afficheront ici avec leur couverture. Cliquez sur l'un d'eux pour l'ouvrir dans l'éditeur." },
     { cible: null, titre: "À vous de jouer ✍️",
       texte: "Créez votre premier livre, puis ouvrez-le : un second guide vous présentera tous les outils d'écriture. Bonne écriture !" }
-  ], { cle: forcer ? null : "tuto_biblio_v1", forcer: forcer });
+  ], {
+    forcer: forcer,
+    dejaVu: !!(bibliotheque && bibliotheque.tutoBiblioVu),
+    onTermine: () => marquerTutoVu("tutoBiblioVu")
+  });
 }
 
 async function migrerImagesEmbarquees(token) {

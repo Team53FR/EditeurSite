@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lecture — Mon Éditeur De Livre</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital@0;1&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="lecture.css">
+</head>
+<body class="lecture-body">
+
+  <header class="lecture-entete">
+    <a href="publies.html" class="lecture-retour">&#8592; Livres publiés</a>
+    <div class="lecture-titre" id="lectureTitre">Lecture</div>
+    <div class="lecture-badge">Lecture seule</div>
+  </header>
+
+  <div class="lecture-scene">
+    <button class="lecture-nav lecture-nav-prec" id="btnApercuPrec" onclick="apercuPrecedent()" title="Page précédente" aria-label="Précédent">&#8249;</button>
+
+    <div class="livre-ouvert" id="conteneurApercu"></div>
+
+    <button class="lecture-nav lecture-nav-suiv" id="btnApercuSuiv" onclick="apercuSuivant()" title="Page suivante" aria-label="Suivant">&#8250;</button>
+  </div>
+
+  <p id="indicateurApercu" class="lecture-indicateur"></p>
+  <p id="message" class="message lecture-message"></p>
+
+  <script src="script.js"></script>
+  <script src="lecture.js"></script>
+</body>
+</html>
