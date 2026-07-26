@@ -2978,17 +2978,11 @@ function synchroniserControlesCouv(data) {
 // bibliothèque), pour qu'il ne réapparaisse jamais, même sur un autre appareil.
 async function marquerTutoEditeurVu() {
   if (!bibliotheque || bibliotheque.tutoEditeurVu) return;
-  bibliotheque.tutoEditeurVu = true;
-  try {
-    flushSpread(); // enregistrer aussi l'état courant du texte, par cohérence
-    const token = sessionStorage.getItem("gh_token");
-    shaBiblio = await ecrireFichierJSON(nomFichierBiblio, bibliotheque, shaBiblio, token, "Tutoriel éditeur vu");
-    marquerSauvegarde();
-    effacerBrouillon();
-  } catch (e) {
-    // Best-effort : on réessaiera à la prochaine sauvegarde ou au prochain lancement.
-    bibliotheque.tutoEditeurVu = false;
-  }
+  const token = sessionStorage.getItem("gh_token");
+  const nouveauSha = await marquerTutoVuDistant(
+    bibliotheque, "tutoEditeurVu", nomFichierBiblio, shaBiblio, token
+  );
+  if (nouveauSha) shaBiblio = nouveauSha;
 }
 
 // =====================================================================
@@ -3116,7 +3110,7 @@ function lancerTutorielEditeur(forcer) {
       texte: "Revenez à votre bibliothèque pour ouvrir un autre livre ou en créer un nouveau. Pensez à sauvegarder avant de quitter cette page." }
   ], {
     forcer: forcer,
-    dejaVu: !!(bibliotheque && bibliotheque.tutoEditeurVu),
+    dejaVu: tutoDejaVu(bibliotheque, "tutoEditeurVu"),
     onTermine: () => marquerTutoEditeurVu()
   });
 }

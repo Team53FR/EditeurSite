@@ -213,6 +213,46 @@ function cheminBibliothequeDe(login) {
   return `bibliotheques/${slugifierLogin(login)}.json`;
 }
 
+// ===== Mémorisation « tutoriel déjà vu » =====
+// Source de vérité : le JSON de l'utilisateur (donc valable sur tous ses
+// appareils). Un repli local sert de filet quand l'écriture distante échoue
+// (réseau coupé, token en lecture seule…), pour que le tutoriel ne
+// réapparaisse pas indéfiniment sur cet appareil.
+
+function cleTutoLocale(champ) {
+  return `tuto_${champ}_${sessionStorage.getItem("gh_login") || ""}`;
+}
+
+function tutoDejaVu(bib, champ) {
+  if (bib && bib[champ]) return true;
+  try { return localStorage.getItem(cleTutoLocale(champ)) === "1"; } catch (e) { return false; }
+}
+
+// Enregistre le drapeau dans le JSON de l'utilisateur. En cas de conflit de
+// version (le fichier a changé entre-temps), on relit le SHA et on retente.
+// Renvoie le nouveau SHA, ou null si l'écriture distante a échoué.
+async function marquerTutoVuDistant(bib, champ, nomFichier, sha, token) {
+  // Repli immédiat : même si le réseau échoue, plus de tutoriel en boucle ici.
+  try { localStorage.setItem(cleTutoLocale(champ), "1"); } catch (e) {}
+
+  if (!bib || bib[champ]) return sha;
+  bib[champ] = true;
+
+  try {
+    return await ecrireFichierJSON(nomFichier, bib, sha, token, "Tutoriel vu");
+  } catch (erreur) {
+    if (erreur && erreur.conflit) {
+      // Le fichier distant a bougé : on repart de la version à jour.
+      try {
+        const frais = await lireFichierJSON(nomFichier, token);
+        frais.contenu[champ] = true;
+        return await ecrireFichierJSON(nomFichier, frais.contenu, frais.sha, token, "Tutoriel vu");
+      } catch (e2) { /* on abandonne : le repli local a déjà fait son office */ }
+    }
+    return null;
+  }
+}
+
 // Index central des livres publiés (lisible par tout utilisateur connecté).
 // Renvoie { contenu: [...], sha } ; liste vide si le fichier n'existe pas encore.
 async function lireIndexPublies(token) {

@@ -51,14 +51,11 @@ async function chargerBibliotheque() {
 // pour qu'il ne réapparaisse jamais, même sur un autre appareil.
 async function marquerTutoVu(champ) {
   if (!bibliotheque || bibliotheque[champ]) return; // déjà marqué : rien à faire
-  bibliotheque[champ] = true;
-  try {
-    const token = sessionStorage.getItem("gh_token");
-    shaBiblio = await ecrireFichierJSON(nomFichierBiblio, bibliotheque, shaBiblio, token, "Tutoriel vu");
-  } catch (e) {
-    // Best-effort : en cas d'échec réseau, on réessaiera à la prochaine occasion.
-    bibliotheque[champ] = false;
-  }
+  const token = sessionStorage.getItem("gh_token");
+  const nouveauSha = await marquerTutoVuDistant(
+    bibliotheque, champ, nomFichierBiblio, shaBiblio, token
+  );
+  if (nouveauSha) shaBiblio = nouveauSha;
 }
 
 function lancerTutorielBiblio(forcer) {
@@ -80,7 +77,7 @@ function lancerTutorielBiblio(forcer) {
       texte: "Créez votre premier livre, puis ouvrez-le : un second guide vous présentera tous les outils d'écriture. Bonne écriture !" }
   ], {
     forcer: forcer,
-    dejaVu: !!(bibliotheque && bibliotheque.tutoBiblioVu),
+    dejaVu: tutoDejaVu(bibliotheque, "tutoBiblioVu"),
     onTermine: () => marquerTutoVu("tutoBiblioVu")
   });
 }

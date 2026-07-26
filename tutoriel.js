@@ -20,8 +20,10 @@
 
   // options :
   //   forcer   : rejoue le tutoriel même s'il a déjà été vu (bouton « ? »)
-  //   dejaVu   : true si l'utilisateur l'a déjà terminé (persisté ailleurs)
-  //   onTermine: appelé à la fin/fermeture, pour mémoriser qu'il a été vu
+  //   dejaVu   : true si l'utilisateur l'a déjà vu (persisté ailleurs)
+  //   onTermine: mémorise qu'il a été vu. Appelé DÈS L'OUVERTURE (et non à la
+  //              fin) : si l'utilisateur ferme l'onglet ou navigue en plein
+  //              milieu, le tutoriel ne doit pas revenir indéfiniment.
   window.lancerTutoriel = function (etapes, options) {
     options = options || {};
     if (!etapes || !etapes.length) return;
@@ -32,6 +34,11 @@
     window.addEventListener("resize", repositionner);
     window.addEventListener("scroll", repositionner, true);
     document.addEventListener("keydown", surTouche, true);
+
+    // Le tutoriel est affiché : on considère qu'il a été vu.
+    if (!options.forcer && typeof options.onTermine === "function") {
+      try { options.onTermine(); } catch (e) {}
+    }
   };
 
   function construire() {
@@ -173,7 +180,9 @@
   function fermerEtMarquer() {
     const opt = etat && etat.options;
     fermer();
-    if (opt && typeof opt.onTermine === "function") {
+    // Deuxième tentative de mémorisation : si l'enregistrement au moment de
+    // l'ouverture a échoué (réseau, conflit), on retente à la fermeture.
+    if (opt && !opt.forcer && typeof opt.onTermine === "function") {
       try { opt.onTermine(); } catch (e) {}
     }
   }
