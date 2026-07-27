@@ -1411,3 +1411,11 @@ button.danger {
   border-color: var(--s-accent);
   box-shadow: 0 0 0 3px rgba(138,75,56,.14);
 }
+
+/* Bouton-icône « Publier » : état publié bien visible */
+.sommaire .btn-icone.actif,
+.sommaire .btn-icone.actif:hover {
+  background: var(--s-accent);
+  border-color: var(--s-accent);
+  color: #fff;
+}

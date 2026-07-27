@@ -2998,7 +2998,11 @@ function majBoutonPublier() {
   const btn = document.getElementById("btnPublier");
   if (!btn || indexLivre === -1) return;
   const publie = !!livreActuel().publie;
-  btn.textContent = publie ? "🌐 Publié — dépublier" : "🌐 Publier";
+  // Bouton-icône : on ne touche PAS au contenu (ce serait écraser le SVG),
+  // seulement l'état visuel et le libellé accessible.
+  const libelle = publie ? "Publié — cliquer pour dépublier" : "Publier";
+  btn.title = libelle;
+  btn.setAttribute("aria-label", libelle);
   btn.classList.toggle("actif", publie);
 }
 
