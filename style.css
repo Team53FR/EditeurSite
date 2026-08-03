@@ -750,6 +750,7 @@ button.danger {
 .texte-livre h2 {
   font-size: 20pt;   /* taille par défaut d'un titre de chapitre */
   font-weight: bold;
+  text-align: center;
   margin: 0 0 8px 0;
   line-height: 1.2;
 }
@@ -757,6 +758,8 @@ button.danger {
 .texte-livre h3 {
   font-size: 13pt;   /* taille par défaut d'un sous-titre */
   font-weight: bold;
+  font-style: italic;
+  text-align: center;
   margin: 0 0 6px 0;
   line-height: 1.25;
 }
