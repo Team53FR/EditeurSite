@@ -11,7 +11,14 @@
 
 const MM_EN_PX = 96 / 25.4; // conversion CSS : 1mm = 96/25.4 px
 const DELTA_RELIURE_MM = 4; // ajouté côté reliure, retiré côté extérieur
-const PIED_PAGE_MM = 12;    // zone réservée au numéro de page
+// Zone réservée au numéro de page. DOIT correspondre au « numPageH » de
+// l'éditeur (32 px logiques), sinon la hauteur utile diffère de celle qui a
+// servi à découper les pages et le texte se retrouve coupé à l'impression.
+// On retire une petite tolérance (2 mm) pour absorber les écarts d'arrondi
+// mm/px entre le rendu écran et le rendu imprimé ; le numéro de page reste
+// à sa place (il est positionné à 6 mm du bas, indépendamment).
+const TOLERANCE_MM = 2;
+const PIED_PAGE_MM = 32 * 25.4 / 96 - TOLERANCE_MM; // ≈ 6,47 mm
 
 function exporterImpression() {
   flushSpread();
