@@ -126,8 +126,69 @@ function exporterLivret() {
 
   Promise.all(promessesImages).finally(() => {
     if (message) message.textContent = "";
-    window.print();
+    lancerImpressionLivret();
   });
+}
+
+// ----- Recto-verso : automatique ou en deux passes -----
+// Les faces ont été ajoutées en alternance (recto, verso, recto, verso…) :
+// les enfants IMPAIRS de #zoneImpression sont donc les rectos et les PAIRS les
+// versos. Pour une imprimante sans duplex, on imprime les rectos, puis les
+// versos une fois la pile remise dans le bac.
+
+function lancerImpressionLivret() {
+  const duplexAuto = confirm(
+    "Votre imprimante fait-elle le recto-verso automatiquement ?\n\n" +
+    "OK : oui — tout imprimer d'un coup.\n" +
+    "Annuler : non — imprimer en deux fois (rectos, puis versos)."
+  );
+
+  if (duplexAuto) {
+    definirPasseLivret(null);
+    window.print();
+    return;
+  }
+
+  definirPasseLivret("recto");   // passe 1
+  window.print();
+  afficherPanneauVersos();
+}
+
+function definirPasseLivret(passe) {
+  const zone = document.getElementById("zoneImpression");
+  if (!zone) return;
+  zone.classList.remove("passe-recto", "passe-verso");
+  if (passe) zone.classList.add("passe-" + passe);
+}
+
+// Panneau guidant la seconde passe (les versos).
+function afficherPanneauVersos() {
+  const ancien = document.getElementById("panneauVersos");
+  if (ancien) ancien.remove();
+
+  const panneau = document.createElement("div");
+  panneau.id = "panneauVersos";
+  panneau.className = "panneau-versos";
+  panneau.innerHTML =
+    "<h3>Étape 2 : les versos</h3>" +
+    "<p>Reprenez la pile imprimée et remettez-la dans le bac <strong>sans en changer l'ordre</strong>. " +
+    "Le sens de rechargement dépend de l'imprimante : au moindre doute, faites l'essai sur une seule feuille.</p>" +
+    '<div class="panneau-versos-actions">' +
+      '<button class="pv-annuler">Annuler</button>' +
+      '<button class="pv-imprimer">Imprimer les versos</button>' +
+    "</div>";
+  document.body.appendChild(panneau);
+
+  panneau.querySelector(".pv-annuler").onclick = () => {
+    definirPasseLivret(null);
+    panneau.remove();
+  };
+  panneau.querySelector(".pv-imprimer").onclick = () => {
+    definirPasseLivret("verso");
+    window.print();
+    definirPasseLivret(null);
+    panneau.remove();
+  };
 }
 
 function creerFaceLivret(demiGauche, demiDroite, livre, f, margeInt, margeExt, promessesImages) {

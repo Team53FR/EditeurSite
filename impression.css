@@ -149,4 +149,68 @@
     text-transform: uppercase;
     opacity: 0.85;
   }
+
+  /* Recto-verso en deux passes (imprimante sans duplex).
+     Les faces alternent recto/verso : enfants impairs = rectos, pairs = versos. */
+  #zoneImpression.passe-recto > .feuille-impression:nth-child(even) { display: none; }
+  #zoneImpression.passe-verso > .feuille-impression:nth-child(odd)  { display: none; }
+
+  /* Le panneau d'aide ne doit jamais s'imprimer */
+  .panneau-versos { display: none !important; }
 }
+
+/* ----- Panneau « Étape 2 : les versos » (impression en deux passes) ----- */
+.panneau-versos {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 200;
+  width: 330px;
+  background: #fffdf8;
+  border: 1px solid #e6ddc9;
+  border-radius: 14px;
+  box-shadow: 0 12px 34px rgba(60,42,20,.22);
+  padding: 18px 20px;
+  font-family: system-ui, sans-serif;
+  color: #2b2622;
+}
+
+.panneau-versos h3 {
+  font-family: "EB Garamond", Georgia, serif;
+  font-size: 18px;
+  margin: 0 0 8px;
+}
+
+.panneau-versos p {
+  font-size: 13px;
+  line-height: 1.5;
+  color: #6f6455;
+  margin: 0 0 14px;
+}
+
+.panneau-versos-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.panneau-versos-actions button {
+  border: 1px solid #e6ddc9;
+  border-radius: 9px;
+  background: #f6efe0;
+  color: #2b2622;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 9px 14px;
+  margin: 0;
+  cursor: pointer;
+}
+
+.panneau-versos-actions .pv-imprimer {
+  background: #8a4b38;
+  border-color: #8a4b38;
+  color: #fff;
+}
+
+.panneau-versos-actions .pv-imprimer:hover { background: #6d3a2b; border-color: #6d3a2b; }
+.panneau-versos-actions .pv-annuler:hover { background: #fff; }
