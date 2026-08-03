@@ -356,9 +356,48 @@ function appliquerStyle(baliseKey) {
   restaurerSelection();
   const balise = baliseKey === "h2" ? "H2" : baliseKey === "h3" ? "H3" : "P";
   document.execCommand("formatBlock", false, balise);
+
+  // Une taille posée à la main (font-size en ligne) survit au changement de
+  // bloc et l'emporterait sur la taille du type : un titre resterait en 11 pt.
+  // On la retire des blocs concernés pour que la taille du type s'applique
+  // (20 pt pour un titre, 13 pt pour un sous-titre, 11 pt pour un paragraphe).
+  nettoyerTaillesBlocsSelection();
+
   enregistrerHistorique();
   marquerModifie();
   majEtatBarreOutils();
+}
+
+// Retire les tailles en ligne dans les blocs touchés par la sélection.
+function nettoyerTaillesBlocsSelection() {
+  const ed = editeurEl();
+  const sel = window.getSelection();
+  if (!ed || !sel || sel.rangeCount === 0) return;
+  const range = sel.getRangeAt(0);
+
+  const blocs = [...ed.querySelectorAll("p, h2, h3, li")].filter(b => range.intersectsNode(b));
+  if (blocs.length === 0) return;
+
+  blocs.forEach(bloc => {
+    if (bloc.style && bloc.style.fontSize) {
+      bloc.style.fontSize = "";
+      if (!bloc.getAttribute("style")) bloc.removeAttribute("style");
+    }
+    bloc.querySelectorAll("[style]").forEach(el => {
+      if (el.style.fontSize) {
+        el.style.fontSize = "";
+        if (!el.getAttribute("style")) el.removeAttribute("style");
+      }
+    });
+    bloc.querySelectorAll("font[size]").forEach(f => f.removeAttribute("size"));
+    // Déballer les <span> devenus vides de tout attribut
+    bloc.querySelectorAll("span").forEach(sp => {
+      if (sp.attributes.length === 0) {
+        while (sp.firstChild) sp.parentNode.insertBefore(sp.firstChild, sp);
+        sp.remove();
+      }
+    });
+  });
 }
 
 // Police de caractères de la sélection (#7)
