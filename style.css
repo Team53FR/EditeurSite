@@ -1427,3 +1427,29 @@ button.danger {
   border-color: var(--s-accent);
   color: #fff;
 }
+
+/* Bouton de suppression d'un chapitre dans le sommaire */
+.supprimer-chapitre {
+  background: none;
+  border: none;
+  color: #c4b8a0;
+  font-size: 12px;
+  line-height: 1;
+  padding: 4px 5px;
+  margin: 0 0 0 2px;
+  border-radius: 6px;
+  cursor: pointer;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity .12s ease, background .12s ease, color .12s ease;
+}
+
+.sommaire li:hover .supprimer-chapitre,
+.sommaire li.actif .supprimer-chapitre {
+  opacity: 1;
+}
+
+.supprimer-chapitre:hover {
+  background: #a33;
+  color: #fff;
+}

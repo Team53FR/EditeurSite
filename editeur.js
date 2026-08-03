@@ -2686,7 +2686,7 @@ function afficherSommaire() {
     return;
   }
 
-  chapitres.forEach(ch => {
+  chapitres.forEach((ch, i) => {
     const li = document.createElement("li");
     li.className = (ch.page === indexSpread || ch.page === indexSpread + 1) ? "actif" : "";
 
@@ -2702,8 +2702,94 @@ function afficherSommaire() {
     num.textContent = "p." + (ch.page + 1);
     li.appendChild(num);
 
+    const suppr = document.createElement("button");
+    suppr.className = "supprimer-chapitre";
+    suppr.textContent = "✕";
+    suppr.title = "Supprimer ce chapitre et tout son contenu";
+    suppr.setAttribute("aria-label", "Supprimer le chapitre " + ch.titre);
+    suppr.onclick = (e) => { e.stopPropagation(); supprimerChapitre(i); };
+    li.appendChild(suppr);
+
     liste.appendChild(li);
   });
+}
+
+// ----- Suppression d'un chapitre entier -----
+// Supprime le titre ET tout son contenu, jusqu'au chapitre suivant (exclu).
+// On travaille sur le livre recollé, puis on redécoupe : la pagination reste
+// juste et aucun autre chapitre n'est touché.
+
+function contenuCompletLivre() {
+  let tout = "";
+  for (const sp of spreadsLivre()) tout = fusionnerSuite(tout, sp);
+  return tout;
+}
+
+// Découpe le contenu complet en tranches : une par chapitre, plus l'éventuel
+// texte d'avant-propos (avant le premier titre).
+function tranchesChapitres(html) {
+  const d = document.createElement("div");
+  d.innerHTML = html || "";
+  const tranches = [];
+  let courante = { titre: null, noeuds: [] };
+  [...d.childNodes].forEach(n => {
+    const estTitre = n.nodeType === 1 && n.tagName === "H2" && (n.textContent || "").trim();
+    if (estTitre) {
+      tranches.push(courante);
+      courante = { titre: (n.textContent || "").trim(), noeuds: [n] };
+    } else {
+      courante.noeuds.push(n);
+    }
+  });
+  tranches.push(courante);
+  return { conteneur: d, tranches };
+}
+
+function supprimerChapitre(indexChapitre) {
+  if (indexChapitre < 0 || modeApercu || modeCouverture) return;
+
+  const { conteneur, tranches } = tranchesChapitres(contenuCompletLivre());
+  // tranches[0] = texte avant le premier chapitre ; les chapitres suivent.
+  const avecTitre = tranches.filter(t => t.titre !== null);
+  const cible = avecTitre[indexChapitre];
+  if (!cible) return;
+
+  // Compter ce qui va disparaître, pour une confirmation honnête.
+  const boite = document.createElement("div");
+  cible.noeuds.forEach(n => boite.appendChild(n.cloneNode(true)));
+  const texte = (boite.textContent || "").trim();
+  const mots = texte ? texte.split(/\s+/).length : 0;
+
+  if (!confirm(
+      "Supprimer le chapitre « " + cible.titre + " » ?\n\n" +
+      "Son titre et tout son contenu seront supprimés (" + mots + " mot" + (mots > 1 ? "s" : "") + ").\n" +
+      "Cette action ne peut pas être annulée avec Ctrl+Z.")) {
+    return;
+  }
+
+  cible.noeuds.forEach(n => { if (n.parentNode === conteneur) conteneur.removeChild(n); });
+
+  const livre = livreActuel();
+  livre.spreads = [conteneur.innerHTML || ""];
+  indexSpread = 0;
+  repaginerTout();
+
+  const spreads = spreadsLivre();
+  if (numSpread() >= spreads.length) indexSpread = Math.max(0, (spreads.length - 1) * 2);
+
+  afficherSpread();
+  afficherSommaire();
+  majCompteurMots();
+  marquerModifie();
+  planifierBrouillon();
+
+  const message = document.getElementById("message");
+  if (message) {
+    message.textContent = "Chapitre « " + cible.titre + " » supprimé.";
+    setTimeout(() => {
+      if (message.textContent.indexOf("supprimé") !== -1) message.textContent = "";
+    }, 3000);
+  }
 }
 
 // Ajoute un chapitre : un titre qui DÉMARRE SUR UNE NOUVELLE PAGE
