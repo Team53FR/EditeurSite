@@ -914,6 +914,14 @@ function previewCouverture() {
   if (toggleAuteurInput) toggleAuteurInput.checked = afficherAuteur;
   if (ligneToggleTitre) ligneToggleTitre.style.display = mode === "couverture" ? "block" : "none";
 
+  // La 4e de couverture n'affiche pas de titre : ses réglages (police, taille,
+  // position) n'ont donc rien à y faire.
+  const visibleTitre = mode === "couverture" ? "block" : "none";
+  ["blocPoliceTitre", "blocPosTitre"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = visibleTitre;
+  });
+
   const apercu = document.getElementById("previewCouverture");
   apercu.innerHTML = `
     ${mode === "couverture" && afficherTitre ? `<div class="apercu-titre" style="color:${couleurTexte};${styleTexteCouv(data, "titre")}">${livre.titre || "Titre"}</div>` : ""}
@@ -1960,11 +1968,14 @@ function remplacerTout() {
 
   flushSpread();
   let total = 0;
-  const pages = livreActuel().pages;
 
-  pages.forEach(p => {
+  // On remplace dans les DOUBLES-PAGES (la source). Modifier livre.pages
+  // (pages dérivées) serait sans effet : elles sont régénérées depuis les
+  // doubles-pages à la première occasion.
+  const spreads = spreadsLivre();
+  for (let i = 0; i < spreads.length; i++) {
     const conteneur = document.createElement("div");
-    conteneur.innerHTML = p.contenu || "";
+    conteneur.innerHTML = spreads[i] || "";
     const walker = document.createTreeWalker(conteneur, NodeFilter.SHOW_TEXT);
     const noeuds = [];
     while (walker.nextNode()) noeuds.push(walker.currentNode);
@@ -1972,8 +1983,11 @@ function remplacerTout() {
       const res = remplacerInsensible(noeud.textContent, requete, remplacement);
       if (res.compte > 0) { noeud.textContent = res.texte; total += res.compte; }
     });
-    p.contenu = conteneur.innerHTML;
-  });
+    spreads[i] = conteneur.innerHTML;
+  }
+
+  // Le texte change de longueur : on redécoupe tout le livre.
+  if (total > 0) repaginerTout();
 
   afficherSpread();
   afficherSommaire();
