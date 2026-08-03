@@ -2484,7 +2484,9 @@ function flushSpread() {
   const spreads = spreadsLivre();
 
   const part = calculerPartition(ed.innerHTML);
-  spreads[s] = part.garde;
+  // La coupe peut laisser un titre vide en fin de page : on l'enlève.
+  // (Uniquement sur la partie qui reste derrière — jamais là où est le curseur.)
+  spreads[s] = retirerTitresVides(part.garde);
   if (part.overflow && texteBrutPage(part.overflow).trim() !== "") {
     assurerSpread(s + 1);
     spreads[s + 1] = fusionnerSuite(part.overflow, spreads[s + 1] || "");
@@ -2524,7 +2526,9 @@ function gererFlux() {
   // Débordement : coupe propre, report sur la double-page suivante.
   const offset = offsetCaret(ed);
   const part = calculerPartition(ed.innerHTML);
-  spreads[s] = part.garde;
+  // La coupe peut laisser un titre vide en fin de page : on l'enlève.
+  // (Uniquement sur la partie qui reste derrière — jamais là où est le curseur.)
+  spreads[s] = retirerTitresVides(part.garde);
   assurerSpread(s + 1);
   spreads[s + 1] = fusionnerSuite(part.overflow, spreads[s + 1] || "");
   pagesObsoletes = true;
@@ -2795,6 +2799,21 @@ function changerFormat(nouveauFormat) {
   if (sel) sel.value = nouveauFormat;
 }
 
+// Retire les titres SANS TEXTE : coquilles laissées par la coupe des pages
+// (un titre à saut de page laisse une balise vide en fin de page précédente).
+// Invisibles dans le sommaire mais elles s'accumulent à chaque repagination et
+// redeviennent des chapitres fantômes quand le texte se recompose autour.
+function retirerTitresVides(html) {
+  if (!html || html.indexOf("<h") === -1) return html;
+  const d = document.createElement("div");
+  d.innerHTML = html;
+  let retire = false;
+  d.querySelectorAll("h2, h3").forEach(h => {
+    if (!(h.textContent || "").trim() && !h.querySelector("img")) { h.remove(); retire = true; }
+  });
+  return retire ? d.innerHTML : html;
+}
+
 // Recolle tout le livre puis le redécoupe en doubles-pages pour la géométrie
 // courante. La recomposition est une partition stricte : aucun texte perdu.
 function repaginerTout() {
@@ -2802,6 +2821,7 @@ function repaginerTout() {
   const spreads = spreadsLivre();
   let tout = "";
   for (const s of spreads) tout = fusionnerSuite(tout, s);
+  tout = retirerTitresVides(tout);   // pas de coquilles reportées d'un découpage à l'autre
 
   const nouveaux = [];
   let reste = tout;
@@ -2809,7 +2829,10 @@ function repaginerTout() {
   while (texteBrutPage(reste).trim() !== "" && securite < 5000) {
     securite++;
     const part = calculerPartition(reste);
-    nouveaux.push(part.garde);
+    // Chaque coupe peut laisser un titre vide en fin de page : on nettoie
+    // le morceau produit, sinon les coquilles se multiplient à chaque
+    // repagination (et redeviennent des chapitres fantômes).
+    nouveaux.push(retirerTitresVides(part.garde));
     reste = part.overflow || "";
     if (texteBrutPage(reste).trim() === "") break;
   }
