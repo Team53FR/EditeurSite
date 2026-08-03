@@ -1419,3 +1419,11 @@ button.danger {
   border-color: var(--s-accent);
   color: #fff;
 }
+
+/* Effet actif sur la sélection : bouton de la barre d'outils mis en évidence */
+.barre-outils button.actif,
+.barre-outils button.actif:hover {
+  background: var(--s-accent);
+  border-color: var(--s-accent);
+  color: #fff;
+}

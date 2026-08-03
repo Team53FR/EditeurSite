@@ -225,7 +225,14 @@ async function chargerLivre() {
     zoneEd.addEventListener("blur", sauvegarderSelection);
     zoneEd.addEventListener("input", surSaisie);
     zoneEd.addEventListener("paste", gererCollage);
-    document.addEventListener("selectionchange", lireTailleCourrante);
+    // Reflet de l'état de la sélection dans la barre d'outils. « selectionchange »
+    // est très bavard : on regroupe les rafraîchissements sur l'image suivante.
+    let majPrevue = false;
+    document.addEventListener("selectionchange", () => {
+      if (majPrevue) return;
+      majPrevue = true;
+      requestAnimationFrame(() => { majPrevue = false; majEtatBarreOutils(); });
+    });
     document.addEventListener("keydown", raccourcisClavier);
     window.addEventListener("beforeunload", (e) => {
       if (modifie) { e.preventDefault(); e.returnValue = ""; }
@@ -341,6 +348,7 @@ function formater(commande, valeur) {
   document.execCommand(commande, false, valeur || null);
   enregistrerHistorique();
   marquerModifie();
+  majEtatBarreOutils();   // refléter aussitôt le nouvel état
 }
 
 // Style de paragraphe : Paragraphe / Titre / Sous-titre (#7)
@@ -350,6 +358,7 @@ function appliquerStyle(baliseKey) {
   document.execCommand("formatBlock", false, balise);
   enregistrerHistorique();
   marquerModifie();
+  majEtatBarreOutils();
 }
 
 // Police de caractères de la sélection (#7)
@@ -3195,6 +3204,101 @@ function reinitialiserTailles() {
   if (message) {
     message.textContent = "Tailles remises par défaut sur tout le livre.";
     setTimeout(() => { if (message.textContent.startsWith("Tailles remises")) message.textContent = ""; }, 2500);
+  }
+}
+
+// =====================================================================
+//  Reflet de l'état de la sélection dans la barre d'outils
+//
+//  Met en évidence les effets actifs (gras, italique, alignement, listes) et
+//  recale les listes déroulantes (style, police, interligne) et la taille sur
+//  ce qui est réellement appliqué au curseur ou à la sélection.
+//  Purement indicatif : on ne modifie jamais le texte ici, et changer la
+//  valeur d'un <select> par script ne déclenche pas son onchange — l'édition
+//  reste donc entièrement disponible.
+// =====================================================================
+
+// Bouton de la barre d'outils portant un onclick donné
+function boutonOutil(fragmentOnclick) {
+  return document.querySelector('.barre-outils button[onclick*="' + fragmentOnclick + '"]');
+}
+
+function marquerBouton(fragmentOnclick, actif) {
+  const b = boutonOutil(fragmentOnclick);
+  if (b) b.classList.toggle("actif", !!actif);
+}
+
+// Normalise une pile de polices pour pouvoir la comparer aux options du select
+function normaliserPolice(v) {
+  return (v || "").toLowerCase().replace(/["']/g, "").replace(/\s+/g, "");
+}
+
+function majEtatBarreOutils() {
+  if (modeApercu || modeCouverture) return;
+  const ed = editeurEl();
+  if (!ed) return;
+
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return;
+  if (!ed.contains(sel.anchorNode)) return;  // curseur hors de la zone d'écriture
+
+  // --- Effets à bascule ---
+  try {
+    marquerBouton("'bold'", document.queryCommandState("bold"));
+    marquerBouton("'italic'", document.queryCommandState("italic"));
+    marquerBouton("'underline'", document.queryCommandState("underline"));
+    marquerBouton("insertUnorderedList", document.queryCommandState("insertUnorderedList"));
+    marquerBouton("insertOrderedList", document.queryCommandState("insertOrderedList"));
+    marquerBouton("justifyLeft", document.queryCommandState("justifyLeft"));
+    marquerBouton("justifyCenter", document.queryCommandState("justifyCenter"));
+    marquerBouton("justifyRight", document.queryCommandState("justifyRight"));
+    marquerBouton("justifyFull", document.queryCommandState("justifyFull"));
+  } catch (e) { /* queryCommandState est déprécié : on ignore s'il échoue */ }
+
+  // Élément porteur des styles au point d'insertion
+  let noeud = sel.anchorNode;
+  if (noeud && noeud.nodeType === Node.TEXT_NODE) noeud = noeud.parentElement;
+  if (!noeud) return;
+  const style = window.getComputedStyle(noeud);
+
+  // --- Style de paragraphe (Titre / Sous-titre / Paragraphe) ---
+  let bloc = noeud;
+  while (bloc && bloc !== ed && !/^(H2|H3|P|LI|DIV)$/.test(bloc.tagName)) bloc = bloc.parentElement;
+  const selStyle = document.getElementById("selectStyle");
+  if (selStyle && bloc && bloc !== ed) {
+    const t = bloc.tagName;
+    selStyle.value = (t === "H2" || t === "H3") ? t.toLowerCase() : "p";
+  }
+
+  // --- Police ---
+  const selPolice = document.getElementById("selectPolice");
+  if (selPolice) {
+    const courante = normaliserPolice(style.fontFamily);
+    const trouvee = [...selPolice.options].find(o => normaliserPolice(o.value) === courante);
+    if (trouvee) selPolice.value = trouvee.value;
+  }
+
+  // --- Interligne (rapport ligne / taille de police) ---
+  const selInter = document.getElementById("selectInterligne");
+  if (selInter) {
+    const taillePx = parseFloat(style.fontSize) || 0;
+    const lignePx = parseFloat(style.lineHeight);
+    if (taillePx && !isNaN(lignePx)) {
+      const ratio = lignePx / taillePx;
+      let meilleure = null, ecartMin = Infinity;
+      [...selInter.options].forEach(o => {
+        const ecart = Math.abs(parseFloat(o.value) - ratio);
+        if (ecart < ecartMin) { ecartMin = ecart; meilleure = o.value; }
+      });
+      if (meilleure !== null && ecartMin < 0.2) selInter.value = meilleure;
+    }
+  }
+
+  // --- Taille (en points) ---
+  const input = document.getElementById("inputTaille");
+  if (input && document.activeElement !== input) {
+    const pt = Math.round(parseFloat(style.fontSize) / (96 / 72));
+    if (pt) input.value = pt;
   }
 }
 
