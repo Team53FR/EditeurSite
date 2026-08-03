@@ -2429,6 +2429,15 @@ function regenererPagesSpread(s) {
   const d = calculerDeuxPages(spreads[s]);
   livre.pages[2 * s]     = { id: "p" + (2 * s + 1), contenu: d.gauche };
   livre.pages[2 * s + 1] = { id: "p" + (2 * s + 2), contenu: d.droite };
+
+  // Sur la DERNIÈRE double-page, retirer les pages vides de fin — comme le
+  // fait regenererToutesPages. Sans cela, le compteur annoncerait une page de
+  // plus qu'il n'y en a réellement. (Les pages vides du milieu sont conservées :
+  // elles maintiennent l'alignement page <-> double-page.)
+  if (s === spreads.length - 1) {
+    const pages = livre.pages;
+    while (pages.length > 1 && !texteBrutPage(pages[pages.length - 1].contenu).trim()) pages.pop();
+  }
 }
 
 function regenererToutesPages() {
@@ -2517,8 +2526,10 @@ function gererFlux() {
   // natif et la position du curseur sont donc intacts.
   if (ed.scrollWidth <= ed.clientWidth + 2) {
     spreads[s] = ed.innerHTML;
+    // Seule cette double-page a changé : on régénère SES pages uniquement.
+    // (Marquer tout le livre obsolète forcerait un recalcul complet à chaque
+    //  frappe — ~190 ms sur un livre de 60 pages, d'où les ralentissements.)
     regenererPagesSpread(s);
-    pagesObsoletes = true;
     afficherSommaire();
     return;
   }
@@ -2940,16 +2951,19 @@ function repaginerTout() {
 function majCompteurMots() {
   if (indexLivre === -1) return;
   flushSpread();
-  const spreads = spreadsLivre();
+
+  // On compte sur les doubles-pages (source), sans passer par assurerPagesAJour :
+  // régénérer toutes les pages dérivées juste pour un compteur coûtait ~180 ms
+  // sur un livre de 60 pages, à chaque frappe.
   let mots = 0;
   const tmp = document.createElement("div");
-  spreads.forEach(html => {
+  spreadsLivre().forEach(html => {
     tmp.innerHTML = html || "";
     const txt = (tmp.textContent || "").trim();
     if (txt) mots += txt.split(/\s+/).length;
   });
-  assurerPagesAJour();
-  const nbPages = livreActuel().pages.length;
+
+  const nbPages = (livreActuel().pages || []).length;
   const el = document.getElementById("compteurMots");
   if (el) el.textContent = `${mots} mot${mots > 1 ? "s" : ""} · ${nbPages} page${nbPages > 1 ? "s" : ""}`;
 }
