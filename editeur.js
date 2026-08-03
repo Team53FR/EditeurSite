@@ -2427,6 +2427,12 @@ function regenererPagesSpread(s) {
   if (s < 0 || s >= spreads.length) return;
   if (!Array.isArray(livre.pages)) livre.pages = [];
   const d = calculerDeuxPages(spreads[s]);
+
+  // Écrire à un index au-delà de la fin laisserait des trous (éléments
+  // indéfinis) dans le tableau : on le complète d'abord avec des pages vides.
+  while (livre.pages.length < 2 * s) {
+    livre.pages.push({ id: "p" + (livre.pages.length + 1), contenu: "" });
+  }
   livre.pages[2 * s]     = { id: "p" + (2 * s + 1), contenu: d.gauche };
   livre.pages[2 * s + 1] = { id: "p" + (2 * s + 2), contenu: d.droite };
 
@@ -2434,9 +2440,20 @@ function regenererPagesSpread(s) {
   // fait regenererToutesPages. Sans cela, le compteur annoncerait une page de
   // plus qu'il n'y en a réellement. (Les pages vides du milieu sont conservées :
   // elles maintiennent l'alignement page <-> double-page.)
-  if (s === spreads.length - 1) {
-    const pages = livre.pages;
-    while (pages.length > 1 && !texteBrutPage(pages[pages.length - 1].contenu).trim()) pages.pop();
+  nettoyerPagesVidesFin();
+}
+
+// Retire les pages vides en fin de livre (au moins une page conservée).
+// Régénérer une double-page écrit toujours DEUX pages : sans ce nettoyage,
+// une page vide finale réapparaîtrait et le compteur annoncerait une page
+// de trop.
+function nettoyerPagesVidesFin() {
+  const pages = livreActuel().pages;
+  if (!Array.isArray(pages)) return;
+  while (pages.length > 1) {
+    const derniere = pages[pages.length - 1];
+    if (derniere && texteBrutPage(derniere.contenu).trim()) break;
+    pages.pop();
   }
 }
 
@@ -2502,7 +2519,9 @@ function flushSpread() {
     regenererPagesSpread(s + 1);
   }
   regenererPagesSpread(s);
-  pagesObsoletes = true;
+  // Les pages des doubles-pages modifiées viennent d'être régénérées ci-dessus :
+  // inutile d'invalider tout le livre, ce qui forcerait un recalcul complet
+  // (~130 ms sur 60 pages) à chaque changement de page ou collage.
 }
 
 // ----- Saisie : auto-flow du débordement (le texte continue tout seul) -----
