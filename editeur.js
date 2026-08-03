@@ -2551,7 +2551,21 @@ function appliquerInterligne(valeur) {
   if (cibles.length === 0) cibles = [conteneur];
   cibles.forEach(bloc => { bloc.style.lineHeight = valeur; });
   marquerModifie();
-  surSaisie();
+
+  // L'interligne change la hauteur occupée par le texte : il faut re-répartir
+  // TOUT le livre. Un simple gererFlux() ne traiterait que le débordement de la
+  // double-page courante — en réduisant l'interligne, le texte des pages
+  // suivantes ne remonterait pas et la page resterait à moitié vide.
+  flushSpread();
+  repaginerTout();
+
+  const spreads = spreadsLivre();
+  if (numSpread() >= spreads.length) indexSpread = Math.max(0, (spreads.length - 1) * 2);
+
+  afficherSpread();
+  afficherSommaire();
+  majCompteurMots();
+  planifierBrouillon();
 }
 
 // ----- Navigation -----
@@ -2754,6 +2768,14 @@ function repaginerTout() {
   livre.spreads = nouveaux.length ? nouveaux : [""];
   pagesObsoletes = true;
   regenererToutesPages();
+
+  // La zone d'édition affiche encore l'ANCIEN découpage : si on la laissait
+  // telle quelle, le prochain flushSpread() réécrirait ce contenu périmé
+  // dans le modèle et dupliquerait du texte. On la recale donc tout de suite.
+  if (numSpread() >= livre.spreads.length) {
+    indexSpread = Math.max(0, (livre.spreads.length - 1) * 2);
+  }
+  afficherSpread();
 }
 
 // ----- Compteur de mots (sur le texte continu) -----
