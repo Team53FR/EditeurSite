@@ -2523,15 +2523,18 @@ function flushSpread() {
   assurerSpread(s);
   const spreads = spreadsLivre();
 
-  const part = calculerPartition(ed.innerHTML);
-  // La coupe peut laisser un titre vide en fin de page : on l'enlève.
-  // (Uniquement sur la partie qui reste derrière — jamais là où est le curseur.)
-  spreads[s] = retirerTitresVides(part.garde);
-  if (part.overflow && texteBrutPage(part.overflow).trim() !== "") {
-    assurerSpread(s + 1);
-    spreads[s + 1] = fusionnerSuite(part.overflow, spreads[s + 1] || "");
-    regenererPagesSpread(s + 1);
-  }
+  // On ENREGISTRE simplement l'état courant de la zone d'édition.
+  //
+  // Surtout, on ne reporte PAS ici le débordement sur la double-page suivante :
+  // flushSpread ne rafraîchit pas la zone d'édition, qui continuerait donc
+  // d'afficher le texte complet. Le gererFlux suivant repartirait de ce contenu
+  // et reporterait une SECONDE fois le même débordement — le texte se
+  // retrouvait dupliqué (reproduit en collant deux fois un chapitre).
+  //
+  // La découpe est le rôle de gererFlux, qui, lui, réaffiche la double-page et
+  // suit le curseur. Les opérations qui exigent un découpage exact
+  // (sauvegarde, aperçu, impression, changement de format) repaginent déjà.
+  spreads[s] = ed.innerHTML;
   regenererPagesSpread(s);
   // Les pages des doubles-pages modifiées viennent d'être régénérées ci-dessus :
   // inutile d'invalider tout le livre, ce qui forcerait un recalcul complet
@@ -2576,6 +2579,21 @@ function gererFlux() {
   assurerSpread(s + 1);
   spreads[s + 1] = fusionnerSuite(part.overflow, spreads[s + 1] || "");
   pagesObsoletes = true;
+
+  // Le report peut à son tour déborder (collage de plusieurs pages d'un coup) :
+  // on poursuit la cascade jusqu'à ce que tout tienne. Sans cela, les
+  // doubles-pages suivantes resteraient trop pleines et les pages dérivées
+  // (sommaire, compteur, impression) seraient fausses.
+  let k = s + 1, securite = 0;
+  while (k < spreads.length && securite < 2000) {
+    securite++;
+    const suite = calculerPartition(spreads[k]);
+    if (!suite.overflow || texteBrutPage(suite.overflow).trim() === "") break;
+    spreads[k] = retirerTitresVides(suite.garde);
+    assurerSpread(k + 1);
+    spreads[k + 1] = fusionnerSuite(suite.overflow, spreads[k + 1] || "");
+    k++;
+  }
 
   const longueurGarde = texteBrutPage(part.garde).length;
   if (offset !== null && offset > longueurGarde) {
@@ -3042,7 +3060,9 @@ async function sauvegarder() {
   const message = document.getElementById("message");
 
   flushSpread();
-  regenererToutesPages();
+  // Le contenu courant peut déborder de sa double-page (flushSpread ne découpe
+  // pas) : on repagine pour enregistrer un livre proprement découpé.
+  repaginerTout();
 
   // Retirer les doubles-pages vides en fin de livre (au moins une)
   const spreads = spreadsLivre();
@@ -3066,7 +3086,7 @@ async function sauvegarder() {
 
 function ouvrirApercu() {
   flushSpread();
-  regenererToutesPages();
+  repaginerTout();   // découpage exact avant de feuilleter
   modeApercu = true;
   animationEnCours = false;
   indexApercu = 0;

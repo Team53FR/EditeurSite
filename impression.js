@@ -22,7 +22,7 @@ const PIED_PAGE_MM = 32 * 25.4 / 96 - TOLERANCE_MM; // ≈ 6,47 mm
 
 function exporterImpression() {
   flushSpread();
-  regenererToutesPages(); // pages dérivées à jour pour l'impression
+  repaginerTout(); // découpage exact avant impression (flushSpread ne découpe pas)
   const livre = livreActuel();
   const f = FORMATS[livre.format || "149x210"] || FORMATS["149x210"];
 
@@ -80,7 +80,7 @@ function exporterImpression() {
 
 function exporterLivret() {
   flushSpread();
-  regenererToutesPages(); // pages dérivées à jour pour l'impression
+  repaginerTout(); // découpage exact avant impression (flushSpread ne découpe pas)
   const livre = livreActuel();
   const f = FORMATS[livre.format || "149x210"] || FORMATS["149x210"];
 
