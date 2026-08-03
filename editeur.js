@@ -3059,10 +3059,23 @@ async function sauvegarder() {
   const token = sessionStorage.getItem("gh_token");
   const message = document.getElementById("message");
 
-  flushSpread();
-  // Le contenu courant peut déborder de sa double-page (flushSpread ne découpe
-  // pas) : on repagine pour enregistrer un livre proprement découpé.
-  repaginerTout();
+  // Seule la double-page en cours d'édition peut déborder (flushSpread ne
+  // découpe pas). gererFlux la découpe et poursuit la cascade si besoin :
+  // coût constant, au lieu de recoller et redécouper tout le livre
+  // (~1,8 s sur 30 000 mots). Les opérations qui touchent TOUT le livre
+  // (format, interligne, tailles) repaginent déjà de leur côté.
+  gererFlux();
+
+  // Les pages dérivées sont régénérées au fil des modifications : on ne
+  // recalcule tout que si nécessaire. Garde de cohérence (coût nul) : la
+  // sauvegarde est irréversible, on ne veut jamais y envoyer des pages
+  // désynchronisées des doubles-pages.
+  const nbSpreads = spreadsLivre().length;
+  const nbPages = (livreActuel().pages || []).length;
+  if (nbPages > nbSpreads * 2 || nbPages < nbSpreads * 2 - 1) {
+    pagesObsoletes = true;
+  }
+  assurerPagesAJour();
 
   // Retirer les doubles-pages vides en fin de livre (au moins une)
   const spreads = spreadsLivre();
