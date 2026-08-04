@@ -4,9 +4,49 @@
 //  la reliure (livret agrafé / page à page) et le type d'imprimante.
 // =====================================================================
 
+// Mode d'emploi détaillé, déplié par le bouton « ? » de chaque catégorie.
+const AIDE_IMPRESSION = {
+  livret: {
+    titre: "Le livret à agrafer, comment ça marche",
+    principe: "Chaque feuille reçoit DEUX pages côte à côte, et porte quatre pages une fois " +
+              "imprimée des deux côtés. Les pages ne sont pas imprimées dans l'ordre : elles " +
+              "sont réparties pour retomber dans le bon ordre une fois la pile pliée. C'est " +
+              "pour cela que la première feuille montre la fin du livre à gauche.",
+    etapes: [
+      "Imprimez en recto-verso. Si votre imprimante ne le fait pas seule, choisissez « En deux fois » : les rectos sortent d'abord, puis vous remettez la pile dans le bac pour les versos.",
+      "Ne changez surtout pas l'ordre des feuilles en les récupérant.",
+      "Pliez toute la pile en deux d'un seul geste, bien au milieu.",
+      "Agrafez sur le pli, avec deux agrafes réparties (une agrafeuse à long bras aide beaucoup ; sinon, agrafez à plat puis pliez).",
+      "Facultatif : égalisez le bord extérieur au massicot, les feuilles intérieures dépassant toujours un peu."
+    ],
+    bon: ["Rapide, sans colle ni matériel particulier.", "Les pages tombent dans l'ordre toutes seules.", "Idéal pour une nouvelle, un carnet, un tirage d'essai."],
+    limites: ["Le nombre de pages est complété à un multiple de 4 (des pages blanches sont ajoutées si besoin).",
+              "Au-delà d'une quarantaine de pages, le pli gonfle et les pages centrales ressortent nettement.",
+              "Le dos est agrafé, pas plat : le livre ne tient pas debout comme un roman."],
+    reglages: "Dans la fenêtre d'impression : format paysage, échelle 100 % (surtout pas « ajuster à la page »), et recto-verso « retourner sur les bords courts »."
+  },
+  doscolle: {
+    titre: "Le dos collé, comment ça marche",
+    principe: "Une seule page par feuille, imprimée recto-verso, dans l'ordre de lecture. " +
+              "Les feuilles sont ensuite encollées sur la tranche, comme un vrai roman de poche.",
+    etapes: [
+      "Imprimez en recto-verso, dans l'ordre. Si votre imprimante ne le fait pas seule, choisissez « En deux fois ».",
+      "Empilez les feuilles dans l'ordre, puis tapotez la pile sur une table pour aligner parfaitement le bord de reliure.",
+      "Serrez la pile entre deux planchettes, en laissant dépasser 2 à 3 mm du bord à encoller.",
+      "Encollez la tranche (colle vinylique blanche, ou colle thermofusible), en croisant les passages. Laissez sécher sous presse au moins une heure.",
+      "Collez la couverture par-dessus, puis marquez le pli du dos avec un plioir."
+    ],
+    bon: ["Aucune limite de pages : c'est le procédé des vrais livres.", "Dos plat, le livre tient debout sur une étagère.", "Rendu le plus proche d'un ouvrage édité."],
+    limites: ["Demande de la colle, une presse improvisée et du temps de séchage.",
+              "Le collage doit être régulier, sous peine de pages qui se détachent.",
+              "Une marge intérieure est réservée à la reliure : ne réduisez pas les marges."],
+    reglages: "Dans la fenêtre d'impression : échelle 100 % (surtout pas « ajuster à la page »), et recto-verso « retourner sur les bords longs »."
+  }
+};
+
 const MODES_IMPRESSION = [
   {
-    categorie: "Livret à agrafer",
+    categorie: "Livret à agrafer", aideCle: "livret",
     aide: "Deux pages par feuille. On plie la pile en deux et on agrafe au centre.",
     choix: [
       { libelle: "Recto-verso automatique", detail: "Votre imprimante retourne les feuilles toute seule.",
@@ -16,7 +56,7 @@ const MODES_IMPRESSION = [
     ]
   },
   {
-    categorie: "Page à page (dos collé)",
+    categorie: "Page à page (dos collé)", aideCle: "doscolle",
     aide: "Une page par feuille, à relier ou à faire relier.",
     choix: [
       { libelle: "Recto-verso automatique", detail: "Votre imprimante retourne les feuilles toute seule.",
@@ -26,6 +66,27 @@ const MODES_IMPRESSION = [
     ]
   }
 ];
+
+// Construit le mode d'emploi dépliable d'une catégorie.
+function construireAideHtml(aide, index) {
+  if (!aide) return "";
+  const liste = (titre, items, classe) =>
+    '<div class="mi-detail-bloc"><h5 class="' + (classe || "") + '">' + titre + "</h5><ul>" +
+    items.map(x => "<li>" + x + "</li>").join("") + "</ul></div>";
+
+  return '<div class="mi-detail" data-aide="' + index + '">' +
+    "<h5>" + aide.titre + "</h5>" +
+    "<p>" + aide.principe + "</p>" +
+    '<div class="mi-detail-bloc"><h5>Assemblage, pas à pas</h5><ol>' +
+      aide.etapes.map(e => "<li>" + e + "</li>").join("") +
+    "</ol></div>" +
+    '<div class="mi-detail-colonnes">' +
+      liste("Ce que ça apporte", aide.bon, "vert") +
+      liste("À savoir", aide.limites, "orange") +
+    "</div>" +
+    '<p class="mi-reglages"><strong>Réglages d\'impression :</strong> ' + aide.reglages + "</p>" +
+  "</div>";
+}
 
 function ouvrirPanneauImpression() {
   fermerPanneauImpression();
@@ -43,8 +104,13 @@ function ouvrirPanneauImpression() {
 
   MODES_IMPRESSION.forEach((cat, i) => {
     html += '<div class="mi-categorie">' +
-      "<h4>" + cat.categorie + "</h4>" +
+      '<div class="mi-titre-ligne">' +
+        "<h4>" + cat.categorie + "</h4>" +
+        '<button class="mi-aide-btn" data-aide="' + i + '" title="Comment ça marche et comment assembler" ' +
+          'aria-label="Aide sur ' + cat.categorie + '">?</button>' +
+      "</div>" +
       '<p class="mi-aide">' + cat.aide + "</p>" +
+      construireAideHtml(AIDE_IMPRESSION[cat.aideCle], i) +
       '<div class="mi-choix">';
     cat.choix.forEach((c, j) => {
       html += '<button class="mi-bouton" data-cat="' + i + '" data-choix="' + j + '">' +
@@ -60,6 +126,17 @@ function ouvrirPanneauImpression() {
   document.body.appendChild(fond);
 
   fond.querySelector(".mi-fermer").onclick = fermerPanneauImpression;
+
+  // Boutons « ? » : déplient le mode d'emploi de leur catégorie
+  fond.querySelectorAll(".mi-aide-btn").forEach(btn => {
+    btn.onclick = () => {
+      const bloc = fond.querySelector('.mi-detail[data-aide="' + btn.dataset.aide + '"]');
+      if (!bloc) return;
+      const ouvert = bloc.classList.toggle("ouvert");
+      btn.classList.toggle("actif", ouvert);
+      btn.setAttribute("aria-expanded", ouvert ? "true" : "false");
+    };
+  });
   fond.querySelectorAll(".mi-bouton").forEach(btn => {
     btn.onclick = () => {
       const c = MODES_IMPRESSION[+btn.dataset.cat].choix[+btn.dataset.choix];
