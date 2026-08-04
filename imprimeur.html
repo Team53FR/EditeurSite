@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Faire imprimer son livre — Mon Éditeur De Livre</title>
+<meta name="description" content="Préparer les fichiers d'un livre pour un imprimeur professionnel : PDF/X-1a, fond perdu, repères de coupe, blanc tournant, registre, BAT. Ce que l'éditeur fait pour vous et ce qui reste à faire.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+
+  <!-- ===== Navigation ===== -->
+  <nav class="nav">
+    <div class="contenu nav-in">
+      <a href="index.html" class="marque">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#8a4b38" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5.5C10.5 4.3 8.3 3.8 6 4c-1 .1-2 .3-3 .6v14c1-.3 2-.5 3-.6 2.3-.2 4.5.3 6 1.5 1.5-1.2 3.7-1.7 6-1.5 1 .1 2 .3 3 .6V4.6c-1-.3-2-.5-3-.6-2.3-.2-4.5.3-6 1.5Z"/><path d="M12 5.5v14"/></svg>
+        Mon Éditeur De Livre
+      </a>
+      <div class="nav-actions">
+        <a href="montage.html" class="btn btn-secondaire">🔧 Monter son livre</a>
+        <a href="connexion.html" class="btn btn-primaire">Se connecter</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ===== En-tête ===== -->
+  <header class="hero" style="padding-bottom:20px">
+    <div class="contenu" style="text-align:center;max-width:780px">
+      <span class="hero-badge">✦ Guide technique</span>
+      <h1 style="font-size:clamp(34px,4.5vw,50px)">Faire imprimer votre livre <span class="surligne">par un professionnel</span></h1>
+      <p class="hero-sous" style="margin:0 auto 8px">
+        Un imprimeur ne remet pas votre livre en page&nbsp;: il imprime le fichier que vous lui donnez.
+        Ce fichier doit donc obéir à des règles précises. Voici lesquelles, ce que l'éditeur respecte
+        tout seul, et les quelques étapes qui restent de votre côté.
+      </p>
+    </div>
+  </header>
+
+  <!-- ===== Les deux fichiers ===== -->
+  <section class="bande-claire" style="padding-top:40px">
+    <div class="contenu">
+      <div class="section-titre">
+        <h2>Deux fichiers, jamais un seul</h2>
+        <p>L'intérieur et la couverture ne s'impriment ni sur la même machine, ni sur le même papier.
+           Ils sont donc toujours fournis séparément.</p>
+      </div>
+
+      <div class="tableau-enveloppe">
+        <table class="tableau-comparatif">
+          <thead>
+            <tr>
+              <th>Fichier</th><th>Contient</th><th>Mise en page</th><th>Nom conseillé</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><a href="#interieur"><strong>L'intérieur</strong></a></td>
+              <td>Les pages de texte seules, numérotées</td>
+              <td><strong>Pages simples</strong>, jamais des doubles pages</td>
+              <td><code>int_MonTitre.pdf</code></td>
+            </tr>
+            <tr>
+              <td><a href="#couverture"><strong>La couverture</strong></a></td>
+              <td>4<sup>e</sup> de couverture, dos et 1<sup>re</sup> réunis</td>
+              <td><strong>Ouverte à plat</strong>, en une seule planche</td>
+              <td><code>cv_MonTitre.pdf</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="astuce" style="margin-top:24px">
+        <strong>Où les générer&nbsp;?</strong> Dans l'éditeur, cliquez sur l'icône d'imprimante,
+        puis choisissez la catégorie <em>Fichier pour l'imprimeur</em>. Un contrôle avant envoi
+        récapitule ce qui est conforme et ce qu'il vous reste à faire, et vous propose un nom
+        de fichier valide.
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Le tableau des exigences ===== -->
+  <section class="contenu" style="padding-top:56px">
+    <div class="section-titre">
+      <h2>Les exigences, une par une</h2>
+      <p>Ces valeurs sont celles que réclament les cahiers des charges d'imprimeurs.
+         La dernière colonne indique qui s'en occupe.</p>
+    </div>
+
+    <div class="tableau-enveloppe">
+      <table class="tableau-comparatif">
+        <thead>
+          <tr><th>Exigence</th><th>Valeur attendue</th><th>Pris en charge par</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Format du PDF</td><td>PDF 1.3, idéalement norme PDF/X-1a</td><td><span class="niveau exigeant">Vous</span></td></tr>
+          <tr><td>Mode colorimétrique</td><td>CMJN ou niveaux de gris, <strong>jamais RVB</strong></td><td><span class="niveau exigeant">Vous</span></td></tr>
+          <tr><td>Profil de sortie</td><td>ISO Coated v2 300&nbsp;% (ECI)</td><td><span class="niveau exigeant">Vous</span></td></tr>
+          <tr><td>Résolution des images</td><td>300&nbsp;ppp ; 600 à 1&nbsp;200&nbsp;ppp au trait</td><td><span class="niveau exigeant">Vous</span></td></tr>
+          <tr><td>Fond perdu</td><td>5&nbsp;mm sur les quatre bords</td><td><span class="niveau facile">L'éditeur</span></td></tr>
+          <tr><td>Repères de coupe et de pli</td><td>Décalés de 5&nbsp;mm</td><td><span class="niveau facile">L'éditeur</span></td></tr>
+          <tr><td>Blanc tournant</td><td>7&nbsp;mm minimum, <strong>folios compris</strong></td><td><span class="niveau facile">L'éditeur</span></td></tr>
+          <tr><td>Pages</td><td>Simples, même format, même orientation, centrées</td><td><span class="niveau facile">L'éditeur</span></td></tr>
+          <tr><td>Registre pair/impair</td><td>Marges symétriques d'une page à l'autre</td><td><span class="niveau facile">L'éditeur</span></td></tr>
+          <tr><td>Épaisseur des filets</td><td>0,2&nbsp;pt (intérieur) ; 0,25&nbsp;pt (couverture)</td><td><span class="niveau facile">L'éditeur</span></td></tr>
+          <tr><td>Couverture</td><td>Fournie ouverte à plat</td><td><span class="niveau facile">L'éditeur</span></td></tr>
+          <tr><td>Nom du fichier</td><td>A-Z, a-z, 0-9 et <code>_</code> uniquement</td><td><span class="niveau moyen">Proposé</span></td></tr>
+          <tr><td>Polices</td><td>Incorporées au PDF (jeu partiel ou complet)</td><td><span class="niveau moyen">À vérifier</span></td></tr>
+          <tr><td>Taux d'encrage</td><td>300&nbsp;% au maximum</td><td><span class="niveau moyen">À vérifier</span></td></tr>
+          <tr><td>BAT</td><td>Intérieur au recto seul + BAT couleur couverture</td><td><span class="niveau exigeant">Vous</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ===== Fiches ===== -->
+  <section class="contenu" style="padding-top:56px">
+
+    <!-- Intérieur -->
+    <article class="fiche" id="interieur">
+      <div class="fiche-entete">
+        <div class="fiche-num">1</div>
+        <div>
+          <h2>Les pages intérieures</h2>
+          <p class="fiche-sous">Fichier <code>int_</code> — le corps du livre</p>
+        </div>
+      </div>
+      <div class="fiche-grille">
+        <div>
+          <h3>Le principe</h3>
+          <p>L'imprimeur imprime sur de grandes feuilles qui portent chacune plusieurs pages,
+             puis les plie et les coupe. Il a donc besoin de vos pages <strong>une par une,
+             dans l'ordre de lecture</strong>, et surtout pas assemblées en doubles pages :
+             c'est lui qui décide comment les regrouper sur la feuille.</p>
+
+          <h3>Ce qui est vérifié à la réception</h3>
+          <ol>
+            <li><strong>Pages simples.</strong> Une page par page du PDF. Un fichier en planches est renvoyé.</li>
+            <li><strong>Même format, même orientation, pages centrées</strong> dans la zone de support, de la première à la dernière.</li>
+            <li><strong>Blanc tournant de 7 mm minimum</strong> par rapport au format rogné — et cette marge vaut aussi pour les numéros de page, qu'on oublie souvent.</li>
+            <li><strong>Registre parfait</strong> entre pages paires et impaires : les lignes du recto et du verso doivent se superposer. Cela suppose des marges de petit fond et de grand fond bien réglées.</li>
+            <li><strong>Fond perdu de 5 mm</strong> pour tout élément qui touche le bord.</li>
+            <li><strong>Filets d'au moins 0,2 pt.</strong> Plus fin, le trait disparaît à l'impression.</li>
+            <li><strong>Pas d'angles de trame laissés par défaut</strong> sur les images en niveaux de gris.</li>
+          </ol>
+        </div>
+        <aside class="fiche-cote">
+          <h4>L'éditeur s'en charge</h4>
+          <ul>
+            <li>Pages simples numérotées</li>
+            <li>Format et orientation constants</li>
+            <li>Pages centrées dans le support</li>
+            <li>Fond perdu de 5 mm</li>
+            <li>Repères de coupe à 5 mm</li>
+            <li>Blanc tournant de 8 mm, folio compris</li>
+            <li>Marges paires/impaires symétriques</li>
+          </ul>
+          <h4 class="orange">Reste à faire</h4>
+          <ul>
+            <li>Conversion CMJN et PDF/X-1a</li>
+            <li>Vérifier la résolution des images</li>
+            <li>Fournir le BAT</li>
+          </ul>
+        </aside>
+      </div>
+      <div class="astuce">
+        <strong>Pourquoi le fichier compte plus de pages qu'à l'écran&nbsp;?</strong>
+        Pour respecter les 7 mm de blanc tournant, le numéro de page est remonté, ce qui réduit
+        un peu la hauteur de texte. Le livre gagne alors quelques pages. C'est normal, et votre
+        livre à l'écran n'est pas modifié.
+      </div>
+    </article>
+
+    <!-- Couverture -->
+    <article class="fiche" id="couverture">
+      <div class="fiche-entete">
+        <div class="fiche-num">2</div>
+        <div>
+          <h2>La couverture</h2>
+          <p class="fiche-sous">Fichier <code>cv_</code> — fournie ouverte à plat</p>
+        </div>
+      </div>
+      <div class="fiche-grille">
+        <div>
+          <h3>Le principe</h3>
+          <p>Contrairement à l'intérieur, la couverture se fournit <strong>en une seule planche,
+             ouverte à plat</strong> : la 4<sup>e</sup> de couverture à gauche, le dos au milieu,
+             la 1<sup>re</sup> de couverture à droite. C'est ainsi qu'elle sera imprimée, puis
+             pliée sur le dos.</p>
+
+          <h3>L'épaisseur du dos</h3>
+          <p>Elle dépend du nombre de pages <em>et</em> du papier. L'ordre de grandeur se calcule
+             ainsi&nbsp;:</p>
+          <p><code>dos (mm) = (nombre de pages ÷ 2) × grammage × main ÷ 1000</code></p>
+          <p>La « main » (ou bouffant) mesure le gonflant du papier ; elle tourne autour de 1,2
+             pour un offset courant. <strong>Faites toujours confirmer la valeur par l'imprimeur</strong> :
+             un dos faux de deux millimètres décale les plis et le titre du dos tombe de travers.</p>
+
+          <h3>Les points de contrôle</h3>
+          <ol>
+            <li><strong>Taux d'encrage de 300 % au maximum</strong>, avec le profil ISO Coated v2 300 % (ECI).</li>
+            <li><strong>Fond perdu de 5 mm</strong> tout autour de la planche.</li>
+            <li><strong>Filets d'au moins 0,25 pt.</strong></li>
+            <li><strong>Textes vectorisés</strong> de préférence, pour éviter tout conflit de police.</li>
+            <li><strong>Couleurs inutiles supprimées</strong> de la table des couleurs.</li>
+            <li><strong>Code-barres</strong> en une seule couleur à 100 %, vectoriel ou en police
+                code-barres — jamais une image.</li>
+          </ol>
+        </div>
+        <aside class="fiche-cote">
+          <h4>L'éditeur s'en charge</h4>
+          <ul>
+            <li>Planche 4<sup>e</sup> + dos + 1<sup>re</sup></li>
+            <li>Calcul du dos, modifiable</li>
+            <li>Repères de coupe et de pli</li>
+            <li>Fond perdu de 5 mm</li>
+            <li>Titre au dos dès 6 mm</li>
+          </ul>
+          <h4 class="orange">Reste à faire</h4>
+          <ul>
+            <li>Conversion CMJN et PDF/X-1a</li>
+            <li>Taux d'encrage à vérifier</li>
+            <li>Code-barres et ISBN</li>
+            <li>Confirmer le dos</li>
+          </ul>
+        </aside>
+      </div>
+      <div class="astuce">
+        <strong>Une photo qui va jusqu'au bord&nbsp;?</strong> Les 5 mm de fond perdu générés par
+        l'éditeur sont remplis par la couleur de fond de la couverture, pas par la photo elle-même.
+        Si votre image doit déborder, prévenez l'imprimeur ou fournissez une couverture déjà
+        débordante.
+      </div>
+    </article>
+
+    <!-- Images et couleurs -->
+    <article class="fiche" id="images">
+      <div class="fiche-entete">
+        <div class="fiche-num">3</div>
+        <div>
+          <h2>Images et couleurs</h2>
+          <p class="fiche-sous">Le poste où les fichiers sont le plus souvent refusés</p>
+        </div>
+      </div>
+      <div class="fiche-grille">
+        <div>
+          <h3>Résolution</h3>
+          <p>Les photographies doivent faire <strong>300 ppp</strong> à leur taille d'utilisation,
+             et les dessins au trait <strong>600 à 1 200 ppp</strong>. Une image qui paraît nette
+             à l'écran peut être très insuffisante sur le papier : à 72 ppp, elle sortira floue.</p>
+
+          <h3>Mode colorimétrique</h3>
+          <p>Toutes les images doivent être en <strong>CMJN</strong> (plus d'éventuels tons directs)
+             ou en <strong>niveaux de gris</strong>. Le RVB, qui est le mode des écrans, est
+             systématiquement refusé : les couleurs y sont hors de portée des encres.</p>
+
+          <h3>Trames et aplats</h3>
+          <ol>
+            <li>Pour les images en demi-teintes, restez entre <strong>5 % et 95 %</strong> :
+                en dessous la trame disparaît, au-dessus elle se bouche.</li>
+            <li>Évitez les <strong>filets maigres dans les graphiques</strong>, en particulier
+                sur les cartes, où ils s'effacent.</li>
+            <li>Sur presse rotative, les fonds tramés doivent faire <strong>au moins 8 %</strong>.</li>
+          </ol>
+        </div>
+        <aside class="fiche-cote">
+          <h4 class="orange">Entièrement de votre côté</h4>
+          <ul>
+            <li>Un navigateur exporte en RVB</li>
+            <li>Il ne rééchantillonne pas vos images</li>
+            <li>Il n'applique aucun profil ICC</li>
+          </ul>
+          <h4>Comment faire</h4>
+          <ul>
+            <li>Préparer les images en 300 ppp avant de les importer</li>
+            <li>Confier la conversion au service PAO de l'imprimeur</li>
+            <li>Ou convertir avec un logiciel de PAO</li>
+          </ul>
+        </aside>
+      </div>
+    </article>
+
+    <!-- Export et envoi -->
+    <article class="fiche" id="export">
+      <div class="fiche-entete">
+        <div class="fiche-num">4</div>
+        <div>
+          <h2>Exporter, nommer, envoyer</h2>
+          <p class="fiche-sous">La dernière ligne droite</p>
+        </div>
+      </div>
+      <div class="fiche-grille">
+        <div>
+          <h3>Les réglages d'export</h3>
+          <ol>
+            <li>Destination <strong>« Enregistrer au format PDF »</strong>.</li>
+            <li><strong>Échelle 100 %</strong> — surtout pas « ajuster à la page », qui réduirait
+                tout le livre de quelques pour cent et fausserait le format.</li>
+            <li>Marges <strong>« aucune »</strong>, en-têtes et pieds de page du navigateur décochés.</li>
+            <li>Le PDF doit être <strong>centré</strong>, avec repères de coupe et de pli décalés de 5 mm.</li>
+            <li><strong>Polices incorporées</strong>, en jeu partiel ou complet.</li>
+          </ol>
+
+          <h3>Nommer les fichiers</h3>
+          <p>Seuls <strong>A-Z, a-z, 0-9 et le tiret bas</strong> sont acceptés : ni accent, ni espace,
+             ni <code>#</code>, <code>$</code>, <code>/</code> ou <code>%</code>. L'usage est de faire
+             précéder le titre d'une abréviation qui dit ce que contient le fichier :</p>
+          <p><code>int_</code> intérieur · <code>cv_</code> couverture · <code>jaq_</code> jaquette ·
+             <code>bande_</code> bandeau · <code>HT_</code> hors-texte</p>
+          <p>Enfin, le fichier <strong>ne doit porter aucune protection</strong> : un PDF verrouillé,
+             même sans mot de passe à l'ouverture, est rejeté.</p>
+
+          <h3>L'envoi</h3>
+          <p>En dessous de <strong>10 Mo</strong>, un courriel suffit. Au-delà, les imprimeurs mettent
+             à disposition un <strong>serveur FTP</strong> ou un <strong>service de dépôt de fichiers</strong>
+             qui renvoie un lien de téléchargement. Les identifiants sont fournis par leur service
+             fabrication.</p>
+        </div>
+        <aside class="fiche-cote">
+          <h4>Le BAT, à ne pas oublier</h4>
+          <ul>
+            <li>Les pages intérieures imprimées <strong>au recto uniquement</strong></li>
+            <li><strong>Sans réduction ni agrandissement</strong> du format</li>
+            <li><strong>Sans correction manuscrite</strong></li>
+            <li>Plus un <strong>BAT couleur</strong> de la couverture</li>
+          </ul>
+          <h4 class="orange">À savoir</h4>
+          <ul>
+            <li>L'imprimeur peut réaliser cette épreuve, mais elle est alors facturée</li>
+            <li>Tout fichier non conforme entraîne un retard, parfois un surcoût</li>
+          </ul>
+        </aside>
+      </div>
+    </article>
+  </section>
+
+  <!-- ===== Erreurs ===== -->
+  <section class="bande-claire" style="padding-top:56px;padding-bottom:56px">
+    <div class="contenu">
+      <div class="section-titre">
+        <h2>Les erreurs qui font refuser un fichier</h2>
+        <p>Ce sont presque toujours les mêmes.</p>
+      </div>
+      <div class="grille-erreurs">
+        <div class="erreur">
+          <h3>Le fichier est en RVB</h3>
+          <p>C'est le refus le plus fréquent. Un navigateur, un traitement de texte et un tableur
+             exportent tous en RVB. La conversion CMJN est une étape à part entière.</p>
+        </div>
+        <div class="erreur">
+          <h3>L'échelle n'est pas à 100 %</h3>
+          <p>« Ajuster à la page » réduit discrètement tout le document. Le format rogné ne tombe
+             plus juste et les repères de coupe deviennent faux.</p>
+        </div>
+        <div class="erreur">
+          <h3>Les pages sont en doubles pages</h3>
+          <p>L'intérieur doit être en pages simples. C'est l'imprimeur qui impose les pages sur
+             la feuille, et il ne peut pas le faire sur des planches déjà assemblées.</p>
+        </div>
+        <div class="erreur">
+          <h3>Le folio touche le bord</h3>
+          <p>Le blanc tournant de 7 mm vaut aussi pour les numéros de page. Un folio trop bas
+             risque d'être coupé au massicot.</p>
+        </div>
+        <div class="erreur">
+          <h3>Le nom contient des accents</h3>
+          <p>Un fichier nommé <code>Été 2024 – final#2.pdf</code> se perd entre les systèmes.
+             Seuls les caractères A-Z, a-z, 0-9 et <code>_</code> sont sûrs.</p>
+        </div>
+        <div class="erreur">
+          <h3>Le dos est faux</h3>
+          <p>Un dos calculé sans connaître le papier décale les deux plis. Le titre du dos se
+             retrouve alors à cheval sur la première de couverture.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Glossaire ===== -->
+  <section class="contenu" style="padding-top:56px">
+    <div class="section-titre">
+      <h2>Le vocabulaire des imprimeurs</h2>
+      <p>Quelques mots qui reviennent dans tous les cahiers des charges.</p>
+    </div>
+    <div class="grille-erreurs">
+      <div class="erreur">
+        <h3>Fond perdu</h3>
+        <p>La bande de 5 mm que vous imprimez <em>en trop</em> tout autour de la page, et qui part
+           au massicot. Sans elle, le moindre décalage de coupe laisse un filet blanc au bord.</p>
+      </div>
+      <div class="erreur">
+        <h3>Blanc tournant</h3>
+        <p>La marge minimale entre le bord coupé et le premier élément imprimé. En dessous de
+           7 mm, le texte risque d'être rogné.</p>
+      </div>
+      <div class="erreur">
+        <h3>Registre</h3>
+        <p>La correspondance entre les lignes du recto et celles du verso d'un même feuillet.
+           Un mauvais registre se voit par transparence.</p>
+      </div>
+      <div class="erreur">
+        <h3>Petit fond, grand fond</h3>
+        <p>Le petit fond est la marge côté reliure, le grand fond la marge côté tranche. Le petit
+           fond est plus large, car une partie disparaît dans la pliure.</p>
+      </div>
+      <div class="erreur">
+        <h3>Folio</h3>
+        <p>Le numéro de page. Il compte comme un élément imprimé, et doit donc lui aussi respecter
+           le blanc tournant.</p>
+      </div>
+      <div class="erreur">
+        <h3>Simili</h3>
+        <p>Une image en demi-teintes, restituée par une trame de points. C'est elle qui impose de
+           rester entre 5 % et 95 %.</p>
+      </div>
+      <div class="erreur">
+        <h3>Filet maigre</h3>
+        <p>Un trait très fin. En dessous de 0,2 pt, il ne s'imprime pas de façon fiable.</p>
+      </div>
+      <div class="erreur">
+        <h3>Taux d'encrage</h3>
+        <p>La somme des quatre encres en un point donné. Au-delà de 300 %, le papier sature et
+           l'encre sèche mal.</p>
+      </div>
+      <div class="erreur">
+        <h3>PDF/X-1a</h3>
+        <p>Une norme de PDF conçue pour l'impression : tout est en CMJN, les polices sont
+           incorporées, rien ne dépend de l'ordinateur qui ouvre le fichier.</p>
+      </div>
+      <div class="erreur">
+        <h3>BAT</h3>
+        <p>Bon à tirer. L'épreuve que vous validez, et qui fait foi : ce qui y figure est ce qui
+           sera imprimé.</p>
+      </div>
+      <div class="erreur">
+        <h3>Format ouvert à plat</h3>
+        <p>La couverture dépliée d'un seul tenant, 4<sup>e</sup> + dos + 1<sup>re</sup>, telle
+           qu'elle est imprimée avant pliage.</p>
+      </div>
+      <div class="erreur">
+        <h3>Rotative</h3>
+        <p>Une presse qui imprime sur une bobine plutôt que sur des feuilles. Ses tolérances
+           diffèrent : filets d'au moins 0,3 pt, fonds tramés à 8 % minimum, fonds perdus de 2 mm.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Appel à l'action ===== -->
+  <section class="contenu" style="padding:64px 0 20px;text-align:center">
+    <div class="section-titre" style="margin-bottom:24px">
+      <h2>Prêt à générer vos fichiers&nbsp;?</h2>
+      <p>Ouvrez votre livre, cliquez sur l'icône d'imprimante, puis choisissez
+         <em>Fichier pour l'imprimeur</em>.</p>
+    </div>
+    <a href="connexion.html" class="btn btn-primaire">Ouvrir mes livres</a>
+    <a href="montage.html" class="btn btn-secondaire">Ou relier soi-même</a>
+  </section>
+
+  <!-- ===== Pied ===== -->
+  <footer class="pied">
+    <div class="contenu pied-in">
+      <div class="marque">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#8a4b38" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5.5C10.5 4.3 8.3 3.8 6 4c-1 .1-2 .3-3 .6v14c1-.3 2-.5 3-.6 2.3-.2 4.5.3 6 1.5 1.5-1.2 3.7-1.7 6-1.5 1 .1 2 .3 3 .6V4.6c-1-.3-2-.5-3-.6-2.3-.2-4.5.3-6 1.5Z"/><path d="M12 5.5v14"/></svg>
+        Mon Éditeur De Livre
+      </div>
+      <small>Écrit, mis en page et imprimé, depuis votre navigateur.</small>
+    </div>
+  </footer>
+
+  <script>
+    // Si une session est ouverte, les boutons mènent directement aux livres.
+    (function(){
+      try {
+        if (sessionStorage.getItem("gh_token")) {
+          document.querySelectorAll('a[href="connexion.html"]').forEach(function(a){
+            a.setAttribute("href", "bibliotheque.html");
+            if (a.textContent.indexOf("connecter") !== -1) a.textContent = "Mes livres";
+          });
+        }
+      } catch (e) {}
+    })();
+  </script>
+</body>
+</html>

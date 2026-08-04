@@ -41,6 +41,32 @@ const AIDE_IMPRESSION = {
               "Le collage doit être régulier, sous peine de pages qui se détachent.",
               "Une marge intérieure est réservée à la reliure : ne réduisez pas les marges."],
     reglages: "Dans la fenêtre d'impression : échelle 100 % (surtout pas « ajuster à la page »), et recto-verso « retourner sur les bords longs »."
+  },
+  imprimeur: {
+    titre: "Le fichier pour un imprimeur professionnel",
+    principe: "Un imprimeur ne réimprime pas votre livre : il traite le fichier que vous lui " +
+              "envoyez. Celui-ci doit donc respecter des règles précises de géométrie — format " +
+              "de support, fond perdu, repères de coupe, blanc tournant, registre. Ces deux " +
+              "exports produisent des pages simples (jamais des doubles pages) au format exact, " +
+              "avec 5 mm de fond perdu et des traits de coupe décalés de 5 mm.",
+    etapes: [
+      "Générez le fichier « Intérieur » : il contient uniquement les pages de texte, numérotées, sans la couverture.",
+      "Générez le fichier « Couverture à plat » : 4e de couverture, dos et 1re de couverture réunis en une seule planche, avec les repères de pli du dos.",
+      "Dans la fenêtre d'impression, choisissez « Enregistrer au format PDF », échelle 100 %, et surtout PAS « ajuster à la page ».",
+      "Renommez les fichiers sans accent ni caractère spécial, en reprenant le nom proposé par le contrôle avant envoi (int_MonTitre, cv_MonTitre).",
+      "Faites convertir les PDF à la norme PDF/X-1a et en CMJN : un navigateur ne sait pas le faire. Le service PAO de l'imprimeur s'en charge, souvent gratuitement.",
+      "Fournissez un BAT : les pages intérieures imprimées au recto uniquement, sans réduction ni agrandissement et sans correction manuscrite, plus un BAT couleur de la couverture."
+    ],
+    bon: ["Format de support, fond perdu et repères de coupe exacts.",
+          "Pages simples, toutes au même format et à la même orientation.",
+          "Registre garanti : les marges paires et impaires sont symétriques.",
+          "Blanc tournant d'au moins 7 mm, folio compris."],
+    limites: ["Un navigateur exporte en RVB et en PDF 1.4 : la conversion CMJN / PDF/X-1a reste à faire.",
+              "Les images gardent leur résolution d'origine : vérifiez qu'elles font bien 300 ppp.",
+              "Les 5 mm de fond perdu de la couverture sont remplis par la couleur de fond, pas par la photo.",
+              "L'épaisseur du dos dépend du papier : faites-la confirmer par l'imprimeur."],
+    reglages: "Dans la fenêtre d'impression : échelle 100 %, aucune marge, ni en-tête ni pied de page du navigateur, " +
+              "et « Enregistrer au format PDF » comme destination."
   }
 };
 
@@ -63,6 +89,16 @@ const MODES_IMPRESSION = [
         action: "exporterImpression", mode: "auto" },
       { libelle: "En deux fois", detail: "Sans recto-verso : les rectos d'abord, puis les versos.",
         action: "exporterImpression", mode: "passes" }
+    ]
+  },
+  {
+    categorie: "Fichier pour l'imprimeur", aideCle: "imprimeur",
+    aide: "Deux PDF conformes à un cahier des charges d'imprimeur : fond perdu, repères de coupe, pages simples.",
+    choix: [
+      { libelle: "Intérieur", detail: "Les pages de texte seules, en pages simples numérotées.",
+        action: "exporterImprimeur", mode: "interieur" },
+      { libelle: "Couverture à plat", detail: "4e de couverture, dos et 1re réunis, avec repères de pli.",
+        action: "exporterImprimeur", mode: "couverture" }
     ]
   }
 ];
@@ -469,4 +505,447 @@ function positionnerImageImpression(img, data, f) {
   img.style.width = largAffichee + "px";
   img.style.height = hautAffichee + "px";
   img.style.transform = `translate(${centreX + offsetX}px, ${centreY + offsetY}px) scale(${zoom})`;
+}
+
+// =====================================================================
+//  Export « fichier pour l'imprimeur »
+//
+//  Produit un PDF conforme aux critères géométriques que les imprimeurs
+//  demandent dans leur cahier des charges :
+//   - pages simples, jamais en planches (sauf la couverture, qui doit au
+//     contraire être fournie ouverte à plat) ;
+//   - toutes les pages au même format et à la même orientation, centrées
+//     dans la zone de support ;
+//   - fond perdu de 5 mm ;
+//   - traits de coupe (et de pli pour la couverture) décalés de 5 mm ;
+//   - blanc tournant d'au moins 7 mm par rapport au format rogné, folio
+//     compris — c'est ce dernier point qui impose de repaginer, le pied
+//     de page habituel étant trop bas ;
+//   - registre parfait entre pages paires et impaires (marges symétriques) ;
+//   - filets d'au moins 0,25 pt.
+//
+//  Ce qu'un navigateur ne sait PAS faire, et qui reste à la charge de
+//  l'utilisateur : la conversion en CMJN, la norme PDF/X-1a, le profil de
+//  sortie ISO Coated v2 300 %. Le panneau de contrôle le dit explicitement
+//  plutôt que de laisser croire que le fichier est prêt à imprimer.
+// =====================================================================
+
+const FOND_PERDU_MM       = 5;   // fond perdu exigé
+const DECALAGE_REPERE_MM  = 5;   // décalage des traits de coupe
+const LONGUEUR_REPERE_MM  = 6;   // longueur des traits de coupe
+const BLANC_TOURNANT_MM   = 7;   // blanc tournant minimum, folio compris
+const FILET_REPERE_PT     = 0.25;
+
+// Marge technique autour du format rogné : fond perdu + repères + 1 mm de garde.
+const MARGE_TECHNIQUE_MM = DECALAGE_REPERE_MM + LONGUEUR_REPERE_MM + 1; // 12 mm
+
+// Pied de page de l'export imprimeur, en pixels logiques (voir PIED_PAGE_PX
+// dans editeur.js). 48 px ≈ 12,7 mm : le folio tient à 7,5 mm du bord rogné
+// sans que la dernière ligne de texte vienne le chevaucher.
+const PIED_PRO_PX  = 56;
+const PIED_PRO_MM  = PIED_PRO_PX * 25.4 / 96;      // ≈ 14,8 mm
+const FOLIO_PRO_MM = 8;                            // > BLANC_TOURNANT_MM
+// Le texte rendu à l'impression occupe quelques pixels de plus que dans le
+// mesureur de pagination (justification et césure automatique, absentes du
+// mesureur). L'export normal absorbe déjà cet écart par une tolérance ; on
+// garde le même principe ici, en dimensionnant le pied pour que la tolérance
+// ne fasse jamais descendre le texte sur la bande du folio :
+//   bas du texte  = 210 - 20 - 177,2 = 12,8 mm du bord rogné
+//   haut du folio = 8 + 3,5          = 11,5 mm du bord rogné
+const TOLERANCE_PRO_MM = 2;
+
+// Épaisseur d'une feuille : grammage × main / 1000 (en mm).
+// La « main » (ou bouffant) dépend du papier ; 1,2 correspond à un offset
+// courant. Seul l'imprimeur peut donner la valeur exacte de son papier.
+const GRAMMAGE_DEFAUT = 90;
+const MAIN_DEFAUT = 1.2;
+
+function epaisseurDosMm(nbPages, grammage, main) {
+  return (nbPages / 2) * grammage * main / 1000;
+}
+
+// Nom de fichier accepté : A-Z, a-z, 0-9 et _ uniquement, précédé de
+// l'abréviation du type de fichier (int = intérieur, cv = couverture).
+function nomFichierConforme(prefixe, titre) {
+  const base = (titre || "livre")
+    .normalize("NFD").replace(/[̀-ͯ]/g, "")  // retire les accents
+    .replace(/[^A-Za-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 40);
+  return prefixe + "_" + (base || "livre");
+}
+
+// Repagine le livre avec le pied de page de l'export imprimeur, exécute le
+// travail demandé, puis remet la pagination d'origine dans tous les cas.
+function avecPaginationImprimeur(livre, travail) {
+  const piedInitial = PIED_PAGE_PX;
+  // Le mesureur compose en drapeau et sans césure, alors que le fichier
+  // imprimeur est justifié avec césure : sans cet accord, les lignes ne
+  // tombent pas au même endroit et le bas des pages est rogné à l'impression.
+  const mesure = document.getElementById("mesureCachee");
+  try {
+    if (mesure) mesure.classList.add("mesure-pro");
+    PIED_PAGE_PX = PIED_PRO_PX;
+    appliquerFormatPage(livre.format || "149x210");
+    repaginerTout();
+    return travail();
+  } finally {
+    if (mesure) mesure.classList.remove("mesure-pro");
+    PIED_PAGE_PX = piedInitial;
+    appliquerFormatPage(livre.format || "149x210");
+    repaginerTout();
+  }
+}
+
+// ----- Panneau de contrôle avant génération -----
+
+function exporterImprimeur(cible) {
+  flushSpread();
+  const livre = livreActuel();
+  const f = FORMATS[livre.format || "149x210"] || FORMATS["149x210"];
+  const pagesEcran = (livre.pages || []).length;
+
+  // Une seule repagination : on en garde un INSTANTANÉ du contenu des pages,
+  // et le livre retrouve aussitôt sa pagination d'écran. Le fichier est
+  // ensuite construit à partir de cet instantané, sans plus y toucher —
+  // repaginer deux fois de plus coûterait plusieurs secondes sur un gros livre.
+  const message = document.getElementById("message");
+  if (message) message.textContent = "Calcul de la pagination imprimeur...";
+  const pagesPro = avecPaginationImprimeur(livre,
+    () => (livre.pages || []).map(p => (p && p.contenu) || ""));
+  if (message) message.textContent = "";
+
+  ouvrirControleImprimeur(cible, livre, f, pagesEcran, pagesPro);
+}
+
+function ouvrirControleImprimeur(cible, livre, f, pagesEcran, pagesPro) {
+  const nbPagesPro = pagesPro.length;
+  fermerPanneauImpression();
+  const ancien = document.getElementById("controleImprimeur");
+  if (ancien) ancien.remove();
+
+  const couverture = cible === "couverture";
+  const margeInt = f.margeH + DELTA_RELIURE_MM;
+  const margeExt = Math.max(6, f.margeH - DELTA_RELIURE_MM);
+  const blancTournant = Math.min(margeExt, f.margeV, FOLIO_PRO_MM);
+  const dos = epaisseurDosMm(nbPagesPro, GRAMMAGE_DEFAUT, MAIN_DEFAUT);
+
+  const conformes = [
+    "Pages simples, jamais en planches" + (couverture ? " — sauf la couverture, fournie ouverte à plat comme demandé" : ""),
+    "Toutes les pages au même format (" + f.larg + " × " + f.haut + " mm) et à la même orientation",
+    "Pages centrées dans la zone de support",
+    "Fond perdu de " + FOND_PERDU_MM + " mm sur les quatre bords",
+    "Traits de coupe" + (couverture ? " et de pli" : "") + " décalés de " + DECALAGE_REPERE_MM + " mm, en filet de " + FILET_REPERE_PT + " pt",
+    "Blanc tournant de " + blancTournant.toFixed(1).replace(".", ",") + " mm, folio compris (minimum exigé : " + BLANC_TOURNANT_MM + " mm)",
+    "Registre assuré : marges paires et impaires symétriques (" + margeInt + " mm au petit fond, " + margeExt + " mm au grand fond)",
+    "Fichier sans protection"
+  ];
+
+  const restants = [
+    "<strong>Conversion en CMJN et à la norme PDF/X-1a</strong> : un navigateur exporte en RVB, en PDF 1.4. C'est la seule étape que cet éditeur ne peut pas faire.",
+    "<strong>Profil de sortie ISO Coated v2 300 %</strong> à appliquer lors de cette conversion.",
+    "<strong>Résolution des images</strong> : 300 ppp pour les photos, 600 à 1 200 ppp pour les dessins au trait.",
+    "<strong>BAT</strong> : les pages intérieures imprimées au recto uniquement, sans réduction ni agrandissement et sans correction manuscrite, plus un BAT couleur de la couverture."
+  ];
+  if (couverture) {
+    restants.push("<strong>Fond perdu de la couverture</strong> : les 5 mm débordants sont remplis par la couleur de fond, pas par la photo.");
+    restants.push("<strong>Épaisseur du dos</strong> : à faire confirmer par l'imprimeur, elle dépend du papier choisi.");
+  }
+
+  const nom = nomFichierConforme(couverture ? "cv" : "int", livre.titre);
+  const largSupport = couverture
+    ? (2 * f.larg + dos + 2 * MARGE_TECHNIQUE_MM).toFixed(1).replace(".", ",")
+    : String(f.larg + 2 * MARGE_TECHNIQUE_MM);
+
+  let html = '<div class="modal-impression-carte ci-carte" role="dialog" aria-modal="true">' +
+    '<button class="mi-fermer" aria-label="Fermer">&#10005;</button>' +
+    "<h3>Contrôle avant envoi</h3>" +
+    '<p class="mi-intro">' + (couverture
+      ? "Couverture ouverte à plat : 4e de couverture, dos et 1re réunis en une seule planche."
+      : "Pages intérieures seules, en pages simples numérotées.") +
+    ' <a href="imprimeur.html" target="_blank" rel="noopener">Guide du fichier imprimeur</a>.</p>';
+
+  html += '<div class="ci-resume">' +
+    "<div><span>Format rogné</span><strong>" + f.larg + " × " + f.haut + " mm</strong></div>" +
+    "<div><span>Support à générer</span><strong>" + largSupport +
+      " × " + (f.haut + 2 * MARGE_TECHNIQUE_MM) + " mm</strong></div>" +
+    "<div><span>Pages du fichier</span><strong>" + (couverture ? "1 planche" : nbPagesPro + " pages") + "</strong></div>" +
+    '<div><span>Nom à donner</span><strong class="ci-nom">' + nom + ".pdf</strong></div>" +
+  "</div>";
+
+  if (!couverture && nbPagesPro !== pagesEcran) {
+    html += '<p class="ci-note">Le fichier compte ' + nbPagesPro + " pages, contre " + pagesEcran +
+      " à l'écran : le folio est remonté pour respecter le blanc tournant de 7 mm, ce qui réduit " +
+      "légèrement la hauteur de texte. Votre livre à l'écran n'est pas modifié.</p>";
+  }
+  if (!couverture && nbPagesPro % 4 !== 0) {
+    html += '<p class="ci-note">' + nbPagesPro + " n'est pas un multiple de 4 : la plupart des reliures " +
+      "en demandent un. L'imprimeur ajoutera des pages blanches, ou vous pouvez en prévoir " +
+      (4 - (nbPagesPro % 4)) + " vous-même.</p>";
+  }
+
+  if (couverture) {
+    html += '<div class="ci-dos">' +
+      "<h4>Épaisseur du dos</h4>" +
+      '<div class="ci-champs">' +
+        '<label>Grammage <input type="number" id="ciGrammage" value="' + GRAMMAGE_DEFAUT + '" min="50" max="200" step="5"> g/m²</label>' +
+        '<label>Main <input type="number" id="ciMain" value="' + MAIN_DEFAUT + '" min="0.8" max="2.5" step="0.05"></label>' +
+        '<label>Dos <input type="number" id="ciDos" value="' + dos.toFixed(1) + '" min="0" max="60" step="0.1"> mm</label>' +
+      "</div>" +
+      '<p class="ci-note">Calculé pour ' + nbPagesPro + " pages. Modifiez le dos directement si votre imprimeur vous donne sa valeur.</p>" +
+    "</div>";
+  }
+
+  html += '<div class="ci-listes">' +
+    '<div class="ci-bloc ci-ok"><h4>Conforme automatiquement</h4><ul>' +
+      conformes.map(x => "<li>" + x + "</li>").join("") +
+    "</ul></div>" +
+    '<div class="ci-bloc ci-reste"><h4>À faire de votre côté</h4><ul>' +
+      restants.map(x => "<li>" + x + "</li>").join("") +
+    "</ul></div>" +
+  "</div>";
+
+  html += '<p class="ci-reglages"><strong>Dans la fenêtre d\'impression :</strong> destination ' +
+    "« Enregistrer au format PDF », échelle 100 % (jamais « ajuster à la page »), marges « aucune », " +
+    "et décochez les en-têtes et pieds de page du navigateur.</p>";
+
+  html += '<div class="ci-actions">' +
+    '<button class="ci-annuler">Annuler</button>' +
+    '<button class="ci-generer">Générer le PDF</button>' +
+  "</div></div>";
+
+  const fond = document.createElement("div");
+  fond.id = "controleImprimeur";
+  fond.className = "modal-impression";
+  fond.innerHTML = html;
+  fond.addEventListener("click", (e) => { if (e.target === fond) fond.remove(); });
+  document.body.appendChild(fond);
+
+  fond.querySelector(".mi-fermer").onclick = () => fond.remove();
+  fond.querySelector(".ci-annuler").onclick = () => fond.remove();
+
+  // Recalcul du dos quand le grammage ou la main changent
+  const champDos = fond.querySelector("#ciDos");
+  if (champDos) {
+    const recalculer = () => {
+      const g = parseFloat(fond.querySelector("#ciGrammage").value) || GRAMMAGE_DEFAUT;
+      const m = parseFloat(fond.querySelector("#ciMain").value) || MAIN_DEFAUT;
+      champDos.value = epaisseurDosMm(nbPagesPro, g, m).toFixed(1);
+    };
+    fond.querySelector("#ciGrammage").oninput = recalculer;
+    fond.querySelector("#ciMain").oninput = recalculer;
+  }
+
+  fond.querySelector(".ci-generer").onclick = () => {
+    // Un champ vidé ou mal saisi ne doit pas produire une couverture sans dos :
+    // on retombe alors sur la valeur calculée.
+    let dosMm = 0;
+    if (champDos) {
+      const saisi = parseFloat(champDos.value);
+      dosMm = (isFinite(saisi) && saisi >= 0) ? saisi : dos;
+    }
+    fond.remove();
+    setTimeout(() => genererFichierImprimeur(cible, dosMm, livre, f, pagesPro), 50);
+  };
+}
+
+// ----- Génération du fichier -----
+
+function genererFichierImprimeur(cible, dosMm, livre, f, pagesPro) {
+  const message = document.getElementById("message");
+  if (message) message.textContent = "Préparation du fichier imprimeur...";
+
+  const promessesImages = [];
+
+  const construire = () => {
+    let zone = document.getElementById("zoneImpression");
+    if (zone) zone.remove();
+    zone = document.createElement("div");
+    zone.id = "zoneImpression";
+    zone.classList.add("zone-pro");
+    document.body.appendChild(zone);
+
+    let stylePage = document.getElementById("stylePageImpression");
+    if (!stylePage) {
+      stylePage = document.createElement("style");
+      stylePage.id = "stylePageImpression";
+      document.head.appendChild(stylePage);
+    }
+
+    if (cible === "couverture") {
+      const largSupport = 2 * f.larg + dosMm + 2 * MARGE_TECHNIQUE_MM;
+      const hautSupport = f.haut + 2 * MARGE_TECHNIQUE_MM;
+      stylePage.textContent = "@page { size: " + largSupport + "mm " + hautSupport + "mm; margin: 0; }";
+      zone.appendChild(creerCouverturePlat(livre, f, dosMm, promessesImages));
+      return;
+    }
+
+    stylePage.textContent = "@page { size: " + (f.larg + 2 * MARGE_TECHNIQUE_MM) + "mm " +
+      (f.haut + 2 * MARGE_TECHNIQUE_MM) + "mm; margin: 0; }";
+
+    const margeInt = f.margeH + DELTA_RELIURE_MM;
+    const margeExt = Math.max(6, f.margeH - DELTA_RELIURE_MM);
+    pagesPro.forEach((contenu, i) => {
+      zone.appendChild(creerPagePro(contenu, i + 1, f, margeInt, margeExt));
+    });
+  };
+
+  // Construction à partir de l'instantané : la pagination du livre à l'écran
+  // n'est pas touchée, et aucune repagination n'est relancée ici.
+  construire();
+
+  Promise.all(promessesImages).finally(() => {
+    if (message) message.textContent = "";
+    definirPasseLivret(null);
+    window.print();
+  });
+}
+
+// Feuille = format rogné + marge technique (fond perdu + repères).
+function creerFeuillePro(largTrim, hautTrim) {
+  const feuille = document.createElement("div");
+  feuille.className = "feuille-pro";
+  feuille.style.width  = (largTrim + 2 * MARGE_TECHNIQUE_MM) + "mm";
+  feuille.style.height = (hautTrim + 2 * MARGE_TECHNIQUE_MM) + "mm";
+  return feuille;
+}
+
+// Zone rognée, centrée dans la zone de support.
+function creerZoneRognePro(largTrim, hautTrim) {
+  const zone = document.createElement("div");
+  zone.className = "zone-rogne-pro";
+  zone.style.left   = MARGE_TECHNIQUE_MM + "mm";
+  zone.style.top    = MARGE_TECHNIQUE_MM + "mm";
+  zone.style.width  = largTrim + "mm";
+  zone.style.height = hautTrim + "mm";
+  return zone;
+}
+
+// Traits de coupe aux quatre angles, décalés de 5 mm du format rogné.
+// Les traits ne mordent jamais sur la zone de fond perdu.
+function ajouterReperesCoupe(feuille, largTrim, hautTrim) {
+  const M = MARGE_TECHNIQUE_MM;
+  const d = DECALAGE_REPERE_MM;
+  const L = LONGUEUR_REPERE_MM;
+
+  const trait = (sens, styles) => {
+    const t = document.createElement("div");
+    t.className = "repere-pro repere-" + sens;
+    Object.assign(t.style, styles);
+    feuille.appendChild(t);
+  };
+
+  [M, M + largTrim].forEach((x, ix) => {
+    [M, M + hautTrim].forEach((y, iy) => {
+      // trait horizontal, prolongeant le bord haut ou bas vers l'extérieur
+      trait("h", {
+        left: (ix === 0 ? x - d - L : x + d) + "mm",
+        top: y + "mm", width: L + "mm", height: "0mm"
+      });
+      // trait vertical, prolongeant le bord gauche ou droit vers l'extérieur
+      trait("v", {
+        left: x + "mm",
+        top: (iy === 0 ? y - d - L : y + d) + "mm",
+        width: "0mm", height: L + "mm"
+      });
+    });
+  });
+}
+
+// Repères de pli : verticaux, de part et d'autre du dos.
+function ajouterReperesPli(feuille, hautTrim, positionsMm) {
+  const M = MARGE_TECHNIQUE_MM;
+  const d = DECALAGE_REPERE_MM;
+  const L = LONGUEUR_REPERE_MM;
+  positionsMm.forEach((x) => {
+    [M - d - L, M + hautTrim + d].forEach((y) => {
+      const t = document.createElement("div");
+      t.className = "repere-pro repere-v repere-pli-pro";
+      t.style.left = (M + x) + "mm";
+      t.style.top = y + "mm";
+      t.style.width = "0mm";
+      t.style.height = L + "mm";
+      feuille.appendChild(t);
+    });
+  });
+}
+
+// Page intérieure : recto = page impaire (petit fond à gauche).
+function creerPagePro(contenu, numero, f, margeInt, margeExt) {
+  const recto = numero % 2 === 1;
+  const feuille = creerFeuillePro(f.larg, f.haut);
+  const zone = creerZoneRognePro(f.larg, f.haut);
+
+  zone.style.paddingTop = f.margeV + "mm";
+  zone.style.paddingLeft = (recto ? margeInt : margeExt) + "mm";
+  zone.style.paddingRight = (recto ? margeExt : margeInt) + "mm";
+
+  const texte = document.createElement("div");
+  texte.className = "texte-impression";
+  texte.style.height = (f.haut - f.margeV - PIED_PRO_MM + TOLERANCE_PRO_MM) + "mm";
+  texte.innerHTML = contenu || "";
+  zone.appendChild(texte);
+
+  const num = document.createElement("div");
+  num.className = "numero-impression numero-pro";
+  num.style.bottom = FOLIO_PRO_MM + "mm";
+  num.textContent = numero;
+  zone.appendChild(num);
+
+  feuille.appendChild(zone);
+  ajouterReperesCoupe(feuille, f.larg, f.haut);
+  return feuille;
+}
+
+// Couverture ouverte à plat : 4e de couverture | dos | 1re de couverture.
+function creerCouverturePlat(livre, f, dosMm, promessesImages) {
+  const largTrim = 2 * f.larg + dosMm;
+  const feuille = creerFeuillePro(largTrim, f.haut);
+  const zone = creerZoneRognePro(largTrim, f.haut);
+  zone.classList.add("couv-plat");
+
+  // Le fond déborde dans le fond perdu : la zone de 5 mm ne doit jamais
+  // rester blanche une fois rognée. Le débord est posé sur la FEUILLE et non
+  // dans la zone rognée, qui est en overflow:hidden et le découperait.
+  const fondCouleur = (livre.couverture && livre.couverture.fond) || "#1a1a2e";
+  const debord = document.createElement("div");
+  debord.className = "debord-pro";
+  debord.style.left   = (MARGE_TECHNIQUE_MM - FOND_PERDU_MM) + "mm";
+  debord.style.top    = (MARGE_TECHNIQUE_MM - FOND_PERDU_MM) + "mm";
+  debord.style.width  = (largTrim + 2 * FOND_PERDU_MM) + "mm";
+  debord.style.height = (f.haut + 2 * FOND_PERDU_MM) + "mm";
+  debord.style.background = fondCouleur;
+  feuille.appendChild(debord);
+
+  zone.appendChild(creerPanneauCouverture(livre, "quatrieme", f, promessesImages));
+
+  const dos = document.createElement("div");
+  dos.className = "dos-pro";
+  dos.style.width = dosMm + "mm";
+  dos.style.height = f.haut + "mm";
+  dos.style.background = fondCouleur;
+  // Sous 6 mm, l'usage est de laisser le dos nu : le texte tomberait sur les plis.
+  if (dosMm >= 6) {
+    const t = document.createElement("div");
+    t.className = "dos-texte-pro";
+    t.style.color = (livre.couverture && livre.couverture.texte) || "#ffffff";
+    t.textContent = [livre.titre, livre.auteur].filter(Boolean).join(" — ");
+    dos.appendChild(t);
+  }
+  zone.appendChild(dos);
+
+  zone.appendChild(creerPanneauCouverture(livre, "couverture", f, promessesImages));
+
+  feuille.appendChild(zone);
+  ajouterReperesCoupe(feuille, largTrim, f.haut);
+  ajouterReperesPli(feuille, f.haut, [f.larg, f.larg + dosMm]);
+  return feuille;
+}
+
+// Un panneau de couverture au format rogné, réutilisant le rendu existant.
+function creerPanneauCouverture(livre, mode, f, promessesImages) {
+  const panneau = creerCouvertureImpression(livre, mode, f, promessesImages);
+  panneau.classList.remove("page-impression");
+  panneau.classList.add("panneau-couv-pro");
+  return panneau;
 }

@@ -868,3 +868,14 @@ main.contenu { padding-top: 40px; padding-bottom: 60px; }
   .fiche { padding: 24px 20px; }
 }
 
+
+/* Extraits techniques (noms de fichiers, formules) dans les guides */
+code {
+  font-family: ui-monospace, "SF Mono", Consolas, monospace;
+  font-size: 0.9em;
+  background: rgba(138, 75, 56, .07);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 1px 5px;
+  overflow-wrap: anywhere;   /* une formule longue se coupe plutot que de deborder */
+}

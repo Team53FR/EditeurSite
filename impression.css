@@ -161,6 +161,90 @@
   #zoneImpression.passe-recto > *:nth-child(even) { display: none; }
   #zoneImpression.passe-verso > *:nth-child(odd)  { display: none; }
 
+
+  /* ----- Fichier pour l'imprimeur -----
+     Feuille = format rogné + 12 mm de marge technique (5 mm de fond perdu,
+     puis les traits de coupe décalés de 5 mm et longs de 6 mm). */
+  .feuille-pro {
+    position: relative;
+    box-sizing: border-box;
+    overflow: hidden;
+    page-break-after: always;
+    break-after: page;
+    background: white;
+    font-family: "EB Garamond", Georgia, serif;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .feuille-pro:last-child {
+    page-break-after: auto;
+    break-after: auto;
+  }
+
+  /* Zone rognée, centrée dans la zone de support */
+  .zone-rogne-pro {
+    position: absolute;
+    box-sizing: border-box;
+    overflow: hidden;
+    background: white;
+  }
+
+  /* Traits de coupe et de pli : filet de 0,25 pt, minimum exigé.
+     Dessinés en noir pur, jamais dans la zone de fond perdu. */
+  .repere-pro { position: absolute; box-sizing: content-box; }
+  .repere-h { border-top: 0.25pt solid #000; }
+  .repere-v { border-left: 0.25pt solid #000; }
+
+  /* Couverture ouverte à plat : 4e | dos | 1re */
+  .couv-plat {
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+  }
+
+  /* Le fond déborde de 5 mm : la coupe ne peut pas laisser de filet blanc.
+     Posé sur la feuille, hors de la zone rognée qui est en overflow:hidden. */
+  .debord-pro {
+    position: absolute;
+    z-index: 0;
+  }
+
+  .panneau-couv-pro {
+    position: relative;
+    z-index: 1;
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+
+  .dos-pro {
+    position: relative;
+    z-index: 1;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  /* Titre au dos : lisible de haut en bas, dos vers soi */
+  .dos-texte-pro {
+    writing-mode: vertical-rl;
+    white-space: nowrap;
+    font-size: 10pt;
+    letter-spacing: 0.06em;
+    overflow: hidden;
+    max-height: 90%;
+  }
+
+  /* Folio remonté à 8 mm du bord rogné (blanc tournant de 7 mm exigé).
+     line-height fixé à 1 pour que la hauteur de la bande soit prévisible et
+     que le texte ne vienne jamais la chevaucher. */
+  .numero-pro {
+    bottom: 8mm;
+    line-height: 1;
+  }
+
   /* Le panneau d'aide ne doit jamais s'imprimer */
   .panneau-versos { display: none !important; }
 }

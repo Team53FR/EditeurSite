@@ -1668,3 +1668,123 @@ button.danger {
   text-decoration: underline;
 }
 .mi-intro a:hover { color: var(--s-accent-deep, #6d3a2b); }
+
+/* ----- Contrôle avant envoi à l'imprimeur ----- */
+.ci-carte { max-width: 720px; }
+
+.ci-resume {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin: 14px 0;
+}
+.ci-resume > div {
+  background: #f6efe0;
+  border: 1px solid #e6ddc9;
+  border-radius: 10px;
+  padding: 9px 12px;
+}
+.ci-resume span {
+  display: block;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: #8a7c68;
+  margin-bottom: 2px;
+}
+.ci-resume strong { font-size: 14px; color: #2b2622; }
+.ci-nom { font-family: ui-monospace, Consolas, monospace; font-size: 13px !important; }
+
+.ci-note {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #6f6455;
+  background: #fdf6e6;
+  border-left: 3px solid #d8a24a;
+  border-radius: 0 8px 8px 0;
+  padding: 9px 12px;
+  margin: 10px 0;
+}
+
+.ci-dos { margin: 14px 0; }
+.ci-dos h4 { font-size: 14px; margin: 0 0 8px; color: #2b2622; }
+.ci-champs { display: flex; flex-wrap: wrap; gap: 10px; }
+.ci-champs label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #6f6455;
+}
+.ci-champs input {
+  width: 72px;
+  padding: 6px 8px;
+  border: 1px solid #e6ddc9;
+  border-radius: 8px;
+  background: #fffdf8;
+  font-size: 13px;
+  color: #2b2622;
+}
+
+.ci-listes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin: 14px 0;
+}
+.ci-bloc {
+  border: 1px solid #e6ddc9;
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: #fffdf8;
+}
+.ci-bloc h4 { font-size: 13px; margin: 0 0 8px; }
+.ci-bloc ul { margin: 0; padding-left: 18px; }
+.ci-bloc li { font-size: 12.5px; line-height: 1.55; color: #6f6455; margin-bottom: 6px; }
+.ci-ok { border-color: #cfe3cf; background: #f6faf5; }
+.ci-ok h4 { color: #3f6b45; }
+.ci-ok li::marker { color: #3f6b45; }
+.ci-reste { border-color: #f0dcc0; background: #fffaf1; }
+.ci-reste h4 { color: #a5682a; }
+.ci-reste li::marker { color: #a5682a; }
+
+.ci-reglages {
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: #6f6455;
+  margin: 0 0 14px;
+}
+
+.ci-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.ci-actions button {
+  border: 1px solid #e6ddc9;
+  border-radius: 9px;
+  background: #f6efe0;
+  color: #2b2622;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 9px 16px;
+  margin: 0;
+  cursor: pointer;
+}
+.ci-actions .ci-generer {
+  background: #8a4b38;
+  border-color: #8a4b38;
+  color: #fff;
+}
+.ci-actions .ci-generer:hover { background: #6d3a2b; border-color: #6d3a2b; }
+.ci-actions .ci-annuler:hover { background: #fff; }
+
+@media (max-width: 620px) {
+  .ci-listes { grid-template-columns: 1fr; }
+}
+
+/* Pendant le calcul de la pagination « fichier imprimeur », le mesureur doit
+   composer le texte exactement comme le PDF exporté (justifié, avec césure),
+   sans quoi les lignes ne tombent pas au même endroit et le bas des pages se
+   retrouve rogné. Voir avecPaginationImprimeur() dans impression.js. */
+#mesureCachee.mesure-pro {
+  text-align: justify;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+}

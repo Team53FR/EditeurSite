@@ -26,6 +26,12 @@ const FORMATS = {
 // page, quelle que soit la taille de la fenêtre, et la pagination ne bouge pas.
 const PX_PAR_MM = 96 / 25.4;
 
+// Hauteur de la bande réservée au numéro de page, en pixels logiques.
+// Variable et non constante : l'export « fichier pour l'imprimeur » la
+// remonte le temps de la génération, pour que le folio respecte le blanc
+// tournant de 7 mm exigé par les imprimeurs (voir impression.js).
+let PIED_PAGE_PX = 32;
+
 function appliquerFormatPage(formatKey) {
   const f = FORMATS[formatKey] || FORMATS["149x210"];
 
@@ -34,7 +40,7 @@ function appliquerFormatPage(formatKey) {
   const hautPx   = Math.round(f.haut * PX_PAR_MM);
   const margeVPx = Math.round(f.margeV * PX_PAR_MM);
   const margeHPx = Math.round(f.margeH * PX_PAR_MM);
-  const numPageH = 32; // zone du numéro de page (logique)
+  const numPageH = PIED_PAGE_PX; // zone du numéro de page (logique)
   const gapPages = 26;
 
   hauteurTextePx = hautPx - margeVPx - numPageH;
@@ -2425,9 +2431,13 @@ function calculerDeuxPages(html) {
   if (!mes || !geomEdition) return { gauche: html || "", droite: "" };
   mes.innerHTML = html || "";
   const p2 = pointCoupe(mes, seuilsColonnes(mes).col2);
+  // La coupe entre les deux pages laisse souvent une coquille de titre vide
+  // en fin de page gauche (le titre lui-même passant à droite). Elle est
+  // invisible à l'écran mais coûte tout l'espace au-dessus des titres à
+  // l'impression, où elle repousse le texte hors de la page.
   const res = {
-    gauche: htmlEntre(mes, null, p2, false),
-    droite: p2 ? htmlEntre(mes, p2, null, true) : ""
+    gauche: retirerTitresVides(htmlEntre(mes, null, p2, false)),
+    droite: p2 ? retirerTitresVides(htmlEntre(mes, p2, null, true)) : ""
   };
   mes.innerHTML = "";
   return res;
