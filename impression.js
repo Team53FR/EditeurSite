@@ -1,3 +1,84 @@
+// =====================================================================
+//  Panneau de choix du mode d'impression
+//  Ouvert par le bouton imprimante : l'utilisateur choisit explicitement
+//  la reliure (livret agrafé / page à page) et le type d'imprimante.
+// =====================================================================
+
+const MODES_IMPRESSION = [
+  {
+    categorie: "Livret à agrafer",
+    aide: "Deux pages par feuille. On plie la pile en deux et on agrafe au centre.",
+    choix: [
+      { libelle: "Recto-verso automatique", detail: "Votre imprimante retourne les feuilles toute seule.",
+        action: "exporterLivret", mode: "auto" },
+      { libelle: "En deux fois", detail: "Sans recto-verso : les rectos d'abord, puis les versos.",
+        action: "exporterLivret", mode: "passes" }
+    ]
+  },
+  {
+    categorie: "Page à page (dos collé)",
+    aide: "Une page par feuille, à relier ou à faire relier.",
+    choix: [
+      { libelle: "Recto-verso automatique", detail: "Votre imprimante retourne les feuilles toute seule.",
+        action: "exporterImpression", mode: "auto" },
+      { libelle: "En deux fois", detail: "Sans recto-verso : les rectos d'abord, puis les versos.",
+        action: "exporterImpression", mode: "passes" }
+    ]
+  }
+];
+
+function ouvrirPanneauImpression() {
+  fermerPanneauImpression();
+
+  const fond = document.createElement("div");
+  fond.id = "panneauImpression";
+  fond.className = "modal-impression";
+  fond.addEventListener("click", (e) => { if (e.target === fond) fermerPanneauImpression(); });
+
+  let html = '<div class="modal-impression-carte" role="dialog" aria-modal="true">' +
+    '<button class="mi-fermer" aria-label="Fermer">&#10005;</button>' +
+    "<h3>Imprimer votre livre</h3>" +
+    '<p class="mi-intro">Choisissez la reliure, puis le type de votre imprimante. ' +
+    "Pour obtenir un PDF, sélectionnez « Enregistrer au format PDF » dans la fenêtre d'impression.</p>";
+
+  MODES_IMPRESSION.forEach((cat, i) => {
+    html += '<div class="mi-categorie">' +
+      "<h4>" + cat.categorie + "</h4>" +
+      '<p class="mi-aide">' + cat.aide + "</p>" +
+      '<div class="mi-choix">';
+    cat.choix.forEach((c, j) => {
+      html += '<button class="mi-bouton" data-cat="' + i + '" data-choix="' + j + '">' +
+        "<span>" + c.libelle + "</span>" +
+        '<small>' + c.detail + "</small>" +
+      "</button>";
+    });
+    html += "</div></div>";
+  });
+
+  html += "</div>";
+  fond.innerHTML = html;
+  document.body.appendChild(fond);
+
+  fond.querySelector(".mi-fermer").onclick = fermerPanneauImpression;
+  fond.querySelectorAll(".mi-bouton").forEach(btn => {
+    btn.onclick = () => {
+      const c = MODES_IMPRESSION[+btn.dataset.cat].choix[+btn.dataset.choix];
+      fermerPanneauImpression();
+      // Laisser la fenêtre se fermer avant d'ouvrir celle du navigateur
+      setTimeout(() => { window[c.action](c.mode); }, 50);
+    };
+  });
+}
+
+function fermerPanneauImpression() {
+  const p = document.getElementById("panneauImpression");
+  if (p) p.remove();
+}
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") fermerPanneauImpression();
+});
+
 // ----- Export impression (PDF / imprimante au format réel) -----
 //
 // Construit une version du livre aux dimensions physiques exactes (en mm),
@@ -20,7 +101,7 @@ const DELTA_RELIURE_MM = 4; // ajouté côté reliure, retiré côté extérieur
 const TOLERANCE_MM = 2;
 const PIED_PAGE_MM = 32 * 25.4 / 96 - TOLERANCE_MM; // ≈ 6,47 mm
 
-function exporterImpression() {
+function exporterImpression(modeRectoVerso) {
   flushSpread();
   repaginerTout(); // découpage exact avant impression (flushSpread ne découpe pas)
   const livre = livreActuel();
@@ -68,7 +149,7 @@ function exporterImpression() {
 
   Promise.all(promessesImages).finally(() => {
     if (message) message.textContent = "";
-    window.print();
+    lancerImpression(modeRectoVerso);
   });
 }
 
@@ -78,7 +159,7 @@ function exporterImpression() {
 // dans l'ordre d'imposition : on imprime recto-verso, on plie la pile en
 // deux, on agrafe au pli, et toutes les pages tombent dans le bon ordre.
 
-function exporterLivret() {
+function exporterLivret(modeRectoVerso) {
   flushSpread();
   repaginerTout(); // découpage exact avant impression (flushSpread ne découpe pas)
   const livre = livreActuel();
@@ -126,7 +207,7 @@ function exporterLivret() {
 
   Promise.all(promessesImages).finally(() => {
     if (message) message.textContent = "";
-    lancerImpressionLivret();
+    lancerImpression(modeRectoVerso);
   });
 }
 
@@ -136,22 +217,17 @@ function exporterLivret() {
 // versos. Pour une imprimante sans duplex, on imprime les rectos, puis les
 // versos une fois la pile remise dans le bac.
 
-function lancerImpressionLivret() {
-  const duplexAuto = confirm(
-    "Votre imprimante fait-elle le recto-verso automatiquement ?\n\n" +
-    "OK : oui — tout imprimer d'un coup.\n" +
-    "Annuler : non — imprimer en deux fois (rectos, puis versos)."
-  );
-
-  if (duplexAuto) {
-    definirPasseLivret(null);
+function lancerImpression(mode) {
+  // mode "passes" : imprimante SANS recto-verso automatique — on imprime
+  // d'abord les rectos, puis les versos une fois la pile remise dans le bac.
+  if (mode === "passes") {
+    definirPasseLivret("recto");
     window.print();
+    afficherPanneauVersos();
     return;
   }
-
-  definirPasseLivret("recto");   // passe 1
+  definirPasseLivret(null);
   window.print();
-  afficherPanneauVersos();
 }
 
 function definirPasseLivret(passe) {

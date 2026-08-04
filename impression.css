@@ -155,8 +155,11 @@
 
   /* Recto-verso en deux passes (imprimante sans duplex).
      Les faces alternent recto/verso : enfants impairs = rectos, pairs = versos. */
-  #zoneImpression.passe-recto > .feuille-impression:nth-child(even) { display: none; }
-  #zoneImpression.passe-verso > .feuille-impression:nth-child(odd)  { display: none; }
+  /* Livret : chaque enfant est une face de feuille (recto, verso, recto…).
+     Page à page : chaque enfant est une page (recto, verso, recto…).
+     Dans les deux cas, les enfants IMPAIRS sont les rectos. */
+  #zoneImpression.passe-recto > *:nth-child(even) { display: none; }
+  #zoneImpression.passe-verso > *:nth-child(odd)  { display: none; }
 
   /* Le panneau d'aide ne doit jamais s'imprimer */
   .panneau-versos { display: none !important; }
