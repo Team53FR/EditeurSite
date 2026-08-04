@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Monter votre livre — Mon Éditeur De Livre</title>
+<meta name="description" content="Guide pratique pour relier soi-même son livre imprimé : livret agrafé, dos collé, cahiers cousus, reliure à anneaux. Matériel, étapes, réglages d'impression.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+
+  <!-- ===== Navigation ===== -->
+  <nav class="nav">
+    <div class="contenu nav-in">
+      <a href="index.html" class="marque">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#8a4b38" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5.5C10.5 4.3 8.3 3.8 6 4c-1 .1-2 .3-3 .6v14c1-.3 2-.5 3-.6 2.3-.2 4.5.3 6 1.5 1.5-1.2 3.7-1.7 6-1.5 1 .1 2 .3 3 .6V4.6c-1-.3-2-.5-3-.6-2.3-.2-4.5.3-6 1.5Z"/><path d="M12 5.5v14"/></svg>
+        Mon Éditeur De Livre
+      </a>
+      <div class="nav-actions">
+        <a href="index.html" class="btn btn-secondaire">← Accueil</a>
+        <a href="connexion.html" class="btn btn-primaire">Se connecter</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ===== En-tête ===== -->
+  <header class="hero" style="padding-bottom:20px">
+    <div class="contenu" style="text-align:center;max-width:760px">
+      <span class="hero-badge">✦ Guide pratique</span>
+      <h1 style="font-size:clamp(34px,4.5vw,50px)">Monter votre livre <span class="surligne">vous-même</span></h1>
+      <p class="hero-sous" style="margin:0 auto 8px">
+        Votre manuscrit est imprimé. Reste à en faire un objet qui se tient, se feuillette et se range
+        sur une étagère. Voici les quatre façons de relier chez soi, de la plus simple à la plus soignée.
+      </p>
+    </div>
+  </header>
+
+  <!-- ===== Choisir ===== -->
+  <section class="bande-claire" style="padding-top:40px">
+    <div class="contenu">
+      <div class="section-titre">
+        <h2>Quelle reliure choisir&nbsp;?</h2>
+        <p>Le bon choix dépend surtout du nombre de pages et du temps que vous voulez y passer.</p>
+      </div>
+
+      <div class="tableau-enveloppe">
+        <table class="tableau-comparatif">
+          <thead>
+            <tr>
+              <th>Reliure</th><th>Pages</th><th>Difficulté</th><th>Matériel</th><th>Le mieux pour</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><a href="#livret"><strong>Livret agrafé</strong></a></td>
+              <td>4 à 40</td>
+              <td><span class="niveau facile">Facile</span></td>
+              <td>Une agrafeuse</td>
+              <td>Nouvelle, carnet, tirage d'essai</td>
+            </tr>
+            <tr>
+              <td><a href="#doscolle"><strong>Dos collé</strong></a></td>
+              <td>30 à 400</td>
+              <td><span class="niveau moyen">Moyen</span></td>
+              <td>Colle, presse improvisée</td>
+              <td>Roman, mémoire, vrai livre de poche</td>
+            </tr>
+            <tr>
+              <td><a href="#cousu"><strong>Cahiers cousus</strong></a></td>
+              <td>30 à 300</td>
+              <td><span class="niveau exigeant">Exigeant</span></td>
+              <td>Aiguille, fil de lin, alêne</td>
+              <td>Édition soignée, livre qui s'ouvre à plat</td>
+            </tr>
+            <tr>
+              <td><a href="#anneaux"><strong>Anneaux ou spirale</strong></a></td>
+              <td>Sans limite</td>
+              <td><span class="niveau facile">Facile</span></td>
+              <td>Perforeuse, anneaux</td>
+              <td>Document de travail, recueil à corriger</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p class="note-tableau">
+        Dans l'éditeur, le bouton <strong>Imprimer</strong> propose les deux mises en page correspondantes :
+        « Livret à agrafer » et « Page à page (dos collé) ». Les reliures cousue et à anneaux partent
+        du même export « page à page ».
+      </p>
+    </div>
+  </section>
+
+  <!-- ===== 1. Livret agrafé ===== -->
+  <section id="livret">
+    <div class="contenu">
+      <div class="fiche">
+        <div class="fiche-entete">
+          <span class="fiche-num">1</span>
+          <div>
+            <h2>Le livret agrafé</h2>
+            <p class="fiche-sous">Aussi appelé « piqûre à cheval ». La reliure la plus rapide.</p>
+          </div>
+        </div>
+
+        <div class="fiche-grille">
+          <div>
+            <h3>Le principe</h3>
+            <p>
+              Chaque feuille porte <strong>deux pages côte à côte</strong>, et quatre pages une fois imprimée
+              des deux côtés. Les pages ne sortent pas dans l'ordre de lecture : elles sont réparties pour
+              retomber juste une fois la pile pliée. C'est pourquoi la première feuille montre la fin du
+              livre à gauche — c'est normal, n'essayez pas de la remettre « dans l'ordre ».
+            </p>
+
+            <h3>Étape par étape</h3>
+            <ol class="etapes-liste">
+              <li>Imprimez en recto-verso, avec l'export <strong>Livret à agrafer</strong>. Sans recto-verso automatique, choisissez « En deux fois ».</li>
+              <li><strong>Ne changez pas l'ordre</strong> des feuilles en les récupérant.</li>
+              <li>Pliez toute la pile en deux <strong>d'un seul geste</strong>, bien au milieu. Marquez le pli avec le dos d'un ongle ou un plioir.</li>
+              <li>Agrafez sur le pli, <strong>deux agrafes</strong> réparties au tiers et aux deux tiers de la hauteur.</li>
+              <li>Égalisez le bord extérieur au massicot : les feuilles intérieures dépassent toujours un peu.</li>
+            </ol>
+          </div>
+
+          <aside class="fiche-cote">
+            <h4>Matériel</h4>
+            <ul><li>Une agrafeuse à long bras (idéal)</li><li>Ou une agrafeuse ordinaire + un tapis de souris</li><li>Un plioir ou une règle</li></ul>
+
+            <h4 class="vert">Ce que ça apporte</h4>
+            <ul><li>Aucune colle, aucun séchage</li><li>Les pages tombent dans l'ordre</li><li>Prêt en quelques minutes</li></ul>
+
+            <h4 class="orange">À savoir</h4>
+            <ul><li>Le nombre de pages est complété à un multiple de 4</li><li>Au-delà de ~40 pages, le pli gonfle</li><li>Le dos n'est pas plat</li></ul>
+
+            <div class="astuce">
+              <strong>Sans agrafeuse à long bras :</strong> ouvrez l'agrafeuse à plat, posez le cahier sur un
+              tapis de souris, appuyez pour planter les agrafes, puis retournez et rabattez les pattes avec
+              une petite cuillère.
+            </div>
+          </aside>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 2. Dos collé ===== -->
+  <section id="doscolle" class="bande-claire">
+    <div class="contenu">
+      <div class="fiche">
+        <div class="fiche-entete">
+          <span class="fiche-num">2</span>
+          <div>
+            <h2>Le dos collé</h2>
+            <p class="fiche-sous">La reliure des livres de poche. Dos plat, sans limite de pages.</p>
+          </div>
+        </div>
+
+        <div class="fiche-grille">
+          <div>
+            <h3>Le principe</h3>
+            <p>
+              Une page par feuille, imprimée recto-verso, dans l'ordre de lecture. Les feuilles sont
+              ensuite <strong>encollées sur la tranche</strong>, puis habillées d'une couverture qui
+              enveloppe le dos.
+            </p>
+
+            <h3>Étape par étape</h3>
+            <ol class="etapes-liste">
+              <li>Imprimez en recto-verso avec l'export <strong>Page à page</strong>.</li>
+              <li>Empilez dans l'ordre, puis <strong>tapotez la tranche</strong> sur une table pour aligner parfaitement le bord à relier.</li>
+              <li>Serrez la pile entre deux planchettes, en laissant dépasser <strong>2 à 3 mm</strong> du bord à encoller.</li>
+              <li>Passez une lame de cutter en biais tous les centimètres sur la tranche : ces entailles font pénétrer la colle et tiennent bien mieux.</li>
+              <li>Encollez généreusement (colle vinylique blanche), en croisant les passages. Laissez sécher <strong>au moins une heure</strong> sous presse.</li>
+              <li>Encollez le dos de la couverture, posez le bloc dessus, puis marquez les deux plis du dos au plioir.</li>
+            </ol>
+          </div>
+
+          <aside class="fiche-cote">
+            <h4>Matériel</h4>
+            <ul><li>Colle vinylique blanche (colle à bois)</li><li>Deux planchettes + serre-joints, ou une pile de livres lourds</li><li>Un pinceau plat, un cutter</li></ul>
+
+            <h4 class="vert">Ce que ça apporte</h4>
+            <ul><li>Aucune limite de pages</li><li>Dos plat : le livre tient debout</li><li>Le rendu le plus proche d'un ouvrage édité</li></ul>
+
+            <h4 class="orange">À savoir</h4>
+            <ul><li>Il faut du temps de séchage</li><li>Un collage irrégulier lâche des pages</li><li>Le livre s'ouvre moins à plat</li></ul>
+
+            <div class="astuce">
+              <strong>La presse du pauvre :</strong> deux planches à découper, quatre pinces à dessin,
+              et une pile de dictionnaires par-dessus. Cela suffit largement.
+            </div>
+          </aside>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 3. Cahiers cousus ===== -->
+  <section id="cousu">
+    <div class="contenu">
+      <div class="fiche">
+        <div class="fiche-entete">
+          <span class="fiche-num">3</span>
+          <div>
+            <h2>Les cahiers cousus</h2>
+            <p class="fiche-sous">La reliure traditionnelle. Plus longue, mais increvable.</p>
+          </div>
+        </div>
+
+        <div class="fiche-grille">
+          <div>
+            <h3>Le principe</h3>
+            <p>
+              Le livre est découpé en petits <strong>cahiers</strong> de 4 à 5 feuilles (16 à 20 pages),
+              pliés puis cousus chacun sur leur pli. Les cahiers sont ensuite assemblés entre eux, et
+              le dos est encollé pour les solidariser.
+            </p>
+
+            <h3>Étape par étape</h3>
+            <ol class="etapes-liste">
+              <li>Imprimez en <strong>Livret à agrafer</strong> mais chapitre par chapitre, pour obtenir plusieurs petits cahiers plutôt qu'un seul gros.</li>
+              <li>Pliez chaque cahier séparément.</li>
+              <li>Percez 3 ou 5 trous régulièrement espacés sur le pli, à l'alêne ou avec une aiguille épaisse.</li>
+              <li>Cousez chaque cahier au fil de lin, en point de chaînette, en laissant du fil aux extrémités.</li>
+              <li>Empilez les cahiers cousus, alignez la tranche, puis encollez le dos et laissez sécher sous presse.</li>
+              <li>Collez une bande de gaze ou de tissu fin sur le dos avant la couverture : c'est ce qui rend la reliure durable.</li>
+            </ol>
+          </div>
+
+          <aside class="fiche-cote">
+            <h4>Matériel</h4>
+            <ul><li>Aiguille à reliure et fil de lin</li><li>Une alêne (ou un poinçon)</li><li>Colle, gaze de reliure</li></ul>
+
+            <h4 class="vert">Ce que ça apporte</h4>
+            <ul><li>Le livre <strong>s'ouvre à plat</strong></li><li>Très solide, ne perd pas ses pages</li><li>Rendu artisanal</li></ul>
+
+            <h4 class="orange">À savoir</h4>
+            <ul><li>Compter plusieurs heures</li><li>Demande de la régularité dans la couture</li><li>Chaque cahier doit faire un multiple de 4 pages</li></ul>
+
+            <div class="astuce">
+              <strong>Pour débuter :</strong> essayez d'abord sur un carnet de deux cahiers.
+              La couture s'apprend en une soirée, mais rate souvent au premier essai.
+            </div>
+          </aside>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 4. Anneaux ===== -->
+  <section id="anneaux" class="bande-claire">
+    <div class="contenu">
+      <div class="fiche">
+        <div class="fiche-entete">
+          <span class="fiche-num">4</span>
+          <div>
+            <h2>Anneaux ou spirale</h2>
+            <p class="fiche-sous">Pas vraiment un livre, mais parfait pour travailler.</p>
+          </div>
+        </div>
+
+        <div class="fiche-grille">
+          <div>
+            <h3>Le principe</h3>
+            <p>
+              Les feuilles sont perforées sur le bord et maintenues par des anneaux ou une spirale
+              plastique. C'est la reliure des documents de travail : on ajoute, on retire, on annote.
+            </p>
+
+            <h3>Étape par étape</h3>
+            <ol class="etapes-liste">
+              <li>Imprimez en <strong>Page à page</strong>, en recto seul si vous comptez annoter les versos.</li>
+              <li>Perforez par petits paquets de 5 à 10 feuilles pour garder des trous bien alignés.</li>
+              <li>Ajoutez une couverture transparente devant et un carton épais derrière.</li>
+              <li>Posez les anneaux ou la spirale.</li>
+            </ol>
+
+            <p class="rappel-marge">
+              <strong>Attention à la marge :</strong> la perforation mord sur le bord intérieur.
+              Choisissez plutôt un format généreux (A4) et gardez la marge de reliure prévue par l'éditeur.
+            </p>
+          </div>
+
+          <aside class="fiche-cote">
+            <h4>Matériel</h4>
+            <ul><li>Une perforeuse</li><li>Anneaux, spirale, ou même de la ficelle</li><li>Une couverture rigide</li></ul>
+
+            <h4 class="vert">Ce que ça apporte</h4>
+            <ul><li>Ouvre complètement à plat</li><li>Pages remplaçables</li><li>Idéal pour relire et corriger</li></ul>
+
+            <h4 class="orange">À savoir</h4>
+            <ul><li>Ça ne ressemble pas à un livre</li><li>Les trous fragilisent le bord</li></ul>
+          </aside>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Papier ===== -->
+  <section id="papier">
+    <div class="contenu">
+      <div class="section-titre">
+        <h2>Le choix du papier</h2>
+        <p>C'est ce qui fait le plus de différence entre un tas de feuilles et un livre.</p>
+      </div>
+
+      <div class="grille-cartes">
+        <div class="carte-f">
+          <h3>Intérieur</h3>
+          <p>
+            Du <strong>90 à 100 g/m²</strong> plutôt que le 80 g habituel : le texte du verso transparaît
+            beaucoup moins. Un blanc cassé ou ivoire fatigue moins les yeux qu'un blanc éclatant.
+          </p>
+        </div>
+        <div class="carte-f">
+          <h3>Couverture</h3>
+          <p>
+            Du <strong>200 à 250 g/m²</strong>. En dessous, elle gondole ; au-dessus, elle devient
+            difficile à plier proprement sans rainer le pli au préalable.
+          </p>
+        </div>
+        <div class="carte-f">
+          <h3>Le sens des fibres</h3>
+          <p>
+            Le papier se plie net dans le sens des fibres, et casse en travers. Si vos plis blanchissent
+            ou craquent, essayez une rame dont le sens est perpendiculaire.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Erreurs fréquentes ===== -->
+  <section class="bande-claire">
+    <div class="contenu">
+      <div class="section-titre">
+        <h2>Les erreurs qui gâchent un tirage</h2>
+        <p>Toutes coûtent une rame de papier. Autant les connaître avant.</p>
+      </div>
+
+      <div class="grille-erreurs">
+        <div class="erreur">
+          <h4>« Ajuster à la page »</h4>
+          <p>Cette option de la fenêtre d'impression réduit le document de quelques pour cent : votre format n'est plus le bon. Choisissez toujours <strong>échelle 100 %</strong>.</p>
+        </div>
+        <div class="erreur">
+          <h4>Le mauvais sens de retournement</h4>
+          <p>En recto-verso, choisissez <strong>bords courts</strong> pour un livret, <strong>bords longs</strong> pour du page à page. Sinon, un verso sur deux sort à l'envers.</p>
+        </div>
+        <div class="erreur">
+          <h4>Lancer tout le livre d'un coup</h4>
+          <p>Imprimez <strong>une feuille de test</strong> d'abord, surtout pour le recto-verso manuel : le sens de rechargement du bac varie selon les imprimantes.</p>
+        </div>
+        <div class="erreur">
+          <h4>Encoller un dos non entaillé</h4>
+          <p>Sur un dos lisse, la colle ne pénètre pas. Les entailles au cutter sont ce qui empêche les pages de se détacher au premier mois.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Appel final ===== -->
+  <section>
+    <div class="contenu" style="text-align:center">
+      <h2 style="font-size:clamp(26px,3.4vw,36px);margin-bottom:12px">Prêt à imprimer&nbsp;?</h2>
+      <p style="color:var(--ink-soft);font-size:16px;max-width:32em;margin:0 auto 22px">
+        Ouvrez votre livre, cliquez sur l'icône imprimante et choisissez la mise en page
+        correspondant à la reliure que vous avez retenue.
+      </p>
+      <a href="connexion.html" class="btn btn-primaire">Ouvrir mes livres</a>
+    </div>
+  </section>
+
+  <!-- ===== Pied ===== -->
+  <footer class="pied">
+    <div class="contenu pied-in">
+      <div class="marque">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#8a4b38" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5.5C10.5 4.3 8.3 3.8 6 4c-1 .1-2 .3-3 .6v14c1-.3 2-.5 3-.6 2.3-.2 4.5.3 6 1.5 1.5-1.2 3.7-1.7 6-1.5 1 .1 2 .3 3 .6V4.6c-1-.3-2-.5-3-.6-2.3-.2-4.5.3-6 1.5Z"/><path d="M12 5.5v14"/></svg>
+        Mon Éditeur De Livre
+      </div>
+      <small>Écrit, mis en page et imprimé, depuis votre navigateur.</small>
+    </div>
+  </footer>
+
+  <script>
+    // Si une session est ouverte, les boutons mènent directement aux livres.
+    (function(){
+      try {
+        if (sessionStorage.getItem("gh_token")) {
+          document.querySelectorAll('a[href="connexion.html"]').forEach(function(a){
+            a.setAttribute("href", "bibliotheque.html");
+            if (a.textContent.indexOf("connecter") !== -1) a.textContent = "Mes livres";
+          });
+        }
+      } catch (e) {}
+    })();
+  </script>
+</body>
+</html>

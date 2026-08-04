@@ -100,7 +100,8 @@ function ouvrirPanneauImpression() {
     '<button class="mi-fermer" aria-label="Fermer">&#10005;</button>' +
     "<h3>Imprimer votre livre</h3>" +
     '<p class="mi-intro">Choisissez la reliure, puis le type de votre imprimante. ' +
-    "Pour obtenir un PDF, sélectionnez « Enregistrer au format PDF » dans la fenêtre d'impression.</p>";
+    "Pour obtenir un PDF, sélectionnez « Enregistrer au format PDF » dans la fenêtre d'impression. " +
+    '<a href="montage.html" target="_blank" rel="noopener">Guide complet du montage</a>.</p>';
 
   MODES_IMPRESSION.forEach((cat, i) => {
     html += '<div class="mi-categorie">' +

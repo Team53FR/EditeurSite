@@ -1660,3 +1660,11 @@ button.danger {
 @media (max-width: 520px) {
   .mi-detail-colonnes { grid-template-columns: 1fr; }
 }
+
+/* Lien vers le guide de montage, dans le panneau d'impression */
+.mi-intro a {
+  color: var(--s-accent, #8a4b38);
+  font-weight: 600;
+  text-decoration: underline;
+}
+.mi-intro a:hover { color: var(--s-accent-deep, #6d3a2b); }
