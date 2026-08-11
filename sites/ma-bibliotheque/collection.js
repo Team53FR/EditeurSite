@@ -336,7 +336,7 @@ function extraireNumeroTome(titre) {
   const regex = /^(.*?)[,:\-–]?\s*(?:tome|t\.?|vol\.?|volume|#)\s*0*(\d{1,4})\b.*$/i;
   const m = regex.exec(titre.trim());
   if (m && m[1].trim()) {
-    return { baseTitre: m[1].replace(/[,:\-–]\s*$/, "").trim(), tome: parseInt(m[2], 10) };
+    return { baseTitre: m[1].replace(/[.,:\-–]\s*$/, "").trim(), tome: parseInt(m[2], 10) };
   }
   return { baseTitre: titre.trim(), tome: null };
 }
@@ -479,8 +479,44 @@ async function rechercherOpenLibraryParTitre(titre, limite) {
   }));
 }
 
-// Entrelace les résultats des deux sources pour varier dès le début de liste,
-// plutôt que d'afficher toute une source avant l'autre.
+// La BnF couvre très bien les publications françaises récentes/confidentielles
+// (webtoons, petits éditeurs, auto-édition...) que Google Books et Open
+// Library ratent souvent (vérifié sur « Là où les étoiles filantes tombent »,
+// un webtoon Kotoon : 0 résultat sur les deux autres sources, plusieurs
+// tomes trouvés sur la BnF). On ne garde que les notices "texte imprimé"
+// (la BnF catalogue aussi films, musique, jeux... sous le même titre).
+async function rechercherBnFParTitre(titre, limite) {
+  const url = `https://catalogue.bnf.fr/api/SRU?version=1.2&operation=searchRetrieve&query=bib.title+all+%22${encodeURIComponent(titre)}%22&recordSchema=dublincore&maximumRecords=${limite * 3}`;
+  const r = await fetch(url);
+  if (!r.ok) return [];
+  const texte = await r.text();
+  const doc = new DOMParser().parseFromString(texte, "application/xml");
+  const records = Array.from(doc.getElementsByTagName("srw:record"));
+  const resultats = [];
+
+  for (const rec of records) {
+    const type = Array.from(rec.getElementsByTagName("dc:type")).map(t => t.textContent).join(" ");
+    if (!/texte imprimé|printed text/i.test(type)) continue;
+
+    const titreBrut = rec.getElementsByTagName("dc:title")[0] ? rec.getElementsByTagName("dc:title")[0].textContent : "";
+    const auteurBrut = rec.getElementsByTagName("dc:creator")[0] ? rec.getElementsByTagName("dc:creator")[0].textContent : "";
+    if (!titreBrut) continue;
+
+    let titreFinal = nettoyerTitreBnF(titreBrut);
+    const descriptions = Array.from(rec.getElementsByTagName("dc:description"));
+    for (const d of descriptions) {
+      const m = REGEX_COLLECTION_BNF.exec((d.textContent || "").trim());
+      if (m) { titreFinal = `${m[1].trim()}, Tome ${m[2]}`; break; }
+    }
+
+    resultats.push({ titre: titreFinal, auteur: nettoyerAuteurBnF(auteurBrut), imageUrl: null, source: "BnF" });
+    if (resultats.length >= limite) break;
+  }
+  return resultats;
+}
+
+// Entrelace les résultats des trois sources pour varier dès le début de
+// liste, plutôt que d'afficher toute une source avant l'autre.
 async function rechercherLivresParTitre(titreBrut, limite = 5) {
   // On enlève un éventuel numéro de tome tapé par l'utilisateur : Open
   // Library en particulier ne matche presque rien avec "Titre Tome N" mais
@@ -490,16 +526,18 @@ async function rechercherLivresParTitre(titreBrut, limite = 5) {
   const titre = (baseTitre || titreBrut || "").trim();
   if (!titre) return [];
 
-  const [google, openLib] = await Promise.all([
+  const [google, openLib, bnf] = await Promise.all([
     rechercherGoogleBooksParTitre(titre, limite).catch(() => []),
-    rechercherOpenLibraryParTitre(titre, limite).catch(() => [])
+    rechercherOpenLibraryParTitre(titre, limite).catch(() => []),
+    rechercherBnFParTitre(titre, limite).catch(() => [])
   ]);
 
   const resultats = [];
-  const max = Math.max(google.length, openLib.length);
+  const max = Math.max(google.length, openLib.length, bnf.length);
   for (let i = 0; i < max && resultats.length < limite; i++) {
     if (google[i]) resultats.push(google[i]);
     if (openLib[i] && resultats.length < limite) resultats.push(openLib[i]);
+    if (bnf[i] && resultats.length < limite) resultats.push(bnf[i]);
   }
   return resultats;
 }
@@ -658,12 +696,25 @@ async function traiterPhotoOCR(event) {
   try {
     await chargerScriptTesseract();
     statut.textContent = "Lecture du texte en cours…";
-    const resultat = await Tesseract.recognize(fichier, "fra+eng");
+
+    // Mode "texte épars" (PSM 11) plutôt que le mode par défaut ("page de
+    // texte uniforme") : une couverture a plusieurs blocs de texte séparés
+    // (titre, auteur, sous-titre...) à des tailles et endroits différents,
+    // pas un paragraphe. Testé : sur une couverture reconstituée à 3 blocs
+    // de texte, le mode par défaut n'en trouvait qu'un ; le mode "épars" les
+    // a tous trouvés. Un pré-traitement (contraste) a aussi été testé et
+    // écarté : il augmente le score de confiance de Tesseract sans améliorer
+    // — parfois en dégradant — le texte réellement reconnu.
+    const lecteur = await Tesseract.createWorker("fra+eng");
+    await lecteur.setParameters({ tessedit_pageseg_mode: "11" });
+    const resultat = await lecteur.recognize(fichier);
+    await lecteur.terminate();
+
     const texte = (resultat.data.text || "").replace(/\s+/g, " ").trim();
     statut.style.display = "none";
     if (texte) {
       document.getElementById("champRechercheTitre").value = texte;
-      afficherToast("Texte détecté — vérifie/corrige avant de rechercher.");
+      afficherToast("Texte détecté — vérifie/corrige avant de rechercher (les logos stylisés restent difficiles à lire).");
     } else {
       afficherToast("Aucun texte détecté sur la photo. Tape le titre manuellement.", true);
     }
