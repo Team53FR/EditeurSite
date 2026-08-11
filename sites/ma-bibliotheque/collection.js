@@ -160,9 +160,11 @@ function ouvrirFormulaireManuel() {
   ouvrirFormulaire();
 }
 
-// ===== Scan de code-barres =====
-// Bibliothèque de lecture de code-barres chargée à la demande seulement
-// (pas de poids supplémentaire pour qui n'utilise jamais le scan).
+// ===== Scan de code-barres (à partir d'une photo, pas en direct) =====
+// Une seule photo à prendre — plus besoin de tenir le téléphone immobile en
+// visant le code-barres en direct. Bibliothèque de lecture chargée à la
+// demande seulement (pas de poids supplémentaire pour qui n'utilise jamais
+// le scan).
 function chargerScriptScanner() {
   return new Promise((resolve, reject) => {
     if (window.Html5Qrcode) { resolve(); return; }
@@ -174,54 +176,45 @@ function chargerScriptScanner() {
   });
 }
 
-let instanceScanner = null;
-let verrouTraitementScan = false;
+// Élément technique requis par la bibliothèque pour le décodage de fichier
+// (jamais affiché : on ne montre pas l'image, seul le résultat nous importe).
+function obtenirElementScannerCache() {
+  let el = document.getElementById("lecteurPhotoCodeBarre");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "lecteurPhotoCodeBarre";
+    el.style.display = "none";
+    document.body.appendChild(el);
+  }
+  return el;
+}
 
-async function demarrerScan() {
+function declencherPhotoCodeBarre() {
   fermerMenuAjout();
-  verrouTraitementScan = false;
+  document.getElementById("champPhotoCodeBarre").click();
+}
 
-  const overlay = document.getElementById("scannerOverlay");
-  const statut = document.getElementById("scannerStatut");
-  overlay.style.display = "flex";
-  statut.textContent = "Chargement du lecteur...";
+async function traiterPhotoCodeBarre(event) {
+  const fichier = event.target.files[0];
+  event.target.value = "";
+  if (!fichier) return;
+
+  afficherToast("Lecture du code-barres…");
 
   try {
     await chargerScriptScanner();
-  } catch (e) {
-    overlay.style.display = "none";
-    afficherToast(e.message, true);
-    return;
-  }
-
-  statut.textContent = "Vise le code-barres du livre";
-
-  try {
-    instanceScanner = new Html5Qrcode("lecteurVideo", {
+    const instance = new Html5Qrcode(obtenirElementScannerCache().id, {
       formatsToSupport: [
         Html5QrcodeSupportedFormats.EAN_13,
         Html5QrcodeSupportedFormats.EAN_8,
         Html5QrcodeSupportedFormats.UPC_A
       ]
     });
-    await instanceScanner.start(
-      { facingMode: "environment" },
-      { fps: 10, qrbox: { width: 260, height: 160 } },
-      (codeDecode) => traiterCodeScanne(codeDecode),
-      () => { /* pas de code détecté sur cette frame : normal, on ignore */ }
-    );
+    const code = await instance.scanFile(fichier, false);
+    try { instance.clear(); } catch (e) {}
+    traiterCodeScanne(code);
   } catch (e) {
-    overlay.style.display = "none";
-    afficherToast("Impossible d'accéder à la caméra. Vérifie les autorisations.", true);
-  }
-}
-
-async function arreterScan() {
-  document.getElementById("scannerOverlay").style.display = "none";
-  if (instanceScanner) {
-    const s = instanceScanner;
-    instanceScanner = null;
-    try { await s.stop(); s.clear(); } catch (e) { /* déjà arrêté */ }
+    afficherToast("Code-barres illisible sur cette photo. Réessaie avec plus de lumière et de netteté, ou utilise la recherche par titre.", true);
   }
 }
 
@@ -438,16 +431,8 @@ async function rechercherTotalTomesSerie(nomSerie) {
 }
 
 async function traiterCodeScanne(code) {
-  if (verrouTraitementScan) return; // le callback peut être rappelé plusieurs fois pour le même code
-  verrouTraitementScan = true;
-
-  const statut = document.getElementById("scannerStatut");
-  if (statut) statut.textContent = `Code ${code} détecté, recherche des informations…`;
-
   let info = null;
   try { info = await rechercherLivreParCodeBarres(code); } catch (e) { /* on continue sans info */ }
-
-  await arreterScan();
 
   if (!info) {
     afficherToast(`Aucune information trouvée pour le code ${code}. Remplis les infos manuellement.`, true);
@@ -455,6 +440,75 @@ async function traiterCodeScanne(code) {
     return;
   }
 
+  await appliquerLivreTrouve(info);
+}
+
+// ===== Recherche d'un livre par titre (texte tapé ou lu par OCR) =====
+// Deux sources interrogées en parallèle. Sert à la fois pour la recherche
+// manuelle par titre ET, en repli automatique, pour compléter les infos
+// manquantes (surtout la couverture) après un scan de code-barres réussi
+// mais incomplet (ex. la BnF donne le texte mais jamais d'image).
+async function rechercherGoogleBooksParTitre(titre, limite) {
+  let url = `https://www.googleapis.com/books/v1/volumes?q=intitle:${encodeURIComponent(titre)}&maxResults=${limite}`;
+  if (CLE_GOOGLE_BOOKS) url += `&key=${encodeURIComponent(CLE_GOOGLE_BOOKS)}`;
+  const r = await fetch(url);
+  if (!r.ok) return [];
+  const data = await r.json();
+  return (data.items || []).map(item => {
+    const vi = item.volumeInfo || {};
+    let imageUrl = vi.imageLinks && (vi.imageLinks.thumbnail || vi.imageLinks.smallThumbnail);
+    if (imageUrl) imageUrl = imageUrl.replace(/^http:/, "https:").replace(/&edge=curl/, "");
+    return {
+      titre: vi.subtitle ? `${vi.title} ${vi.subtitle}` : (vi.title || titre),
+      auteur: (vi.authors || []).join(", "),
+      imageUrl: imageUrl || null,
+      source: "Google Books"
+    };
+  });
+}
+
+async function rechercherOpenLibraryParTitre(titre, limite) {
+  const r = await fetch(`https://openlibrary.org/search.json?title=${encodeURIComponent(titre)}&limit=${limite}`);
+  if (!r.ok) return [];
+  const data = await r.json();
+  return (data.docs || []).slice(0, limite).map(doc => ({
+    titre: doc.title || titre,
+    auteur: (doc.author_name || []).join(", "),
+    imageUrl: doc.cover_i ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-L.jpg` : null,
+    source: "Open Library"
+  }));
+}
+
+// Entrelace les résultats des deux sources pour varier dès le début de liste,
+// plutôt que d'afficher toute une source avant l'autre.
+async function rechercherLivresParTitre(titreBrut, limite = 5) {
+  // On enlève un éventuel numéro de tome tapé par l'utilisateur : Open
+  // Library en particulier ne matche presque rien avec "Titre Tome N" mais
+  // très bien avec le titre seul (vérifié : "One Piece Tome 14" -> 0
+  // résultat, "One Piece" -> des centaines, tomes inclus dans les titres).
+  const { baseTitre } = extraireNumeroTome(titreBrut);
+  const titre = (baseTitre || titreBrut || "").trim();
+  if (!titre) return [];
+
+  const [google, openLib] = await Promise.all([
+    rechercherGoogleBooksParTitre(titre, limite).catch(() => []),
+    rechercherOpenLibraryParTitre(titre, limite).catch(() => [])
+  ]);
+
+  const resultats = [];
+  const max = Math.max(google.length, openLib.length);
+  for (let i = 0; i < max && resultats.length < limite; i++) {
+    if (google[i]) resultats.push(google[i]);
+    if (openLib[i] && resultats.length < limite) resultats.push(openLib[i]);
+  }
+  return resultats;
+}
+
+// Applique un livre trouvé (par scan OU par recherche de titre) au
+// formulaire : fusionne dans une série existante ou pré-remplit une
+// nouvelle fiche. Toujours ouvert pour vérification avant enregistrement —
+// rien n'est jamais sauvegardé automatiquement.
+async function appliquerLivreTrouve(info) {
   const { baseTitre, tome } = extraireNumeroTome(info.titre);
   const titreCible = baseTitre || info.titre;
   const existant = trouverLivreParTitre(titreCible);
@@ -469,6 +523,17 @@ async function traiterCodeScanne(code) {
   let couvertureFinale = dataUrlCouverture;
   if (!couvertureFinale && infoSerie && infoSerie.imageUrl) {
     couvertureFinale = await recupererImageExterneEnDataUrl(infoSerie.imageUrl).catch(() => null);
+  }
+  // Toujours pas de couverture (ex. la BnF a donné le titre mais jamais
+  // d'image) : recherche complémentaire par titre pour combler ce qui
+  // manque, plutôt que de laisser une fiche sans aucune couverture alors
+  // qu'une autre édition du même livre en a une quelque part.
+  if (!couvertureFinale) {
+    try {
+      const complements = await rechercherLivresParTitre(titreCible, 3);
+      const avecImage = complements.find(c => c.imageUrl);
+      if (avecImage) couvertureFinale = await recupererImageExterneEnDataUrl(avecImage.imageUrl).catch(() => null);
+    } catch (e) { /* tant pis, la couverture restera à ajouter à la main */ }
   }
   const totalConnu = infoSerie && infoSerie.volumes ? infoSerie.volumes : null;
 
@@ -506,6 +571,105 @@ async function traiterCodeScanne(code) {
     }
     const messageTotal = totalConnu ? ` (${totalConnu} tomes au total connus)` : "";
     afficherToast(`« ${titreCible} » trouvé${messageTotal}. Vérifie et enregistre.`);
+  }
+}
+
+// ===== Recherche par titre (feuille dédiée) =====
+let resultatsRechercheCourants = [];
+
+function ouvrirRechercheTitre() {
+  fermerMenuAjout();
+  document.getElementById("champRechercheTitre").value = "";
+  document.getElementById("resultatsRecherche").innerHTML = "";
+  document.getElementById("statutOCR").style.display = "none";
+  resultatsRechercheCourants = [];
+  document.getElementById("voileRechercheTitre").classList.add("ouvert");
+  document.getElementById("champRechercheTitre").focus({ preventScroll: true });
+}
+
+function fermerRechercheTitre() {
+  document.getElementById("voileRechercheTitre").classList.remove("ouvert");
+}
+
+async function lancerRechercheTitre() {
+  const titre = document.getElementById("champRechercheTitre").value.trim();
+  if (!titre) { afficherToast("Tape ou photographie un titre.", true); return; }
+
+  const zone = document.getElementById("resultatsRecherche");
+  zone.innerHTML = `<div class="chargement"><span class="spin"></span> Recherche en cours…</div>`;
+
+  let resultats = [];
+  try { resultats = await rechercherLivresParTitre(titre, 6); } catch (e) { /* zone vide gérée ci-dessous */ }
+
+  resultatsRechercheCourants = resultats;
+
+  if (resultats.length === 0) {
+    zone.innerHTML = `<p class="aide-champ">Aucun résultat. Vérifie l'orthographe ou ajoute le livre manuellement.</p>`;
+    return;
+  }
+
+  zone.innerHTML = resultats.map((r, i) => `
+    <button type="button" class="resultat-recherche" onclick="choisirResultatRecherche(${i})">
+      <div class="resultat-couv">${r.imageUrl ? `<img src="${echapperHTML(r.imageUrl)}" alt="">` : iconePlaceholderCouverture()}</div>
+      <div class="resultat-info">
+        <strong>${echapperHTML(r.titre)}</strong>
+        <small>${echapperHTML(r.auteur || "Auteur inconnu")} — ${echapperHTML(r.source)}</small>
+      </div>
+    </button>`).join("");
+}
+
+async function choisirResultatRecherche(index) {
+  const choisi = resultatsRechercheCourants[index];
+  if (!choisi) return;
+  fermerRechercheTitre();
+  afficherToast("Récupération des informations…");
+  await appliquerLivreTrouve(choisi);
+}
+
+// ===== Photo du titre → texte (OCR), pour pré-remplir la recherche =====
+// Chargée à la demande seulement (bibliothèque assez lourde, ~2-5 Mo avec
+// les données de langue). Le texte détecté reste TOUJOURS éditable avant de
+// lancer la recherche : la reconnaissance sur une photo de couverture (police
+// stylisée, angle, reflets) n'est jamais garantie à 100%.
+function chargerScriptTesseract() {
+  return new Promise((resolve, reject) => {
+    if (window.Tesseract) { resolve(); return; }
+    const script = document.createElement("script");
+    script.src = "https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js";
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Impossible de charger la reconnaissance de texte (vérifie ta connexion)."));
+    document.head.appendChild(script);
+  });
+}
+
+function declencherPhotoOCR() {
+  document.getElementById("champPhotoOCR").click();
+}
+
+async function traiterPhotoOCR(event) {
+  const fichier = event.target.files[0];
+  event.target.value = "";
+  if (!fichier) return;
+
+  const statut = document.getElementById("statutOCR");
+  statut.style.display = "block";
+  statut.textContent = "Chargement de la reconnaissance de texte…";
+
+  try {
+    await chargerScriptTesseract();
+    statut.textContent = "Lecture du texte en cours…";
+    const resultat = await Tesseract.recognize(fichier, "fra+eng");
+    const texte = (resultat.data.text || "").replace(/\s+/g, " ").trim();
+    statut.style.display = "none";
+    if (texte) {
+      document.getElementById("champRechercheTitre").value = texte;
+      afficherToast("Texte détecté — vérifie/corrige avant de rechercher.");
+    } else {
+      afficherToast("Aucun texte détecté sur la photo. Tape le titre manuellement.", true);
+    }
+  } catch (e) {
+    statut.style.display = "none";
+    afficherToast(e.message || "Échec de la reconnaissance de texte.", true);
   }
 }
 
