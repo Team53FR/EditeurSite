@@ -770,12 +770,69 @@ async function validerRecadrage() {
   const canvas = document.createElement("canvas");
   canvas.width = img.naturalWidth;
   canvas.height = sHauteur;
-  canvas.getContext("2d").drawImage(img, 0, sy, img.naturalWidth, sHauteur, 0, 0, img.naturalWidth, sHauteur);
-  const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.92));
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(img, 0, sy, img.naturalWidth, sHauteur, 0, 0, img.naturalWidth, sHauteur);
+  binariserCanvas(canvas, ctx);
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
 
   document.getElementById("zoneRecadrage").style.display = "none";
   imageOriginaleRecadrage = null;
   await lireTexteImage(blob);
+}
+
+// Noir/blanc pur (seuil automatique, méthode d'Otsu) plutôt qu'un simple
+// contraste : testé sur un titre à lettrage doré très orné (police et
+// étoiles décoratives qui chevauchent le texte, fond dégradé) — le
+// contraste seul dégradait le texte reconnu (score de confiance de
+// Tesseract plus élevé, texte pourtant plus faux), alors que ce seuillage
+// noir/blanc a nettement amélioré la lecture. Détecte automatiquement si le
+// texte est la couleur claire ou sombre (la classe minoritaire de pixels
+// est supposée être le texte, l'autre le fond) plutôt qu'un seuil fixe qui
+// ne conviendrait qu'à une seule combinaison de couleurs.
+function binariserCanvas(canvas, ctx) {
+  const d = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const nbPixels = d.data.length / 4;
+  const gris = new Uint8ClampedArray(nbPixels);
+  const histogramme = new Array(256).fill(0);
+  for (let i = 0, j = 0; i < d.data.length; i += 4, j++) {
+    const g = Math.round(0.299 * d.data[i] + 0.587 * d.data[i + 1] + 0.114 * d.data[i + 2]);
+    gris[j] = g;
+    histogramme[g]++;
+  }
+
+  const seuil = seuilOtsu(histogramme, nbPixels);
+  let sousLeSeuil = 0;
+  for (let j = 0; j < nbPixels; j++) if (gris[j] <= seuil) sousLeSeuil++;
+  const texteEstSombre = sousLeSeuil < nbPixels / 2; // la classe minoritaire = le texte
+
+  for (let i = 0, j = 0; i < d.data.length; i += 4, j++) {
+    const estTexte = texteEstSombre ? gris[j] <= seuil : gris[j] > seuil;
+    const v = estTexte ? 0 : 255; // texte en noir sur fond blanc : ce que Tesseract préfère
+    d.data[i] = d.data[i + 1] = d.data[i + 2] = v;
+  }
+  ctx.putImageData(d, 0, 0);
+}
+
+// Seuil de binarisation qui maximise la séparation entre les deux groupes
+// de pixels (méthode d'Otsu, standard en traitement d'image) — s'adapte à
+// chaque photo plutôt qu'une valeur fixe devinée à l'avance.
+function seuilOtsu(histogramme, total) {
+  let somme = 0;
+  for (let i = 0; i < 256; i++) somme += i * histogramme[i];
+
+  let sommeArriere = 0, poidsArriere = 0, varianceMax = 0, seuil = 127;
+  for (let i = 0; i < 256; i++) {
+    poidsArriere += histogramme[i];
+    if (poidsArriere === 0) continue;
+    const poidsAvant = total - poidsArriere;
+    if (poidsAvant === 0) break;
+    sommeArriere += i * histogramme[i];
+    const moyenneArriere = sommeArriere / poidsArriere;
+    const moyenneAvant = (somme - sommeArriere) / poidsAvant;
+    const variance = poidsArriere * poidsAvant * Math.pow(moyenneArriere - moyenneAvant, 2);
+    if (variance > varianceMax) { varianceMax = variance; seuil = i; }
+  }
+  return seuil;
 }
 
 async function lireTexteImage(blob) {
