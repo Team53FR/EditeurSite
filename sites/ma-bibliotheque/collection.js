@@ -241,6 +241,15 @@ async function rechercherOpenLibrary(code) {
   };
 }
 
+// Pour les mangas/BD en série, la BnF ne met PAS le numéro de tome dans le
+// titre (qui est souvent le titre propre du tome, ex. "L'instinct") mais
+// dans un champ séparé au format "Collection : <série> ; <numéro>". Repéré
+// en testant le tome 14 de One Piece (titre BnF "L'instinct", sans aucune
+// mention de tome). Quand ce champ existe, on reconstruit un titre
+// "<série>, Tome <numéro>" pour que extraireNumeroTome() (partagé avec les
+// autres sources) le détecte normalement.
+const REGEX_COLLECTION_BNF = /^Collection\s*:\s*(.+?)\s*;\s*(\d+)\s*$/i;
+
 async function rechercherBnF(code) {
   const url = `https://catalogue.bnf.fr/api/SRU?version=1.2&operation=searchRetrieve&query=bib.ean+all+%22${encodeURIComponent(code)}%22&recordSchema=dublincore&maximumRecords=1`;
   const r = await fetch(url);
@@ -250,7 +259,15 @@ async function rechercherBnF(code) {
   const titreBrut = doc.getElementsByTagName("dc:title")[0] ? doc.getElementsByTagName("dc:title")[0].textContent : "";
   const auteurBrut = doc.getElementsByTagName("dc:creator")[0] ? doc.getElementsByTagName("dc:creator")[0].textContent : "";
   if (!titreBrut) return null;
-  return { titre: nettoyerTitreBnF(titreBrut), auteur: nettoyerAuteurBnF(auteurBrut), imageUrl: null };
+
+  let titre = nettoyerTitreBnF(titreBrut);
+  const descriptions = Array.from(doc.getElementsByTagName("dc:description"));
+  for (const d of descriptions) {
+    const m = REGEX_COLLECTION_BNF.exec((d.textContent || "").trim());
+    if (m) { titre = `${m[1].trim()}, Tome ${m[2]}`; break; }
+  }
+
+  return { titre, auteur: nettoyerAuteurBnF(auteurBrut), imageUrl: null };
 }
 
 // « Le petit prince / Antoine de Saint-Exupéry ; avec des aquarelles... »
