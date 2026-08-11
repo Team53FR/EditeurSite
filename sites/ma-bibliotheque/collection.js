@@ -31,6 +31,47 @@ async function chargerCollection() {
   }
   document.getElementById("chargement").style.display = "none";
   afficherLivres();
+
+  // Ne bloque pas l'affichage : tourne après coup, en silence.
+  rafraichirTotauxTomesEnArrierePlan();
+}
+
+// ===== Mise à jour automatique du nombre de tomes des séries =====
+// À l'arrivée sur la bibliothèque : recherche en ligne, pour CHAQUE livre
+// (qu'il ait été ajouté par scan ou saisi à la main), si un total de tomes
+// plus élevé est maintenant connu (utile pour les séries en cours, dont de
+// nouveaux tomes sortent avec le temps — cf. Wikidata/AniList dans
+// rechercherTotalTomesSerie). Ne diminue jamais un total existant, ne
+// bloque jamais l'interface, et n'écrit sur GitHub qu'une seule fois à la
+// fin, seulement si au moins un total a effectivement changé.
+async function rafraichirTotauxTomesEnArrierePlan() {
+  const aVerifier = livres.filter(l => l.titre);
+  if (aVerifier.length === 0) return;
+
+  const resultats = await Promise.all(aVerifier.map(l =>
+    rechercherTotalTomesSerie(l.titre).catch(() => null)
+  ));
+
+  let modifie = false;
+  resultats.forEach((resultat, i) => {
+    const livre = aVerifier[i];
+    const totalConnu = resultat && resultat.volumes;
+    if (totalConnu && totalConnu > (livre.tomesTotal || 1)) {
+      livre.tomesTotal = totalConnu;
+      modifie = true;
+    }
+  });
+
+  if (!modifie) return;
+
+  try {
+    await sauvegarderCollectionAvecRetry();
+  } catch (e) {
+    return; // on retentera au prochain chargement de la page
+  }
+
+  afficherLivres();
+  afficherToast("Nombre de tomes mis à jour pour au moins une série.");
 }
 
 // ===== Affichage de la liste =====
