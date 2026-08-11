@@ -335,6 +335,29 @@ async function recupererImageExterneEnDataUrl(url) {
   return comprimerImage(blob);
 }
 
+// Nombre total de tomes d'une série manga + couverture de secours, via
+// AniList (gratuit, sans clé). Fiable seulement pour les séries TERMINÉES
+// (AniList ne peut pas connaître le total « final » d'une série encore en
+// cours, ex. One Piece — volumes reste alors null, sans qu'il s'agisse d'une
+// erreur : c'est une inconnue réelle). Tri par popularité pour éviter de
+// matcher un spin-off au lieu de la série principale (constaté sur "My Hero
+// Academia", qui sans ce tri renvoyait un roman dérivé à 6 tomes au lieu de
+// la série principale, 42 tomes).
+async function rechercherAniList(nomSerie) {
+  if (!nomSerie) return null;
+  const requete = `query($s:String){ Page(page:1, perPage:1) { media(search:$s, type:MANGA, sort:POPULARITY_DESC) { volumes status coverImage { large } } } }`;
+  const r = await fetch("https://graphql.anilist.co", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Accept": "application/json" },
+    body: JSON.stringify({ query: requete, variables: { s: nomSerie } })
+  });
+  if (!r.ok) return null;
+  const data = await r.json();
+  const media = data.data && data.data.Page && data.data.Page.media && data.data.Page.media[0];
+  if (!media) return null;
+  return { volumes: media.volumes || null, imageUrl: (media.coverImage && media.coverImage.large) || null };
+}
+
 async function traiterCodeScanne(code) {
   if (verrouTraitementScan) return; // le callback peut être rappelé plusieurs fois pour le même code
   verrouTraitementScan = true;
@@ -357,23 +380,32 @@ async function traiterCodeScanne(code) {
   const titreCible = baseTitre || info.titre;
   const existant = trouverLivreParTitre(titreCible);
 
-  let dataUrlCouverture = null;
-  if (info.imageUrl) {
-    dataUrlCouverture = await recupererImageExterneEnDataUrl(info.imageUrl).catch(() => null);
+  // Couverture et nombre total de tomes connu : en parallèle, et seulement
+  // si un numéro de tome a été détecté (donc probablement une série).
+  const [dataUrlCouverture, infoSerie] = await Promise.all([
+    info.imageUrl ? recupererImageExterneEnDataUrl(info.imageUrl).catch(() => null) : Promise.resolve(null),
+    tome ? rechercherAniList(titreCible).catch(() => null) : Promise.resolve(null)
+  ]);
+
+  let couvertureFinale = dataUrlCouverture;
+  if (!couvertureFinale && infoSerie && infoSerie.imageUrl) {
+    couvertureFinale = await recupererImageExterneEnDataUrl(infoSerie.imageUrl).catch(() => null);
   }
+  const totalConnu = infoSerie && infoSerie.volumes ? infoSerie.volumes : null;
 
   if (existant) {
     ouvrirFormulaire(existant.id);
-    if (tome) {
-      if (!tomesPossedesEdition.includes(tome)) tomesPossedesEdition.push(tome);
-      const champTotal = document.getElementById("champTotalTomes");
-      if (tome > (parseInt(champTotal.value, 10) || 1)) champTotal.value = tome;
-      regenererGrilleTomes();
-    }
-    if (dataUrlCouverture && !existant.image) {
-      dataUrlImageEnMemoire = dataUrlCouverture;
+    const champTotal = document.getElementById("champTotalTomes");
+    let total = parseInt(champTotal.value, 10) || 1;
+    if (tome && tome > total) total = tome;
+    if (totalConnu && totalConnu > total) total = totalConnu;
+    champTotal.value = total;
+    if (tome && !tomesPossedesEdition.includes(tome)) tomesPossedesEdition.push(tome);
+    regenererGrilleTomes();
+    if (couvertureFinale && !existant.image) {
+      dataUrlImageEnMemoire = couvertureFinale;
       imageSupprimee = false;
-      document.getElementById("apercuCouverture").innerHTML = `<img src="${dataUrlCouverture}" alt="">`;
+      document.getElementById("apercuCouverture").innerHTML = `<img src="${couvertureFinale}" alt="">`;
       document.getElementById("boutonSupprimerImage").style.display = "block";
     }
     afficherToast(tome
@@ -383,16 +415,18 @@ async function traiterCodeScanne(code) {
     ouvrirFormulaire();
     document.getElementById("champTitre").value = titreCible;
     document.getElementById("champAuteur").value = info.auteur || "";
-    document.getElementById("champTotalTomes").value = tome || 1;
+    const totalInitial = Math.max(tome || 1, totalConnu || 0);
+    document.getElementById("champTotalTomes").value = totalInitial;
     tomesPossedesEdition = tome ? [tome] : [1];
     regenererGrilleTomes();
-    if (dataUrlCouverture) {
-      dataUrlImageEnMemoire = dataUrlCouverture;
+    if (couvertureFinale) {
+      dataUrlImageEnMemoire = couvertureFinale;
       imageSupprimee = false;
-      document.getElementById("apercuCouverture").innerHTML = `<img src="${dataUrlCouverture}" alt="">`;
+      document.getElementById("apercuCouverture").innerHTML = `<img src="${couvertureFinale}" alt="">`;
       document.getElementById("boutonSupprimerImage").style.display = "block";
     }
-    afficherToast(`« ${titreCible} » trouvé. Vérifie et enregistre.`);
+    const messageTotal = totalConnu ? ` (${totalConnu} tomes au total connus)` : "";
+    afficherToast(`« ${titreCible} » trouvé${messageTotal}. Vérifie et enregistre.`);
   }
 }
 
