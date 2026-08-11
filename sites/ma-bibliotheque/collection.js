@@ -107,6 +107,222 @@ async function obtenirUrlImageCache(chemin) {
   return url;
 }
 
+// ===== Menu « Ajouter un livre » =====
+function ouvrirMenuAjout() {
+  document.getElementById("voileMenuAjout").classList.add("ouvert");
+}
+function fermerMenuAjout() {
+  document.getElementById("voileMenuAjout").classList.remove("ouvert");
+}
+function ouvrirFormulaireManuel() {
+  fermerMenuAjout();
+  ouvrirFormulaire();
+}
+
+// ===== Scan de code-barres =====
+// Bibliothèque de lecture de code-barres chargée à la demande seulement
+// (pas de poids supplémentaire pour qui n'utilise jamais le scan).
+function chargerScriptScanner() {
+  return new Promise((resolve, reject) => {
+    if (window.Html5Qrcode) { resolve(); return; }
+    const script = document.createElement("script");
+    script.src = "https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js";
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Impossible de charger le lecteur de code-barres (vérifie ta connexion)."));
+    document.head.appendChild(script);
+  });
+}
+
+let instanceScanner = null;
+let verrouTraitementScan = false;
+
+async function demarrerScan() {
+  fermerMenuAjout();
+  verrouTraitementScan = false;
+
+  const overlay = document.getElementById("scannerOverlay");
+  const statut = document.getElementById("scannerStatut");
+  overlay.style.display = "flex";
+  statut.textContent = "Chargement du lecteur...";
+
+  try {
+    await chargerScriptScanner();
+  } catch (e) {
+    overlay.style.display = "none";
+    afficherToast(e.message, true);
+    return;
+  }
+
+  statut.textContent = "Vise le code-barres du livre";
+
+  try {
+    instanceScanner = new Html5Qrcode("lecteurVideo", {
+      formatsToSupport: [
+        Html5QrcodeSupportedFormats.EAN_13,
+        Html5QrcodeSupportedFormats.EAN_8,
+        Html5QrcodeSupportedFormats.UPC_A
+      ]
+    });
+    await instanceScanner.start(
+      { facingMode: "environment" },
+      { fps: 10, qrbox: { width: 260, height: 160 } },
+      (codeDecode) => traiterCodeScanne(codeDecode),
+      () => { /* pas de code détecté sur cette frame : normal, on ignore */ }
+    );
+  } catch (e) {
+    overlay.style.display = "none";
+    afficherToast("Impossible d'accéder à la caméra. Vérifie les autorisations.", true);
+  }
+}
+
+async function arreterScan() {
+  document.getElementById("scannerOverlay").style.display = "none";
+  if (instanceScanner) {
+    const s = instanceScanner;
+    instanceScanner = null;
+    try { await s.stop(); s.clear(); } catch (e) { /* déjà arrêté */ }
+  }
+}
+
+// Interroge des bases de livres publiques à partir de l'ISBN/code-barres.
+// Renvoie { titre, auteur, imageUrl } ou null si rien trouvé.
+async function rechercherLivreParCodeBarres(code) {
+  try {
+    const r = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${encodeURIComponent(code)}`);
+    if (r.ok) {
+      const data = await r.json();
+      const vi = data.items && data.items[0] && data.items[0].volumeInfo;
+      if (vi && vi.title) {
+        let imageUrl = vi.imageLinks && (vi.imageLinks.thumbnail || vi.imageLinks.smallThumbnail);
+        if (imageUrl) imageUrl = imageUrl.replace(/^http:/, "https:").replace(/&edge=curl/, "");
+        return {
+          titre: vi.subtitle ? `${vi.title} ${vi.subtitle}` : vi.title,
+          auteur: (vi.authors || []).join(", "),
+          imageUrl: imageUrl || null
+        };
+      }
+    }
+  } catch (e) { /* on tente le repli */ }
+
+  try {
+    const r = await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${encodeURIComponent(code)}&format=json&jscmd=data`);
+    if (r.ok) {
+      const data = await r.json();
+      const item = data[`ISBN:${code}`];
+      if (item && item.title) {
+        return {
+          titre: item.title,
+          auteur: (item.authors || []).map(a => a.name).join(", "),
+          imageUrl: item.cover ? (item.cover.large || item.cover.medium || item.cover.small) : null
+        };
+      }
+    }
+  } catch (e) { /* aucune donnée disponible */ }
+
+  return null;
+}
+
+// Détecte un numéro de tome dans un titre ("Tome 12", "T.12", "Vol. 12", "#12", …)
+// et renvoie le titre « nu » de la série à côté.
+function extraireNumeroTome(titre) {
+  if (!titre) return { baseTitre: titre, tome: null };
+  const regex = /^(.*?)[,:\-–]?\s*(?:tome|t\.?|vol\.?|volume|#)\s*0*(\d{1,4})\b.*$/i;
+  const m = regex.exec(titre.trim());
+  if (m && m[1].trim()) {
+    return { baseTitre: m[1].replace(/[,:\-–]\s*$/, "").trim(), tome: parseInt(m[2], 10) };
+  }
+  return { baseTitre: titre.trim(), tome: null };
+}
+
+function normaliserTitre(s) {
+  // Décompose les accents (NFD) puis retire les marques diacritiques
+  // combinées (plage Unicode 0x0300–0x036F), sans dépendre d'un échappement
+  // regex \uXXXX pour éviter toute ambiguïté d'encodage.
+  let sansAccents = "";
+  for (const car of (s || "").normalize("NFD")) {
+    const code = car.codePointAt(0);
+    if (code >= 0x0300 && code <= 0x036f) continue;
+    sansAccents += car;
+  }
+  return sansAccents.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function trouverLivreParTitre(titre) {
+  const cible = normaliserTitre(titre);
+  if (!cible) return null;
+  return livres.find(l => normaliserTitre(l.titre) === cible) || null;
+}
+
+// Récupère une image distante et la fait passer par le même pipeline de
+// compression que les photos prises sur le téléphone.
+async function recupererImageExterneEnDataUrl(url) {
+  const reponse = await fetch(url, { mode: "cors" });
+  if (!reponse.ok) throw new Error("Image distante inaccessible.");
+  const blob = await reponse.blob();
+  return comprimerImage(blob);
+}
+
+async function traiterCodeScanne(code) {
+  if (verrouTraitementScan) return; // le callback peut être rappelé plusieurs fois pour le même code
+  verrouTraitementScan = true;
+
+  const statut = document.getElementById("scannerStatut");
+  if (statut) statut.textContent = `Code ${code} détecté, recherche des informations…`;
+
+  let info = null;
+  try { info = await rechercherLivreParCodeBarres(code); } catch (e) { /* on continue sans info */ }
+
+  await arreterScan();
+
+  if (!info) {
+    afficherToast("Aucune information trouvée pour ce code-barres. Remplis les infos manuellement.", true);
+    ouvrirFormulaire();
+    return;
+  }
+
+  const { baseTitre, tome } = extraireNumeroTome(info.titre);
+  const titreCible = baseTitre || info.titre;
+  const existant = trouverLivreParTitre(titreCible);
+
+  let dataUrlCouverture = null;
+  if (info.imageUrl) {
+    dataUrlCouverture = await recupererImageExterneEnDataUrl(info.imageUrl).catch(() => null);
+  }
+
+  if (existant) {
+    ouvrirFormulaire(existant.id);
+    if (tome) {
+      if (!tomesPossedesEdition.includes(tome)) tomesPossedesEdition.push(tome);
+      const champTotal = document.getElementById("champTotalTomes");
+      if (tome > (parseInt(champTotal.value, 10) || 1)) champTotal.value = tome;
+      regenererGrilleTomes();
+    }
+    if (dataUrlCouverture && !existant.image) {
+      dataUrlImageEnMemoire = dataUrlCouverture;
+      imageSupprimee = false;
+      document.getElementById("apercuCouverture").innerHTML = `<img src="${dataUrlCouverture}" alt="">`;
+      document.getElementById("boutonSupprimerImage").style.display = "block";
+    }
+    afficherToast(tome
+      ? `Tome ${tome} détecté pour « ${existant.titre} ». Vérifie et enregistre.`
+      : `« ${existant.titre} » retrouvé. Vérifie et enregistre.`);
+  } else {
+    ouvrirFormulaire();
+    document.getElementById("champTitre").value = titreCible;
+    document.getElementById("champAuteur").value = info.auteur || "";
+    document.getElementById("champTotalTomes").value = tome || 1;
+    tomesPossedesEdition = tome ? [tome] : [1];
+    regenererGrilleTomes();
+    if (dataUrlCouverture) {
+      dataUrlImageEnMemoire = dataUrlCouverture;
+      imageSupprimee = false;
+      document.getElementById("apercuCouverture").innerHTML = `<img src="${dataUrlCouverture}" alt="">`;
+      document.getElementById("boutonSupprimerImage").style.display = "block";
+    }
+    afficherToast(`« ${titreCible} » trouvé. Vérifie et enregistre.`);
+  }
+}
+
 // ===== Formulaire d'ajout / édition =====
 function ouvrirFormulaire(id) {
   livreEnEdition = id || null;

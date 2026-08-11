@@ -378,6 +378,65 @@ a { color: var(--primaire); }
 
 .zone-danger { margin-top: 1rem; }
 
+/* ===== Menu « Ajouter un livre » ===== */
+.option-menu {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  width: 100%;
+  padding: 1rem;
+  border-radius: 14px;
+  border: 1px solid var(--bordure);
+  background: var(--fond);
+  color: var(--texte);
+  text-align: left;
+  cursor: pointer;
+}
+.option-menu:active { transform: scale(0.98); }
+.option-menu-icone {
+  width: 44px; height: 44px; border-radius: 12px;
+  background: var(--primaire-clair); color: var(--primaire);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.3rem; flex-shrink: 0;
+}
+.option-menu > span:last-child { flex: 1; min-width: 0; }
+.option-menu strong { display: block; font-size: 0.95rem; }
+.option-menu small { display: block; color: var(--texte-att); font-size: 0.8rem; margin-top: 0.15rem; }
+
+/* ===== Scan de code-barres (plein écran) ===== */
+.scanner-overlay {
+  position: fixed; inset: 0;
+  background: #000;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+}
+.scanner-entete {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: calc(1rem + var(--safe-top)) 1.1rem 1rem;
+  color: #fff;
+}
+.scanner-entete span { font-size: 0.95rem; font-weight: 600; }
+.scanner-entete button {
+  background: rgba(255, 255, 255, 0.15); border: none; border-radius: 10px;
+  width: 34px; height: 34px; display: flex; align-items: center; justify-content: center;
+  color: #fff; cursor: pointer; flex-shrink: 0;
+}
+.scanner-video {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background: #000;
+}
+.scanner-video video { width: 100% !important; height: 100% !important; object-fit: cover; }
+.scanner-aide {
+  color: rgba(255, 255, 255, 0.7);
+  text-align: center;
+  font-size: 0.82rem;
+  padding: 0.9rem 1.4rem calc(1.4rem + var(--safe-bottom));
+  margin: 0;
+}
+
 /* ===== Chargement ===== */
 .chargement {
   display: flex; align-items: center; justify-content: center;

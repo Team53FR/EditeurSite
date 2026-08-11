@@ -32,9 +32,49 @@
     </div>
   </main>
 
-  <button class="fab" id="boutonAjouter" title="Ajouter un livre" onclick="ouvrirFormulaire()">
+  <button class="fab" id="boutonAjouter" title="Ajouter un livre" onclick="ouvrirMenuAjout()">
     <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
   </button>
+
+  <!-- Feuille : choix du mode d'ajout -->
+  <div class="voile" id="voileMenuAjout" onclick="if(event.target===this) fermerMenuAjout()">
+    <div class="feuille">
+      <div class="feuille-entete">
+        <h2>Ajouter un livre</h2>
+        <button onclick="fermerMenuAjout()" title="Fermer">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="feuille-corps" style="display:flex;flex-direction:column;gap:0.7rem;">
+        <button type="button" class="option-menu" onclick="demarrerScan()">
+          <span class="option-menu-icone">📷</span>
+          <span>
+            <strong>Scanner un code-barres</strong>
+            <small>Remplit automatiquement titre, auteur et couverture</small>
+          </span>
+        </button>
+        <button type="button" class="option-menu" onclick="ouvrirFormulaireManuel()">
+          <span class="option-menu-icone">✏️</span>
+          <span>
+            <strong>Ajouter manuellement</strong>
+            <small>Renseigne toi-même les informations</small>
+          </span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Plein écran : scan du code-barres -->
+  <div class="scanner-overlay" id="scannerOverlay" style="display:none">
+    <div class="scanner-entete">
+      <span id="scannerStatut">Vise le code-barres du livre</span>
+      <button onclick="arreterScan()" title="Annuler">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div id="lecteurVideo" class="scanner-video"></div>
+    <p class="scanner-aide">Le code-barres (ISBN) est au dos du livre.</p>
+  </div>
 
   <!-- Feuille : ajout / édition d'un livre -->
   <div class="voile" id="voileFormulaire" onclick="if(event.target===this) fermerFormulaire()">
