@@ -4,6 +4,15 @@
 const PROPRIETAIRE = "Team53FR";
 const DEPOT_BDD = "BDD";
 const DOSSIER_BDD = "MaBibliotheque";
+// Optionnel : clé Google Books gratuite (sans elle, le scan de code-barres
+// fonctionne quand même via Open Library et la BnF, mais Google Books limite
+// alors les requêtes anonymes à un quota global PARTAGÉ par tous les sites
+// qui l'utilisent sans clé — il peut donc tomber à zéro sans lien avec ton
+// usage. Pour l'activer : console.cloud.google.com -> nouveau projet ->
+// API "Books API" -> Identifiants -> Créer une clé API (gratuit, 1000
+// requêtes/jour rien que pour toi). Tu peux ensuite la restreindre à ton
+// domaine GitHub Pages dans les paramètres de la clé.
+const CLE_GOOGLE_BOOKS = "";
 // ====================================================
 
 // Construit l'URL de l'API GitHub pour un chemin RELATIF au dossier de la base.

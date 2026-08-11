@@ -184,42 +184,98 @@ async function arreterScan() {
   }
 }
 
-// Interroge des bases de livres publiques à partir de l'ISBN/code-barres.
-// Renvoie { titre, auteur, imageUrl } ou null si rien trouvé.
+// ===== Recherche d'un livre à partir de son code-barres (ISBN/EAN) =====
+// Trois sources interrogées EN PARALLÈLE (pas l'une après l'autre, pour ne
+// pas cumuler les délais) puis combinées :
+//  - BnF (Bibliothèque nationale de France) : très fiable pour le texte
+//    (titre/auteur) des livres publiés en France, aucune limite de quota,
+//    mais ne fournit jamais de couverture.
+//  - Google Books : bonnes couvertures quand disponible, mais quota anonyme
+//    PARTAGÉ mondialement (peut échouer sans rapport avec ton usage — voir
+//    CLE_GOOGLE_BOOKS dans script.js pour le rendre fiable).
+//  - Open Library : complément, couvertures parfois disponibles aussi.
 async function rechercherLivreParCodeBarres(code) {
-  try {
-    const r = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${encodeURIComponent(code)}`);
-    if (r.ok) {
-      const data = await r.json();
-      const vi = data.items && data.items[0] && data.items[0].volumeInfo;
-      if (vi && vi.title) {
-        let imageUrl = vi.imageLinks && (vi.imageLinks.thumbnail || vi.imageLinks.smallThumbnail);
-        if (imageUrl) imageUrl = imageUrl.replace(/^http:/, "https:").replace(/&edge=curl/, "");
-        return {
-          titre: vi.subtitle ? `${vi.title} ${vi.subtitle}` : vi.title,
-          auteur: (vi.authors || []).join(", "),
-          imageUrl: imageUrl || null
-        };
-      }
-    }
-  } catch (e) { /* on tente le repli */ }
+  const [bnf, google, openLib] = await Promise.all([
+    rechercherBnF(code).catch(() => null),
+    rechercherGoogleBooks(code).catch(() => null),
+    rechercherOpenLibrary(code).catch(() => null)
+  ]);
 
-  try {
-    const r = await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${encodeURIComponent(code)}&format=json&jscmd=data`);
-    if (r.ok) {
-      const data = await r.json();
-      const item = data[`ISBN:${code}`];
-      if (item && item.title) {
-        return {
-          titre: item.title,
-          auteur: (item.authors || []).map(a => a.name).join(", "),
-          imageUrl: item.cover ? (item.cover.large || item.cover.medium || item.cover.small) : null
-        };
-      }
-    }
-  } catch (e) { /* aucune donnée disponible */ }
+  // Texte : la BnF est la référence pour les éditions françaises ; sinon on
+  // prend ce qu'on a.
+  const source = bnf || google || openLib;
+  if (!source) return null;
 
-  return null;
+  const imageUrl = (google && google.imageUrl) || (openLib && openLib.imageUrl) || null;
+
+  return { titre: source.titre, auteur: source.auteur, imageUrl };
+}
+
+async function rechercherGoogleBooks(code) {
+  let url = `https://www.googleapis.com/books/v1/volumes?q=isbn:${encodeURIComponent(code)}`;
+  if (CLE_GOOGLE_BOOKS) url += `&key=${encodeURIComponent(CLE_GOOGLE_BOOKS)}`;
+  const r = await fetch(url);
+  if (!r.ok) return null; // inclut le 429 de quota, silencieux : les autres sources prennent le relais
+  const data = await r.json();
+  const vi = data.items && data.items[0] && data.items[0].volumeInfo;
+  if (!vi || !vi.title) return null;
+  let imageUrl = vi.imageLinks && (vi.imageLinks.thumbnail || vi.imageLinks.smallThumbnail);
+  if (imageUrl) imageUrl = imageUrl.replace(/^http:/, "https:").replace(/&edge=curl/, "");
+  return {
+    titre: vi.subtitle ? `${vi.title} ${vi.subtitle}` : vi.title,
+    auteur: (vi.authors || []).join(", "),
+    imageUrl: imageUrl || null
+  };
+}
+
+async function rechercherOpenLibrary(code) {
+  const r = await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${encodeURIComponent(code)}&format=json&jscmd=data`);
+  if (!r.ok) return null;
+  const data = await r.json();
+  const item = data[`ISBN:${code}`];
+  if (!item || !item.title) return null;
+  return {
+    titre: item.title,
+    auteur: (item.authors || []).map(a => a.name).join(", "),
+    imageUrl: item.cover ? (item.cover.large || item.cover.medium || item.cover.small) : null
+  };
+}
+
+async function rechercherBnF(code) {
+  const url = `https://catalogue.bnf.fr/api/SRU?version=1.2&operation=searchRetrieve&query=bib.ean+all+%22${encodeURIComponent(code)}%22&recordSchema=dublincore&maximumRecords=1`;
+  const r = await fetch(url);
+  if (!r.ok) return null;
+  const texte = await r.text();
+  const doc = new DOMParser().parseFromString(texte, "application/xml");
+  const titreBrut = doc.getElementsByTagName("dc:title")[0] ? doc.getElementsByTagName("dc:title")[0].textContent : "";
+  const auteurBrut = doc.getElementsByTagName("dc:creator")[0] ? doc.getElementsByTagName("dc:creator")[0].textContent : "";
+  if (!titreBrut) return null;
+  return { titre: nettoyerTitreBnF(titreBrut), auteur: nettoyerAuteurBnF(auteurBrut), imageUrl: null };
+}
+
+// « Le petit prince / Antoine de Saint-Exupéry ; avec des aquarelles... »
+// -> « Le petit prince » (la BnF fait suivre le titre de mentions d'auteur
+// après un « / », qu'on retire pour ne garder que le titre).
+function nettoyerTitreBnF(brut) {
+  if (!brut) return "";
+  const idx = brut.indexOf(" / ");
+  return (idx === -1 ? brut : brut.slice(0, idx)).trim();
+}
+
+// « Saint-Exupéry, Antoine de (1900-1944). Auteur du texte » -> « Antoine de
+// Saint-Exupéry » (la BnF utilise la notice d'autorité : "Nom, Prénom
+// (dates). Rôle" ; on retire le rôle et les dates, puis on réordonne).
+function nettoyerAuteurBnF(brut) {
+  if (!brut) return "";
+  let s = brut.replace(/\.\s*[^,()]+$/, "").trim();
+  s = s.replace(/\s*\([^)]*\)/g, "").trim();
+  const virgule = s.indexOf(",");
+  if (virgule !== -1) {
+    const nom = s.slice(0, virgule).trim();
+    const prenom = s.slice(virgule + 1).trim();
+    if (prenom) s = `${prenom} ${nom}`;
+  }
+  return s;
 }
 
 // Détecte un numéro de tome dans un titre ("Tome 12", "T.12", "Vol. 12", "#12", …)
@@ -275,7 +331,7 @@ async function traiterCodeScanne(code) {
   await arreterScan();
 
   if (!info) {
-    afficherToast("Aucune information trouvée pour ce code-barres. Remplis les infos manuellement.", true);
+    afficherToast(`Aucune information trouvée pour le code ${code}. Remplis les infos manuellement.`, true);
     ouvrirFormulaire();
     return;
   }
