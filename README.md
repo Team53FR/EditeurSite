@@ -65,3 +65,18 @@ dans son dossier BDD. Pour **ma-bibliotheque**, créer
 À l'ajout d'un nouveau site suivant ce modèle : choisir un nouveau nom de
 dossier BDD (constante `DOSSIER_BDD` en haut du `script.js` du site) et ne
 jamais réutiliser celui d'un site existant.
+
+## App installable (PWA)
+
+**ma-bibliotheque** est installable comme une app sur téléphone (icône sur
+l'écran d'accueil, plein écran sans barre d'adresse), via `manifest.json` +
+`sw.js` (service worker qui met en cache uniquement la coquille de l'appli —
+jamais les données, toujours lues en direct). Aucune réécriture native :
+c'est le même site, juste rendu installable. Ne fonctionne qu'une fois servi
+en HTTPS (GitHub Pages) — pas en ouvrant le fichier en local.
+
+Pour rendre un autre site du dépôt installable de la même façon : dupliquer
+`manifest.json` (adapter `name`/`theme_color`/icônes) et `sw.js` (adapter
+`CACHE_NOM` et `FICHIERS_COQUILLE`) dans son dossier, puis ajouter les
+balises `<link rel="manifest">` et le script d'enregistrement du service
+worker dans le `<head>` de chaque page HTML du site.
