@@ -9,7 +9,10 @@ sous-dossier de `sites/`.
 EditeurSite/
 ├── index.html            # portail racine, liste les sites disponibles
 ├── sites/
-│   └── editeur-livre/    # site "Éditeur de livre en ligne" (ex-racine du dépôt)
+│   ├── editeur-livre/    # site "Éditeur de livre en ligne" (ex-racine du dépôt)
+│   │   ├── index.html
+│   │   └── ...
+│   └── ma-bibliotheque/  # site "Ma Bibliothèque" (répertorie les livres possédés)
 │       ├── index.html
 │       └── ...
 └── README.md
@@ -35,3 +38,30 @@ indépendamment sans rien casser.
 Servi via GitHub Pages depuis la racine du dépôt. Chaque site est donc
 accessible sous `https://<utilisateur>.github.io/EditeurSite/sites/<nom-du-site>/`,
 et le portail racine sous `https://<utilisateur>.github.io/EditeurSite/`.
+
+## Stockage « BDD » sur GitHub
+
+Ces sites n'ont pas de backend : ils lisent/écrivent directement, depuis le
+navigateur, des fichiers JSON (et images) dans le dépôt privé **`Team53FR/BDD`**
+via l'API Contents de GitHub, authentifiés par un token personnel saisi à la
+connexion (gardé uniquement en `sessionStorage`, jamais persisté).
+
+Chaque site utilise son **propre dossier** dans ce dépôt BDD, pour ne jamais
+mélanger ses données avec celles d'un autre site :
+
+| Site              | Dossier dans `Team53FR/BDD` | Fichiers                                  |
+|-------------------|------------------------------|--------------------------------------------|
+| editeur-livre      | `EditeurLivre/`             | `users.json`, `bibliotheques/<login>.json`, `images/<login>/…` |
+| ma-bibliotheque    | `MaBibliotheque/`           | `compte.json`, `livres.json`, `images/…`  |
+
+Pour qu'un site fonctionne, son (ou ses) fichier(s) de compte doivent exister
+dans son dossier BDD. Pour **ma-bibliotheque**, créer
+`MaBibliotheque/compte.json` dans `Team53FR/BDD` :
+
+```json
+{ "login": "ton_identifiant", "password": "ton_mot_de_passe" }
+```
+
+À l'ajout d'un nouveau site suivant ce modèle : choisir un nouveau nom de
+dossier BDD (constante `DOSSIER_BDD` en haut du `script.js` du site) et ne
+jamais réutiliser celui d'un site existant.
