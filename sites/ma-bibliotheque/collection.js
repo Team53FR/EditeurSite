@@ -684,11 +684,101 @@ function declencherPhotoOCR() {
   document.getElementById("champPhotoOCR").click();
 }
 
-async function traiterPhotoOCR(event) {
+// ===== Recadrage avant lecture =====
+// Testé : sur une photo de couverture complète, l'OCR lit correctement le
+// titre PUIS invente du texte à partir de l'illustration en dessous (étoiles,
+// personnages...) — résultat illisible. En ne lisant que la zone du titre
+// (recadrée par l'utilisateur), le même texte ressort parfaitement propre.
+// D'où cette étape de recadrage : deux repères à glisser verticalement pour
+// cadrer juste le titre avant de lancer la lecture.
+let imageOriginaleRecadrage = null; // Image en pleine résolution
+let hautRecadrage = 0.04;           // fraction de la hauteur (0 = haut de la photo)
+let basRecadrage = 0.34;
+let poigneeActive = null;
+
+function traiterPhotoOCR(event) {
   const fichier = event.target.files[0];
   event.target.value = "";
   if (!fichier) return;
 
+  const lecteur = new FileReader();
+  lecteur.onload = () => {
+    const img = new Image();
+    img.onload = () => {
+      imageOriginaleRecadrage = img;
+      hautRecadrage = 0.04;
+      basRecadrage = 0.34;
+      document.getElementById("imageRecadrage").src = lecteur.result;
+      document.getElementById("zoneRecadrage").style.display = "block";
+      document.getElementById("statutOCR").style.display = "none";
+      appliquerPositionsRecadrage();
+    };
+    img.onerror = () => afficherToast("Impossible de charger cette photo.", true);
+    img.src = lecteur.result;
+  };
+  lecteur.onerror = () => afficherToast("Lecture du fichier impossible.", true);
+  lecteur.readAsDataURL(fichier);
+}
+
+function appliquerPositionsRecadrage() {
+  document.getElementById("masqueHaut").style.top = "0";
+  document.getElementById("masqueHaut").style.height = (hautRecadrage * 100) + "%";
+  document.getElementById("masqueBas").style.bottom = "0";
+  document.getElementById("masqueBas").style.height = ((1 - basRecadrage) * 100) + "%";
+  document.getElementById("poigneeHaut").style.top = (hautRecadrage * 100) + "%";
+  document.getElementById("poigneeBas").style.top = (basRecadrage * 100) + "%";
+}
+
+function demarrerGlisserRecadrage(poignee) {
+  poigneeActive = poignee;
+}
+
+function deplacerGlisserRecadrage(clientY) {
+  if (!poigneeActive) return;
+  const conteneur = document.getElementById("conteneurRecadrage");
+  const rect = conteneur.getBoundingClientRect();
+  if (rect.height === 0) return;
+  const pct = Math.max(0, Math.min(1, (clientY - rect.top) / rect.height));
+  if (poigneeActive === "haut") {
+    hautRecadrage = Math.min(pct, basRecadrage - 0.04);
+  } else {
+    basRecadrage = Math.max(pct, hautRecadrage + 0.04);
+  }
+  appliquerPositionsRecadrage();
+}
+
+function arreterGlisserRecadrage() {
+  poigneeActive = null;
+}
+
+document.getElementById("poigneeHaut").addEventListener("pointerdown", (e) => { e.preventDefault(); demarrerGlisserRecadrage("haut"); });
+document.getElementById("poigneeBas").addEventListener("pointerdown", (e) => { e.preventDefault(); demarrerGlisserRecadrage("bas"); });
+document.addEventListener("pointermove", (e) => deplacerGlisserRecadrage(e.clientY));
+document.addEventListener("pointerup", arreterGlisserRecadrage);
+
+function annulerRecadrage() {
+  document.getElementById("zoneRecadrage").style.display = "none";
+  imageOriginaleRecadrage = null;
+}
+
+async function validerRecadrage() {
+  const img = imageOriginaleRecadrage;
+  if (!img) return;
+
+  const sy = Math.round(hautRecadrage * img.naturalHeight);
+  const sHauteur = Math.max(1, Math.round((basRecadrage - hautRecadrage) * img.naturalHeight));
+  const canvas = document.createElement("canvas");
+  canvas.width = img.naturalWidth;
+  canvas.height = sHauteur;
+  canvas.getContext("2d").drawImage(img, 0, sy, img.naturalWidth, sHauteur, 0, 0, img.naturalWidth, sHauteur);
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.92));
+
+  document.getElementById("zoneRecadrage").style.display = "none";
+  imageOriginaleRecadrage = null;
+  await lireTexteImage(blob);
+}
+
+async function lireTexteImage(blob) {
   const statut = document.getElementById("statutOCR");
   statut.style.display = "block";
   statut.textContent = "Chargement de la reconnaissance de texte…";
@@ -700,23 +790,19 @@ async function traiterPhotoOCR(event) {
     // Mode "texte épars" (PSM 11) plutôt que le mode par défaut ("page de
     // texte uniforme") : une couverture a plusieurs blocs de texte séparés
     // (titre, auteur, sous-titre...) à des tailles et endroits différents,
-    // pas un paragraphe. Testé : sur une couverture reconstituée à 3 blocs
-    // de texte, le mode par défaut n'en trouvait qu'un ; le mode "épars" les
-    // a tous trouvés. Un pré-traitement (contraste) a aussi été testé et
-    // écarté : il augmente le score de confiance de Tesseract sans améliorer
-    // — parfois en dégradant — le texte réellement reconnu.
+    // pas un paragraphe.
     const lecteur = await Tesseract.createWorker("fra+eng");
     await lecteur.setParameters({ tessedit_pageseg_mode: "11" });
-    const resultat = await lecteur.recognize(fichier);
+    const resultat = await lecteur.recognize(blob);
     await lecteur.terminate();
 
     const texte = (resultat.data.text || "").replace(/\s+/g, " ").trim();
     statut.style.display = "none";
     if (texte) {
       document.getElementById("champRechercheTitre").value = texte;
-      afficherToast("Texte détecté — vérifie/corrige avant de rechercher (les logos stylisés restent difficiles à lire).");
+      afficherToast("Texte détecté — vérifie/corrige avant de rechercher.");
     } else {
-      afficherToast("Aucun texte détecté sur la photo. Tape le titre manuellement.", true);
+      afficherToast("Aucun texte détecté. Recadre plus près du titre, ou tape-le manuellement.", true);
     }
   } catch (e) {
     statut.style.display = "none";
