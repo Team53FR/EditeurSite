@@ -335,14 +335,15 @@ async function recupererImageExterneEnDataUrl(url) {
   return comprimerImage(blob);
 }
 
-// Nombre total de tomes d'une série manga + couverture de secours, via
-// AniList (gratuit, sans clé). Fiable seulement pour les séries TERMINÉES
-// (AniList ne peut pas connaître le total « final » d'une série encore en
-// cours, ex. One Piece — volumes reste alors null, sans qu'il s'agisse d'une
-// erreur : c'est une inconnue réelle). Tri par popularité pour éviter de
-// matcher un spin-off au lieu de la série principale (constaté sur "My Hero
-// Academia", qui sans ce tri renvoyait un roman dérivé à 6 tomes au lieu de
-// la série principale, 42 tomes).
+// Nombre total de tomes d'une série manga + couverture de secours, combiné
+// depuis deux sources gratuites interrogées en parallèle :
+//  - AniList : fiable seulement pour les séries TERMINÉES (son champ
+//    "volumes" ne connaît pas de total pour une série encore en cours,
+//    ex. One Piece — reste alors null, ce n'est pas une erreur).
+//  - Wikidata : propriété P2635 ("nombre de parties de cette œuvre"),
+//    entretenue par la communauté même pour les séries en cours (One
+//    Piece -> 111, à jour). Complète justement le trou laissé par AniList.
+// On garde le plus grand des deux nombres trouvés.
 async function rechercherAniList(nomSerie) {
   if (!nomSerie) return null;
   const requete = `query($s:String){ Page(page:1, perPage:1) { media(search:$s, type:MANGA, sort:POPULARITY_DESC) { volumes status coverImage { large } } } }`;
@@ -356,6 +357,43 @@ async function rechercherAniList(nomSerie) {
   const media = data.data && data.data.Page && data.data.Page.media && data.data.Page.media[0];
   if (!media) return null;
   return { volumes: media.volumes || null, imageUrl: (media.coverImage && media.coverImage.large) || null };
+}
+
+function echapperChaineSparql(s) {
+  return String(s).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+}
+
+// Q21198342 = « manga series » sur Wikidata : on restreint la recherche à ce
+// type (et ses sous-types) pour ne pas confondre avec l'anime, un jeu vidéo
+// ou tout autre item homonyme du même univers (une franchise comme One
+// Piece a des dizaines d'items Wikidata distincts portant le même nom).
+async function rechercherWikidataTomes(nomSerie) {
+  if (!nomSerie) return null;
+  const nom = echapperChaineSparql(nomSerie);
+  const sparql = `SELECT ?value WHERE {
+    VALUES ?label { "${nom}"@en "${nom}"@fr }
+    ?item rdfs:label ?label.
+    ?item wdt:P31 ?type.
+    ?type wdt:P279* wd:Q21198342.
+    ?item wdt:P2635 ?value.
+  } LIMIT 1`;
+  const r = await fetch("https://query.wikidata.org/sparql?format=json&query=" + encodeURIComponent(sparql));
+  if (!r.ok) return null;
+  const data = await r.json();
+  const valeur = data.results.bindings[0] && data.results.bindings[0].value.value;
+  if (!valeur) return null;
+  const n = parseInt(valeur, 10);
+  return Number.isFinite(n) ? n : null;
+}
+
+async function rechercherTotalTomesSerie(nomSerie) {
+  const [wikidata, aniList] = await Promise.all([
+    rechercherWikidataTomes(nomSerie).catch(() => null),
+    rechercherAniList(nomSerie).catch(() => null)
+  ]);
+  const volumes = Math.max(wikidata || 0, (aniList && aniList.volumes) || 0) || null;
+  const imageUrl = (aniList && aniList.imageUrl) || null;
+  return { volumes, imageUrl };
 }
 
 async function traiterCodeScanne(code) {
@@ -384,7 +422,7 @@ async function traiterCodeScanne(code) {
   // si un numéro de tome a été détecté (donc probablement une série).
   const [dataUrlCouverture, infoSerie] = await Promise.all([
     info.imageUrl ? recupererImageExterneEnDataUrl(info.imageUrl).catch(() => null) : Promise.resolve(null),
-    tome ? rechercherAniList(titreCible).catch(() => null) : Promise.resolve(null)
+    tome ? rechercherTotalTomesSerie(titreCible).catch(() => null) : Promise.resolve(null)
   ]);
 
   let couvertureFinale = dataUrlCouverture;
