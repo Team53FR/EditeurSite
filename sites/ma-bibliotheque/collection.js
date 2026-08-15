@@ -337,12 +337,28 @@ function nettoyerAuteurBnF(brut) {
 // théorique.
 function extraireNumeroTome(titre) {
   if (!titre) return { baseTitre: titre, tome: null };
-  const regex = /^(.*?)[,:\-–]?\s*(?:\b(?:tome|t\.?|vol\.?|volume)|#)\s*0*(\d{1,4})\b.*$/i;
-  const m = regex.exec(titre.trim());
+  const t = titre.trim();
+
+  const regexMotCle = /^(.*?)[,:\-–]?\s*(?:\b(?:tome|t\.?|vol\.?|volume)|#)\s*0*(\d{1,4})\b.*$/i;
+  let m = regexMotCle.exec(t);
   if (m && m[1].trim()) {
     return { baseTitre: m[1].replace(/[.,:\-–]\s*$/, "").trim(), tome: parseInt(m[2], 10) };
   }
-  return { baseTitre: titre.trim(), tome: null };
+
+  // Repli : point ou virgule suivi directement du numéro, sans mot-clé, en
+  // toute fin de titre (ex. "One Piece. 56" — convention BnF pour certains
+  // tomes, vue en pratique). La ponctuation explicite rend ce motif sûr sans
+  // garde-fou supplémentaire : contrairement à un simple espace, un titre
+  // qui se termine légitimement par un nombre n'est normalement pas suivi
+  // d'un point ou d'une virgule juste avant ("Fahrenheit 451", pas
+  // "Fahrenheit. 451").
+  const regexPonctuation = /^(.+?)[.,]\s*0*(\d{1,4})$/;
+  m = regexPonctuation.exec(t);
+  if (m && m[1].trim()) {
+    return { baseTitre: m[1].trim(), tome: parseInt(m[2], 10) };
+  }
+
+  return { baseTitre: t, tome: null };
 }
 
 // Repli pour les résultats de recherche qui donnent juste "Titre N" sans
