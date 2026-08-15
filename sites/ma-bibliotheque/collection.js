@@ -485,12 +485,25 @@ function echapperChaineSparql(s) {
 // type (et ses sous-types) pour ne pas confondre avec l'anime, un jeu vidéo
 // ou tout autre item homonyme du même univers (une franchise comme One
 // Piece a des dizaines d'items Wikidata distincts portant le même nom).
+//
+// Recherche via le service mwapi (délègue à la recherche d'entités de
+// Wikidata, insensible à la casse) plutôt qu'une correspondance exacte de
+// libellé : signalé en pratique sur "L'Atelier des sorciers" — la
+// correspondance exacte échouait silencieusement à la moindre différence de
+// casse avec le libellé réel sur Wikidata (accents/majuscules), renvoyant
+// aucun total au lieu d'un mauvais total. mwapi corrige ça une fois pour
+// toutes, sans avoir à deviner la casse exacte.
 async function rechercherWikidataTomes(nomSerie) {
   if (!nomSerie) return null;
   const nom = echapperChaineSparql(nomSerie);
   const sparql = `SELECT ?value WHERE {
-    VALUES ?label { "${nom}"@en "${nom}"@fr }
-    ?item rdfs:label ?label.
+    SERVICE wikibase:mwapi {
+      bd:serviceParam wikibase:endpoint "www.wikidata.org";
+                      wikibase:api "EntitySearch";
+                      mwapi:search "${nom}";
+                      mwapi:language "fr".
+      ?item wikibase:apiOutputItem mwapi:item.
+    }
     ?item wdt:P31 ?type.
     ?type wdt:P279* wd:Q21198342.
     ?item wdt:P2635 ?value.
