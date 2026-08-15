@@ -439,6 +439,14 @@ a { color: var(--primaire); }
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
+/* Carte « toute la série » : mise en avant, distincte des tomes précis */
+.resultat-serie {
+  border-color: var(--primaire);
+  background: var(--primaire-clair);
+}
+.resultat-serie .resultat-couv { font-size: 1.4rem; background: var(--carte); }
+.resultat-serie .resultat-info strong { color: var(--primaire); }
+
 /* ===== Chargement ===== */
 .chargement {
   display: flex; align-items: center; justify-content: center;

@@ -614,12 +614,14 @@ async function appliquerLivreTrouve(info) {
 
 // ===== Recherche par titre (feuille dédiée) =====
 let resultatsRechercheCourants = [];
+let dernierTitreRecherche = "";
 
 function ouvrirRechercheTitre() {
   fermerMenuAjout();
   document.getElementById("champRechercheTitre").value = "";
   document.getElementById("resultatsRecherche").innerHTML = "";
   resultatsRechercheCourants = [];
+  dernierTitreRecherche = "";
   document.getElementById("voileRechercheTitre").classList.add("ouvert");
   document.getElementById("champRechercheTitre").focus({ preventScroll: true });
 }
@@ -629,23 +631,41 @@ function fermerRechercheTitre() {
 }
 
 async function lancerRechercheTitre() {
-  const titre = document.getElementById("champRechercheTitre").value.trim();
-  if (!titre) { afficherToast("Tape un titre.", true); return; }
+  const saisie = document.getElementById("champRechercheTitre").value.trim();
+  if (!saisie) { afficherToast("Tape un titre.", true); return; }
+
+  // Titre "nu" (sans numéro de tome) : sert de nom de série pour l'option
+  // « toute la série » ci-dessous, qu'on tape "One Piece" ou "One Piece
+  // Tome 14".
+  const { baseTitre } = extraireNumeroTome(saisie);
+  dernierTitreRecherche = (baseTitre || saisie).trim();
 
   const zone = document.getElementById("resultatsRecherche");
   zone.innerHTML = `<div class="chargement"><span class="spin"></span> Recherche en cours…</div>`;
 
   let resultats = [];
-  try { resultats = await rechercherLivresParTitre(titre, 6); } catch (e) { /* zone vide gérée ci-dessous */ }
+  try { resultats = await rechercherLivresParTitre(saisie, 6); } catch (e) { /* zone vide gérée ci-dessous */ }
 
   resultatsRechercheCourants = resultats;
 
+  // Deux façons d'ajouter, à choisir : un tome précis (fusionné dans la
+  // série existante si elle y est déjà) ou la série entière d'un coup (les
+  // tomes possédés se cochent alors à la main dans le formulaire).
+  const carteSerie = `
+    <button type="button" class="resultat-recherche resultat-serie" onclick="ajouterSerieComplete()">
+      <div class="resultat-couv">📚</div>
+      <div class="resultat-info">
+        <strong>Toute la série « ${echapperHTML(dernierTitreRecherche)} »</strong>
+        <small>Tu coches ensuite toi-même les tomes possédés</small>
+      </div>
+    </button>`;
+
   if (resultats.length === 0) {
-    zone.innerHTML = `<p class="aide-champ">Aucun résultat. Vérifie l'orthographe ou ajoute le livre manuellement.</p>`;
+    zone.innerHTML = carteSerie + `<p class="aide-champ">Aucun tome précis trouvé pour ce titre. Vérifie l'orthographe, ajoute la série entière ci-dessus, ou ajoute le livre manuellement.</p>`;
     return;
   }
 
-  zone.innerHTML = resultats.map((r, i) => `
+  zone.innerHTML = carteSerie + resultats.map((r, i) => `
     <button type="button" class="resultat-recherche" onclick="choisirResultatRecherche(${i})">
       <div class="resultat-couv">${r.imageUrl ? `<img src="${echapperHTML(r.imageUrl)}" alt="">` : iconePlaceholderCouverture()}</div>
       <div class="resultat-info">
@@ -661,6 +681,51 @@ async function choisirResultatRecherche(index) {
   fermerRechercheTitre();
   afficherToast("Récupération des informations…");
   await appliquerLivreTrouve(choisi);
+}
+
+// Ajoute (ou rouvre) la série entière sans viser un tome précis : total de
+// tomes pré-rempli si connu (Wikidata/AniList), mais AUCUN tome coché —
+// c'est à l'utilisateur de cocher ensuite ce qu'il possède déjà.
+async function ajouterSerieComplete() {
+  const titreCible = dernierTitreRecherche;
+  if (!titreCible) return;
+
+  const existant = trouverLivreParTitre(titreCible);
+  if (existant) {
+    fermerRechercheTitre();
+    ouvrirFormulaire(existant.id);
+    afficherToast(`« ${existant.titre} » est déjà dans ta bibliothèque — coche les tomes que tu possèdes.`);
+    return;
+  }
+
+  fermerRechercheTitre();
+  afficherToast("Récupération des informations de la série…");
+
+  // Auteur/couverture : on prend le meilleur résultat déjà en main (pas de
+  // nouvelle recherche), quitte à n'avoir ni l'un ni l'autre.
+  const candidat = resultatsRechercheCourants.find(r => r.imageUrl) || resultatsRechercheCourants[0] || null;
+  let dataUrlCouverture = null;
+  if (candidat && candidat.imageUrl) {
+    dataUrlCouverture = await recupererImageExterneEnDataUrl(candidat.imageUrl).catch(() => null);
+  }
+
+  let totalConnu = null;
+  try { totalConnu = (await rechercherTotalTomesSerie(titreCible)).volumes; } catch (e) { /* laissé à 1, éditable */ }
+
+  ouvrirFormulaire();
+  document.getElementById("champTitre").value = titreCible;
+  document.getElementById("champAuteur").value = (candidat && candidat.auteur) || "";
+  document.getElementById("champTotalTomes").value = Math.max(1, totalConnu || 1);
+  tomesPossedesEdition = []; // rien de coché : choix manuel
+  regenererGrilleTomes();
+  if (dataUrlCouverture) {
+    dataUrlImageEnMemoire = dataUrlCouverture;
+    imageSupprimee = false;
+    document.getElementById("apercuCouverture").innerHTML = `<img src="${dataUrlCouverture}" alt="">`;
+    document.getElementById("boutonSupprimerImage").style.display = "block";
+  }
+  const messageTotal = totalConnu ? `${totalConnu} tomes trouvés` : "coche les tomes que tu possèdes";
+  afficherToast(`« ${titreCible} » : ${messageTotal}.`);
 }
 
 // ===== Formulaire d'ajout / édition =====
