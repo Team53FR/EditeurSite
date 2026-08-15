@@ -13,6 +13,13 @@ const DOSSIER_BDD = "MaBibliotheque";
 // requêtes/jour rien que pour toi). Tu peux ensuite la restreindre à ton
 // domaine GitHub Pages dans les paramètres de la clé.
 const CLE_GOOGLE_BOOKS = "";
+// Clé TMDB (The Movie Database) — nécessaire pour la recherche de séries
+// (titre, créateur, affiche, liste des saisons/épisodes). Gratuite, sans
+// carte bancaire : compte sur themoviedb.org -> Paramètres -> API ->
+// Demander une clé API (v3 auth), quelques minutes d'attente d'approbation.
+// Sans clé, la recherche de série ne fonctionne pas ; l'ajout manuel reste
+// disponible.
+const CLE_TMDB = "";
 // ====================================================
 
 // Construit l'URL de l'API GitHub pour un chemin RELATIF au dossier de la base.

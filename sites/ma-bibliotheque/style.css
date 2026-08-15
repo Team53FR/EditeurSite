@@ -156,6 +156,21 @@ a { color: var(--primaire); }
   padding: 0.5rem; border-radius: 10px; display: flex;
 }
 .app-header .icone-deconnexion:hover { background: var(--fond); color: var(--danger); }
+
+.onglets-type { display: flex; gap: 0.4rem; margin-bottom: 0.75rem; }
+.onglet-type {
+  flex: 1;
+  padding: 0.55rem 0.6rem;
+  border-radius: 10px;
+  border: 1px solid var(--bordure);
+  background: var(--fond);
+  color: var(--texte-att);
+  font-weight: 600;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+.onglet-type.actif { background: var(--primaire); border-color: var(--primaire); color: #fff; }
+
 .recherche { position: relative; }
 .recherche input {
   width: 100%;
@@ -425,6 +440,59 @@ a { color: var(--primaire); }
 .separateur-form { height: 1px; background: var(--bordure); margin: 1.3rem 0; }
 
 .zone-danger { margin-top: 1rem; }
+
+/* ===== Accordéon saisons / épisodes (séries) ===== */
+.saison-item {
+  border: 1px solid var(--bordure);
+  border-radius: 12px;
+  margin-top: 0.5rem;
+  overflow: hidden;
+}
+.saison-entete {
+  width: 100%;
+  display: flex; align-items: center; gap: 0.6rem;
+  padding: 0.75rem 0.9rem;
+  background: var(--fond);
+  border: none;
+  color: var(--texte);
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  text-align: left;
+}
+.saison-entete .saison-nom { flex: 1; }
+.saison-entete small { font-weight: 500; color: var(--texte-att); font-size: 0.8rem; }
+.saison-entete svg { color: var(--texte-att); transition: transform 0.15s ease; flex-shrink: 0; }
+.saison-item.ouverte .saison-entete svg { transform: rotate(180deg); }
+.saison-item.complete .saison-entete small { color: var(--succes); }
+.saison-corps { padding: 0.9rem; border-top: 1px solid var(--bordure); }
+.champ-nombre-mini {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.6rem;
+  margin-bottom: 0.8rem;
+}
+.champ-nombre-mini label { font-size: 0.82rem; color: var(--texte-att); }
+.champ-nombre-mini input {
+  width: 64px; text-align: center;
+  padding: 0.45rem; border-radius: 8px; border: 1px solid var(--bordure);
+  background: var(--fond); color: var(--texte);
+}
+.grille-episodes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(38px, 1fr));
+  gap: 0.35rem;
+}
+.case-episode {
+  aspect-ratio: 1;
+  border-radius: 8px;
+  border: 1.5px solid var(--bordure);
+  background: var(--carte);
+  color: var(--texte-att);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.74rem; font-weight: 600;
+  cursor: pointer;
+  -webkit-user-select: none; user-select: none;
+}
+.case-episode.vu { background: var(--primaire); border-color: var(--primaire); color: #fff; }
 
 /* ===== Menu « Ajouter un livre » ===== */
 .option-menu {

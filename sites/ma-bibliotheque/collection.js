@@ -9,6 +9,27 @@ let dataUrlImageEnMemoire = null; // nouvelle couverture choisie, en attente d'e
 let imageSupprimee = false;
 const cacheImages = new Map(); // chemin GitHub -> URL locale (blob:)
 
+// Séries : mêmes livres.json (champ type: "livre"|"serie", "livre" par
+// défaut pour les entrées existantes créées avant cette fonctionnalité).
+let serieEnEdition = null;
+let saisonsEdition = [];        // [{ numero, episodesTotal, episodesVus: [] }]
+let saisonOuverte = null;       // numéro de la saison dépliée dans le formulaire (une seule à la fois)
+let dataUrlImageEnMemoireSerie = null;
+let imageSupprimeeSerie = false;
+
+// ===== Onglet actif (Livres / Séries) =====
+let ongletActif = "livre";
+try { ongletActif = localStorage.getItem("mb_ongletActif") || "livre"; } catch (e) {}
+
+function changerOngletType(type) {
+  ongletActif = type;
+  try { localStorage.setItem("mb_ongletActif", type); } catch (e) {}
+  document.querySelectorAll(".onglet-type").forEach((b) => b.classList.toggle("actif", b.dataset.type === type));
+  document.getElementById("champRecherche").placeholder = type === "serie" ? "Rechercher une série..." : "Rechercher un livre...";
+  afficherLivres();
+}
+document.querySelectorAll(".onglet-type").forEach((b) => b.classList.toggle("actif", b.dataset.type === ongletActif));
+
 // ===== Mode d'affichage (grille / liste / miniatures) =====
 // Mémorisé sur l'appareil : utile dès qu'on a pas mal de livres et que la
 // grande grille devient illisible.
@@ -79,7 +100,9 @@ async function rafraichirTotauxTomesEnArrierePlan() {
     if (Date.now() - dernier < DELAI_RAFRAICHISSEMENT_TOMES_MS) return;
   } catch (e) { /* localStorage indisponible : on rafraîchit sans throttle */ }
 
-  const aVerifier = livres.filter(l => l.titre);
+  // Uniquement les livres : Wikidata/AniList servent au nombre de tomes,
+  // pas aux séries TV (saisons/épisodes déjà connus via TMDB à l'ajout).
+  const aVerifier = livres.filter(l => l.titre && (l.type || "livre") === "livre");
   if (aVerifier.length === 0) return;
 
   try { localStorage.setItem("mb_dernierRafraichissementTomes", String(Date.now())); } catch (e) {}
@@ -113,29 +136,33 @@ async function rafraichirTotauxTomesEnArrierePlan() {
 // ===== Affichage de la liste =====
 function afficherLivres() {
   const recherche = (document.getElementById("champRecherche").value || "").trim().toLowerCase();
-  const filtres = livres
+  const delOnglet = livres.filter(l => (l.type || "livre") === ongletActif);
+  const filtres = delOnglet
     .filter(l => !recherche
       || (l.titre || "").toLowerCase().includes(recherche)
-      || (l.auteur || "").toLowerCase().includes(recherche))
+      || (l.auteur || l.createur || "").toLowerCase().includes(recherche))
     .sort((a, b) => (a.titre || "").localeCompare(b.titre || "", "fr", { sensitivity: "base" }));
 
   const grille = document.getElementById("grilleLivres");
   const etatVide = document.getElementById("etatVide");
+  const estSerie = ongletActif === "serie";
 
   if (filtres.length === 0) {
     grille.style.display = "none";
     grille.innerHTML = "";
     etatVide.style.display = "block";
-    document.getElementById("etatVideTitre").textContent =
-      livres.length === 0 ? "Aucun livre pour l'instant" : "Aucun résultat";
-    etatVide.querySelector("p").textContent =
-      livres.length === 0 ? "Touche le bouton + pour ajouter ton premier livre." : "Essaie un autre terme de recherche.";
+    document.getElementById("etatVideTitre").textContent = delOnglet.length === 0
+      ? (estSerie ? "Aucune série pour l'instant" : "Aucun livre pour l'instant")
+      : "Aucun résultat";
+    etatVide.querySelector("p").textContent = delOnglet.length === 0
+      ? `Touche le bouton + pour ajouter ${estSerie ? "ta première série" : "ton premier livre"}.`
+      : "Essaie un autre terme de recherche.";
     return;
   }
 
   etatVide.style.display = "none";
   grille.style.display = "grid";
-  grille.innerHTML = filtres.map(carteLivreHTML).join("");
+  grille.innerHTML = filtres.map((item) => (item.type === "serie" ? carteSerieHTML(item) : carteLivreHTML(item))).join("");
 
   configurerChargementParesseuxImages(filtres);
 }
@@ -186,6 +213,26 @@ function carteLivreHTML(l) {
     </button>`;
 }
 
+function carteSerieHTML(s) {
+  const saisons = Array.isArray(s.saisons) ? s.saisons : [];
+  const total = saisons.reduce((somme, sa) => somme + Math.max(0, sa.episodesTotal || 0), 0) || 1;
+  const vus = saisons.reduce((somme, sa) => somme + (Array.isArray(sa.episodesVus) ? sa.episodesVus.length : 0), 0);
+  const pourcentage = Math.min(100, Math.round((vus / total) * 100));
+  const complet = vus >= total;
+  return `
+    <button class="carte-livre" onclick="ouvrirFormulaireSerie('${s.id}')">
+      <div class="couv-livre" id="couv-${s.id}">${iconePlaceholderCouverture()}</div>
+      <div class="info-livre">
+        <h3>${echapperHTML(s.titre || "Sans titre")}</h3>
+        <p class="auteur">${echapperHTML(s.createur || "")}</p>
+        <div class="progression${complet ? ' badge-complet' : ''}">
+          <div class="barre-progression"><span style="width:${pourcentage}%"></span></div>
+          <small>${vus}/${total} ép.</small>
+        </div>
+      </div>
+    </button>`;
+}
+
 function iconePlaceholderCouverture() {
   return `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>`;
 }
@@ -211,8 +258,56 @@ async function obtenirUrlImageCache(chemin) {
   return url;
 }
 
-// ===== Menu « Ajouter un livre » =====
+// ===== Menu « Ajouter un livre / une série » =====
+// Contenu généré selon l'onglet actif plutôt que deux feuilles statiques
+// distinctes : évite de dupliquer toute la structure HTML du menu.
 function ouvrirMenuAjout() {
+  const titre = document.getElementById("titreMenuAjout");
+  const corps = document.getElementById("corpsMenuAjout");
+
+  if (ongletActif === "serie") {
+    titre.textContent = "Ajouter une série";
+    corps.innerHTML = `
+      <button type="button" class="option-menu" onclick="ouvrirRechercheSerie()">
+        <span class="option-menu-icone">🔎</span>
+        <span>
+          <strong>Rechercher une série</strong>
+          <small>Tape le titre, les saisons se remplissent automatiquement</small>
+        </span>
+      </button>
+      <button type="button" class="option-menu" onclick="ouvrirFormulaireSerieManuel()">
+        <span class="option-menu-icone">✏️</span>
+        <span>
+          <strong>Ajouter manuellement</strong>
+          <small>Renseigne toi-même les informations</small>
+        </span>
+      </button>`;
+  } else {
+    titre.textContent = "Ajouter un livre";
+    corps.innerHTML = `
+      <button type="button" class="option-menu" onclick="declencherPhotoCodeBarre()">
+        <span class="option-menu-icone">📷</span>
+        <span>
+          <strong>Photo du code-barres</strong>
+          <small>Prends une photo, pas besoin de viser en direct</small>
+        </span>
+      </button>
+      <button type="button" class="option-menu" onclick="ouvrirRechercheTitre()">
+        <span class="option-menu-icone">🔎</span>
+        <span>
+          <strong>Rechercher par titre</strong>
+          <small>Tape le titre du livre</small>
+        </span>
+      </button>
+      <button type="button" class="option-menu" onclick="ouvrirFormulaireManuel()">
+        <span class="option-menu-icone">✏️</span>
+        <span>
+          <strong>Ajouter manuellement</strong>
+          <small>Renseigne toi-même les informations</small>
+        </span>
+      </button>`;
+  }
+
   document.getElementById("voileMenuAjout").classList.add("ouvert");
 }
 function fermerMenuAjout() {
@@ -462,7 +557,13 @@ function normaliserTitre(s) {
 function trouverLivreParTitre(titre) {
   const cible = normaliserTitre(titre);
   if (!cible) return null;
-  return livres.find(l => normaliserTitre(l.titre) === cible) || null;
+  return livres.find(l => (l.type || "livre") === "livre" && normaliserTitre(l.titre) === cible) || null;
+}
+
+function trouverSerieParTitre(titre) {
+  const cible = normaliserTitre(titre);
+  if (!cible) return null;
+  return livres.find(l => l.type === "serie" && normaliserTitre(l.titre) === cible) || null;
 }
 
 // Récupère une image distante et la fait passer par le même pipeline de
@@ -844,6 +945,425 @@ async function ajouterSerieComplete() {
   }
   const messageTotal = totalConnu ? `${totalConnu} tomes trouvés` : "coche les tomes que tu possèdes";
   afficherToast(`« ${titreCible} » : ${messageTotal}.`);
+}
+
+// ============================================================
+// ===== Séries (visionnage, saisons/épisodes) =====
+// ============================================================
+
+// ===== Recherche TMDB =====
+async function rechercherSeriesTMDB(titre) {
+  if (!CLE_TMDB) return [];
+  const r = await fetch(`https://api.themoviedb.org/3/search/tv?api_key=${encodeURIComponent(CLE_TMDB)}&query=${encodeURIComponent(titre)}&language=fr-FR`);
+  if (!r.ok) return [];
+  const data = await r.json();
+  return (data.results || []).slice(0, 8).map((item) => ({
+    id: item.id,
+    titre: item.name,
+    annee: (item.first_air_date || "").slice(0, 4),
+    imageUrl: item.poster_path ? `https://image.tmdb.org/t/p/w342${item.poster_path}` : null
+  }));
+}
+
+// Détails d'une série (saisons + nombre d'épisodes par saison) : un second
+// appel après la recherche, seulement quand l'utilisateur a choisi LAQUELLE
+// des séries trouvées l'intéresse.
+async function obtenirDetailsSerieTMDB(id) {
+  const r = await fetch(`https://api.themoviedb.org/3/tv/${id}?api_key=${encodeURIComponent(CLE_TMDB)}&language=fr-FR`);
+  if (!r.ok) throw new Error("Détails de la série introuvables.");
+  const data = await r.json();
+  const createur = (data.created_by || []).map((c) => c.name).join(", ");
+  const saisons = (data.seasons || [])
+    .filter((s) => s.season_number && s.season_number > 0) // ignore les "spéciaux" (saison 0)
+    .map((s) => ({ numero: s.season_number, episodesTotal: Math.max(1, s.episode_count || 1), episodesVus: [] }));
+  const imageUrl = data.poster_path ? `https://image.tmdb.org/t/p/w342${data.poster_path}` : null;
+  return {
+    titre: data.name,
+    createur,
+    saisons: saisons.length ? saisons : [{ numero: 1, episodesTotal: 1, episodesVus: [] }],
+    imageUrl
+  };
+}
+
+// ===== Feuille de recherche =====
+let resultatsRechercheSerieCourants = [];
+
+function ouvrirRechercheSerie() {
+  fermerMenuAjout();
+  document.getElementById("champRechercheSerie").value = "";
+  document.getElementById("resultatsRechercheSerie").innerHTML = "";
+  resultatsRechercheSerieCourants = [];
+  document.getElementById("voileRechercheSerie").classList.add("ouvert");
+  document.getElementById("champRechercheSerie").focus({ preventScroll: true });
+}
+
+function fermerRechercheSerie() {
+  document.getElementById("voileRechercheSerie").classList.remove("ouvert");
+}
+
+async function lancerRechercheSerie() {
+  const titre = document.getElementById("champRechercheSerie").value.trim();
+  if (!titre) { afficherToast("Tape un titre.", true); return; }
+
+  if (!CLE_TMDB) {
+    afficherToast("Recherche indisponible : aucune clé TMDB configurée (voir CLE_TMDB dans script.js).", true);
+    return;
+  }
+
+  const zone = document.getElementById("resultatsRechercheSerie");
+  zone.innerHTML = `<div class="chargement"><span class="spin"></span> Recherche en cours…</div>`;
+
+  let resultats = [];
+  try { resultats = await rechercherSeriesTMDB(titre); } catch (e) { /* zone vide gérée ci-dessous */ }
+
+  resultatsRechercheSerieCourants = resultats;
+
+  if (resultats.length === 0) {
+    zone.innerHTML = `<p class="aide-champ">Aucun résultat. Vérifie l'orthographe ou ajoute la série manuellement.</p>`;
+    return;
+  }
+
+  zone.innerHTML = resultats.map((r, i) => `
+    <button type="button" class="resultat-recherche" onclick="choisirResultatRechercheSerie(${i})">
+      <div class="resultat-couv">${r.imageUrl ? `<img src="${echapperHTML(r.imageUrl)}" alt="">` : iconePlaceholderCouverture()}</div>
+      <div class="resultat-info">
+        <strong>${echapperHTML(r.titre)}</strong>
+        <small>${echapperHTML(r.annee || "TMDB")}</small>
+      </div>
+    </button>`).join("");
+}
+
+async function choisirResultatRechercheSerie(index) {
+  const choisi = resultatsRechercheSerieCourants[index];
+  if (!choisi) return;
+  fermerRechercheSerie();
+
+  const existant = trouverSerieParTitre(choisi.titre);
+  if (existant) {
+    ouvrirFormulaireSerie(existant.id);
+    afficherToast(`« ${existant.titre} » est déjà dans ta bibliothèque — coche les épisodes vus.`);
+    return;
+  }
+
+  afficherToast("Récupération des saisons…");
+
+  try {
+    const details = await obtenirDetailsSerieTMDB(choisi.id);
+    let dataUrlCouverture = null;
+    if (details.imageUrl) {
+      dataUrlCouverture = await recupererImageExterneEnDataUrl(details.imageUrl).catch(() => null);
+    }
+
+    ouvrirFormulaireSerie();
+    document.getElementById("champTitreSerie").value = details.titre;
+    document.getElementById("champCreateurSerie").value = details.createur || "";
+    saisonsEdition = details.saisons;
+    saisonOuverte = null;
+    document.getElementById("champNombreSaisons").value = saisonsEdition.length;
+    rendreListeSaisons();
+
+    if (dataUrlCouverture) {
+      dataUrlImageEnMemoireSerie = dataUrlCouverture;
+      imageSupprimeeSerie = false;
+      document.getElementById("apercuCouvertureSerie").innerHTML = `<img src="${dataUrlCouverture}" alt="">`;
+      document.getElementById("boutonSupprimerImageSerie").style.display = "block";
+    }
+
+    afficherToast(`« ${details.titre} » trouvée (${saisonsEdition.length} saison${saisonsEdition.length > 1 ? "s" : ""}). Coche les épisodes vus.`);
+  } catch (e) {
+    ouvrirFormulaireSerie();
+    document.getElementById("champTitreSerie").value = choisi.titre;
+    afficherToast(e.message || "Échec de la récupération des informations. Complète à la main.", true);
+  }
+}
+
+// ===== Formulaire d'ajout / édition d'une série =====
+function ouvrirFormulaireSerieManuel() {
+  fermerMenuAjout();
+  ouvrirFormulaireSerie();
+}
+
+function ouvrirFormulaireSerie(id) {
+  serieEnEdition = id || null;
+  dataUrlImageEnMemoireSerie = null;
+  imageSupprimeeSerie = false;
+  saisonOuverte = null;
+
+  const apercu = document.getElementById("apercuCouvertureSerie");
+  const boutonSupprimerImage = document.getElementById("boutonSupprimerImageSerie");
+  const zoneSuppression = document.getElementById("zoneSuppressionSerie");
+
+  if (id) {
+    const s = livres.find((x) => x.id === id);
+    if (!s) return;
+    document.getElementById("titreFormulaireSerie").textContent = "Modifier la série";
+    document.getElementById("champTitreSerie").value = s.titre || "";
+    document.getElementById("champCreateurSerie").value = s.createur || "";
+    saisonsEdition = Array.isArray(s.saisons) && s.saisons.length
+      ? s.saisons.map((sa) => ({
+          numero: sa.numero,
+          episodesTotal: Math.max(1, sa.episodesTotal || 1),
+          episodesVus: Array.isArray(sa.episodesVus) ? [...sa.episodesVus] : []
+        }))
+      : [{ numero: 1, episodesTotal: 1, episodesVus: [] }];
+    document.getElementById("champNombreSaisons").value = saisonsEdition.length;
+    zoneSuppression.style.display = "block";
+    apercu.innerHTML = iconePlaceholderCouverture();
+
+    if (s.image) {
+      boutonSupprimerImage.style.display = "block";
+      obtenirUrlImageCache(s.image).then((url) => {
+        if (serieEnEdition === id) apercu.innerHTML = `<img src="${url}" alt="">`;
+      }).catch(() => {});
+    } else {
+      boutonSupprimerImage.style.display = "none";
+    }
+  } else {
+    document.getElementById("titreFormulaireSerie").textContent = "Ajouter une série";
+    document.getElementById("champTitreSerie").value = "";
+    document.getElementById("champCreateurSerie").value = "";
+    saisonsEdition = [{ numero: 1, episodesTotal: 1, episodesVus: [] }];
+    document.getElementById("champNombreSaisons").value = 1;
+    zoneSuppression.style.display = "none";
+    boutonSupprimerImage.style.display = "none";
+    apercu.innerHTML = iconePlaceholderCouverture();
+  }
+
+  rendreListeSaisons();
+  document.getElementById("voileFormulaireSerie").classList.add("ouvert");
+  document.getElementById("champTitreSerie").focus({ preventScroll: true });
+}
+
+function fermerFormulaireSerie() {
+  document.getElementById("voileFormulaireSerie").classList.remove("ouvert");
+  serieEnEdition = null;
+}
+
+// ===== Saisons =====
+function changerNombreSaisons(delta) {
+  const champ = document.getElementById("champNombreSaisons");
+  let val = (parseInt(champ.value, 10) || 1) + delta;
+  if (val < 1) val = 1;
+  if (val > 60) val = 60;
+  champ.value = val;
+  regenererSaisons();
+}
+
+function regenererSaisons() {
+  let total = parseInt(document.getElementById("champNombreSaisons").value, 10);
+  if (!Number.isFinite(total) || total < 1) total = 1;
+  if (total > 60) total = 60;
+  document.getElementById("champNombreSaisons").value = total;
+
+  while (saisonsEdition.length < total) {
+    saisonsEdition.push({ numero: saisonsEdition.length + 1, episodesTotal: 10, episodesVus: [] });
+  }
+  if (saisonsEdition.length > total) saisonsEdition = saisonsEdition.slice(0, total);
+  saisonsEdition.forEach((s, i) => { s.numero = i + 1; }); // renumérote, garde l'ordre
+
+  if (saisonOuverte && saisonOuverte > total) saisonOuverte = null;
+  rendreListeSaisons();
+}
+
+function trouverSaison(numero) {
+  return saisonsEdition.find((s) => s.numero === numero);
+}
+
+function rendreListeSaisons() {
+  const zone = document.getElementById("listeSaisons");
+  zone.innerHTML = saisonsEdition.map((s) => {
+    const total = Math.max(1, s.episodesTotal || 1);
+    const vus = (s.episodesVus || []).length;
+    const complete = vus >= total;
+    const ouverte = saisonOuverte === s.numero;
+
+    let corpsHtml = "";
+    if (ouverte) {
+      let episodesHtml = "";
+      for (let i = 1; i <= total; i++) {
+        const estVu = (s.episodesVus || []).includes(i);
+        episodesHtml += `<button type="button" class="case-episode${estVu ? " vu" : ""}" onclick="basculerEpisode(${s.numero}, ${i})">${i}</button>`;
+      }
+      corpsHtml = `
+        <div class="saison-corps">
+          <div class="champ-nombre-mini">
+            <label>Nombre d'épisodes</label>
+            <input type="number" min="1" max="99" value="${total}" onchange="changerEpisodesTotalSaison(${s.numero}, this.value)">
+          </div>
+          <div class="grille-episodes">${episodesHtml}</div>
+          <div class="raccourcis-tomes">
+            <button type="button" onclick="cocherTousEpisodesSaison(${s.numero}, true)">Tout regarder</button>
+            <button type="button" onclick="cocherTousEpisodesSaison(${s.numero}, false)">Tout décocher</button>
+          </div>
+        </div>`;
+    }
+
+    return `
+      <div class="saison-item${ouverte ? " ouverte" : ""}${complete ? " complete" : ""}">
+        <button type="button" class="saison-entete" onclick="basculerSaisonOuverte(${s.numero})">
+          <span class="saison-nom">Saison ${s.numero}</span>
+          <small>${vus}/${total}</small>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        ${corpsHtml}
+      </div>`;
+  }).join("");
+}
+
+function basculerSaisonOuverte(numero) {
+  saisonOuverte = saisonOuverte === numero ? null : numero;
+  rendreListeSaisons();
+}
+
+function changerEpisodesTotalSaison(numero, valeur) {
+  const s = trouverSaison(numero);
+  if (!s) return;
+  let total = parseInt(valeur, 10);
+  if (!Number.isFinite(total) || total < 1) total = 1;
+  if (total > 999) total = 999;
+  s.episodesTotal = total;
+  s.episodesVus = (s.episodesVus || []).filter((n) => n <= total);
+  rendreListeSaisons();
+}
+
+function basculerEpisode(numeroSaison, numeroEpisode) {
+  const s = trouverSaison(numeroSaison);
+  if (!s) return;
+  if (!Array.isArray(s.episodesVus)) s.episodesVus = [];
+  const idx = s.episodesVus.indexOf(numeroEpisode);
+  if (idx === -1) s.episodesVus.push(numeroEpisode); else s.episodesVus.splice(idx, 1);
+  rendreListeSaisons();
+}
+
+function cocherTousEpisodesSaison(numero, etat) {
+  const s = trouverSaison(numero);
+  if (!s) return;
+  const total = Math.max(1, s.episodesTotal || 1);
+  s.episodesVus = etat ? Array.from({ length: total }, (_, i) => i + 1) : [];
+  rendreListeSaisons();
+}
+
+// ===== Couverture (affiche) =====
+function declencherChoixImageSerie(source) {
+  document.getElementById(source === "camera" ? "champImageCameraSerie" : "champImageGalerieSerie").click();
+}
+
+async function imageChoisieSerie(event) {
+  const fichier = event.target.files[0];
+  event.target.value = "";
+  if (!fichier) return;
+  try {
+    const dataUrl = await comprimerImage(fichier);
+    dataUrlImageEnMemoireSerie = dataUrl;
+    imageSupprimeeSerie = false;
+    document.getElementById("apercuCouvertureSerie").innerHTML = `<img src="${dataUrl}" alt="">`;
+    document.getElementById("boutonSupprimerImageSerie").style.display = "block";
+  } catch (e) {
+    afficherToast("Impossible de charger cette image.", true);
+  }
+}
+
+function retirerImageSerie() {
+  dataUrlImageEnMemoireSerie = null;
+  imageSupprimeeSerie = true;
+  document.getElementById("apercuCouvertureSerie").innerHTML = iconePlaceholderCouverture();
+  document.getElementById("boutonSupprimerImageSerie").style.display = "none";
+}
+
+// ===== Enregistrement / suppression =====
+async function enregistrerSerie() {
+  const titre = document.getElementById("champTitreSerie").value.trim();
+  if (!titre) { afficherToast("Le titre est obligatoire.", true); return; }
+
+  const createur = document.getElementById("champCreateurSerie").value.trim();
+  const saisons = saisonsEdition.map((s) => {
+    const total = Math.max(1, s.episodesTotal || 1);
+    return {
+      numero: s.numero,
+      episodesTotal: total,
+      episodesVus: (s.episodesVus || []).filter((n) => n >= 1 && n <= total).sort((a, b) => a - b)
+    };
+  });
+
+  const bouton = document.getElementById("boutonEnregistrerSerie");
+  bouton.disabled = true;
+  bouton.textContent = "Enregistrement...";
+
+  const estNouveau = !serieEnEdition;
+  const id = serieEnEdition || genererIdLivre();
+  const serieExistante = estNouveau ? null : livres.find((l) => l.id === id);
+  const ancienChemin = serieExistante ? serieExistante.image : null;
+  let cheminImage = ancienChemin || null;
+
+  try {
+    if (dataUrlImageEnMemoireSerie) {
+      cheminImage = `images/${id}.jpg`;
+      await uploaderImageBase64(cheminImage, dataUrlImageEnMemoireSerie, token, `Affiche — ${titre}`);
+    } else if (imageSupprimeeSerie) {
+      cheminImage = null;
+    }
+
+    const donnees = {
+      id,
+      type: "serie",
+      titre,
+      createur,
+      saisons,
+      image: cheminImage,
+      dateAjout: serieExistante ? serieExistante.dateAjout : new Date().toISOString(),
+      dateModif: new Date().toISOString()
+    };
+
+    if (estNouveau) {
+      livres.push(donnees);
+    } else {
+      livres[livres.findIndex((l) => l.id === id)] = donnees;
+    }
+
+    await sauvegarderCollectionAvecRetry();
+
+    if (ancienChemin && ancienChemin !== cheminImage) {
+      supprimerFichierGithub(ancienChemin, token, "Remplacement de l'affiche").catch(() => {});
+      cacheImages.delete(ancienChemin);
+    }
+    if (cheminImage) cacheImages.delete(cheminImage);
+
+    fermerFormulaireSerie();
+    afficherLivres();
+    afficherToast(estNouveau ? "Série ajoutée." : "Série mise à jour.");
+  } catch (e) {
+    afficherToast(e.message || "Échec de l'enregistrement.", true);
+  } finally {
+    bouton.disabled = false;
+    bouton.textContent = "Enregistrer";
+  }
+}
+
+async function supprimerSerieCourante() {
+  if (!serieEnEdition) return;
+  if (!confirm("Supprimer définitivement cette série ?")) return;
+
+  const bouton = document.getElementById("boutonEnregistrerSerie");
+  bouton.disabled = true;
+
+  try {
+    const serie = livres.find((l) => l.id === serieEnEdition);
+    livres = livres.filter((l) => l.id !== serieEnEdition);
+    await sauvegarderCollectionAvecRetry();
+
+    if (serie && serie.image) {
+      supprimerFichierGithub(serie.image, token, "Suppression d'une série").catch(() => {});
+      cacheImages.delete(serie.image);
+    }
+
+    fermerFormulaireSerie();
+    afficherLivres();
+    afficherToast("Série supprimée.");
+  } catch (e) {
+    afficherToast(e.message || "Échec de la suppression.", true);
+  } finally {
+    bouton.disabled = false;
+  }
 }
 
 // ===== Formulaire d'ajout / édition =====
