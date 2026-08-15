@@ -65,7 +65,7 @@
           <span class="option-menu-icone">🔎</span>
           <span>
             <strong>Rechercher par titre</strong>
-            <small>Tape le titre ou prends-le en photo</small>
+            <small>Tape le titre du livre</small>
           </span>
         </button>
         <button type="button" class="option-menu" onclick="ouvrirFormulaireManuel()">
@@ -96,31 +96,8 @@
           <label for="champRechercheTitre">Titre du livre</label>
           <input type="text" id="champRechercheTitre" placeholder="Ex. One Piece" onkeydown="if(event.key==='Enter'){lancerRechercheTitre();}">
         </div>
-        <div style="display:flex; gap:0.6rem; margin-bottom:0.9rem;">
-          <button type="button" class="btn btn-secondaire" style="flex:1" onclick="declencherPhotoOCR()">📷 Photo du titre</button>
-          <button type="button" class="btn btn-primaire" style="flex:1" onclick="lancerRechercheTitre()">Rechercher</button>
-        </div>
-        <input type="file" accept="image/*" capture="environment" id="champPhotoOCR" style="display:none" onchange="traiterPhotoOCR(event)">
+        <button type="button" class="btn btn-primaire btn-bloc" style="margin-bottom:0.9rem" onclick="lancerRechercheTitre()">Rechercher</button>
 
-        <!-- Recadrage de la photo avant lecture : la lecture de texte se
-             trompe beaucoup moins en ignorant l'illustration de la
-             couverture, en ne lisant que la zone du titre. -->
-        <div id="zoneRecadrage" style="display:none">
-          <p class="aide-champ" style="margin-top:0">Cadre juste le titre (évite l'illustration) pour une lecture bien plus fiable.</p>
-          <div id="conteneurRecadrage" class="conteneur-recadrage">
-            <img id="imageRecadrage" alt="">
-            <div id="masqueHaut" class="masque-recadrage"></div>
-            <div id="masqueBas" class="masque-recadrage"></div>
-            <div id="poigneeHaut" class="poignee-recadrage"><span></span></div>
-            <div id="poigneeBas" class="poignee-recadrage"><span></span></div>
-          </div>
-          <div style="display:flex; gap:0.6rem; margin-top:0.8rem;">
-            <button type="button" class="btn btn-secondaire" style="flex:1" onclick="annulerRecadrage()">Annuler</button>
-            <button type="button" class="btn btn-primaire" style="flex:1" onclick="validerRecadrage()">Lire le texte</button>
-          </div>
-        </div>
-
-        <p id="statutOCR" class="aide-champ" style="display:none"></p>
         <div id="resultatsRecherche"></div>
       </div>
     </div>

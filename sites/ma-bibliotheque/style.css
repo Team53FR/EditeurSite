@@ -403,37 +403,6 @@ a { color: var(--primaire); }
 .option-menu strong { display: block; font-size: 0.95rem; }
 .option-menu small { display: block; color: var(--texte-att); font-size: 0.8rem; margin-top: 0.15rem; }
 
-/* ===== Recadrage de photo avant lecture de texte (OCR) ===== */
-.conteneur-recadrage {
-  position: relative;
-  overflow: hidden;
-  border-radius: 12px;
-  touch-action: none;
-  background: #000;
-  line-height: 0;
-}
-.conteneur-recadrage img { width: 100%; display: block; }
-.masque-recadrage {
-  position: absolute;
-  left: 0; right: 0;
-  background: rgba(0, 0, 0, 0.6);
-  pointer-events: none;
-}
-.poignee-recadrage {
-  position: absolute;
-  left: 0; right: 0;
-  height: 30px;
-  margin-top: -15px;
-  display: flex; align-items: center; justify-content: center;
-  cursor: ns-resize;
-}
-.poignee-recadrage span {
-  width: 56px; height: 5px;
-  border-radius: 3px;
-  background: #fff;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
-}
-
 /* ===== Résultats de recherche par titre ===== */
 .resultat-recherche {
   display: flex;

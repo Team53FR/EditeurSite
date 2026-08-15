@@ -443,8 +443,8 @@ async function traiterCodeScanne(code) {
   await appliquerLivreTrouve(info);
 }
 
-// ===== Recherche d'un livre par titre (texte tapé ou lu par OCR) =====
-// Deux sources interrogées en parallèle. Sert à la fois pour la recherche
+// ===== Recherche d'un livre par titre (texte tapé) =====
+// Trois sources interrogées en parallèle. Sert à la fois pour la recherche
 // manuelle par titre ET, en repli automatique, pour compléter les infos
 // manquantes (surtout la couverture) après un scan de code-barres réussi
 // mais incomplet (ex. la BnF donne le texte mais jamais d'image).
@@ -619,7 +619,6 @@ function ouvrirRechercheTitre() {
   fermerMenuAjout();
   document.getElementById("champRechercheTitre").value = "";
   document.getElementById("resultatsRecherche").innerHTML = "";
-  document.getElementById("statutOCR").style.display = "none";
   resultatsRechercheCourants = [];
   document.getElementById("voileRechercheTitre").classList.add("ouvert");
   document.getElementById("champRechercheTitre").focus({ preventScroll: true });
@@ -631,7 +630,7 @@ function fermerRechercheTitre() {
 
 async function lancerRechercheTitre() {
   const titre = document.getElementById("champRechercheTitre").value.trim();
-  if (!titre) { afficherToast("Tape ou photographie un titre.", true); return; }
+  if (!titre) { afficherToast("Tape un titre.", true); return; }
 
   const zone = document.getElementById("resultatsRecherche");
   zone.innerHTML = `<div class="chargement"><span class="spin"></span> Recherche en cours…</div>`;
@@ -662,215 +661,6 @@ async function choisirResultatRecherche(index) {
   fermerRechercheTitre();
   afficherToast("Récupération des informations…");
   await appliquerLivreTrouve(choisi);
-}
-
-// ===== Photo du titre → texte (OCR), pour pré-remplir la recherche =====
-// Chargée à la demande seulement (bibliothèque assez lourde, ~2-5 Mo avec
-// les données de langue). Le texte détecté reste TOUJOURS éditable avant de
-// lancer la recherche : la reconnaissance sur une photo de couverture (police
-// stylisée, angle, reflets) n'est jamais garantie à 100%.
-function chargerScriptTesseract() {
-  return new Promise((resolve, reject) => {
-    if (window.Tesseract) { resolve(); return; }
-    const script = document.createElement("script");
-    script.src = "https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js";
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error("Impossible de charger la reconnaissance de texte (vérifie ta connexion)."));
-    document.head.appendChild(script);
-  });
-}
-
-function declencherPhotoOCR() {
-  document.getElementById("champPhotoOCR").click();
-}
-
-// ===== Recadrage avant lecture =====
-// Testé : sur une photo de couverture complète, l'OCR lit correctement le
-// titre PUIS invente du texte à partir de l'illustration en dessous (étoiles,
-// personnages...) — résultat illisible. En ne lisant que la zone du titre
-// (recadrée par l'utilisateur), le même texte ressort parfaitement propre.
-// D'où cette étape de recadrage : deux repères à glisser verticalement pour
-// cadrer juste le titre avant de lancer la lecture.
-let imageOriginaleRecadrage = null; // Image en pleine résolution
-let hautRecadrage = 0.04;           // fraction de la hauteur (0 = haut de la photo)
-let basRecadrage = 0.34;
-let poigneeActive = null;
-
-function traiterPhotoOCR(event) {
-  const fichier = event.target.files[0];
-  event.target.value = "";
-  if (!fichier) return;
-
-  const lecteur = new FileReader();
-  lecteur.onload = () => {
-    const img = new Image();
-    img.onload = () => {
-      imageOriginaleRecadrage = img;
-      hautRecadrage = 0.04;
-      basRecadrage = 0.34;
-      document.getElementById("imageRecadrage").src = lecteur.result;
-      document.getElementById("zoneRecadrage").style.display = "block";
-      document.getElementById("statutOCR").style.display = "none";
-      appliquerPositionsRecadrage();
-    };
-    img.onerror = () => afficherToast("Impossible de charger cette photo.", true);
-    img.src = lecteur.result;
-  };
-  lecteur.onerror = () => afficherToast("Lecture du fichier impossible.", true);
-  lecteur.readAsDataURL(fichier);
-}
-
-function appliquerPositionsRecadrage() {
-  document.getElementById("masqueHaut").style.top = "0";
-  document.getElementById("masqueHaut").style.height = (hautRecadrage * 100) + "%";
-  document.getElementById("masqueBas").style.bottom = "0";
-  document.getElementById("masqueBas").style.height = ((1 - basRecadrage) * 100) + "%";
-  document.getElementById("poigneeHaut").style.top = (hautRecadrage * 100) + "%";
-  document.getElementById("poigneeBas").style.top = (basRecadrage * 100) + "%";
-}
-
-function demarrerGlisserRecadrage(poignee) {
-  poigneeActive = poignee;
-}
-
-function deplacerGlisserRecadrage(clientY) {
-  if (!poigneeActive) return;
-  const conteneur = document.getElementById("conteneurRecadrage");
-  const rect = conteneur.getBoundingClientRect();
-  if (rect.height === 0) return;
-  const pct = Math.max(0, Math.min(1, (clientY - rect.top) / rect.height));
-  if (poigneeActive === "haut") {
-    hautRecadrage = Math.min(pct, basRecadrage - 0.04);
-  } else {
-    basRecadrage = Math.max(pct, hautRecadrage + 0.04);
-  }
-  appliquerPositionsRecadrage();
-}
-
-function arreterGlisserRecadrage() {
-  poigneeActive = null;
-}
-
-document.getElementById("poigneeHaut").addEventListener("pointerdown", (e) => { e.preventDefault(); demarrerGlisserRecadrage("haut"); });
-document.getElementById("poigneeBas").addEventListener("pointerdown", (e) => { e.preventDefault(); demarrerGlisserRecadrage("bas"); });
-document.addEventListener("pointermove", (e) => deplacerGlisserRecadrage(e.clientY));
-document.addEventListener("pointerup", arreterGlisserRecadrage);
-
-function annulerRecadrage() {
-  document.getElementById("zoneRecadrage").style.display = "none";
-  imageOriginaleRecadrage = null;
-}
-
-async function validerRecadrage() {
-  const img = imageOriginaleRecadrage;
-  if (!img) return;
-
-  const sy = Math.round(hautRecadrage * img.naturalHeight);
-  const sHauteur = Math.max(1, Math.round((basRecadrage - hautRecadrage) * img.naturalHeight));
-  const canvas = document.createElement("canvas");
-  canvas.width = img.naturalWidth;
-  canvas.height = sHauteur;
-  const ctx = canvas.getContext("2d");
-  ctx.drawImage(img, 0, sy, img.naturalWidth, sHauteur, 0, 0, img.naturalWidth, sHauteur);
-  binariserCanvas(canvas, ctx);
-  const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
-
-  document.getElementById("zoneRecadrage").style.display = "none";
-  imageOriginaleRecadrage = null;
-  await lireTexteImage(blob);
-}
-
-// Noir/blanc pur (seuil automatique, méthode d'Otsu) plutôt qu'un simple
-// contraste : testé sur un titre à lettrage doré très orné (police et
-// étoiles décoratives qui chevauchent le texte, fond dégradé) — le
-// contraste seul dégradait le texte reconnu (score de confiance de
-// Tesseract plus élevé, texte pourtant plus faux), alors que ce seuillage
-// noir/blanc a nettement amélioré la lecture. Détecte automatiquement si le
-// texte est la couleur claire ou sombre (la classe minoritaire de pixels
-// est supposée être le texte, l'autre le fond) plutôt qu'un seuil fixe qui
-// ne conviendrait qu'à une seule combinaison de couleurs.
-function binariserCanvas(canvas, ctx) {
-  const d = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const nbPixels = d.data.length / 4;
-  const gris = new Uint8ClampedArray(nbPixels);
-  const histogramme = new Array(256).fill(0);
-  for (let i = 0, j = 0; i < d.data.length; i += 4, j++) {
-    const g = Math.round(0.299 * d.data[i] + 0.587 * d.data[i + 1] + 0.114 * d.data[i + 2]);
-    gris[j] = g;
-    histogramme[g]++;
-  }
-
-  const seuil = seuilOtsu(histogramme, nbPixels);
-  let sousLeSeuil = 0;
-  for (let j = 0; j < nbPixels; j++) if (gris[j] <= seuil) sousLeSeuil++;
-  const texteEstSombre = sousLeSeuil < nbPixels / 2; // la classe minoritaire = le texte
-
-  for (let i = 0, j = 0; i < d.data.length; i += 4, j++) {
-    const estTexte = texteEstSombre ? gris[j] <= seuil : gris[j] > seuil;
-    const v = estTexte ? 0 : 255; // texte en noir sur fond blanc : ce que Tesseract préfère
-    d.data[i] = d.data[i + 1] = d.data[i + 2] = v;
-  }
-  ctx.putImageData(d, 0, 0);
-}
-
-// Seuil de binarisation qui maximise la séparation entre les deux groupes
-// de pixels (méthode d'Otsu, standard en traitement d'image) — s'adapte à
-// chaque photo plutôt qu'une valeur fixe devinée à l'avance.
-function seuilOtsu(histogramme, total) {
-  let somme = 0;
-  for (let i = 0; i < 256; i++) somme += i * histogramme[i];
-
-  let sommeArriere = 0, poidsArriere = 0, varianceMax = 0, seuil = 127;
-  for (let i = 0; i < 256; i++) {
-    poidsArriere += histogramme[i];
-    if (poidsArriere === 0) continue;
-    const poidsAvant = total - poidsArriere;
-    if (poidsAvant === 0) break;
-    sommeArriere += i * histogramme[i];
-    const moyenneArriere = sommeArriere / poidsArriere;
-    const moyenneAvant = (somme - sommeArriere) / poidsAvant;
-    const variance = poidsArriere * poidsAvant * Math.pow(moyenneArriere - moyenneAvant, 2);
-    if (variance > varianceMax) { varianceMax = variance; seuil = i; }
-  }
-  return seuil;
-}
-
-async function lireTexteImage(blob) {
-  const statut = document.getElementById("statutOCR");
-  statut.style.display = "block";
-  statut.textContent = "Chargement de la reconnaissance de texte…";
-
-  try {
-    await chargerScriptTesseract();
-    statut.textContent = "Lecture du texte en cours…";
-
-    // Mode "texte épars" (PSM 11) plutôt que le mode par défaut ("page de
-    // texte uniforme") : une couverture a plusieurs blocs de texte séparés
-    // (titre, auteur, sous-titre...) à des tailles et endroits différents,
-    // pas un paragraphe.
-    // Modèle rapide par défaut (pas "best") : testé sur une police stylisée
-    // reconstituée, "best" n'améliorait RIEN par rapport au modèle rapide
-    // (échec identique) tout en étant nettement plus lent à charger ET à
-    // faire tourner à chaque lecture — confirmé lent à l'usage. Le vrai gain
-    // de précision vient du recadrage + de la binarisation ci-dessous, pas
-    // du modèle.
-    const lecteur = await Tesseract.createWorker("fra+eng");
-    await lecteur.setParameters({ tessedit_pageseg_mode: "11" });
-    const resultat = await lecteur.recognize(blob);
-    await lecteur.terminate();
-
-    const texte = (resultat.data.text || "").replace(/\s+/g, " ").trim();
-    statut.style.display = "none";
-    if (texte) {
-      document.getElementById("champRechercheTitre").value = texte;
-      afficherToast("Texte détecté — vérifie/corrige avant de rechercher.");
-    } else {
-      afficherToast("Aucun texte détecté. Recadre plus près du titre, ou tape-le manuellement.", true);
-    }
-  } catch (e) {
-    statut.style.display = "none";
-    afficherToast(e.message || "Échec de la reconnaissance de texte.", true);
-  }
 }
 
 // ===== Formulaire d'ajout / édition =====
