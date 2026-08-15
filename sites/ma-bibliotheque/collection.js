@@ -44,9 +44,24 @@ async function chargerCollection() {
 // rechercherTotalTomesSerie). Ne diminue jamais un total existant, ne
 // bloque jamais l'interface, et n'écrit sur GitHub qu'une seule fois à la
 // fin, seulement si au moins un total a effectivement changé.
+//
+// Limité à une fois par jour (au lieu de systématiquement à chaque
+// ouverture) : signalé comme cause de lenteur — avec ne serait-ce qu'une
+// vingtaine de livres, ça fait 2 requêtes (Wikidata + AniList) par livre,
+// en concurrence avec le chargement des couvertures. Le nombre de tomes
+// d'une série ne change de toute façon pas plus d'une fois toutes les
+// quelques semaines, une vérification quotidienne suffit largement.
+const DELAI_RAFRAICHISSEMENT_TOMES_MS = 20 * 60 * 60 * 1000; // ~20h
 async function rafraichirTotauxTomesEnArrierePlan() {
+  try {
+    const dernier = parseInt(localStorage.getItem("mb_dernierRafraichissementTomes") || "0", 10);
+    if (Date.now() - dernier < DELAI_RAFRAICHISSEMENT_TOMES_MS) return;
+  } catch (e) { /* localStorage indisponible : on rafraîchit sans throttle */ }
+
   const aVerifier = livres.filter(l => l.titre);
   if (aVerifier.length === 0) return;
+
+  try { localStorage.setItem("mb_dernierRafraichissementTomes", String(Date.now())); } catch (e) {}
 
   const resultats = await Promise.all(aVerifier.map(l =>
     rechercherTotalTomesSerie(l.titre).catch(() => null)
@@ -101,7 +116,34 @@ function afficherLivres() {
   grille.style.display = "grid";
   grille.innerHTML = filtres.map(carteLivreHTML).join("");
 
-  filtres.forEach(l => { if (l.image) chargerImageCarte(l.id, l.image); });
+  configurerChargementParesseuxImages(filtres);
+}
+
+// Ne charge la couverture (appel réseau authentifié vers l'API GitHub) que
+// des livres visibles à l'écran, pas de toute la bibliothèque d'un coup —
+// signalé comme cause de lenteur sur une bibliothèque avec pas mal de
+// livres. Le reste se charge au fil du défilement.
+let observateurImages = null;
+function configurerChargementParesseuxImages(filtres) {
+  if (observateurImages) observateurImages.disconnect();
+
+  const parId = new Map(filtres.map(l => [l.id, l]));
+  observateurImages = new IntersectionObserver((entrees) => {
+    entrees.forEach((entree) => {
+      if (!entree.isIntersecting) return;
+      observateurImages.unobserve(entree.target);
+      const livre = parId.get(entree.target.dataset.livreId);
+      if (livre && livre.image) chargerImageCarte(livre.id, livre.image);
+    });
+  }, { rootMargin: "400px" }); // charge un peu avant d'arriver à l'écran, pas de "pop" visible
+
+  filtres.forEach((l) => {
+    if (!l.image) return;
+    const el = document.getElementById(`couv-${l.id}`);
+    if (!el) return;
+    el.dataset.livreId = l.id;
+    observateurImages.observe(el);
+  });
 }
 
 function carteLivreHTML(l) {
