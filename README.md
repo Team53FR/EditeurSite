@@ -44,7 +44,10 @@ et le portail racine sous `https://<utilisateur>.github.io/EditeurSite/`.
 Ces sites n'ont pas de backend : ils lisent/écrivent directement, depuis le
 navigateur, des fichiers JSON (et images) dans le dépôt privé **`Team53FR/BDD`**
 via l'API Contents de GitHub, authentifiés par un token personnel saisi à la
-connexion (gardé uniquement en `sessionStorage`, jamais persisté).
+connexion. Persistance du token selon le site : `editeur-livre` le garde
+uniquement en `sessionStorage` (jamais persisté, à retaper à chaque
+ouverture) ; `ma-bibliotheque`, à usage personnel sur un seul appareil, le
+mémorise en `localStorage` (persiste jusqu'à déconnexion manuelle).
 
 Chaque site utilise son **propre dossier** dans ce dépôt BDD, pour ne jamais
 mélanger ses données avec celles d'un autre site :

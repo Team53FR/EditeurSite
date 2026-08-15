@@ -200,8 +200,11 @@ async function obtenirUrlImage(chemin, token) {
 // ===== Connexion (compte unique) =====
 // Les identifiants vivent dans MaBibliotheque/compte.json sur le dépôt BDD :
 //   { "login": "...", "password": "..." }
-// Le token GitHub, lui, n'est JAMAIS stocké nulle part : uniquement en mémoire
-// de session (sessionStorage), le temps de l'onglet ouvert.
+// Le token GitHub est mémorisé sur l'appareil (localStorage) pour éviter de
+// le retaper à chaque ouverture — usage personnel sur un téléphone déjà
+// protégé par son propre verrouillage. Contrepartie assumée : quiconque
+// déverrouille le téléphone a accès à la bibliothèque tant qu'on ne s'est
+// pas déconnecté manuellement (bouton dédié, cf. seDeconnecter()).
 async function seConnecter() {
   const login = document.getElementById("login").value.trim();
   const password = document.getElementById("password").value;
@@ -219,7 +222,7 @@ async function seConnecter() {
     const { contenu: compte } = await lireFichierJSON("compte.json", token);
 
     if (compte && compte.login === login && compte.password === password) {
-      sessionStorage.setItem("mb_token", token);
+      localStorage.setItem("mb_token", token);
       window.location.href = "collection.html";
     } else {
       message.textContent = "Identifiants incorrects.";
@@ -234,14 +237,14 @@ async function seConnecter() {
 }
 
 function seDeconnecter() {
-  sessionStorage.removeItem("mb_token");
+  localStorage.removeItem("mb_token");
   window.location.href = "connexion.html";
 }
 
-// Redirige vers la connexion si aucun token en session. À appeler en haut des
+// Redirige vers la connexion si aucun token mémorisé. À appeler en haut des
 // pages protégées.
 function exigerConnexion() {
-  const token = sessionStorage.getItem("mb_token");
+  const token = localStorage.getItem("mb_token");
   if (!token) {
     window.location.href = "connexion.html";
     return null;
