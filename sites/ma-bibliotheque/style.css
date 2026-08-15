@@ -167,6 +167,28 @@ a { color: var(--primaire); }
 }
 .recherche svg { position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); color: var(--texte-att); }
 
+/* ===== Bascule du mode d'affichage ===== */
+.groupe-vues {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+}
+.bouton-vue {
+  flex: 1;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0.5rem;
+  border-radius: 10px;
+  border: 1px solid var(--bordure);
+  background: var(--fond);
+  color: var(--texte-att);
+  cursor: pointer;
+}
+.bouton-vue.actif {
+  background: var(--primaire);
+  border-color: var(--primaire);
+  color: #fff;
+}
+
 /* ===== Contenu ===== */
 .contenu {
   padding: 1rem 1rem calc(6rem + var(--safe-bottom));
@@ -195,6 +217,32 @@ a { color: var(--primaire); }
 @media (min-width: 980px) {
   .grille-livres { grid-template-columns: repeat(5, 1fr); }
 }
+
+/* Vue Liste : une ligne par livre, couverture à gauche */
+.grille-livres.vue-liste {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.vue-liste .carte-livre { flex-direction: row; align-items: center; }
+.vue-liste .couv-livre { width: 52px; flex-shrink: 0; }
+.vue-liste .info-livre { flex: 1; min-width: 0; padding: 0.5rem 0.8rem; }
+.vue-liste .info-livre h3 { font-size: 0.88rem; -webkit-line-clamp: 1; }
+.vue-liste .progression { margin-top: 0.35rem; }
+
+/* Vue Miniature : grille dense, juste la couverture + le titre */
+.grille-livres.vue-miniature {
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+}
+@media (min-width: 480px) { .grille-livres.vue-miniature { grid-template-columns: repeat(4, 1fr); } }
+@media (min-width: 640px) { .grille-livres.vue-miniature { grid-template-columns: repeat(5, 1fr); } }
+@media (min-width: 760px) { .grille-livres.vue-miniature { grid-template-columns: repeat(6, 1fr); } }
+@media (min-width: 980px) { .grille-livres.vue-miniature { grid-template-columns: repeat(8, 1fr); } }
+.vue-miniature .info-livre { padding: 0.35rem 0.4rem 0.45rem; }
+.vue-miniature .info-livre h3 { font-size: 0.72rem; -webkit-line-clamp: 1; }
+.vue-miniature .info-livre .auteur { display: none; }
+.vue-miniature .progression small { display: none; }
 
 .carte-livre {
   background: var(--carte);

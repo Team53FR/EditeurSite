@@ -9,6 +9,27 @@ let dataUrlImageEnMemoire = null; // nouvelle couverture choisie, en attente d'e
 let imageSupprimee = false;
 const cacheImages = new Map(); // chemin GitHub -> URL locale (blob:)
 
+// ===== Mode d'affichage (grille / liste / miniatures) =====
+// Mémorisé sur l'appareil : utile dès qu'on a pas mal de livres et que la
+// grande grille devient illisible.
+let modeAffichage = "grille";
+try { modeAffichage = localStorage.getItem("mb_modeAffichage") || "grille"; } catch (e) {}
+
+function changerModeAffichage(mode) {
+  modeAffichage = mode;
+  try { localStorage.setItem("mb_modeAffichage", mode); } catch (e) {}
+  appliquerModeAffichage();
+}
+
+function appliquerModeAffichage() {
+  const grille = document.getElementById("grilleLivres");
+  if (grille) grille.className = "grille-livres vue-" + modeAffichage;
+  document.querySelectorAll(".bouton-vue").forEach((b) => {
+    b.classList.toggle("actif", b.dataset.vue === modeAffichage);
+  });
+}
+appliquerModeAffichage();
+
 if (token) {
   chargerCollection();
 }
