@@ -330,15 +330,41 @@ function nettoyerAuteurBnF(brut) {
 }
 
 // Détecte un numéro de tome dans un titre ("Tome 12", "T.12", "Vol. 12", "#12", …)
-// et renvoie le titre « nu » de la série à côté.
+// et renvoie le titre « nu » de la série à côté. \b avant les mots-clés (pas
+// avant "#", un symbole n'a pas cette notion) pour ne pas couper au milieu
+// d'un mot : sans ça, "Fahrenheit 451" était lu comme le "t" de "T." suivi
+// de 451, donnant baseTitre="Fahrenhei" — un vrai bug, pas juste un cas
+// théorique.
 function extraireNumeroTome(titre) {
   if (!titre) return { baseTitre: titre, tome: null };
-  const regex = /^(.*?)[,:\-–]?\s*(?:tome|t\.?|vol\.?|volume|#)\s*0*(\d{1,4})\b.*$/i;
+  const regex = /^(.*?)[,:\-–]?\s*(?:\b(?:tome|t\.?|vol\.?|volume)|#)\s*0*(\d{1,4})\b.*$/i;
   const m = regex.exec(titre.trim());
   if (m && m[1].trim()) {
     return { baseTitre: m[1].replace(/[.,:\-–]\s*$/, "").trim(), tome: parseInt(m[2], 10) };
   }
   return { baseTitre: titre.trim(), tome: null };
+}
+
+// Repli pour les résultats de recherche qui donnent juste "Titre N" sans
+// mot-clé (ex. "ONE PIECE 2" chez Open Library, au lieu de "One Piece,
+// Tome 2") : extraireNumeroTome() seul ne détecte rien, créant un doublon
+// "ONE PIECE 2" à côté de la série "One Piece" existante au lieu d'y
+// ajouter le tome 2 — bug reproduit et corrigé ici. On ne traite le nombre
+// final comme un tome que si le titre sans ce nombre correspond à une
+// série DÉJÀ dans la bibliothèque : ça élimine le risque de couper à tort
+// un titre qui se termine légitimement par un nombre (ex. "Fahrenheit
+// 451", jamais dans la bibliothèque sous le nom "Fahrenheit").
+function extraireNumeroTomeAvecRepliBibliotheque(titreBrut) {
+  const direct = extraireNumeroTome(titreBrut);
+  if (direct.tome) return direct;
+
+  const m = /^(.+?)\s+0*(\d{1,3})$/.exec((titreBrut || "").trim());
+  if (!m) return direct;
+  const candidatBase = m[1].trim();
+  if (trouverLivreParTitre(candidatBase)) {
+    return { baseTitre: candidatBase, tome: parseInt(m[2], 10) };
+  }
+  return direct;
 }
 
 function normaliserTitre(s) {
@@ -547,7 +573,7 @@ async function rechercherLivresParTitre(titreBrut, limite = 5) {
 // nouvelle fiche. Toujours ouvert pour vérification avant enregistrement —
 // rien n'est jamais sauvegardé automatiquement.
 async function appliquerLivreTrouve(info) {
-  const { baseTitre, tome } = extraireNumeroTome(info.titre);
+  const { baseTitre, tome } = extraireNumeroTomeAvecRepliBibliotheque(info.titre);
   const titreCible = baseTitre || info.titre;
   const existant = trouverLivreParTitre(titreCible);
 
