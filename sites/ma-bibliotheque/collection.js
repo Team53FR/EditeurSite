@@ -838,7 +838,7 @@ function seuilOtsu(histogramme, total) {
 async function lireTexteImage(blob) {
   const statut = document.getElementById("statutOCR");
   statut.style.display = "block";
-  statut.textContent = "Chargement de la reconnaissance de texte (haute précision, un peu plus long la première fois)…";
+  statut.textContent = "Chargement de la reconnaissance de texte…";
 
   try {
     await chargerScriptTesseract();
@@ -848,14 +848,13 @@ async function lireTexteImage(blob) {
     // texte uniforme") : une couverture a plusieurs blocs de texte séparés
     // (titre, auteur, sous-titre...) à des tailles et endroits différents,
     // pas un paragraphe.
-    // Modèle "best" (haute précision) plutôt que le modèle rapide par
-    // défaut : plus lourd à télécharger (~10-20 Mo par langue au lieu de
-    // 1-4 Mo, mis en cache par le navigateur ensuite) mais plus fiable sur
-    // les polices atypiques/stylisées, qui sont justement le point faible
-    // de l'OCR sur les couvertures de livres.
-    const lecteur = await Tesseract.createWorker("fra+eng", 1, {
-      langPath: "https://cdn.jsdelivr.net/gh/tesseract-ocr/tessdata_best@main"
-    });
+    // Modèle rapide par défaut (pas "best") : testé sur une police stylisée
+    // reconstituée, "best" n'améliorait RIEN par rapport au modèle rapide
+    // (échec identique) tout en étant nettement plus lent à charger ET à
+    // faire tourner à chaque lecture — confirmé lent à l'usage. Le vrai gain
+    // de précision vient du recadrage + de la binarisation ci-dessous, pas
+    // du modèle.
+    const lecteur = await Tesseract.createWorker("fra+eng");
     await lecteur.setParameters({ tessedit_pageseg_mode: "11" });
     const resultat = await lecteur.recognize(blob);
     await lecteur.terminate();
