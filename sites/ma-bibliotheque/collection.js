@@ -990,12 +990,19 @@ async function obtenirDetailsSerieTVMaze(id) {
 
   const parSaison = new Map();
   (episodes || []).forEach((ep) => {
-    const numero = ep.season || 1;
-    parSaison.set(numero, (parSaison.get(numero) || 0) + 1);
+    const cle = ep.season || 1;
+    parSaison.set(cle, (parSaison.get(cle) || 0) + 1);
   });
+  // Renumérote 1, 2, 3... après tri chronologique plutôt que de garder tel
+  // quel le numéro fourni par TVMaze : certains animes très longs sans
+  // vraies saisons formelles (ex. One Piece) sont regroupés par ANNÉE de
+  // diffusion dans leur champ "season" (1999, 2000, 2001...), ce qui
+  // affichait "Saison 1999" au lieu de "Saison 1". Sans effet pour les
+  // séries à saisons normales : trier 1,2,3... et renuméroter 1,2,3...
+  // donne exactement le même résultat.
   const saisons = Array.from(parSaison.entries())
     .sort((a, b) => a[0] - b[0])
-    .map(([numero, episodesTotal]) => ({ numero, episodesTotal, episodesVus: [] }));
+    .map(([, episodesTotal], index) => ({ numero: index + 1, episodesTotal, episodesVus: [] }));
 
   return {
     titre: show.name,
