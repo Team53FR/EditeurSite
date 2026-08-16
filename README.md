@@ -219,12 +219,21 @@ ex. BB-8, R2-D2, C-3PO) n'existent qu'au palier Défaut dans le jeu — ils sont
 automatiquement masqués des autres onglets de palier (`estDisponibleAuPalier()`
 dans `suivi.js`).
 
-**Photo par droïde (optionnelle, ajoutée par toi)** : chaque entrée du
-catalogue peut avoir une image perso (bouton ✎ sur la carte), stockée dans
+**Visuel par droïde** : par défaut, chaque carte affiche une couleur générée
+à partir du nom du droïde (`couleurDroide()` dans `suivi.js`, un hash simple
+→ teinte HSL) pour que chaque droïde reste visuellement distinct sans travail
+manuel. Ce n'est délibérément **pas un visuel officiel du jeu** : je n'ai
+trouvé aucune source d'images de droïdes qu'Epic Games mettrait à disposition
+publiquement, et la seule alternative concrète (un dépôt communautaire
+hébergeant des images extraites du jeu, sans mention de licence) n'est pas
+plus autorisée à être redistribuée que si je les hébergeais moi-même — donc
+pas utilisée.
+
+Chaque entrée du catalogue peut en revanche recevoir une **vraie photo perso**
+(bouton ✎ sur la carte, remplace le visuel généré), stockée dans
 `DroidFortnite/images/<id>.<ext>`, avec le même mécanisme que les couvertures
 de livres de ma-bibliotheque (compression côté client, upload via l'API
-Contents de GitHub). Volontairement **pas de visuels officiels du jeu** :
-je ne peux pas redistribuer les images d'Epic Games moi-même.
+Contents de GitHub).
 
 **Données partagées, éditables dans l'outil** : `DroidFortnite/catalogue.json`
 et `DroidFortnite/renaissance.json` sont communs à tous les comptes du site
