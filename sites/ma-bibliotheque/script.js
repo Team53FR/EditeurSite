@@ -201,14 +201,16 @@ async function obtenirUrlImage(chemin, token) {
   throw new Error(`Image "${chemin}" introuvable.`);
 }
 
-// ===== Connexion (compte unique) =====
-// Les identifiants vivent dans MaBibliotheque/compte.json sur le dépôt BDD :
-//   { "login": "...", "password": "..." }
-// Le token GitHub est mémorisé sur l'appareil (localStorage) pour éviter de
-// le retaper à chaque ouverture — usage personnel sur un téléphone déjà
-// protégé par son propre verrouillage. Contrepartie assumée : quiconque
-// déverrouille le téléphone a accès à la bibliothèque tant qu'on ne s'est
-// pas déconnecté manuellement (bouton dédié, cf. seDeconnecter()).
+// ===== Comptes (un par personne, chacun avec sa propre collection) =====
+// Les identifiants vivent dans MaBibliotheque/users.json sur le dépôt BDD :
+//   [{ "login": "...", "password": "...", "nomAffichage": "..." }]
+// (Anciennement un compte unique dans compte.json — voir migrerMaBibliothequeVersMultiCompte()
+// côté portail central pour la bascule vers ce fichier.)
+// Le token GitHub et l'identifiant sont mémorisés sur l'appareil (localStorage)
+// pour éviter de les retaper à chaque ouverture — usage personnel sur un
+// téléphone déjà protégé par son propre verrouillage. Contrepartie assumée :
+// quiconque déverrouille le téléphone a accès à la bibliothèque tant qu'on ne
+// s'est pas déconnecté manuellement (bouton dédié, cf. seDeconnecter()).
 async function seConnecter() {
   const login = document.getElementById("login").value.trim();
   const password = document.getElementById("password").value;
@@ -223,17 +225,20 @@ async function seConnecter() {
   message.textContent = "Vérification en cours...";
 
   try {
-    const { contenu: compte } = await lireFichierJSON("compte.json", token);
+    const { contenu } = await lireFichierJSON("users.json", token);
+    const utilisateurs = Array.isArray(contenu) ? contenu : [];
+    const utilisateur = utilisateurs.find(u => u.login === login && u.password === password);
 
-    if (compte && compte.login === login && compte.password === password) {
+    if (utilisateur) {
       localStorage.setItem("mb_token", token);
+      localStorage.setItem("mb_login", utilisateur.login);
       window.location.href = "collection.html";
     } else {
       message.textContent = "Identifiants incorrects.";
     }
   } catch (erreur) {
     if (erreur.status === 404) {
-      message.textContent = "Aucun compte configuré : crée MaBibliotheque/compte.json dans le dépôt BDD.";
+      message.textContent = "Aucun compte configuré : crée MaBibliotheque/users.json dans le dépôt BDD.";
     } else {
       message.textContent = erreur.message;
     }
@@ -242,16 +247,37 @@ async function seConnecter() {
 
 function seDeconnecter() {
   localStorage.removeItem("mb_token");
+  localStorage.removeItem("mb_login");
   window.location.href = "connexion.html";
 }
 
-// Redirige vers la connexion si aucun token mémorisé. À appeler en haut des
-// pages protégées.
+// Redirige vers la connexion si aucune session mémorisée (token + identité).
+// À appeler en haut des pages protégées.
 function exigerConnexion() {
   const token = localStorage.getItem("mb_token");
-  if (!token) {
+  const login = localStorage.getItem("mb_login");
+  if (!token || !login) {
     window.location.href = "connexion.html";
     return null;
   }
   return token;
+}
+
+// ===== Chemins propres à chaque compte =====
+function slugifierLogin(login) {
+  return (login || "")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // enlever les accents
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9_-]+/g, "_");
+}
+
+function cheminBibliothequeCourante() {
+  const login = localStorage.getItem("mb_login");
+  return `bibliotheques/${slugifierLogin(login)}.json`;
+}
+
+function obtenirPrefixeImagesUtilisateur() {
+  const login = localStorage.getItem("mb_login");
+  return `images/${slugifierLogin(login)}`;
 }

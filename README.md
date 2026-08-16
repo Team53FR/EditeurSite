@@ -61,16 +61,27 @@ mélanger ses données avec celles d'un autre site :
 | Site              | Dossier dans `Team53FR/BDD` | Fichiers                                  |
 |-------------------|------------------------------|--------------------------------------------|
 | editeur-livre      | `EditeurLivre/`             | `users.json`, `bibliotheques/<login>.json`, `images/<login>/…` |
-| ma-bibliotheque    | `MaBibliotheque/`           | `compte.json`, `livres.json`, `images/…`  |
+| ma-bibliotheque    | `MaBibliotheque/`           | `users.json`, `bibliotheques/<login>.json`, `images/<login>/…` |
 | portail central    | `Web/`                      | `utilisateurs.json`, `sites.json`         |
 
-Pour qu'un site fonctionne, son (ou ses) fichier(s) de compte doivent exister
-dans son dossier BDD. Pour **ma-bibliotheque**, créer
-`MaBibliotheque/compte.json` dans `Team53FR/BDD` :
+Les deux sites suivent donc désormais le **même modèle par compte** : chaque
+personne a sa propre bibliothèque et ses propres images, retrouvées via un
+identifiant « slug » dérivé de son login (`slugifierLogin()`, dupliqué à
+l'identique dans chaque `script.js` de site — voir « Connexion centrale »
+pour la version côté portail).
+
+Pour qu'un site fonctionne, son fichier de comptes doit exister dans son
+dossier BDD. Pour **ma-bibliotheque**, créer `MaBibliotheque/users.json`
+dans `Team53FR/BDD` :
 
 ```json
-{ "login": "ton_identifiant", "password": "ton_mot_de_passe" }
+[{ "login": "ton_identifiant", "password": "ton_mot_de_passe", "nomAffichage": "" }]
 ```
+
+(Historique : avant la migration multi-compte, ma-bibliotheque n'avait qu'un
+`compte.json` unique et une collection `livres.json` partagée par tout le
+monde — voir « Migration de Ma Bibliothèque » ci-dessous si ces fichiers
+existent encore dans ton dépôt.)
 
 À l'ajout d'un nouveau site suivant ce modèle : choisir un nouveau nom de
 dossier BDD (constante `DOSSIER_BDD` en haut du `script.js` du site) et ne
@@ -112,19 +123,19 @@ entre un relais et sa propre page de connexion.
 crée automatiquement un compte administrateur fondateur à partir de ce qui
 vient d'être saisi. Ensuite, le bouton « Importer les comptes existants » du
 panneau admin fusionne les comptes déjà présents dans
-`EditeurLivre/users.json` et `MaBibliotheque/compte.json` (sans jamais créer
+`EditeurLivre/users.json` et `MaBibliotheque/users.json` (sans jamais créer
 de doublon, relançable autant de fois que nécessaire).
 
-**Limite connue — sites « identité-dépendants »** : `ma-bibliotheque` ne
-vérifie que la présence d'un token, donc le relais fonctionne pour n'importe
-quel compte auquel on donne accès. `editeur-livre` est différent : il attend
-que `gh_login` corresponde à une entrée réelle de son propre
-`EditeurLivre/users.json` (utilisé pour retrouver sa bibliothèque et ses
-droits admin). Pour rester cohérent sans jamais modifier le code
-d'editeur-livre, le panneau admin central fait un *upsert* silencieux dans
-`EditeurLivre/users.json` chaque fois qu'un compte central se voit accorder
-l'accès à `editeur-livre`. Un futur site purement « token » s'ajoute donc en
-pure donnée (`Web/sites.json`) ; un futur site « identité » demandera une
+**Sites « identité-dépendants »** : les deux sites vérifient que le login
+relayé correspond à une entrée réelle de leur propre fichier de comptes
+(`EditeurLivre/users.json` / `MaBibliotheque/users.json`), puisque chacun a
+sa bibliothèque propre. Pour rester cohérent sans jamais modifier le code de
+ces sites, le panneau admin central fait un *upsert* silencieux dans le
+fichier de comptes du site concerné (`synchroniserEditeurLivre()` /
+`synchroniserMaBibliotheque()` dans `admin.js` racine, même logique dupliquée
+pour chaque site) chaque fois qu'un compte central se voit accorder l'accès à
+ce site. Un futur site purement « token », sans notion d'identité, s'ajoute
+en pure donnée (`Web/sites.json`) ; un futur site « identité » demandera une
 petite synchro dédiée du même genre.
 
 Révoquer un accès dans le panneau admin retire la carte du tableau de bord
@@ -132,6 +143,48 @@ mais **ne bloque pas** une connexion directe sur le site concerné (son propre
 mot de passe existe toujours dans son propre fichier BDD) — cohérent avec le
 fait qu'aucun site de ce dépôt n'a d'autorisation côté serveur, puisqu'il n'y
 a pas de serveur.
+
+## Migration de Ma Bibliothèque (compte unique → comptes séparés)
+
+Ma Bibliothèque a été créée avec un seul compte partagé
+(`MaBibliotheque/compte.json` + une collection unique `livres.json`). Le
+bouton « Migrer Ma Bibliothèque vers des comptes séparés » du panneau admin
+(`migrerMaBibliothequeVersMultiCompte()` dans `script.js` racine) fait passer
+ce site au même modèle par compte qu'editeur-livre :
+
+1. Lit l'ancien `compte.json`, en déduit le login et son « slug ».
+2. Recopie chaque image de couverture référencée dans `livres.json` vers
+   `images/<slug>/…` (l'API Contents de GitHub n'a pas de copie serveur : il
+   faut télécharger puis ré-uploader chaque fichier).
+3. Écrit la collection dans `bibliotheques/<slug>.json` et crée/complète
+   `MaBibliotheque/users.json`.
+
+Ne supprime **jamais** `compte.json`/`livres.json`/les anciennes images — ils
+restent en place, orphelins mais inoffensifs, à supprimer à la main une fois
+vérifié que tout fonctionne. Sans danger à relancer : la vérification se fait
+sur l'existence de `bibliotheques/<slug>.json` pour ce compte précis (pas
+juste "`users.json` existe"), pour rester correct même si un second compte a
+été créé côté portail avant que ce bouton n'ait été cliqué.
+
+## Transfert de données entre comptes
+
+Le panneau admin propose un bouton « Transférer » sur chaque compte
+(`transfererBibliotheque()` dans `admin.js` racine), pour réaffecter toute la
+bibliothèque d'un compte à un autre — utile par exemple si un compte est
+remplacé par un autre. Fonctionne pour `editeur-livre`, `ma-bibliotheque`, ou
+les deux à la fois (un seul mécanisme générique, `CONFIG_TRANSFERT`, décrit
+la forme des données propre à chaque site) :
+
+- **Mode** choisi à chaque transfert : « Déplacer » (le compte source perd
+  ses données) ou « Copier » (les deux comptes les ont ensuite).
+- **Conflit** : si le compte destination a déjà des données, celles du compte
+  source sont **ajoutées** aux siennes plutôt que de les écraser — en cas de
+  collision d'identifiant, l'élément transféré reçoit un nouvel id.
+- **Images** : téléchargées depuis l'ancien chemin puis ré-uploadées sous le
+  nouveau (même contrainte API que la migration ci-dessus).
+
+Chaque écriture reste un commit sur le dépôt privé `Team53FR/BDD` : même en
+cas d'erreur, l'historique Git permet de revenir en arrière.
 
 ## App installable (PWA)
 

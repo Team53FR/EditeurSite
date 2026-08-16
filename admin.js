@@ -105,6 +105,19 @@ function afficherUtilisateurs() {
     bEdit.onclick = () => editerUtilisateur(u.login);
     actions.appendChild(bEdit);
 
+    const bTransfert = document.createElement("button");
+    bTransfert.className = "btn-mini";
+    bTransfert.textContent = "Transférer";
+    if (utilisateurs.length < 2) {
+      bTransfert.disabled = true;
+      bTransfert.title = "Il faut au moins un autre compte pour transférer des données";
+      bTransfert.style.opacity = ".5";
+      bTransfert.style.cursor = "not-allowed";
+    } else {
+      bTransfert.onclick = () => basculerFormulaireTransfert(u.login);
+    }
+    actions.appendChild(bTransfert);
+
     const bDel = document.createElement("button");
     bDel.className = "btn-mini danger";
     bDel.textContent = "Supprimer";
@@ -119,7 +132,45 @@ function afficherUtilisateurs() {
     actions.appendChild(bDel);
 
     liste.appendChild(li);
+
+    if (transfertOuvertPour === u.login) {
+      liste.appendChild(construireFormulaireTransfert(u.login));
+    }
   });
+}
+
+function construireFormulaireTransfert(loginSource) {
+  const autres = utilisateurs.filter(x => x.login !== loginSource);
+  const li = document.createElement("li");
+  li.className = "bloc-carte";
+  li.style.margin = "0";
+  li.innerHTML =
+    `<h2 style="font-size:0.95rem">Transférer les données de « ${echapper(loginSource)} »</h2>` +
+    `<div class="champ">` +
+      `<label for="transfertDest">Vers le compte</label>` +
+      `<select id="transfertDest">` +
+      autres.map(x => `<option value="${echapper(x.login)}">${echapper(x.login)}${x.nomAffichage ? " (" + echapper(x.nomAffichage) + ")" : ""}</option>`).join("") +
+      `</select>` +
+    `</div>` +
+    `<div class="champ">` +
+      `<label>Sites concernés</label>` +
+      `<label class="case-acces"><input type="checkbox" id="transfertEditeurLivre"><span>📖 Éditeur de livre</span></label>` +
+      `<label class="case-acces"><input type="checkbox" id="transfertMaBibliotheque"><span>📚 Ma Bibliothèque</span></label>` +
+    `</div>` +
+    `<div class="champ">` +
+      `<label>Mode</label>` +
+      `<label class="case-acces"><input type="radio" name="transfertMode" value="deplacer" checked><span>Déplacer (le compte source les perd)</span></label>` +
+      `<label class="case-acces"><input type="radio" name="transfertMode" value="copier"><span>Copier (le compte source les garde aussi)</span></label>` +
+    `</div>` +
+    `<div style="display:flex; gap:0.7rem;">` +
+      `<button class="btn btn-primaire" id="btnConfirmerTransfert">Confirmer le transfert</button>` +
+      `<button class="btn btn-fantome" id="btnAnnulerTransfert">Annuler</button>` +
+    `</div>` +
+    `<p id="messageTransfert" class="message"></p>`;
+
+  li.querySelector("#btnConfirmerTransfert").onclick = () => confirmerTransfert(loginSource);
+  li.querySelector("#btnAnnulerTransfert").onclick = () => basculerFormulaireTransfert(loginSource);
+  return li;
 }
 
 function editerUtilisateur(login) {
@@ -187,6 +238,33 @@ async function synchroniserEditeurLivre(loginCentral, passwordCentral, nomAffich
     `Synchronisation du compte ${loginCentral} depuis le portail central`);
 }
 
+// Même principe que synchroniserEditeurLivre(), pour Ma Bibliothèque (qui est
+// maintenant, elle aussi, un site à comptes séparés — voir
+// migrerMaBibliothequeVersMultiCompte()). Pas de champ "role" ici : ce site
+// n'a pas de notion d'administrateur propre.
+async function synchroniserMaBibliotheque(loginCentral, passwordCentral, nomAffichage) {
+  let liste = [];
+  let sha = null;
+  try {
+    const r = await lireFichierJSONAbsolu("MaBibliotheque/users.json", token);
+    liste = Array.isArray(r.contenu) ? r.contenu : [];
+    sha = r.sha;
+  } catch (e) {
+    if (e.status !== 404) throw e;
+  }
+
+  const existant = liste.find(u => u.login === loginCentral);
+  if (existant) {
+    existant.password = passwordCentral;
+    if (nomAffichage) existant.nomAffichage = nomAffichage;
+  } else {
+    liste.push({ login: loginCentral, password: passwordCentral, nomAffichage: nomAffichage || "" });
+  }
+
+  await ecrireFichierJSONAbsolu("MaBibliotheque/users.json", liste, sha, token,
+    `Synchronisation du compte ${loginCentral} depuis le portail central`);
+}
+
 async function enregistrerUtilisateur() {
   const message = document.getElementById("message");
   const moi = localStorage.getItem("team53_login");
@@ -234,6 +312,10 @@ async function enregistrerUtilisateur() {
       try { await synchroniserEditeurLivre(login, password, nomAffichage); }
       catch (e) { /* ignoré : la synchro pourra être retentée en réenregistrant */ }
     }
+    if (acces.includes("ma-bibliotheque")) {
+      try { await synchroniserMaBibliotheque(login, password, nomAffichage); }
+      catch (e) { /* ignoré : la synchro pourra être retentée en réenregistrant */ }
+    }
 
     annulerEdition();
     message.textContent = "Enregistré avec succès.";
@@ -265,6 +347,160 @@ async function supprimerUtilisateur(login) {
     message.textContent = erreur.conflit
       ? "La liste des comptes a été modifiée ailleurs. Rechargez la page avant de réessayer."
       : erreur.message;
+  }
+}
+
+// =====================================================================
+//  Transfert de bibliothèque entre comptes
+// =====================================================================
+// Depuis la migration de Ma Bibliothèque (voir plus haut), les deux sites
+// suivent le même pattern par compte (bibliotheques/<slug>.json +
+// images/<slug>/...) — un seul mécanisme de transfert suffit pour les deux.
+const CONFIG_TRANSFERT = {
+  "editeur-livre": {
+    dossier: "EditeurLivre",
+    formeTableau: "objet", // { livres: [...] }
+    champsImage: (livre) => ["couverture", "quatrieme"]
+      .map(cle => ({ objet: livre[cle], champ: "imageChemin" }))
+      .filter(x => x.objet && x.objet[x.champ])
+  },
+  "ma-bibliotheque": {
+    dossier: "MaBibliotheque",
+    formeTableau: "tableau", // [...]
+    champsImage: (item) => (item && item.image) ? [{ objet: item, champ: "image" }] : []
+  }
+};
+
+function listeDepuisContenu(contenu, forme) {
+  return forme === "objet" ? (contenu && Array.isArray(contenu.livres) ? contenu.livres : []) : (Array.isArray(contenu) ? contenu : []);
+}
+function contenuDepuisListe(liste, forme) {
+  return forme === "objet" ? { livres: liste } : liste;
+}
+
+// Transfère (déplace ou copie) TOUTE la bibliothèque d'un compte vers un
+// autre, pour un site donné. Ajoute aux données déjà présentes chez le
+// destinataire plutôt que de les écraser ; en cas de collision d'id, l'item
+// transféré reçoit un nouvel id (rien n'est jamais perdu ni remplacé en
+// silence).
+async function transfererBibliotheque(siteId, loginSource, loginDest, mode) {
+  const cfg = CONFIG_TRANSFERT[siteId];
+  const slugSource = slugifierLoginPortail(loginSource);
+  const slugDest = slugifierLoginPortail(loginDest);
+  const cheminSource = `${cfg.dossier}/bibliotheques/${slugSource}.json`;
+  const cheminDest = `${cfg.dossier}/bibliotheques/${slugDest}.json`;
+
+  let source;
+  try {
+    source = await lireFichierJSONAbsolu(cheminSource, token);
+  } catch (e) {
+    if (e.status === 404) return { transferes: 0 };
+    throw e;
+  }
+
+  let dest = null;
+  try {
+    dest = await lireFichierJSONAbsolu(cheminDest, token);
+  } catch (e) {
+    if (e.status !== 404) throw e;
+  }
+
+  const listeSource = listeDepuisContenu(source.contenu, cfg.formeTableau);
+  const listeDest = dest ? listeDepuisContenu(dest.contenu, cfg.formeTableau) : [];
+  const idsExistants = new Set(listeDest.map(x => x.id));
+
+  for (const item of listeSource) {
+    if (idsExistants.has(item.id)) item.id = item.id + "_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+    idsExistants.add(item.id);
+
+    for (const { objet, champ } of cfg.champsImage(item)) {
+      const ancienChemin = `${cfg.dossier}/${objet[champ]}`;
+      const nouveauCheminRelatif = `images/${slugDest}/${item.id}_${objet[champ].split("/").pop()}`;
+      const nouveauChemin = `${cfg.dossier}/${nouveauCheminRelatif}`;
+      try {
+        const base64 = await telechargerImageBrute(ancienChemin, token);
+        await uploaderImageAbsolu(nouveauChemin, base64, token, `Transfert vers ${loginDest}`);
+        objet[champ] = nouveauCheminRelatif;
+        if (mode === "deplacer") await supprimerFichierAbsolu(ancienChemin, token, `Transfert vers ${loginDest}`);
+      } catch (e) {
+        // Best-effort : l'item est quand même transféré, avec son ancienne image
+        // si le déplacement de l'image a échoué (mieux qu'un item sans couverture).
+      }
+    }
+
+    listeDest.push(item);
+  }
+
+  await ecrireFichierJSONAbsolu(cheminDest, contenuDepuisListe(listeDest, cfg.formeTableau),
+    dest ? dest.sha : null, token, `Transfert de ${loginSource} vers ${loginDest}`);
+
+  if (mode === "deplacer") {
+    await supprimerFichierAbsolu(cheminSource, token, `Transfert de ${loginSource} vers ${loginDest}`);
+  }
+
+  return { transferes: listeSource.length };
+}
+
+let transfertOuvertPour = null; // login du compte source dont le formulaire de transfert est ouvert
+
+function basculerFormulaireTransfert(login) {
+  transfertOuvertPour = transfertOuvertPour === login ? null : login;
+  afficherUtilisateurs();
+}
+
+async function confirmerTransfert(loginSource) {
+  const loginDest = document.getElementById("transfertDest").value;
+  const versEditeur = document.getElementById("transfertEditeurLivre").checked;
+  const versMB = document.getElementById("transfertMaBibliotheque").checked;
+  const mode = document.querySelector('input[name="transfertMode"]:checked').value;
+  const message = document.getElementById("messageTransfert");
+
+  if (!loginDest) { message.textContent = "Choisis un compte de destination."; return; }
+  if (!versEditeur && !versMB) { message.textContent = "Choisis au moins un site."; return; }
+
+  const verbe = mode === "deplacer" ? "Déplacer" : "Copier";
+  const sites = [versEditeur && "Éditeur de livre", versMB && "Ma Bibliothèque"].filter(Boolean).join(" et ");
+  if (!confirm(`${verbe} les données de « ${loginSource} » vers « ${loginDest} » pour : ${sites} ?` +
+    (mode === "deplacer" ? "\n\nLe compte source n'aura plus ces données ensuite." : ""))) return;
+
+  message.textContent = "Transfert en cours...";
+  const resumes = [];
+  try {
+    if (versEditeur) {
+      const r = await transfererBibliotheque("editeur-livre", loginSource, loginDest, mode);
+      resumes.push(`Éditeur de livre : ${r.transferes} livre(s)`);
+    }
+    if (versMB) {
+      const r = await transfererBibliotheque("ma-bibliotheque", loginSource, loginDest, mode);
+      resumes.push(`Ma Bibliothèque : ${r.transferes} livre(s)/série(s)`);
+    }
+    message.className = "message ok";
+    message.textContent = "Transfert terminé — " + resumes.join(" · ");
+    transfertOuvertPour = null;
+    afficherUtilisateurs();
+  } catch (erreur) {
+    message.className = "message";
+    message.textContent = "Erreur pendant le transfert : " + erreur.message;
+  }
+}
+
+async function lancerMigrationMaBibliotheque() {
+  const message = document.getElementById("messageMigrationMB");
+  message.className = "message";
+  message.textContent = "Migration en cours (peut prendre un moment si beaucoup de couvertures)...";
+  try {
+    const resultat = await migrerMaBibliothequeVersMultiCompte(token);
+    message.className = "message ok";
+    if (resultat.dejaMigre) {
+      message.textContent = "Déjà migré : rien à refaire.";
+    } else if (resultat.rienAMigrer) {
+      message.textContent = "Aucun compte Ma Bibliothèque trouvé (MaBibliotheque/compte.json absent) : rien à migrer.";
+    } else {
+      message.textContent = `Migration terminée pour « ${resultat.login} » : ${resultat.livres} livre(s)/série(s), ${resultat.imagesDeplacees} image(s) déplacée(s) vers un dossier séparé.`;
+    }
+  } catch (erreur) {
+    message.className = "message";
+    message.textContent = erreur.message;
   }
 }
 

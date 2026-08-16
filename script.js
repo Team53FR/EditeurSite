@@ -30,7 +30,7 @@ const DEFAULT_SITES = [
     pageArrivee: "sites/ma-bibliotheque/collection.html",
     relais: {
       stockage: "localStorage",
-      cles: { token: "mb_token" }
+      cles: { token: "mb_token", login: "mb_login" }
     }
   }
 ];
@@ -155,6 +155,73 @@ function ecrireFichierJSONAbsolu(chemin, contenu, sha, token, messageCommit) {
 }
 function obtenirShaFichierAbsolu(chemin, token) {
   return _obtenirShaParUrl(urlContenuAbsolu(chemin), token);
+}
+
+// Normalise un login en nom de fichier — même algorithme que
+// slugifierLogin() dans sites/editeur-livre/script.js et
+// sites/ma-bibliotheque/script.js (à garder identique pour que les chemins
+// calculés ici correspondent exactement à ceux que chaque site recalcule
+// lui-même côté client).
+function slugifierLoginPortail(login) {
+  return (login || "")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // enlever les accents
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9_-]+/g, "_");
+}
+
+function _arrayBufferVersBase64(buffer) {
+  let binaire = "";
+  const octets = new Uint8Array(buffer);
+  const taille = 0x8000; // éviter un appel apply() avec un tableau trop grand
+  for (let i = 0; i < octets.length; i += taille) {
+    binaire += String.fromCharCode.apply(null, octets.subarray(i, i + taille));
+  }
+  return btoa(binaire);
+}
+
+// Télécharge les octets bruts d'un fichier (image) à un chemin ABSOLU et les
+// renvoie encodés en base64, prêts pour uploaderImageAbsolu().
+async function telechargerImageBrute(chemin, token) {
+  const reponse = await fetch(urlContenuAbsolu(chemin), {
+    headers: { "Authorization": `Bearer ${token}`, "Accept": "application/vnd.github.raw" }
+  });
+  if (!reponse.ok) {
+    const erreur = new Error(`Impossible de télécharger l'image "${chemin}".`);
+    erreur.status = reponse.status;
+    throw erreur;
+  }
+  return _arrayBufferVersBase64(await reponse.arrayBuffer());
+}
+
+async function uploaderImageAbsolu(chemin, contenuBase64, token, messageCommit) {
+  const shaExistant = await obtenirShaFichierAbsolu(chemin, token);
+  const corps = { message: messageCommit || `Ajout de l'image ${chemin}`, content: contenuBase64 };
+  if (shaExistant) corps.sha = shaExistant;
+
+  const reponse = await fetch(urlContenuAbsolu(chemin), {
+    method: "PUT",
+    headers: { "Authorization": `Bearer ${token}`, "Accept": "application/vnd.github+json" },
+    body: JSON.stringify(corps)
+  });
+
+  if (!reponse.ok) {
+    let details = "";
+    try { const err = await reponse.json(); if (err.message) details = ` (${err.message})`; } catch (e) {}
+    throw new Error(`Échec de l'envoi de l'image${details}.`);
+  }
+  return chemin;
+}
+
+async function supprimerFichierAbsolu(chemin, token, messageCommit) {
+  const sha = await obtenirShaFichierAbsolu(chemin, token);
+  if (!sha) return;
+  await fetch(urlContenuAbsolu(chemin), {
+    method: "DELETE",
+    headers: { "Authorization": `Bearer ${token}`, "Accept": "application/vnd.github+json" },
+    body: JSON.stringify({ message: messageCommit || `Suppression de ${chemin}`, sha })
+  });
+  // Volontairement silencieux en cas d'échec : ne doit pas bloquer le reste du flux.
 }
 
 // ===== Registre des sites (Web/sites.json, avec repli sur DEFAULT_SITES) =====
@@ -297,10 +364,13 @@ function relayerVersSite(site) {
 }
 
 // ===== Migration des comptes existants =====
-// Fusionne EditeurLivre/users.json et MaBibliotheque/compte.json dans
+// Fusionne EditeurLivre/users.json et MaBibliotheque/users.json dans
 // Web/utilisateurs.json. Ré-exécutable sans jamais créer de doublon ni
 // écraser un compte central déjà présent : les comptes déjà migrés ne sont
 // que complétés (union des accès), jamais recréés.
+// Note : MaBibliotheque/users.json n'existe que si
+// migrerMaBibliothequeVersMultiCompte() a déjà tourné (voir plus bas) —
+// avant ça, ce site n'a qu'un compte.json unique, non repris ici.
 async function importerComptesExistants(token) {
   let utilisateurs = [];
   let sha = null;
@@ -342,9 +412,12 @@ async function importerComptesExistants(token) {
   }
 
   try {
-    const { contenu } = await lireFichierJSONAbsolu("MaBibliotheque/compte.json", token);
-    if (contenu && contenu.login) fusionner(contenu.login, contenu.password, "", "ma-bibliotheque");
+    const { contenu } = await lireFichierJSONAbsolu("MaBibliotheque/users.json", token);
+    (Array.isArray(contenu) ? contenu : []).forEach(u =>
+      fusionner(u.login, u.password, u.nomAffichage, "ma-bibliotheque"));
   } catch (e) {
+    // 404 : soit rien n'a encore été migré (voir migrerMaBibliothequeVersMultiCompte),
+    // soit le site n'a pas encore de compte du tout — dans les deux cas, rien à fusionner.
     if (e.status !== 404) throw e;
   }
 
@@ -352,4 +425,85 @@ async function importerComptesExistants(token) {
     "Import des comptes existants (editeur-livre, ma-bibliotheque)");
 
   return { ajoutes, accesAjoutes, total: utilisateurs.length };
+}
+
+// ===== Migration structurelle de Ma Bibliothèque vers un compte par personne =====
+// Avant : MaBibliotheque/compte.json (un seul compte) + livres.json (une
+// seule collection partagée) + images/<id>.jpg (chemin plat).
+// Après : MaBibliotheque/users.json (comptes multiples) +
+// bibliotheques/<slug>.json (une collection par compte) +
+// images/<slug>/<id>.jpg — même pattern qu'editeur-livre. Ne supprime jamais
+// les anciens fichiers, qui restent en place par sécurité une fois la
+// migration faite.
+//
+// Idempotence : on vérifie l'existence de bibliotheques/<slug>.json pour LE
+// COMPTE DE compte.json précisément (pas juste "users.json existe") — sinon,
+// si un admin donne accès à Ma Bibliothèque à un second compte central AVANT
+// d'avoir cliqué ce bouton, synchroniserMaBibliotheque() aura déjà créé
+// users.json avec ce second compte, et ce bouton se croirait "déjà fait" en
+// laissant la vraie collection historique orpheline dans l'ancien
+// livres.json. On fusionne donc dans users.json plutôt que de l'écraser.
+async function migrerMaBibliothequeVersMultiCompte(token) {
+  let compte;
+  try {
+    const r = await lireFichierJSONAbsolu("MaBibliotheque/compte.json", token);
+    compte = r.contenu;
+  } catch (e) {
+    if (e.status === 404) return { rienAMigrer: true };
+    throw e;
+  }
+  if (!compte || !compte.login) return { rienAMigrer: true };
+
+  const slug = slugifierLoginPortail(compte.login);
+
+  const dejaMigre = await obtenirShaFichierAbsolu(`MaBibliotheque/bibliotheques/${slug}.json`, token);
+  if (dejaMigre) return { dejaMigre: true };
+
+  let livres = [];
+  try {
+    const r = await lireFichierJSONAbsolu("MaBibliotheque/livres.json", token);
+    livres = Array.isArray(r.contenu) ? r.contenu : [];
+  } catch (e) {
+    if (e.status !== 404) throw e;
+  }
+
+  let imagesDeplacees = 0;
+  for (const item of livres) {
+    if (item && item.image) {
+      const ancienChemin = "MaBibliotheque/" + item.image;
+      const nouveauCheminRelatif = `images/${slug}/${item.image.split("/").pop()}`;
+      try {
+        const base64 = await telechargerImageBrute(ancienChemin, token);
+        await uploaderImageAbsolu("MaBibliotheque/" + nouveauCheminRelatif, base64, token,
+          `Migration de l'image de ${compte.login} vers un compte séparé`);
+        item.image = nouveauCheminRelatif;
+        imagesDeplacees++;
+      } catch (e) {
+        // Best-effort : une image en échec ne doit pas bloquer toute la migration ;
+        // l'item garde son ancien chemin (toujours valide, rien n'est supprimé).
+      }
+    }
+  }
+
+  await ecrireFichierJSONAbsolu(`MaBibliotheque/bibliotheques/${slug}.json`, livres, null, token,
+    `Bibliothèque séparée pour ${compte.login}`);
+
+  // Fusion dans users.json (jamais d'écrasement : un autre compte a pu y être
+  // ajouté entre-temps par synchroniserMaBibliotheque()).
+  let utilisateursMB = [];
+  let shaUsersMB = null;
+  try {
+    const r = await lireFichierJSONAbsolu("MaBibliotheque/users.json", token);
+    utilisateursMB = Array.isArray(r.contenu) ? r.contenu : [];
+    shaUsersMB = r.sha;
+  } catch (e) {
+    if (e.status !== 404) throw e;
+  }
+  if (!utilisateursMB.some(u => u.login === compte.login)) {
+    utilisateursMB.push({ login: compte.login, password: compte.password, nomAffichage: "" });
+  }
+  await ecrireFichierJSONAbsolu("MaBibliotheque/users.json", utilisateursMB, shaUsersMB, token,
+    "Passage de Ma Bibliothèque à des comptes séparés");
+
+  return { migre: true, login: compte.login, livres: livres.length, imagesDeplacees };
 }

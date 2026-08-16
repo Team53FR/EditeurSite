@@ -58,7 +58,7 @@ if (token) {
 // ===== Chargement =====
 async function chargerCollection() {
   try {
-    const { contenu, sha } = await lireFichierJSON("livres.json", token);
+    const { contenu, sha } = await lireFichierJSON(cheminBibliothequeCourante(), token);
     livres = Array.isArray(contenu) ? contenu : (Array.isArray(contenu.livres) ? contenu.livres : []);
     shaLivres = sha;
   } catch (e) {
@@ -1319,7 +1319,7 @@ async function enregistrerSerie() {
 
   try {
     if (dataUrlImageEnMemoireSerie) {
-      cheminImage = `images/${id}.jpg`;
+      cheminImage = `${obtenirPrefixeImagesUtilisateur()}/${id}.jpg`;
       await uploaderImageBase64(cheminImage, dataUrlImageEnMemoireSerie, token, `Affiche — ${titre}`);
     } else if (imageSupprimeeSerie) {
       cheminImage = null;
@@ -1537,13 +1537,13 @@ function genererIdLivre() {
 
 async function sauvegarderCollectionAvecRetry() {
   try {
-    shaLivres = await ecrireFichierJSON("livres.json", livres, shaLivres, token, "Mise à jour de la collection");
+    shaLivres = await ecrireFichierJSON(cheminBibliothequeCourante(), livres, shaLivres, token, "Mise à jour de la collection");
   } catch (e) {
     if (e.conflit) {
       // Le fichier distant a bougé entre-temps (autre appareil) : on relit son
       // SHA à jour et on retente l'écriture avec notre version locale.
-      const frais = await lireFichierJSON("livres.json", token);
-      shaLivres = await ecrireFichierJSON("livres.json", livres, frais.sha, token, "Mise à jour de la collection");
+      const frais = await lireFichierJSON(cheminBibliothequeCourante(), token);
+      shaLivres = await ecrireFichierJSON(cheminBibliothequeCourante(), livres, frais.sha, token, "Mise à jour de la collection");
     } else {
       throw e;
     }
@@ -1570,7 +1570,7 @@ async function enregistrerLivre() {
 
   try {
     if (dataUrlImageEnMemoire) {
-      cheminImage = `images/${id}.jpg`;
+      cheminImage = `${obtenirPrefixeImagesUtilisateur()}/${id}.jpg`;
       await uploaderImageBase64(cheminImage, dataUrlImageEnMemoire, token, `Couverture — ${titre}`);
     } else if (imageSupprimee) {
       cheminImage = null;
