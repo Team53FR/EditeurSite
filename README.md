@@ -7,7 +7,11 @@ sous-dossier de `sites/`.
 
 ```
 EditeurSite/
-├── index.html            # portail racine, liste les sites disponibles
+├── index.html             # accueil : bouton de connexion (ou redirection si déjà connecté)
+├── connexion.html          # connexion centrale (un seul compte pour tous les sites)
+├── tableau-de-bord.html    # liste les sites accessibles au compte connecté
+├── admin-comptes.html      # gestion des comptes centraux (réservé aux admins)
+├── script.js / admin.js / style.css   # logique + style du portail central
 ├── sites/
 │   ├── editeur-livre/    # site "Éditeur de livre en ligne" (ex-racine du dépôt)
 │   │   ├── index.html
@@ -27,11 +31,13 @@ indépendamment sans rien casser.
 
 1. Créer un dossier `sites/<nom-du-site>/` avec son propre `index.html` et ses
    assets.
-2. Ajouter une carte de lien vers ce site dans le portail racine
-   ([index.html](index.html)).
-3. Ne jamais utiliser de chemins absolus (`/style.css`, `/script.js`, …) dans
+2. Ne jamais utiliser de chemins absolus (`/style.css`, `/script.js`, …) dans
    le site : rester en relatif (`style.css`, `./script.js`, `../autre/`)
    pour que le site reste indépendant de son emplacement.
+3. Pour qu'il apparaisse dans le tableau de bord central, ajouter une entrée
+   dans `Web/sites.json` (voir « Connexion centrale » ci-dessous). Si le site
+   se contente de vérifier la présence d'un token (comme `ma-bibliotheque`),
+   c'est une pure modification de données, sans toucher au code du portail.
 
 ## Hébergement
 
@@ -56,6 +62,7 @@ mélanger ses données avec celles d'un autre site :
 |-------------------|------------------------------|--------------------------------------------|
 | editeur-livre      | `EditeurLivre/`             | `users.json`, `bibliotheques/<login>.json`, `images/<login>/…` |
 | ma-bibliotheque    | `MaBibliotheque/`           | `compte.json`, `livres.json`, `images/…`  |
+| portail central    | `Web/`                      | `utilisateurs.json`, `sites.json`         |
 
 Pour qu'un site fonctionne, son (ou ses) fichier(s) de compte doivent exister
 dans son dossier BDD. Pour **ma-bibliotheque**, créer
@@ -68,6 +75,63 @@ dans son dossier BDD. Pour **ma-bibliotheque**, créer
 À l'ajout d'un nouveau site suivant ce modèle : choisir un nouveau nom de
 dossier BDD (constante `DOSSIER_BDD` en haut du `script.js` du site) et ne
 jamais réutiliser celui d'un site existant.
+
+## Connexion centrale
+
+Un seul compte (racine du dépôt : `index.html` / `connexion.html` /
+`tableau-de-bord.html` / `admin-comptes.html`) donne accès, depuis un tableau
+de bord unique, à tous les sites que l'administrateur a autorisés — plus
+besoin de se reconnecter séparément à chaque site.
+
+Les comptes centraux vivent dans `Web/utilisateurs.json` :
+
+```json
+[{ "login": "...", "password": "...", "role": "admin", "nomAffichage": "...",
+   "acces": ["editeur-livre", "ma-bibliotheque"], "derniereConnexion": "..." }]
+```
+
+Le registre des sites affichables vit dans `Web/sites.json` (repli automatique
+sur une constante `DEFAULT_SITES` dans `script.js` tant que ce fichier
+n'existe pas) :
+
+```json
+[{ "id": "mon-site", "nom": "Mon site", "description": "...", "icone": "🌐",
+   "pageArrivee": "sites/mon-site/apres-connexion.html",
+   "relais": { "stockage": "sessionStorage" | "localStorage",
+               "cles": { "token": "clé_attendue_par_le_site", "...": "..." } } }]
+```
+
+**Relais d'identifiants** : au clic sur une carte du tableau de bord, le
+portail préremplit directement les clés `sessionStorage`/`localStorage` que le
+site cible lit déjà lui-même (selon `relais`), puis navigue vers
+`pageArrivee`. Le site n'est jamais modifié — il ne voit pas la différence
+entre un relais et sa propre page de connexion.
+
+**Premier lancement** : `Web/utilisateurs.json` n'existe pas encore, donc
+`seConnecter()` du portail traite un 404 comme une première installation et
+crée automatiquement un compte administrateur fondateur à partir de ce qui
+vient d'être saisi. Ensuite, le bouton « Importer les comptes existants » du
+panneau admin fusionne les comptes déjà présents dans
+`EditeurLivre/users.json` et `MaBibliotheque/compte.json` (sans jamais créer
+de doublon, relançable autant de fois que nécessaire).
+
+**Limite connue — sites « identité-dépendants »** : `ma-bibliotheque` ne
+vérifie que la présence d'un token, donc le relais fonctionne pour n'importe
+quel compte auquel on donne accès. `editeur-livre` est différent : il attend
+que `gh_login` corresponde à une entrée réelle de son propre
+`EditeurLivre/users.json` (utilisé pour retrouver sa bibliothèque et ses
+droits admin). Pour rester cohérent sans jamais modifier le code
+d'editeur-livre, le panneau admin central fait un *upsert* silencieux dans
+`EditeurLivre/users.json` chaque fois qu'un compte central se voit accorder
+l'accès à `editeur-livre`. Un futur site purement « token » s'ajoute donc en
+pure donnée (`Web/sites.json`) ; un futur site « identité » demandera une
+petite synchro dédiée du même genre.
+
+Révoquer un accès dans le panneau admin retire la carte du tableau de bord
+mais **ne bloque pas** une connexion directe sur le site concerné (son propre
+mot de passe existe toujours dans son propre fichier BDD) — cohérent avec le
+fait qu'aucun site de ce dépôt n'a d'autorisation côté serveur, puisqu'il n'y
+a pas de serveur.
 
 ## App installable (PWA)
 

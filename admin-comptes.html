@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#4f46e5">
+<title>Gestion des comptes — Team53FR</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="app-header">
+    <div class="app-header-ligne">
+      <h1>🔐 Gestion des comptes</h1>
+      <div class="actions-entete">
+        <a href="tableau-de-bord.html" class="icone-bouton" title="Retour au tableau de bord">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+        </a>
+        <button class="icone-bouton deconnexion" title="Se déconnecter" onclick="seDeconnecter()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div class="contenu">
+
+    <div class="bloc-carte">
+      <h2>Comptes</h2>
+      <p class="sous-titre">Chaque compte accède aux sites cochés depuis le tableau de bord.</p>
+      <ul class="user-liste" id="listeUtilisateurs"></ul>
+    </div>
+
+    <div class="bloc-carte">
+      <h2 id="formTitre">Ajouter un utilisateur</h2>
+      <p class="sous-titre" id="formNote">Le mot de passe est stocké tel quel dans Web/utilisateurs.json.</p>
+
+      <div class="champ">
+        <label for="champLogin">Identifiant</label>
+        <input type="text" id="champLogin" placeholder="identifiant" autocomplete="off">
+      </div>
+      <div class="champ">
+        <label for="champPassword">Mot de passe</label>
+        <input type="text" id="champPassword" placeholder="mot de passe" autocomplete="off">
+      </div>
+      <div class="champ">
+        <label for="champNom">Nom affiché (optionnel)</label>
+        <input type="text" id="champNom" placeholder="ex. Robin" autocomplete="off">
+      </div>
+      <div class="champ">
+        <label for="champRole">Rôle central</label>
+        <select id="champRole">
+          <option value="user">Utilisateur</option>
+          <option value="admin">Administrateur (gère les comptes)</option>
+        </select>
+      </div>
+
+      <div class="champ">
+        <label>Accès aux sites</label>
+        <div class="case-acces-sites" id="casesAcces"></div>
+      </div>
+
+      <div style="display:flex; gap:0.7rem;">
+        <button class="btn btn-primaire" id="btnEnregistrer" onclick="enregistrerUtilisateur()">Ajouter</button>
+        <button class="btn btn-fantome" id="btnAnnuler" style="display:none" onclick="annulerEdition()">Annuler</button>
+      </div>
+
+      <p id="message" class="message"></p>
+    </div>
+
+    <div class="bloc-carte">
+      <h2>Import des comptes existants</h2>
+      <p class="sous-titre">Fusionne les comptes d'Éditeur de livre et de Ma Bibliothèque dans les comptes centraux. Peut être relancé sans créer de doublon.</p>
+      <button class="btn btn-secondaire" onclick="lancerImport()">Importer les comptes existants</button>
+      <p id="messageImport" class="message"></p>
+    </div>
+
+  </div>
+
+  <script src="script.js"></script>
+  <script src="admin.js"></script>
+</body>
+</html>

@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#4f46e5">
+<title>Tableau de bord — Team53FR</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="app-header">
+    <div class="app-header-ligne">
+      <h1><span id="entete-pastille">🔐</span> Team53FR</h1>
+      <div class="actions-entete">
+        <a href="admin-comptes.html" id="lien-admin" class="icone-bouton" title="Gestion des comptes" style="display:none">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </a>
+        <button class="icone-bouton deconnexion" title="Se déconnecter" onclick="seDeconnecter()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div class="contenu">
+    <div id="zone-sites"></div>
+  </div>
+
+  <script src="script.js"></script>
+  <script>
+    async function initTableauDeBord() {
+      const token = exigerConnexionCentrale();
+      if (!token) return;
+
+      const nom = localStorage.getItem("team53_nom");
+      if (nom) document.querySelector(".app-header h1").innerHTML =
+        '<span id="entete-pastille">🔐</span> Bonjour, ' + echapper(nom);
+
+      if (localStorage.getItem("team53_role") === "admin") {
+        document.getElementById("lien-admin").style.display = "";
+      }
+
+      const acces = JSON.parse(localStorage.getItem("team53_acces") || "[]");
+      const zone = document.getElementById("zone-sites");
+      let sites;
+      try {
+        sites = await chargerSites(token);
+      } catch (e) {
+        sites = DEFAULT_SITES;
+      }
+
+      const autorises = sites.filter(s => acces.includes(s.id));
+
+      if (!autorises.length) {
+        zone.innerHTML =
+          '<div class="etat-vide">' +
+          '<div class="pastille-lg" style="margin:0 auto 1rem;">🔒</div>' +
+          '<h2>Aucun site accessible</h2>' +
+          '<p>Demande à un administrateur de t\'accorder l\'accès à un site.</p>' +
+          '</div>';
+        return;
+      }
+
+      const grille = document.createElement("div");
+      grille.className = "grille-sites";
+      autorises.forEach(site => {
+        const carte = document.createElement("button");
+        carte.className = "carte-site";
+        carte.innerHTML =
+          '<div class="icone-site">' + (site.icone || "🌐") + '</div>' +
+          '<h2>' + echapper(site.nom) + '</h2>' +
+          '<p>' + echapper(site.description || "") + '</p>';
+        carte.addEventListener("click", () => relayerVersSite(site));
+        grille.appendChild(carte);
+      });
+      zone.innerHTML = "";
+      zone.appendChild(grille);
+    }
+
+    function echapper(txt) {
+      const d = document.createElement("div");
+      d.textContent = txt == null ? "" : String(txt);
+      return d.innerHTML;
+    }
+
+    initTableauDeBord();
+  </script>
+</body>
+</html>

@@ -1,0 +1,355 @@
+// ===== Portail central Team53FR — connexion à la base « BDD » sur GitHub =====
+// Même dépôt BDD que les sites (Team53FR/BDD), dans son propre dossier "Web/"
+// pour ne jamais toucher aux données des sites eux-mêmes.
+const PROPRIETAIRE = "Team53FR";
+const DEPOT_BDD = "BDD";
+const DOSSIER_BDD = "Web";
+
+// Registre de secours si Web/sites.json n'existe pas encore sur le dépôt BDD
+// (premier déploiement). Une fois Web/sites.json créé, il prend le dessus.
+// Le champ "relais" décrit comment préremplir la session du site cible avant
+// d'y naviguer : quel stockage (sessionStorage/localStorage) et sous quelles
+// clés, pour ne JAMAIS avoir à modifier le code du site lui-même.
+const DEFAULT_SITES = [
+  {
+    id: "editeur-livre",
+    nom: "Éditeur de livre",
+    description: "Créez, mettez en page et imprimez vos livres en ligne.",
+    icone: "📖",
+    pageArrivee: "sites/editeur-livre/bibliotheque.html",
+    relais: {
+      stockage: "sessionStorage",
+      cles: { token: "gh_token", login: "gh_login", role: "gh_role", nom: "gh_nom" }
+    }
+  },
+  {
+    id: "ma-bibliotheque",
+    nom: "Ma Bibliothèque",
+    description: "Répertoriez les livres et séries que vous possédez, tome par tome.",
+    icone: "📚",
+    pageArrivee: "sites/ma-bibliotheque/collection.html",
+    relais: {
+      stockage: "localStorage",
+      cles: { token: "mb_token" }
+    }
+  }
+];
+// ==============================================================
+
+// ----- Construction des URLs de l'API GitHub Contents -----
+
+// Chemin RELATIF au dossier Web/. Ex. "utilisateurs.json" -> .../contents/Web/utilisateurs.json
+function urlContenuBDD(chemin) {
+  const base = (DOSSIER_BDD || "").replace(/^\/+|\/+$/g, "");
+  const prefixe = base ? base + "/" : "";
+  return `https://api.github.com/repos/${PROPRIETAIRE}/${DEPOT_BDD}/contents/${prefixe}${chemin}`;
+}
+
+// Chemin ABSOLU depuis la racine du dépôt BDD (hors du dossier Web/), utilisé
+// uniquement pour lire/écrire les fichiers des sites existants lors de la
+// migration ou de la synchronisation d'un compte (ex. "EditeurLivre/users.json").
+function urlContenuAbsolu(chemin) {
+  return `https://api.github.com/repos/${PROPRIETAIRE}/${DEPOT_BDD}/contents/${chemin}`;
+}
+
+async function _lireFichierJSONParUrl(url, nomAffiche, token) {
+  const reponse = await fetch(url, {
+    headers: {
+      "Authorization": `Bearer ${token}`,
+      "Accept": "application/vnd.github+json"
+    }
+  });
+
+  if (!reponse.ok) {
+    const erreur = new Error("Impossible de lire le fichier (token invalide ou dépôt introuvable).");
+    erreur.status = reponse.status;
+    throw erreur;
+  }
+
+  const data = await reponse.json();
+  let contenuDecode;
+
+  if (data.content) {
+    try {
+      contenuDecode = decodeURIComponent(escape(atob(data.content)));
+    } catch (e) {
+      throw new Error(`Le contenu de "${nomAffiche}" n'a pas pu être décodé (encodage invalide).`);
+    }
+  } else if (data.download_url) {
+    const reponseBrute = await fetch(data.download_url);
+    if (!reponseBrute.ok) {
+      throw new Error(`Le fichier "${nomAffiche}" est trop volumineux et sa version brute n'a pas pu être récupérée.`);
+    }
+    contenuDecode = await reponseBrute.text();
+  } else {
+    throw new Error(`Le fichier "${nomAffiche}" est trop volumineux pour être lu (aucune URL brute disponible).`);
+  }
+
+  if (!contenuDecode.trim()) {
+    throw new Error(`Le fichier "${nomAffiche}" est vide.`);
+  }
+
+  try {
+    return { contenu: JSON.parse(contenuDecode), sha: data.sha };
+  } catch (e) {
+    throw new Error(`Le fichier "${nomAffiche}" contient un JSON invalide : ${e.message}`);
+  }
+}
+
+async function _ecrireFichierJSONParUrl(url, contenu, sha, token, messageCommit) {
+  const contenuEncode = btoa(unescape(encodeURIComponent(JSON.stringify(contenu, null, 2))));
+  const corps = { message: messageCommit || "Mise à jour", content: contenuEncode };
+  if (sha) corps.sha = sha;
+
+  const reponse = await fetch(url, {
+    method: "PUT",
+    headers: {
+      "Authorization": `Bearer ${token}`,
+      "Accept": "application/vnd.github+json"
+    },
+    body: JSON.stringify(corps)
+  });
+
+  if (!reponse.ok) {
+    let details = "";
+    try { const err = await reponse.json(); if (err.message) details = ` (${err.message})`; } catch (e) {}
+    const erreur = new Error(`Échec de l'écriture${details}.`);
+    erreur.status = reponse.status;
+    if (reponse.status === 409) erreur.conflit = true;
+    throw erreur;
+  }
+
+  const data = await reponse.json();
+  return data.content.sha;
+}
+
+async function _obtenirShaParUrl(url, token) {
+  const reponse = await fetch(url, {
+    headers: { "Authorization": `Bearer ${token}`, "Accept": "application/vnd.github+json" }
+  });
+  if (reponse.status === 404) return null;
+  if (!reponse.ok) throw new Error("Impossible de vérifier l'existence du fichier.");
+  const data = await reponse.json();
+  return data.sha;
+}
+
+// --- Variantes relatives au dossier Web/ ---
+function lireFichierJSON(nomFichier, token) {
+  return _lireFichierJSONParUrl(urlContenuBDD(nomFichier), nomFichier, token);
+}
+function ecrireFichierJSON(nomFichier, contenu, sha, token, messageCommit) {
+  return _ecrireFichierJSONParUrl(urlContenuBDD(nomFichier), contenu, sha, token, messageCommit);
+}
+function obtenirShaFichier(nomFichier, token) {
+  return _obtenirShaParUrl(urlContenuBDD(nomFichier), token);
+}
+
+// --- Variantes absolues (chemin complet depuis la racine du dépôt BDD),
+//     utilisées uniquement pour la migration / synchronisation avec les
+//     fichiers propres à chaque site existant. ---
+function lireFichierJSONAbsolu(chemin, token) {
+  return _lireFichierJSONParUrl(urlContenuAbsolu(chemin), chemin, token);
+}
+function ecrireFichierJSONAbsolu(chemin, contenu, sha, token, messageCommit) {
+  return _ecrireFichierJSONParUrl(urlContenuAbsolu(chemin), contenu, sha, token, messageCommit);
+}
+function obtenirShaFichierAbsolu(chemin, token) {
+  return _obtenirShaParUrl(urlContenuAbsolu(chemin), token);
+}
+
+// ===== Registre des sites (Web/sites.json, avec repli sur DEFAULT_SITES) =====
+async function chargerSites(token) {
+  try {
+    const { contenu } = await lireFichierJSON("sites.json", token);
+    if (Array.isArray(contenu) && contenu.length) return contenu;
+  } catch (e) { /* 404 ou absent : on retombe sur DEFAULT_SITES */ }
+  return DEFAULT_SITES;
+}
+
+// ===== Connexion centrale =====
+// Les comptes centraux vivent dans Web/utilisateurs.json sur le dépôt BDD :
+//   [{ login, password, role: "admin"|"user", nomAffichage, acces: [siteId,...], derniereConnexion }]
+// Session mémorisée en localStorage (persiste jusqu'à déconnexion manuelle),
+// comme ma-bibliotheque.
+async function seConnecter() {
+  const login = document.getElementById("login").value.trim();
+  const password = document.getElementById("password").value;
+  const token = document.getElementById("token").value.trim();
+  const message = document.getElementById("message");
+
+  if (!login || !password || !token) {
+    message.textContent = "Merci de remplir tous les champs.";
+    return;
+  }
+
+  message.textContent = "Vérification en cours...";
+
+  let utilisateurs, sha;
+  try {
+    const resultat = await lireFichierJSON("utilisateurs.json", token);
+    utilisateurs = Array.isArray(resultat.contenu) ? resultat.contenu : [];
+    sha = resultat.sha;
+  } catch (erreur) {
+    if (erreur.status === 404) {
+      // Premier lancement : personne ne peut encore se connecter puisque
+      // Web/utilisateurs.json n'existe pas. On amorce le système en créant un
+      // compte fondateur admin à partir de ce qui vient d'être saisi.
+      try {
+        const sites = await chargerSites(token);
+        const fondateur = {
+          login, password, role: "admin",
+          nomAffichage: login,
+          acces: sites.map(s => s.id),
+          derniereConnexion: new Date().toISOString()
+        };
+        await ecrireFichierJSON("utilisateurs.json", [fondateur], null, token,
+          `Création du compte fondateur ${login}`);
+        ouvrirSessionCentrale(fondateur, token);
+        window.location.href = "tableau-de-bord.html";
+      } catch (e2) {
+        message.textContent = "Impossible de créer le premier compte : " + e2.message;
+      }
+      return;
+    }
+    message.textContent = erreur.message;
+    return;
+  }
+
+  const utilisateur = utilisateurs.find(u => u.login === login && u.password === password);
+  if (!utilisateur) {
+    message.textContent = "Identifiants incorrects.";
+    return;
+  }
+
+  ouvrirSessionCentrale(utilisateur, token);
+
+  // Best-effort : ne doit jamais empêcher la connexion en cas d'échec d'écriture.
+  try {
+    utilisateur.derniereConnexion = new Date().toISOString();
+    await ecrireFichierJSON("utilisateurs.json", utilisateurs, sha, token, `Dernière connexion de ${login}`);
+  } catch (e) { /* ignoré */ }
+
+  window.location.href = "tableau-de-bord.html";
+}
+
+function ouvrirSessionCentrale(utilisateur, token) {
+  localStorage.setItem("team53_token", token);
+  localStorage.setItem("team53_login", utilisateur.login);
+  localStorage.setItem("team53_role", utilisateur.role === "admin" ? "admin" : "user");
+  localStorage.setItem("team53_nom", utilisateur.nomAffichage ? String(utilisateur.nomAffichage) : "");
+  localStorage.setItem("team53_acces", JSON.stringify(Array.isArray(utilisateur.acces) ? utilisateur.acces : []));
+}
+
+function seDeconnecter() {
+  localStorage.removeItem("team53_token");
+  localStorage.removeItem("team53_login");
+  localStorage.removeItem("team53_role");
+  localStorage.removeItem("team53_nom");
+  localStorage.removeItem("team53_acces");
+  window.location.href = "connexion.html";
+}
+
+// Redirige vers la connexion si aucune session centrale n'est mémorisée.
+function exigerConnexionCentrale() {
+  const token = localStorage.getItem("team53_token");
+  if (!token) {
+    window.location.href = "connexion.html";
+    return null;
+  }
+  return token;
+}
+
+// Redirige vers le tableau de bord si le compte connecté n'est pas admin central.
+function exigerAdminCentral() {
+  const token = exigerConnexionCentrale();
+  if (!token) return null;
+  if (localStorage.getItem("team53_role") !== "admin") {
+    alert("Accès réservé aux administrateurs.");
+    window.location.href = "tableau-de-bord.html";
+    return null;
+  }
+  return token;
+}
+
+// ===== Relais d'identifiants vers un site =====
+// Préremplit les clés de stockage que le site cible lit déjà lui-même (sans
+// aucune modification de son propre code), puis y navigue directement.
+function relayerVersSite(site) {
+  const acces = JSON.parse(localStorage.getItem("team53_acces") || "[]");
+  if (!acces.includes(site.id)) {
+    alert("Accès non autorisé à ce site.");
+    return;
+  }
+
+  const valeurs = {
+    token: localStorage.getItem("team53_token"),
+    login: localStorage.getItem("team53_login"),
+    role: localStorage.getItem("team53_role"),
+    nom: localStorage.getItem("team53_nom")
+  };
+
+  const cible = site.relais.stockage === "sessionStorage" ? sessionStorage : localStorage;
+  Object.entries(site.relais.cles).forEach(([cle, nomCleCible]) => {
+    if (valeurs[cle] != null) cible.setItem(nomCleCible, valeurs[cle]);
+  });
+
+  window.location.href = site.pageArrivee;
+}
+
+// ===== Migration des comptes existants =====
+// Fusionne EditeurLivre/users.json et MaBibliotheque/compte.json dans
+// Web/utilisateurs.json. Ré-exécutable sans jamais créer de doublon ni
+// écraser un compte central déjà présent : les comptes déjà migrés ne sont
+// que complétés (union des accès), jamais recréés.
+async function importerComptesExistants(token) {
+  let utilisateurs = [];
+  let sha = null;
+  try {
+    const resultat = await lireFichierJSON("utilisateurs.json", token);
+    utilisateurs = Array.isArray(resultat.contenu) ? resultat.contenu : [];
+    sha = resultat.sha;
+  } catch (e) {
+    if (e.status !== 404) throw e;
+  }
+
+  const normaliser = s => (s || "").trim().toLowerCase();
+  const index = new Map(utilisateurs.map(u => [normaliser(u.login), u]));
+  let ajoutes = 0, accesAjoutes = 0;
+
+  function fusionner(login, password, nomAffichage, siteId) {
+    const cle = normaliser(login);
+    if (!cle) return;
+    let central = index.get(cle);
+    if (!central) {
+      central = { login, password, role: "user", nomAffichage: nomAffichage || "", acces: [] };
+      index.set(cle, central);
+      utilisateurs.push(central);
+      ajoutes++;
+    }
+    if (!Array.isArray(central.acces)) central.acces = [];
+    if (!central.acces.includes(siteId)) {
+      central.acces.push(siteId);
+      accesAjoutes++;
+    }
+  }
+
+  try {
+    const { contenu } = await lireFichierJSONAbsolu("EditeurLivre/users.json", token);
+    (Array.isArray(contenu) ? contenu : []).forEach(u =>
+      fusionner(u.login, u.password, u.nomAffichage, "editeur-livre"));
+  } catch (e) {
+    if (e.status !== 404) throw e;
+  }
+
+  try {
+    const { contenu } = await lireFichierJSONAbsolu("MaBibliotheque/compte.json", token);
+    if (contenu && contenu.login) fusionner(contenu.login, contenu.password, "", "ma-bibliotheque");
+  } catch (e) {
+    if (e.status !== 404) throw e;
+  }
+
+  await ecrireFichierJSON("utilisateurs.json", utilisateurs, sha, token,
+    "Import des comptes existants (editeur-livre, ma-bibliotheque)");
+
+  return { ajoutes, accesAjoutes, total: utilisateurs.length };
+}
