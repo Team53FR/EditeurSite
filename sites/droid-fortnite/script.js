@@ -192,13 +192,32 @@ async function sauvegarderAvecFusion(nomFichier, tableauLocal, sha, token, messa
 // départ fournies. Je n'ai aucun moyen d'écrire directement dans le dépôt
 // BDD moi-même (pas de token) : ce mécanisme, déclenché au premier chargement
 // authentifié par un compte quelconque, est la seule façon de les amorcer.
+//
+// Deux chargements peuvent démarrer l'amorçage en même temps (rechargement
+// de page pendant que la création précédente était encore en vol, deux
+// onglets ouverts...) : le second à écrire reçoit alors un 409 (le fichier a
+// été créé entre-temps par le premier). Dans ce cas précis, ce n'est pas une
+// vraie erreur — on relit simplement ce que l'autre vient de créer.
 async function chargerOuAmorcer(nomFichier, donneesInitiales, token, messageCommit) {
   try {
-    return await lireFichierJSON(nomFichier, token);
+    const resultat = await lireFichierJSON(nomFichier, token);
+    if (Array.isArray(resultat.contenu) && resultat.contenu.length === 0) {
+      // Le fichier existe mais est vide (ex. laissé dans cet état par une
+      // précédente tentative d'amorçage interrompue en cours de route) :
+      // le repeupler avec les données de départ plutôt que de rester bloqué.
+      const sha = await ecrireFichierJSON(nomFichier, donneesInitiales, resultat.sha, token, messageCommit);
+      return { contenu: donneesInitiales, sha };
+    }
+    return resultat;
   } catch (e) {
     if (e.status !== 404) throw e;
-    const sha = await ecrireFichierJSON(nomFichier, donneesInitiales, null, token, messageCommit);
-    return { contenu: donneesInitiales, sha };
+    try {
+      const sha = await ecrireFichierJSON(nomFichier, donneesInitiales, null, token, messageCommit);
+      return { contenu: donneesInitiales, sha };
+    } catch (e2) {
+      if (e2.conflit) return await lireFichierJSON(nomFichier, token);
+      throw e2;
+    }
   }
 }
 
