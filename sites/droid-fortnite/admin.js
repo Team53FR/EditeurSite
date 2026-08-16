@@ -10,11 +10,10 @@ let shaPaliers = null;
 let modeEditionId = null; // id du droïde en cours de modification, ou null (mode ajout)
 const cacheImages = new Map(); // chemin GitHub -> URL locale (blob:)
 
-// État du formulaire pour l'icône et la couleur de contour, en attente
-// d'enregistrement (pas encore envoyés tant qu'on ne valide pas le formulaire).
+// État du formulaire pour l'icône, en attente d'enregistrement (pas encore
+// envoyée tant qu'on ne valide pas le formulaire).
 let dataUrlImageAdmin = null;
 let imageSupprimeeAdmin = false;
-let couleurAdmin = null;
 
 function echapper(txt) {
   const d = document.createElement("div");
@@ -52,15 +51,22 @@ function retirerImageAdmin() {
   document.getElementById("boutonSupprimerImageAdmin").style.display = "none";
 }
 
-function choisirCouleurAdmin(valeur) {
-  couleurAdmin = valeur;
-  document.getElementById("boutonSupprimerCouleurAdmin").style.display = "";
+// ===== Onglets (Droïdes / Ajouter / Paliers) =====
+let ongletAdminActif = "droides";
+
+function changerOngletAdmin(type) {
+  ongletAdminActif = type;
+  document.querySelectorAll(".onglet-type").forEach((b) => b.classList.toggle("actif", b.dataset.type === type));
+  document.getElementById("zoneDroides").style.display = type === "droides" ? "" : "none";
+  document.getElementById("zoneAjout").style.display = type === "ajout" ? "" : "none";
+  document.getElementById("zonePaliers").style.display = type === "paliers" ? "" : "none";
 }
 
-function retirerCouleurAdmin() {
-  couleurAdmin = null;
-  document.getElementById("champCouleur").value = "#0891b2";
-  document.getElementById("boutonSupprimerCouleurAdmin").style.display = "none";
+// Clic sur l'onglet « Ajouter » : repart toujours d'un formulaire vide (pour
+// modifier un droïde existant, on passe par sa carte dans l'onglet Droïdes).
+function ouvrirOngletAjout() {
+  annulerEditionDroide();
+  changerOngletAdmin("ajout");
 }
 
 if (token) {
@@ -76,7 +82,8 @@ async function chargerDonnees() {
     ]);
     catalogue = Array.isArray(rCatalogue.contenu) ? rCatalogue.contenu : [];
     shaCatalogue = rCatalogue.sha;
-    paliers = (Array.isArray(rPaliers.contenu) && rPaliers.contenu.length) ? rPaliers.contenu : PALIERS_INITIAUX;
+    const paliersCharges = normaliserPaliers(rPaliers.contenu);
+    paliers = paliersCharges.length ? paliersCharges : PALIERS_INITIAUX;
     shaPaliers = rPaliers.sha;
   } catch (e) {
     message.textContent = e.message;
@@ -89,17 +96,20 @@ async function chargerDonnees() {
 // ===== Droïdes =====
 // Petites cartes (comme le Droidex de suivi.html) plutôt qu'une longue
 // liste : avec ~70 droïdes, une liste verticale devient vite illisible.
-// Cliquer une carte l'ouvre en modification ; le bouton 🗑 dans le coin
-// supprime directement (avec confirmation).
+// Triées par rareté (Typique en premier), puis par nom. Cliquer une carte
+// l'ouvre en modification ; le bouton 🗑 dans le coin supprime directement
+// (avec confirmation).
 function afficherDroides() {
   const grille = document.getElementById("listeDroides");
   grille.innerHTML = "";
 
-  catalogue.slice().sort((a, b) => a.nom.localeCompare(b.nom)).forEach((d) => {
+  catalogue.slice().sort((a, b) => {
+    const diff = ORDRE_RARETE.indexOf(a.rarete) - ORDRE_RARETE.indexOf(b.rarete);
+    return diff !== 0 ? diff : a.nom.localeCompare(b.nom);
+  }).forEach((d) => {
     const carte = document.createElement("div");
     carte.className = "carte-droide";
     carte.title = "Modifier";
-    if (d.couleur) carte.style.borderColor = d.couleur;
     carte.innerHTML =
       `<div class="droide-entete">` +
         `<div class="droide-icone" id="icone-admin-${d.id}" style="background:${d.image ? "" : couleurDroide(d.id)};color:${d.image ? "" : "#fff"}">${iconeClasse(d.classe)}</div>` +
@@ -135,13 +145,10 @@ async function editerDroide(id) {
   modeEditionId = id;
   dataUrlImageAdmin = null;
   imageSupprimeeAdmin = false;
-  couleurAdmin = d.couleur || null;
 
   document.getElementById("champNom").value = d.nom;
   document.getElementById("champClasse").value = d.classe;
   document.getElementById("champRarete").value = d.rarete;
-  document.getElementById("champCouleur").value = d.couleur || "#0891b2";
-  document.getElementById("boutonSupprimerCouleurAdmin").style.display = d.couleur ? "" : "none";
   document.getElementById("titreFormDroide").textContent = "Modifier « " + d.nom + " »";
   document.getElementById("btnEnregistrerDroide").textContent = "Enregistrer les modifications";
   document.getElementById("btnAnnulerDroide").style.display = "";
@@ -159,6 +166,7 @@ async function editerDroide(id) {
     } catch (e) { /* reste sur le placeholder */ }
   }
 
+  changerOngletAdmin("ajout");
   document.getElementById("champNom").focus();
 }
 
@@ -166,18 +174,21 @@ function annulerEditionDroide() {
   modeEditionId = null;
   dataUrlImageAdmin = null;
   imageSupprimeeAdmin = false;
-  couleurAdmin = null;
   document.getElementById("champNom").value = "";
   document.getElementById("champClasse").value = "Ouvrier";
   document.getElementById("champRarete").value = "Typique";
-  document.getElementById("champCouleur").value = "#0891b2";
-  document.getElementById("boutonSupprimerCouleurAdmin").style.display = "none";
   document.getElementById("apercuDroideAdmin").innerHTML = iconePlaceholderDroideAdmin();
   document.getElementById("boutonSupprimerImageAdmin").style.display = "none";
   document.getElementById("titreFormDroide").textContent = "Ajouter un droïde";
   document.getElementById("btnEnregistrerDroide").textContent = "Ajouter";
   document.getElementById("btnAnnulerDroide").style.display = "none";
   document.getElementById("messageDroideAdmin").textContent = "";
+}
+
+// Bouton « Annuler » du formulaire : abandonne l'édition et revient à la liste.
+function annulerEtRevenir() {
+  annulerEditionDroide();
+  changerOngletAdmin("droides");
 }
 
 function genererId(prefixe) {
@@ -213,7 +224,6 @@ async function enregistrerDroideAdmin() {
 
     const entree = { id, nom, classe, rarete };
     if (cheminImage) entree.image = cheminImage;
-    if (couleurAdmin) entree.couleur = couleurAdmin;
 
     const copie = modeEditionId
       ? catalogue.map((x) => x.id === modeEditionId ? entree : x)
@@ -224,8 +234,7 @@ async function enregistrerDroideAdmin() {
     catalogue = copie;
     annulerEditionDroide();
     afficherDroides();
-    message.textContent = "Enregistré avec succès.";
-    setTimeout(() => { if (message.textContent === "Enregistré avec succès.") message.textContent = ""; }, 2500);
+    changerOngletAdmin("droides");
   } catch (e) {
     message.textContent = e.message;
   }
@@ -245,14 +254,14 @@ async function supprimerDroide(id) {
     if (d.image) supprimerFichierGithub(d.image, token, "Suppression du droïde associé").catch(() => {});
     if (modeEditionId === id) annulerEditionDroide();
     afficherDroides();
-    message.textContent = "Droïde supprimé.";
-    setTimeout(() => { if (message.textContent === "Droïde supprimé.") message.textContent = ""; }, 2500);
   } catch (e) {
     message.textContent = e.message;
   }
 }
 
 // ===== Paliers de variante =====
+// La couleur de chaque palier teinte le contour des cartes du Droidex quand
+// cet onglet est actif (définie ici, pas par droïde).
 function afficherPaliers() {
   const liste = document.getElementById("listePaliers");
   liste.innerHTML = "";
@@ -261,8 +270,11 @@ function afficherPaliers() {
     const li = document.createElement("li");
     li.className = "ligne-item";
     li.innerHTML =
-      `<div class="ligne-info"><div class="ligne-titre">${index + 1}. ${echapper(p)}</div></div>` +
+      `<div class="ligne-info"><div class="ligne-titre">${index + 1}. ${echapper(p.nom)}</div></div>` +
+      `<input type="color" class="palier-couleur" value="${echapper(p.couleur || "#9ca3af")}" title="Couleur du contour">` +
       `<div class="ligne-actions"></div>`;
+
+    li.querySelector(".palier-couleur").addEventListener("change", (e) => changerCouleurPalier(index, e.target.value));
 
     const actions = li.querySelector(".ligne-actions");
 
@@ -305,14 +317,21 @@ async function sauvegarderPaliers(copie, messageCommit) {
   }
 }
 
+function changerCouleurPalier(index, couleur) {
+  const copie = paliers.slice();
+  copie[index] = Object.assign({}, copie[index], { couleur });
+  sauvegarderPaliers(copie, `Couleur du palier ${copie[index].nom}`);
+}
+
 function ajouterPalier() {
-  const champ = document.getElementById("champNouveauPalier");
-  const nom = champ.value.trim();
+  const champNom = document.getElementById("champNouveauPalier");
+  const champCouleur = document.getElementById("champCouleurNouveauPalier");
+  const nom = champNom.value.trim();
   const message = document.getElementById("messagePaliers");
   if (!nom) { message.textContent = "Le nom du palier est obligatoire."; return; }
-  if (paliers.includes(nom)) { message.textContent = "Ce palier existe déjà."; return; }
-  champ.value = "";
-  sauvegarderPaliers(paliers.concat([nom]), `Ajout du palier ${nom}`);
+  if (paliers.some((p) => p.nom === nom)) { message.textContent = "Ce palier existe déjà."; return; }
+  champNom.value = "";
+  sauvegarderPaliers(paliers.concat([{ nom, couleur: champCouleur.value }]), `Ajout du palier ${nom}`);
 }
 
 function deplacerPalier(index, direction) {
@@ -324,8 +343,8 @@ function deplacerPalier(index, direction) {
 }
 
 function supprimerPalier(index) {
-  const nom = paliers[index];
-  if (!confirm(`Supprimer le palier « ${nom}» ?\n\nLa progression déjà enregistrée pour ce palier n'est pas supprimée, juste rendue invisible (elle réapparaîtrait si un palier du même nom est recréé).`)) return;
+  const nom = paliers[index].nom;
+  if (!confirm(`Supprimer le palier « ${nom} » ?\n\nLa progression déjà enregistrée pour ce palier n'est pas supprimée, juste rendue invisible (elle réapparaîtrait si un palier du même nom est recréé).`)) return;
   const copie = paliers.filter((_, i) => i !== index);
   sauvegarderPaliers(copie, `Suppression du palier ${nom}`);
 }

@@ -293,40 +293,48 @@ uniquement quand un seul compte écrit jamais un fichier donné, comme
 fusionne les entrées locales absentes (par `id`), pour ne jamais perdre
 silencieusement l'ajout fait par quelqu'un d'autre entre-temps.
 
-**Panneau admin (`admin.html`)** : ajout, modification et suppression des
-droïdes, plus gestion de la liste des paliers de variante elle-même
-(`DroidFortnite/paliers.json`, amorcée comme les deux autres fichiers
-partagés) — ajout, suppression, réordonnancement (pas de renommage,
-volontairement : ça casserait silencieusement les clés
-`"<idDroide>::<ancienNom>"` déjà enregistrées dans les progressions
-personnelles). Réservé aux admins du portail central : pas de rôle propre à
-Droid Fortnite, `estAdminCentral()`/`exigerAdminDroidFortnite()` dans
-`script.js` lisent directement `team53_role` en `localStorage` (même origine
-que le portail, donc même `localStorage` — aucun changement du relais
-nécessaire). Le bouton flottant d'ajout et le lien ⚙ vers `admin.html` sont
-masqués pour les comptes non-admin dans `suivi.html`. La liste des droïdes y
-est affichée en petites cartes (comme le Droidex de `suivi.html`, classes
-`.grille-droides`/`.carte-droide` réutilisées telles quelles) plutôt qu'en
-liste verticale — avec ~70 droïdes, une liste devient vite illisible. Une
-carte cliquée ouvre la modification ; le bouton 🗑 dans son coin supprime
-directement (avec confirmation), `stopPropagation()` empêche qu'il déclenche
-aussi l'ouverture de la modification. `iconeClasse()`/`classeRareteCss()`/
-`couleurDroide()` ont été déplacées dans `script.js` pour être partagées
-entre `suivi.js` (Droidex) et `admin.js` (gestion).
+**Panneau admin (`admin.html`)**, réservé aux admins du portail central : pas
+de rôle propre à Droid Fortnite, `estAdminCentral()`/`exigerAdminDroidFortnite()`
+dans `script.js` lisent directement `team53_role` en `localStorage` (même
+origine que le portail, aucun changement du relais nécessaire). Le bouton
+flottant d'ajout et le lien ⚙ vers `admin.html` sont masqués pour les
+comptes non-admin dans `suivi.html`.
 
-Le formulaire d'ajout/modification d'un droïde dans `admin.html` permet aussi
-de fixer son **icône** (toujours pas de visuel officiel du jeu) et la
-**couleur du contour de sa carte** (`<input type="color">`, stockée en `hex`
-dans le champ `couleur` de l'entrée catalogue, appliquée en style inline sur
-`.carte-droide` — l'emporte sur la couleur générée automatiquement par
-`couleurDroide()`). L'édition de l'icône n'est **plus accessible depuis
-`suivi.html`** (le bouton ✎ sur la carte a été retiré) : elle passe
-uniquement par `admin.html` désormais. `comprimerImage()` (compression
-client avant upload, dans `script.js`, partagée entre `suivi.js` et
-`admin.js`) préserve la transparence de la source : elle exporte en PNG si
-l'image redimensionnée contient un pixel non totalement opaque, sinon en
-JPEG (plus léger) — un fond transparent (icône détourée) n'est donc plus
-aplati en noir comme avec un export JPEG systématique.
+Organisé en **trois onglets** (même pattern `.onglet-type` que Droidex/
+Renaissance de `suivi.html`) :
+- **Droïdes** : catalogue en petites cartes (comme le Droidex, classes
+  `.grille-droides`/`.carte-droide` réutilisées telles quelles — une liste
+  verticale devient vite illisible avec ~70 entrées), **triées par rareté**
+  (Typique en premier, `ORDRE_RARETE` dans `script.js`) puis par nom. Une
+  carte cliquée bascule sur l'onglet Ajouter avec le formulaire pré-rempli
+  (`editerDroide()`) ; le bouton 🗑 dans son coin supprime directement
+  (confirmation, `stopPropagation()` pour ne pas aussi ouvrir la
+  modification).
+- **Ajouter** : formulaire nom/classe/rareté + icône (photo perso,
+  compression via `comprimerImage()` dans `script.js`, partagée avec
+  `suivi.js` — toujours pas de visuel officiel du jeu). Cliquer l'onglet
+  directement repart d'un formulaire vide (`ouvrirOngletAjout()`) ;
+  Enregistrer ou Annuler ramène à l'onglet Droïdes.
+- **Paliers** : liste ordonnée avec ↑/↓/Supprimer **et un sélecteur de
+  couleur par palier** (`<input type="color">`, change immédiatement à
+  l'enregistrement).
+
+**La couleur du contour d'une carte de droïde est celle du palier actif**
+(pas une couleur propre à chaque droïde) : dans `suivi.js`,
+`afficherDroidex()` cherche la couleur de `palierActif` dans `paliers` et
+l'applique en style inline à toutes les cartes affichées. `DroidFortnite/paliers.json`
+est donc passé d'un tableau de chaînes à un tableau d'objets
+`{ nom, couleur }` — `normaliserPaliers()` dans `script.js` reconnaît et
+convertit à la volée l'ancienne forme (tableau de chaînes) pour ne rien
+casser si le fichier existait déjà avant ce changement. Pas de renommage
+possible (seulement ajout/suppression/réordonnancement) : renommer
+casserait silencieusement les clés `"<idDroide>::<ancienNom>"` déjà
+enregistrées dans les progressions personnelles.
+
+`comprimerImage()` préserve la transparence de la source : elle exporte en
+PNG si l'image redimensionnée contient un pixel non totalement opaque,
+sinon en JPEG (plus léger) — un fond transparent (icône détourée) n'est
+donc pas aplati en noir comme avec un export JPEG systématique.
 
 ## App installable (PWA)
 

@@ -533,6 +533,11 @@ a { color: var(--primaire); }
 .ligne-item .ligne-titre { font-weight: 600; font-size: 0.9rem; }
 .ligne-item .ligne-sous { font-size: 0.78rem; color: var(--texte-att); }
 .ligne-item .ligne-actions { display: flex; gap: 0.3rem; flex-shrink: 0; }
+.ligne-item .palier-couleur {
+  width: 34px; height: 34px; flex-shrink: 0;
+  padding: 2px; border-radius: 8px; border: 1px solid var(--bordure); background: var(--carte);
+  cursor: pointer;
+}
 
 .btn-mini {
   padding: 0.45rem 0.7rem; font-size: 0.8rem; border-radius: 8px;

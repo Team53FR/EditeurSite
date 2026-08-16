@@ -528,5 +528,27 @@ const RENAISSANCE_INITIALE = [
 // plus fort (confirmé par capture d'écran du jeu — au-delà de ce que le
 // tracker communautaire connaît encore, qui s'arrête à Beskar). Donnée de
 // départ uniquement : la vraie liste vit dans DroidFortnite/paliers.json
-// (partagée, éditable depuis admin.html — ajout/suppression/réordonnancement).
-const PALIERS_INITIAUX = ["Défaut", "Or", "Diamant", "Arc-en-ciel", "Beskar", "Galactique", "Stellar"];
+// (partagée, éditable depuis admin.html — ajout/suppression/réordonnancement,
+// avec une couleur par palier qui teinte le contour des cartes du Droidex).
+const PALIERS_INITIAUX = [
+  { nom: "Défaut", couleur: "#9ca3af" },
+  { nom: "Or", couleur: "#eab308" },
+  { nom: "Diamant", couleur: "#38bdf8" },
+  { nom: "Arc-en-ciel", couleur: "#a855f7" },
+  { nom: "Beskar", couleur: "#94a3b8" },
+  { nom: "Galactique", couleur: "#4f46e5" },
+  { nom: "Stellar", couleur: "#f97316" }
+];
+
+// Ordre d'affichage des raretés, du plus faible au plus fort (utilisé pour
+// trier la liste des droïdes dans le panneau admin).
+const ORDRE_RARETE = ["Typique", "Rare", "Épique", "Légendaire", "Mythique", "Iconique"];
+
+// paliers.json pouvait exister sous l'ancienne forme (tableau de chaînes,
+// avant l'ajout d'une couleur par palier) : on la reconnaît et la convertit
+// à la volée, sans rien casser pour qui l'a déjà utilisée.
+function normaliserPaliers(bruts) {
+  return (Array.isArray(bruts) ? bruts : []).map((p) =>
+    typeof p === "string" ? { nom: p, couleur: null } : p
+  );
+}

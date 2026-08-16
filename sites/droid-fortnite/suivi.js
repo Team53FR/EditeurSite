@@ -13,7 +13,7 @@ let perso = { droidesPossedes: [], renaissanceAtteinte: [] };
 let shaPerso = null;
 
 let ongletActif = "droidex";
-let palierActif = PALIERS_INITIAUX[0];
+let palierActif = PALIERS_INITIAUX[0].nom;
 const cacheImages = new Map(); // chemin GitHub -> URL locale (blob:)
 
 function clePossession(idDroide, palier) {
@@ -24,8 +24,9 @@ function clePossession(idDroide, palier) {
 // palier (Défaut) dans le jeu — pas d'amélioration possible pour eux. On
 // compare au premier élément du tableau CHARGÉ, pas à la chaîne "Défaut" en
 // dur, pour rester correct même si la liste de paliers a été modifiée.
-function estDisponibleAuPalier(d, palier) {
-  return d.rarete !== "Iconique" || palier === paliers[0];
+function estDisponibleAuPalier(d, palierNom) {
+  const premier = paliers[0] && paliers[0].nom;
+  return d.rarete !== "Iconique" || palierNom === premier;
 }
 
 function changerOnglet(type) {
@@ -60,8 +61,9 @@ async function chargerTout() {
     shaCatalogue = rCatalogue.sha;
     renaissance = Array.isArray(rRenaissance.contenu) ? rRenaissance.contenu : [];
     shaRenaissance = rRenaissance.sha;
-    paliers = (Array.isArray(rPaliers.contenu) && rPaliers.contenu.length) ? rPaliers.contenu : PALIERS_INITIAUX;
-    palierActif = paliers[0];
+    const paliersCharges = normaliserPaliers(rPaliers.contenu);
+    paliers = paliersCharges.length ? paliersCharges : PALIERS_INITIAUX;
+    palierActif = paliers[0].nom;
   } catch (e) {
     document.getElementById("chargement").innerHTML =
       `<p style="color:var(--danger);text-align:center">${echapperHTML(e.message)}</p>`;
@@ -81,16 +83,16 @@ function construireOngletsPalier() {
   paliers.forEach((p) => {
     const bouton = document.createElement("button");
     bouton.type = "button";
-    bouton.className = "onglet-palier" + (p === palierActif ? " actif" : "");
-    bouton.textContent = p;
-    bouton.addEventListener("click", () => changerPalierActif(p));
+    bouton.className = "onglet-palier" + (p.nom === palierActif ? " actif" : "");
+    bouton.textContent = p.nom;
+    bouton.addEventListener("click", () => changerPalierActif(p.nom));
     zone.appendChild(bouton);
   });
 }
 
-function changerPalierActif(p) {
-  palierActif = p;
-  document.querySelectorAll(".onglet-palier").forEach((b) => b.classList.toggle("actif", b.textContent === p));
+function changerPalierActif(nom) {
+  palierActif = nom;
+  document.querySelectorAll(".onglet-palier").forEach((b) => b.classList.toggle("actif", b.textContent === nom));
   afficherDroidex();
 }
 
@@ -181,13 +183,18 @@ function afficherDroidex() {
   grille.innerHTML = "";
   vide.style.display = filtres.length ? "none" : "";
 
+  // Le contour des cartes prend la couleur du PALIER actif (définie dans le
+  // gestionnaire), pas une couleur propre à chaque droïde.
+  const palierObjActif = paliers.find((p) => p.nom === palierActif);
+  const couleurPalierActif = palierObjActif && palierObjActif.couleur;
+
   filtres.forEach((d) => {
     const possede = perso.droidesPossedes.includes(clePossession(d.id, palierActif));
     const carte = document.createElement("div");
     carte.className = "carte-droide" + (possede ? " possede" : "");
     carte.setAttribute("role", "button");
     carte.setAttribute("aria-pressed", possede ? "true" : "false");
-    if (d.couleur) carte.style.borderColor = d.couleur;
+    if (couleurPalierActif) carte.style.borderColor = couleurPalierActif;
     carte.innerHTML =
       `<div class="droide-entete">` +
         `<div class="droide-icone" id="icone-${d.id}" style="background:${d.image ? "" : couleurDroide(d.id)};color:${d.image ? "" : "#fff"}">${iconeClasse(d.classe)}</div>` +

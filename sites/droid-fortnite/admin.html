@@ -25,79 +25,90 @@
         </button>
       </div>
     </div>
+
+    <div class="onglets-type" role="tablist">
+      <button type="button" class="onglet-type actif" data-type="droides" onclick="changerOngletAdmin('droides')">🤖 Droïdes</button>
+      <button type="button" class="onglet-type" data-type="ajout" onclick="ouvrirOngletAjout()">➕ Ajouter</button>
+      <button type="button" class="onglet-type" data-type="paliers" onclick="changerOngletAdmin('paliers')">🎚️ Paliers</button>
+    </div>
   </header>
 
   <div class="contenu">
 
-    <div class="bloc-carte">
-      <h2>Droïdes</h2>
-      <p class="sous-titre">Catalogue partagé — visible par tous les comptes du site.</p>
-      <div class="grille-droides" id="listeDroides"></div>
-
-      <h2 id="titreFormDroide" style="font-size:0.95rem">Ajouter un droïde</h2>
-
-      <div class="zone-couverture">
-        <div class="apercu-couverture" id="apercuDroideAdmin">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
-        </div>
-        <div class="actions-couverture">
-          <button type="button" class="btn btn-secondaire" onclick="declencherChoixImageAdmin('camera')">📷 Prendre une photo</button>
-          <button type="button" class="btn btn-secondaire" onclick="declencherChoixImageAdmin('galerie')">🖼️ Choisir dans la galerie</button>
-          <button type="button" class="btn btn-fantome" id="boutonSupprimerImageAdmin" onclick="retirerImageAdmin()" style="display:none">Retirer l'icône</button>
-        </div>
+    <div id="zoneDroides">
+      <div class="bloc-carte">
+        <h2>Droïdes</h2>
+        <p class="sous-titre">Catalogue partagé, trié par rareté (Typique en premier) — clique une carte pour la modifier.</p>
+        <div class="grille-droides" id="listeDroides"></div>
       </div>
-      <input type="file" accept="image/*" capture="environment" id="champImageCameraAdmin" style="display:none" onchange="imageChoisieAdmin(event)">
-      <input type="file" accept="image/*" id="champImageGalerieAdmin" style="display:none" onchange="imageChoisieAdmin(event)">
-      <p class="note-source">Photo perso uniquement (pas de visuel officiel du jeu — droits d'auteur Epic Games).</p>
-
-      <div class="champ">
-        <label for="champNom">Nom</label>
-        <input type="text" id="champNom" placeholder="ex. Senate Hovercam">
-      </div>
-      <div class="champ">
-        <label for="champClasse">Classe</label>
-        <select id="champClasse">
-          <option value="Ouvrier">🔧 Ouvrier</option>
-          <option value="Astromec">📡 Astromec</option>
-          <option value="Combat">⚔️ Combat</option>
-        </select>
-      </div>
-      <div class="champ">
-        <label for="champRarete">Rareté</label>
-        <select id="champRarete">
-          <option value="Typique">Typique</option>
-          <option value="Rare">Rare</option>
-          <option value="Épique">Épique</option>
-          <option value="Légendaire">Légendaire</option>
-          <option value="Mythique">Mythique</option>
-          <option value="Iconique">Iconique</option>
-        </select>
-      </div>
-      <div class="champ">
-        <label for="champCouleur">Couleur du contour de la carte (optionnel)</label>
-        <div style="display:flex; gap:0.6rem; align-items:center;">
-          <input type="color" id="champCouleur" value="#0891b2" style="width:52px; height:38px; padding:2px; border-radius:8px; border:1px solid var(--bordure); background:var(--fond);" oninput="choisirCouleurAdmin(this.value)">
-          <button type="button" class="btn-mini" id="boutonSupprimerCouleurAdmin" onclick="retirerCouleurAdmin()" style="display:none">Aucune couleur</button>
-        </div>
-      </div>
-      <div style="display:flex; gap:0.7rem;">
-        <button class="btn btn-primaire" id="btnEnregistrerDroide" onclick="enregistrerDroideAdmin()">Ajouter</button>
-        <button class="btn btn-fantome" id="btnAnnulerDroide" style="display:none" onclick="annulerEditionDroide()">Annuler</button>
-      </div>
-      <p id="messageDroideAdmin" class="message"></p>
     </div>
 
-    <div class="bloc-carte">
-      <h2>Paliers de variante</h2>
-      <p class="sous-titre">Ordre du plus faible au plus fort — détermine les onglets du Droidex. Un droïde de rareté Iconique n'existe qu'au premier palier de la liste.</p>
-      <ul class="liste-simple" id="listePaliers"></ul>
+    <div id="zoneAjout" style="display:none">
+      <div class="bloc-carte">
+        <h2 id="titreFormDroide" style="font-size:0.95rem">Ajouter un droïde</h2>
 
-      <div class="champ">
-        <label for="champNouveauPalier">Ajouter un palier (en fin de liste)</label>
-        <input type="text" id="champNouveauPalier" placeholder="ex. Nova" onkeydown="if(event.key==='Enter'){ajouterPalier();}">
+        <div class="zone-couverture">
+          <div class="apercu-couverture" id="apercuDroideAdmin">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+          </div>
+          <div class="actions-couverture">
+            <button type="button" class="btn btn-secondaire" onclick="declencherChoixImageAdmin('camera')">📷 Prendre une photo</button>
+            <button type="button" class="btn btn-secondaire" onclick="declencherChoixImageAdmin('galerie')">🖼️ Choisir dans la galerie</button>
+            <button type="button" class="btn btn-fantome" id="boutonSupprimerImageAdmin" onclick="retirerImageAdmin()" style="display:none">Retirer l'icône</button>
+          </div>
+        </div>
+        <input type="file" accept="image/*" capture="environment" id="champImageCameraAdmin" style="display:none" onchange="imageChoisieAdmin(event)">
+        <input type="file" accept="image/*" id="champImageGalerieAdmin" style="display:none" onchange="imageChoisieAdmin(event)">
+        <p class="note-source">Photo perso uniquement (pas de visuel officiel du jeu — droits d'auteur Epic Games).</p>
+
+        <div class="champ">
+          <label for="champNom">Nom</label>
+          <input type="text" id="champNom" placeholder="ex. Senate Hovercam">
+        </div>
+        <div class="champ">
+          <label for="champClasse">Classe</label>
+          <select id="champClasse">
+            <option value="Ouvrier">🔧 Ouvrier</option>
+            <option value="Astromec">📡 Astromec</option>
+            <option value="Combat">⚔️ Combat</option>
+          </select>
+        </div>
+        <div class="champ">
+          <label for="champRarete">Rareté</label>
+          <select id="champRarete">
+            <option value="Typique">Typique</option>
+            <option value="Rare">Rare</option>
+            <option value="Épique">Épique</option>
+            <option value="Légendaire">Légendaire</option>
+            <option value="Mythique">Mythique</option>
+            <option value="Iconique">Iconique</option>
+          </select>
+        </div>
+        <div style="display:flex; gap:0.7rem;">
+          <button class="btn btn-primaire" id="btnEnregistrerDroide" onclick="enregistrerDroideAdmin()">Ajouter</button>
+          <button class="btn btn-fantome" id="btnAnnulerDroide" style="display:none" onclick="annulerEtRevenir()">Annuler</button>
+        </div>
+        <p id="messageDroideAdmin" class="message"></p>
       </div>
-      <button class="btn btn-primaire" onclick="ajouterPalier()">Ajouter le palier</button>
-      <p id="messagePaliers" class="message"></p>
+    </div>
+
+    <div id="zonePaliers" style="display:none">
+      <div class="bloc-carte">
+        <h2>Paliers de variante</h2>
+        <p class="sous-titre">Ordre du plus faible au plus fort — détermine les onglets du Droidex. La couleur de chaque palier teinte le contour des cartes quand son onglet est actif. Un droïde de rareté Iconique n'existe qu'au premier palier de la liste.</p>
+        <ul class="liste-simple" id="listePaliers"></ul>
+
+        <div class="champ">
+          <label for="champNouveauPalier">Ajouter un palier (en fin de liste)</label>
+          <input type="text" id="champNouveauPalier" placeholder="ex. Nova" onkeydown="if(event.key==='Enter'){ajouterPalier();}">
+        </div>
+        <div class="champ">
+          <label for="champCouleurNouveauPalier">Couleur du contour</label>
+          <input type="color" id="champCouleurNouveauPalier" value="#9ca3af" style="width:52px; height:38px; padding:2px; border-radius:8px; border:1px solid var(--bordure); background:var(--fond);">
+        </div>
+        <button class="btn btn-primaire" onclick="ajouterPalier()">Ajouter le palier</button>
+        <p id="messagePaliers" class="message"></p>
+      </div>
     </div>
 
   </div>
