@@ -101,7 +101,7 @@ async function rafraichirTotauxTomesEnArrierePlan() {
   } catch (e) { /* localStorage indisponible : on rafraîchit sans throttle */ }
 
   // Uniquement les livres : Wikidata/AniList servent au nombre de tomes,
-  // pas aux séries TV (saisons/épisodes déjà connus via TMDB à l'ajout).
+  // pas aux séries TV (saisons/épisodes déjà connus via TVMaze à l'ajout).
   const aVerifier = livres.filter(l => l.titre && (l.type || "livre") === "livre");
   if (aVerifier.length === 0) return;
 
@@ -951,37 +951,57 @@ async function ajouterSerieComplete() {
 // ===== Séries (visionnage, saisons/épisodes) =====
 // ============================================================
 
-// ===== Recherche TMDB =====
-async function rechercherSeriesTMDB(titre) {
-  if (!CLE_TMDB) return [];
-  const r = await fetch(`https://api.themoviedb.org/3/search/tv?api_key=${encodeURIComponent(CLE_TMDB)}&query=${encodeURIComponent(titre)}&language=fr-FR`);
+// ===== Recherche TVMaze =====
+// Gratuit, sans clé ni inscription (contrairement à TMDB, qui demandait des
+// coordonnées personnelles dans son formulaire d'inscription à l'API).
+// Bonne couverture aussi bien occidentale qu'animée — vérifié en direct sur
+// plusieurs séries/animes. Quand un nom correspond à plusieurs séries
+// distinctes (ex. "One Piece" : l'anime de 1999 ET l'adaptation Netflix de
+// 2023 sont deux fiches séparées), les DEUX apparaissent dans les résultats
+// avec leur année et leur type pour les distinguer — pas un bug, l'utilisateur
+// choisit comme pour les résultats de recherche de livres.
+async function rechercherSeriesTVMaze(titre) {
+  const r = await fetch(`https://api.tvmaze.com/search/shows?q=${encodeURIComponent(titre)}`);
   if (!r.ok) return [];
   const data = await r.json();
-  return (data.results || []).slice(0, 8).map((item) => ({
-    id: item.id,
-    titre: item.name,
-    annee: (item.first_air_date || "").slice(0, 4),
-    imageUrl: item.poster_path ? `https://image.tmdb.org/t/p/w342${item.poster_path}` : null
+  return (data || []).slice(0, 8).map((d) => ({
+    id: d.show.id,
+    titre: d.show.name,
+    annee: (d.show.premiered || "").slice(0, 4),
+    type: d.show.type || "",
+    imageUrl: d.show.image ? (d.show.image.medium || d.show.image.original) : null
   }));
 }
 
-// Détails d'une série (saisons + nombre d'épisodes par saison) : un second
-// appel après la recherche, seulement quand l'utilisateur a choisi LAQUELLE
-// des séries trouvées l'intéresse.
-async function obtenirDetailsSerieTMDB(id) {
-  const r = await fetch(`https://api.themoviedb.org/3/tv/${id}?api_key=${encodeURIComponent(CLE_TMDB)}&language=fr-FR`);
-  if (!r.ok) throw new Error("Détails de la série introuvables.");
-  const data = await r.json();
-  const createur = (data.created_by || []).map((c) => c.name).join(", ");
-  const saisons = (data.seasons || [])
-    .filter((s) => s.season_number && s.season_number > 0) // ignore les "spéciaux" (saison 0)
-    .map((s) => ({ numero: s.season_number, episodesTotal: Math.max(1, s.episode_count || 1), episodesVus: [] }));
-  const imageUrl = data.poster_path ? `https://image.tmdb.org/t/p/w342${data.poster_path}` : null;
+// Détails d'une série (saisons + nombre d'épisodes par saison) : deux appels
+// après la recherche, seulement quand l'utilisateur a choisi LAQUELLE des
+// séries trouvées l'intéresse — la fiche série (affiche) et la liste
+// complète des épisodes, qu'on regroupe nous-mêmes par saison (TVMaze ne
+// renvoie pas directement un total par saison, juste chaque épisode avec
+// son numéro de saison).
+async function obtenirDetailsSerieTVMaze(id) {
+  const [show, episodes] = await Promise.all([
+    fetch(`https://api.tvmaze.com/shows/${id}`).then((r) => {
+      if (!r.ok) throw new Error("Détails de la série introuvables.");
+      return r.json();
+    }),
+    fetch(`https://api.tvmaze.com/shows/${id}/episodes`).then((r) => (r.ok ? r.json() : []))
+  ]);
+
+  const parSaison = new Map();
+  (episodes || []).forEach((ep) => {
+    const numero = ep.season || 1;
+    parSaison.set(numero, (parSaison.get(numero) || 0) + 1);
+  });
+  const saisons = Array.from(parSaison.entries())
+    .sort((a, b) => a[0] - b[0])
+    .map(([numero, episodesTotal]) => ({ numero, episodesTotal, episodesVus: [] }));
+
   return {
-    titre: data.name,
-    createur,
+    titre: show.name,
+    createur: "", // TVMaze ne fournit pas cette information
     saisons: saisons.length ? saisons : [{ numero: 1, episodesTotal: 1, episodesVus: [] }],
-    imageUrl
+    imageUrl: show.image ? (show.image.original || show.image.medium) : null
   };
 }
 
@@ -1005,16 +1025,11 @@ async function lancerRechercheSerie() {
   const titre = document.getElementById("champRechercheSerie").value.trim();
   if (!titre) { afficherToast("Tape un titre.", true); return; }
 
-  if (!CLE_TMDB) {
-    afficherToast("Recherche indisponible : aucune clé TMDB configurée (voir CLE_TMDB dans script.js).", true);
-    return;
-  }
-
   const zone = document.getElementById("resultatsRechercheSerie");
   zone.innerHTML = `<div class="chargement"><span class="spin"></span> Recherche en cours…</div>`;
 
   let resultats = [];
-  try { resultats = await rechercherSeriesTMDB(titre); } catch (e) { /* zone vide gérée ci-dessous */ }
+  try { resultats = await rechercherSeriesTVMaze(titre); } catch (e) { /* zone vide gérée ci-dessous */ }
 
   resultatsRechercheSerieCourants = resultats;
 
@@ -1028,7 +1043,7 @@ async function lancerRechercheSerie() {
       <div class="resultat-couv">${r.imageUrl ? `<img src="${echapperHTML(r.imageUrl)}" alt="">` : iconePlaceholderCouverture()}</div>
       <div class="resultat-info">
         <strong>${echapperHTML(r.titre)}</strong>
-        <small>${echapperHTML(r.annee || "TMDB")}</small>
+        <small>${echapperHTML([r.annee, r.type].filter(Boolean).join(" · ") || "TVMaze")}</small>
       </div>
     </button>`).join("");
 }
@@ -1048,7 +1063,7 @@ async function choisirResultatRechercheSerie(index) {
   afficherToast("Récupération des saisons…");
 
   try {
-    const details = await obtenirDetailsSerieTMDB(choisi.id);
+    const details = await obtenirDetailsSerieTVMaze(choisi.id);
     let dataUrlCouverture = null;
     if (details.imageUrl) {
       dataUrlCouverture = await recupererImageExterneEnDataUrl(details.imageUrl).catch(() => null);
