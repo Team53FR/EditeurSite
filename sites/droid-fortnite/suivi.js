@@ -5,10 +5,18 @@ let catalogue = [];
 let shaCatalogue = null;
 let renaissance = [];
 let shaRenaissance = null;
-let perso = { droidesPossedes: {}, renaissanceAtteinte: [] };
+// droidesPossedes : tableau de clés "<idDroide>::<palier>" — chaque droïde
+// peut être possédé indépendamment à CHAQUE palier (Défaut, Or, Diamant...),
+// comme dans le jeu (le compteur du jeu compte chaque palier séparément).
+let perso = { droidesPossedes: [], renaissanceAtteinte: [] };
 let shaPerso = null;
 
 let ongletActif = "droidex";
+let palierActif = PALIERS_DROIDE[0];
+
+function clePossession(idDroide, palier) {
+  return idDroide + "::" + palier;
+}
 
 function changerOnglet(type) {
   ongletActif = type;
@@ -40,23 +48,52 @@ async function chargerTout() {
     return;
   }
 
+  construireOngletsPalier();
   document.getElementById("chargement").style.display = "none";
   document.getElementById("zoneDroidex").style.display = "";
   afficherDroidex();
   afficherRenaissance();
 }
 
+function construireOngletsPalier() {
+  const zone = document.getElementById("ongletsPalier");
+  zone.innerHTML = "";
+  PALIERS_DROIDE.forEach((p) => {
+    const bouton = document.createElement("button");
+    bouton.type = "button";
+    bouton.className = "onglet-palier" + (p === palierActif ? " actif" : "");
+    bouton.textContent = p;
+    bouton.addEventListener("click", () => changerPalierActif(p));
+    zone.appendChild(bouton);
+  });
+}
+
+function changerPalierActif(p) {
+  palierActif = p;
+  document.querySelectorAll(".onglet-palier").forEach((b) => b.classList.toggle("actif", b.textContent === p));
+  afficherDroidex();
+}
+
 async function chargerBibliothequePerso() {
   try {
     const { contenu, sha } = await lireFichierJSON(cheminBibliothequeCourante(), token);
+    let droidesPossedes = [];
+    if (Array.isArray(contenu && contenu.droidesPossedes)) {
+      droidesPossedes = contenu.droidesPossedes;
+    } else if (contenu && contenu.droidesPossedes && typeof contenu.droidesPossedes === "object") {
+      // Ancienne forme (un seul palier par droïde, avant l'introduction des
+      // onglets de palier) : on reprend le palier déjà enregistré comme seul
+      // palier possédé pour ce droïde, rien n'est perdu.
+      droidesPossedes = Object.entries(contenu.droidesPossedes).map(([id, palier]) => clePossession(id, palier));
+    }
     perso = {
-      droidesPossedes: (contenu && typeof contenu.droidesPossedes === "object" && contenu.droidesPossedes) || {},
+      droidesPossedes,
       renaissanceAtteinte: (contenu && Array.isArray(contenu.renaissanceAtteinte)) ? contenu.renaissanceAtteinte : []
     };
     shaPerso = sha;
   } catch (e) {
     if (e.status !== 404) throw e;
-    perso = { droidesPossedes: {}, renaissanceAtteinte: [] };
+    perso = { droidesPossedes: [], renaissanceAtteinte: [] };
     shaPerso = null;
   }
 }
@@ -123,7 +160,7 @@ function afficherDroidex() {
     if (recherche && !d.nom.toLowerCase().includes(recherche)) return false;
     if (filtreClasse && d.classe !== filtreClasse) return false;
     if (filtreRarete && d.rarete !== filtreRarete) return false;
-    const possede = !!perso.droidesPossedes[d.id];
+    const possede = perso.droidesPossedes.includes(clePossession(d.id, palierActif));
     if (filtrePossede === "oui" && !possede) return false;
     if (filtrePossede === "non" && possede) return false;
     return true;
@@ -135,48 +172,37 @@ function afficherDroidex() {
   vide.style.display = filtres.length ? "none" : "";
 
   filtres.forEach((d) => {
-    const palierActuel = perso.droidesPossedes[d.id] || "";
+    const possede = perso.droidesPossedes.includes(clePossession(d.id, palierActif));
     const carte = document.createElement("div");
-    carte.className = "carte-droide" + (palierActuel ? " possede" : "");
+    carte.className = "carte-droide" + (possede ? " possede" : "");
+    carte.setAttribute("role", "button");
+    carte.setAttribute("aria-pressed", possede ? "true" : "false");
     carte.innerHTML =
       `<div class="droide-entete">` +
         `<div class="droide-icone">${iconeClasse(d.classe)}</div>` +
         `<div class="droide-nom">${echapperHTML(d.nom)}</div>` +
+        `<span class="droide-case">✓</span>` +
       `</div>` +
-      `<span class="badge-rarete ${classeRareteCss(d.rarete)}">${echapperHTML(d.rarete)}</span>` +
-      `<select class="select-palier"></select>`;
+      `<span class="badge-rarete ${classeRareteCss(d.rarete)}">${echapperHTML(d.rarete)}</span>`;
 
-    const select = carte.querySelector(".select-palier");
-    const optionVide = document.createElement("option");
-    optionVide.value = "";
-    optionVide.textContent = "Non possédé";
-    select.appendChild(optionVide);
-    PALIERS_DROIDE.forEach((p) => {
-      const opt = document.createElement("option");
-      opt.value = p;
-      opt.textContent = p;
-      if (p === palierActuel) opt.selected = true;
-      select.appendChild(opt);
-    });
-    select.addEventListener("change", () => changerPalier(d.id, select.value));
+    carte.addEventListener("click", () => basculerPossession(d.id));
 
     grille.appendChild(carte);
   });
 
   const total = catalogue.length;
-  const possedes = catalogue.filter((d) => !!perso.droidesPossedes[d.id]).length;
+  const possedes = catalogue.filter((d) => perso.droidesPossedes.includes(clePossession(d.id, palierActif))).length;
   const pct = total ? Math.round((possedes / total) * 100) : 0;
   document.getElementById("compteurDroidex").innerHTML =
-    `<b>${possedes} / ${total}</b>` +
+    `<b>${possedes} / ${total}</b> au palier ${echapperHTML(palierActif)}` +
     `<div class="barre-progression"><span style="width:${pct}%"></span></div>`;
 }
 
-function changerPalier(idDroide, palier) {
-  if (palier) {
-    perso.droidesPossedes[idDroide] = palier;
-  } else {
-    delete perso.droidesPossedes[idDroide];
-  }
+function basculerPossession(idDroide) {
+  const cle = clePossession(idDroide, palierActif);
+  const index = perso.droidesPossedes.indexOf(cle);
+  if (index === -1) perso.droidesPossedes.push(cle);
+  else perso.droidesPossedes.splice(index, 1);
   afficherDroidex();
   sauvegarderPerso();
 }

@@ -197,18 +197,24 @@ Chaque écriture reste un commit sur le dépôt privé `Team53FR/BDD` : même en
 cas d'erreur, l'historique Git permet de revenir en arrière.
 
 **Non couvert par ce bouton** : `droid-fortnite`, dont la donnée personnelle
-(`{ droidesPossedes: {id: palier}, renaissanceAtteinte: [...] }`) est une
-association id→valeur, pas des objets avec un `.id` comme le suppose
-`CONFIG_TRANSFERT`. Pourrait être ajouté plus tard avec une sémantique dédiée
-si besoin.
+(`{ droidesPossedes: ["<id>::<palier>", ...], renaissanceAtteinte: [...] }`)
+est un ensemble de clés composites, pas des objets avec un `.id` comme le
+suppose `CONFIG_TRANSFERT`. Pourrait être ajouté plus tard avec une
+sémantique dédiée si besoin.
 
 ## Droid Fortnite (suivi de Star Wars: Droid Tycoon)
 
 Suivi personnel de progression pour ce mode de jeu Fortnite : un « droidex »
-(catalogue des droïdes, avec le palier d'amélioration actuel de chacun —
-Défaut/Or/Diamant/Arc-en-ciel/Beskar/Galactique/Stellar — pour ceux possédés)
-et une liste des paliers de « renaissance » (crédits + droïdes requis pour
-chaque niveau).
+(catalogue des droïdes, organisé en onglets par palier d'amélioration —
+Défaut/Or/Diamant/Arc-en-ciel/Beskar/Galactique/Stellar — chaque droïde
+pouvant être possédé **indépendamment à chaque palier**, comme dans le jeu,
+pas juste à un seul palier « actuel ») et une liste des paliers de
+« renaissance » (crédits + droïdes requis pour chaque niveau).
+
+La progression personnelle stocke donc des clés composites
+`"<idDroide>::<palier>"` dans `droidesPossedes` (un tableau, une clé par
+combinaison droïde+palier réellement possédée) plutôt qu'un simple palier
+par droïde.
 
 **Données partagées, éditables dans l'outil** : `DroidFortnite/catalogue.json`
 et `DroidFortnite/renaissance.json` sont communs à tous les comptes du site
