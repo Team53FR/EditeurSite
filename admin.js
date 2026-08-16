@@ -265,6 +265,31 @@ async function synchroniserMaBibliotheque(loginCentral, passwordCentral, nomAffi
     `Synchronisation du compte ${loginCentral} depuis le portail central`);
 }
 
+// Même principe, pour Droid Fortnite (également à comptes séparés dès sa
+// création). Pas de champ "role" ici non plus.
+async function synchroniserDroidFortnite(loginCentral, passwordCentral, nomAffichage) {
+  let liste = [];
+  let sha = null;
+  try {
+    const r = await lireFichierJSONAbsolu("DroidFortnite/users.json", token);
+    liste = Array.isArray(r.contenu) ? r.contenu : [];
+    sha = r.sha;
+  } catch (e) {
+    if (e.status !== 404) throw e;
+  }
+
+  const existant = liste.find(u => u.login === loginCentral);
+  if (existant) {
+    existant.password = passwordCentral;
+    if (nomAffichage) existant.nomAffichage = nomAffichage;
+  } else {
+    liste.push({ login: loginCentral, password: passwordCentral, nomAffichage: nomAffichage || "" });
+  }
+
+  await ecrireFichierJSONAbsolu("DroidFortnite/users.json", liste, sha, token,
+    `Synchronisation du compte ${loginCentral} depuis le portail central`);
+}
+
 async function enregistrerUtilisateur() {
   const message = document.getElementById("message");
   const moi = localStorage.getItem("team53_login");
@@ -314,6 +339,10 @@ async function enregistrerUtilisateur() {
     }
     if (acces.includes("ma-bibliotheque")) {
       try { await synchroniserMaBibliotheque(login, password, nomAffichage); }
+      catch (e) { /* ignoré : la synchro pourra être retentée en réenregistrant */ }
+    }
+    if (acces.includes("droid-fortnite")) {
+      try { await synchroniserDroidFortnite(login, password, nomAffichage); }
       catch (e) { /* ignoré : la synchro pourra être retentée en réenregistrant */ }
     }
 

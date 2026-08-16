@@ -32,6 +32,17 @@ const DEFAULT_SITES = [
       stockage: "localStorage",
       cles: { token: "mb_token", login: "mb_login" }
     }
+  },
+  {
+    id: "droid-fortnite",
+    nom: "Droid Fortnite",
+    description: "Suis ta progression dans Star Wars: Droid Tycoon — droidex et paliers de renaissance.",
+    icone: "🤖",
+    pageArrivee: "sites/droid-fortnite/suivi.html",
+    relais: {
+      stockage: "localStorage",
+      cles: { token: "df_token", login: "df_login" }
+    }
   }
 ];
 // ==============================================================

@@ -16,7 +16,10 @@ EditeurSite/
 │   ├── editeur-livre/    # site "Éditeur de livre en ligne" (ex-racine du dépôt)
 │   │   ├── index.html
 │   │   └── ...
-│   └── ma-bibliotheque/  # site "Ma Bibliothèque" (répertorie les livres possédés)
+│   ├── ma-bibliotheque/  # site "Ma Bibliothèque" (répertorie les livres possédés)
+│   │   ├── index.html
+│   │   └── ...
+│   └── droid-fortnite/   # site "Droid Fortnite" (suivi de Star Wars: Droid Tycoon)
 │       ├── index.html
 │       └── ...
 └── README.md
@@ -62,13 +65,20 @@ mélanger ses données avec celles d'un autre site :
 |-------------------|------------------------------|--------------------------------------------|
 | editeur-livre      | `EditeurLivre/`             | `users.json`, `bibliotheques/<login>.json`, `images/<login>/…` |
 | ma-bibliotheque    | `MaBibliotheque/`           | `users.json`, `bibliotheques/<login>.json`, `images/<login>/…` |
+| droid-fortnite     | `DroidFortnite/`            | `users.json`, `catalogue.json`, `renaissance.json` (partagés), `bibliotheques/<login>.json` (personnel) |
 | portail central    | `Web/`                      | `utilisateurs.json`, `sites.json`         |
 
-Les deux sites suivent donc désormais le **même modèle par compte** : chaque
-personne a sa propre bibliothèque et ses propres images, retrouvées via un
+Les trois sites suivent donc le **même modèle par compte** pour leurs données
+personnelles : chaque personne a sa propre bibliothèque (et, pour
+editeur-livre/ma-bibliotheque, ses propres images), retrouvées via un
 identifiant « slug » dérivé de son login (`slugifierLogin()`, dupliqué à
 l'identique dans chaque `script.js` de site — voir « Connexion centrale »
-pour la version côté portail).
+pour la version côté portail). Droid Fortnite s'en écarte légèrement :
+`catalogue.json` (liste des droïdes) et `renaissance.json` (paliers de
+renaissance) sont des données **partagées**, identiques pour tout le monde —
+seule la progression personnelle (`bibliotheques/<login>.json` : droïdes
+possédés + palier, renaissances atteintes) est propre à chaque compte. Voir
+« Droid Fortnite » ci-dessous.
 
 Pour qu'un site fonctionne, son fichier de comptes doit exister dans son
 dossier BDD. Pour **ma-bibliotheque**, créer `MaBibliotheque/users.json`
@@ -185,6 +195,46 @@ la forme des données propre à chaque site) :
 
 Chaque écriture reste un commit sur le dépôt privé `Team53FR/BDD` : même en
 cas d'erreur, l'historique Git permet de revenir en arrière.
+
+**Non couvert par ce bouton** : `droid-fortnite`, dont la donnée personnelle
+(`{ droidesPossedes: {id: palier}, renaissanceAtteinte: [...] }`) est une
+association id→valeur, pas des objets avec un `.id` comme le suppose
+`CONFIG_TRANSFERT`. Pourrait être ajouté plus tard avec une sémantique dédiée
+si besoin.
+
+## Droid Fortnite (suivi de Star Wars: Droid Tycoon)
+
+Suivi personnel de progression pour ce mode de jeu Fortnite : un « droidex »
+(catalogue des droïdes, avec le palier d'amélioration actuel de chacun —
+Défaut/Or/Diamant/Arc-en-ciel/Beskar/Galactique/Stellar — pour ceux possédés)
+et une liste des paliers de « renaissance » (crédits + droïdes requis pour
+chaque niveau).
+
+**Données partagées, éditables dans l'outil** : `DroidFortnite/catalogue.json`
+et `DroidFortnite/renaissance.json` sont communs à tous les comptes du site
+(contrairement à `bibliotheques/<login>.json`, personnel). N'importe quel
+compte peut ajouter un droïde ou un palier manquant depuis `suivi.html` — pas
+de notion d'administrateur propre à ce site. Ces deux fichiers sont amorcés
+automatiquement (créés avec des données de départ) au premier chargement
+authentifié si absents — je ne peux pas les créer moi-même directement dans
+`Team53FR/BDD` (pas de token).
+
+**Provenance des données de départ** : sourcées du tracker communautaire
+open-source *Droidex* (github.com/erikpeik/droidex) — **pas des données
+officielles Epic Games**, potentiellement incomplètes ou datées (le jeu est
+mis à jour régulièrement ; par exemple les paliers Galactique/Stellar,
+confirmés en jeu, n'étaient pas encore dans ce tracker au moment de
+l'écriture). À corriger/compléter librement dans l'outil.
+
+**Écriture des fichiers partagés — fusion, pas simple retry** : comme
+plusieurs comptes peuvent ajouter une entrée à `catalogue.json`/
+`renaissance.json`, `sauvegarderAvecFusion()` (dans `sites/droid-fortnite/script.js`)
+gère différemment un conflit d'écriture (409) que le pattern habituel :
+au lieu de relire seulement le sha distant et réécrire l'état local (sûr
+uniquement quand un seul compte écrit jamais un fichier donné, comme
+`bibliotheques/<login>.json`), elle relit le **contenu** distant et y
+fusionne les entrées locales absentes (par `id`), pour ne jamais perdre
+silencieusement l'ajout fait par quelqu'un d'autre entre-temps.
 
 ## App installable (PWA)
 
