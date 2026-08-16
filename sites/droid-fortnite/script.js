@@ -98,6 +98,96 @@ async function obtenirShaFichier(chemin, token) {
   return data.sha;
 }
 
+// ===== Images (photos ajoutées par les comptes du site, pas des visuels du
+// jeu — voir la note dans le formulaire d'ajout d'image) =====
+function extraireExtensionDataUrl(dataUrl) {
+  const correspondance = /^data:image\/([a-zA-Z0-9.+-]+);base64,/.exec(dataUrl);
+  if (!correspondance) return "jpg";
+  let ext = correspondance[1].toLowerCase();
+  if (ext === "jpeg") ext = "jpg";
+  if (ext === "svg+xml") ext = "svg";
+  return ext;
+}
+
+async function uploaderImageBase64(chemin, dataUrl, token, messageCommit) {
+  const virgule = dataUrl.indexOf(",");
+  if (virgule === -1) throw new Error("Format d'image invalide.");
+  const contenuBase64 = dataUrl.slice(virgule + 1);
+
+  const shaExistant = await obtenirShaFichier(chemin, token);
+
+  const url = urlContenuBDD(chemin);
+  const corps = { message: messageCommit || `Ajout de l'image ${chemin}`, content: contenuBase64 };
+  if (shaExistant) corps.sha = shaExistant;
+
+  const reponse = await fetch(url, {
+    method: "PUT",
+    headers: {
+      "Authorization": `Bearer ${token}`,
+      "Accept": "application/vnd.github+json"
+    },
+    body: JSON.stringify(corps)
+  });
+
+  if (!reponse.ok) {
+    let details = "";
+    try { const err = await reponse.json(); if (err.message) details = ` (${err.message})`; } catch (e) {}
+    throw new Error(`Échec de l'envoi de l'image${details}.`);
+  }
+
+  return chemin;
+}
+
+async function supprimerFichierGithub(chemin, token, messageCommit) {
+  const sha = await obtenirShaFichier(chemin, token);
+  if (!sha) return;
+  const url = urlContenuBDD(chemin);
+  await fetch(url, {
+    method: "DELETE",
+    headers: {
+      "Authorization": `Bearer ${token}`,
+      "Accept": "application/vnd.github+json"
+    },
+    body: JSON.stringify({ message: messageCommit || `Suppression de ${chemin}`, sha })
+  });
+  // Volontairement silencieux en cas d'échec : ne doit pas bloquer le reste du flux
+}
+
+function mimeDepuisChemin(chemin) {
+  const ext = (chemin.split(".").pop() || "").toLowerCase();
+  if (ext === "png") return "image/png";
+  if (ext === "gif") return "image/gif";
+  if (ext === "webp") return "image/webp";
+  if (ext === "svg") return "image/svg+xml";
+  return "image/jpeg";
+}
+
+async function obtenirUrlImage(chemin, token) {
+  const url = urlContenuBDD(chemin);
+
+  // Octets bruts, authentifiés par le token (le download_url d'un dépôt privé
+  // est une URL signée temporaire qui finit par expirer dans un <img>).
+  const reponse = await fetch(url, {
+    headers: { "Authorization": `Bearer ${token}`, "Accept": "application/vnd.github.raw" }
+  });
+
+  if (reponse.ok) {
+    const brut = await reponse.blob();
+    const mime = mimeDepuisChemin(chemin);
+    const blob = (brut.type && brut.type.startsWith("image/")) ? brut : new Blob([brut], { type: mime });
+    return URL.createObjectURL(blob); // URL locale stable, sans expiration
+  }
+
+  const reponseJson = await fetch(url, {
+    headers: { "Authorization": `Bearer ${token}`, "Accept": "application/vnd.github+json" }
+  });
+  if (!reponseJson.ok) throw new Error(`Impossible de charger l'image "${chemin}".`);
+  const data = await reponseJson.json();
+  if (data.content) return `data:${mimeDepuisChemin(chemin)};base64,${data.content.replace(/\n/g, "")}`;
+  if (data.download_url) return data.download_url;
+  throw new Error(`Image "${chemin}" introuvable.`);
+}
+
 // ===== Connexion (comptes multiples) =====
 // Les identifiants vivent dans DroidFortnite/users.json sur le dépôt BDD :
 //   [{ "login": "...", "password": "...", "nomAffichage": "..." }]
@@ -171,9 +261,11 @@ function cheminBibliothequeCourante() {
 // Contrairement à un fichier personnel (un seul compte l'écrit jamais, donc
 // « relire le sha puis réécrire le tableau local » est sûr), ces deux
 // fichiers peuvent être modifiés par n'importe quel compte du site. Sur
-// conflit (409), on relit le contenu DISTANT (pas juste son sha) et on y
-// fusionne les entrées locales absentes (par id), pour ne jamais écraser
-// silencieusement l'ajout fait par quelqu'un d'autre entre-temps.
+// conflit (409), on relit le contenu DISTANT (pas juste son sha) et on
+// fusionne : le tableau local (nos ajouts ET nos modifications) l'emporte
+// pour chaque id qu'il contient, et on ne reprend du distant que les id
+// qu'on ne connaît pas (ajoutés par quelqu'un d'autre entre-temps) — pour
+// ne jamais perdre ni un ajout concurrent, ni notre propre modification.
 async function sauvegarderAvecFusion(nomFichier, tableauLocal, sha, token, messageCommit) {
   try {
     return await ecrireFichierJSON(nomFichier, tableauLocal, sha, token, messageCommit);
@@ -181,8 +273,8 @@ async function sauvegarderAvecFusion(nomFichier, tableauLocal, sha, token, messa
     if (!e.conflit) throw e;
     const frais = await lireFichierJSON(nomFichier, token);
     const distant = Array.isArray(frais.contenu) ? frais.contenu : [];
-    const idsDistants = new Set(distant.map(x => x.id));
-    const fusion = distant.concat(tableauLocal.filter(x => !idsDistants.has(x.id)));
+    const idsLocaux = new Set(tableauLocal.map(x => x.id));
+    const fusion = distant.filter(x => !idsLocaux.has(x.id)).concat(tableauLocal);
     return await ecrireFichierJSON(nomFichier, fusion, frais.sha, token, messageCommit);
   }
 }

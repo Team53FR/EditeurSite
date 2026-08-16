@@ -214,7 +214,17 @@ pas juste à un seul palier « actuel ») et une liste des paliers de
 La progression personnelle stocke donc des clés composites
 `"<idDroide>::<palier>"` dans `droidesPossedes` (un tableau, une clé par
 combinaison droïde+palier réellement possédée) plutôt qu'un simple palier
-par droïde.
+par droïde. Exception : les droïdes de rareté **Iconique** (événementiels,
+ex. BB-8, R2-D2, C-3PO) n'existent qu'au palier Défaut dans le jeu — ils sont
+automatiquement masqués des autres onglets de palier (`estDisponibleAuPalier()`
+dans `suivi.js`).
+
+**Photo par droïde (optionnelle, ajoutée par toi)** : chaque entrée du
+catalogue peut avoir une image perso (bouton ✎ sur la carte), stockée dans
+`DroidFortnite/images/<id>.<ext>`, avec le même mécanisme que les couvertures
+de livres de ma-bibliotheque (compression côté client, upload via l'API
+Contents de GitHub). Volontairement **pas de visuels officiels du jeu** :
+je ne peux pas redistribuer les images d'Epic Games moi-même.
 
 **Données partagées, éditables dans l'outil** : `DroidFortnite/catalogue.json`
 et `DroidFortnite/renaissance.json` sont communs à tous les comptes du site

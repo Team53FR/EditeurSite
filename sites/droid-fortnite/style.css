@@ -271,8 +271,15 @@ a { color: var(--primaire); }
   width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0;
   background: var(--primaire-clair); color: var(--primaire);
   display: flex; align-items: center; justify-content: center; font-size: 1.1rem;
+  overflow: hidden;
 }
+.droide-icone img { width: 100%; height: 100%; object-fit: cover; }
 .droide-nom { flex: 1; min-width: 0; font-weight: 600; font-size: 0.9rem; line-height: 1.25; }
+.droide-modifier {
+  flex-shrink: 0; background: transparent; border: none; color: var(--texte-att);
+  padding: 0.2rem; border-radius: 6px; cursor: pointer; font-size: 0.9rem; line-height: 1;
+}
+.droide-modifier:hover { color: var(--primaire); background: var(--fond); }
 
 .badge-rarete {
   display: inline-flex; align-self: flex-start;
@@ -405,6 +412,24 @@ a { color: var(--primaire); }
   display: flex; gap: 0.7rem;
 }
 .feuille-pied .btn { flex: 1; }
+
+/* ===== Photo d'un droïde (formulaire de modification) ===== */
+.zone-couverture {
+  display: flex; gap: 1rem; align-items: flex-start; margin-bottom: 1.3rem;
+}
+.apercu-couverture {
+  width: 96px; aspect-ratio: 1;
+  border-radius: 10px;
+  background: var(--fond);
+  border: 1.5px dashed var(--bordure);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--texte-att);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.apercu-couverture img { width: 100%; height: 100%; object-fit: cover; }
+.actions-couverture { display: flex; flex-direction: column; gap: 0.5rem; flex: 1; }
+.actions-couverture .btn { justify-content: flex-start; font-size: 0.88rem; padding: 0.65rem 0.9rem; }
 
 /* ===== Chargement ===== */
 .chargement {
