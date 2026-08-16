@@ -1,8 +1,11 @@
 /* ===== Droid Fortnite — mobile-first =====
    Base commune (variables/composants) reprise de sites/ma-bibliotheque/style.css
    pour rester cohérent avec les autres sites du dépôt, avec sa propre teinte
-   « space opera » (or/bronze sur fond profond, façon générique de space-opera —
-   pas de logo ni de police officielle Star Wars, juste une palette/ambiance). */
+   « HUD de space opera » : fond très sombre + or (comme le logo « DROÏDEX »
+   du jeu) + cyan (comme les libellés de rareté du jeu) + orange (comme ses
+   barres de progression), police d'affichage Orbitron (Google Fonts, libre)
+   pour les titres, coins coupés façon panneau futuriste. Palette/ambiance
+   uniquement — aucun logo, police ou visuel officiel Star Wars/Epic Games. */
 
 :root {
   color-scheme: light dark;
@@ -15,12 +18,16 @@
   --primaire-fonce: #96690a;
   --primaire-clair: #fbf0d2;
   --sur-primaire: #fff; /* couleur du texte posé sur un fond --primaire */
-  --accent: #c2410c;
+  --secondaire: #0e7490;      /* cyan, comme les libellés de rareté du jeu */
+  --secondaire-clair: #cffafe;
+  --accent: #c2410c;          /* orange, comme les barres de progression du jeu */
   --danger: #dc2626;
   --danger-fonce: #b91c1c;
   --succes: #16a34a;
   --ombre: 0 4px 16px rgba(30, 30, 60, 0.08);
   --rayon: 16px;
+  --coin-hud: 12px; /* taille des coins coupés façon panneau futuriste */
+  --police-titre: 'Orbitron', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-top: env(safe-area-inset-top, 0px);
 }
@@ -36,6 +43,8 @@
     --primaire-fonce: #f3d375;
     --primaire-clair: #3a3011;
     --sur-primaire: #14110a; /* texte sombre sur or clair, plus lisible que du blanc */
+    --secondaire: #22d3ee;
+    --secondaire-clair: #123540;
     --accent: #fb923c;
     --ombre: 0 4px 20px rgba(0, 0, 0, 0.5);
   }
@@ -61,7 +70,9 @@ html, body { height: 100%; }
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  background: var(--fond);
+  /* background-color (pas le raccourci "background") pour ne pas écraser le
+     champ d'étoiles (background-image) posé plus haut en thème sombre. */
+  background-color: var(--fond);
   color: var(--texte);
   -webkit-tap-highlight-color: transparent;
 }
@@ -88,7 +99,7 @@ a { color: var(--primaire); }
   user-select: none;
 }
 .btn:active { transform: scale(0.97); }
-.btn-primaire { background: var(--primaire); color: var(--sur-primaire); }
+.btn-primaire { background: var(--primaire); color: var(--sur-primaire); box-shadow: 0 0 0 1px var(--primaire-fonce), 0 0 14px -2px var(--primaire); }
 .btn-primaire:hover { background: var(--primaire-fonce); }
 .btn-secondaire { background: var(--primaire-clair); color: var(--primaire); }
 .btn-danger { background: transparent; color: var(--danger); border: 1px solid var(--danger); }
@@ -122,6 +133,9 @@ a { color: var(--primaire); }
   font-size: 1.05rem;
   color: var(--primaire);
   margin-bottom: 1.5rem;
+  font-family: var(--police-titre);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
 }
 .marque-auth .pastille {
   width: 36px; height: 36px;
@@ -131,7 +145,7 @@ a { color: var(--primaire); }
   display: flex; align-items: center; justify-content: center;
   font-size: 1.2rem;
 }
-.carte-auth h1 { margin: 0 0 0.3rem; font-size: 1.4rem; letter-spacing: 0.02em; }
+.carte-auth h1 { margin: 0 0 0.3rem; font-size: 1.4rem; letter-spacing: 0.02em; font-family: var(--police-titre); }
 .carte-auth .intro { margin: 0 0 1.5rem; color: var(--texte-att); font-size: 0.92rem; }
 
 .champ { margin-bottom: 1.1rem; }
@@ -157,7 +171,7 @@ a { color: var(--primaire); }
   border-radius: 18px; background: var(--primaire); color: var(--sur-primaire);
   display: flex; align-items: center; justify-content: center; font-size: 1.9rem;
 }
-.hero h1 { margin: 0 0 0.6rem; font-size: 1.7rem; letter-spacing: 0.03em; text-transform: uppercase; }
+.hero h1 { margin: 0 0 0.6rem; font-size: 1.7rem; letter-spacing: 0.03em; text-transform: uppercase; font-family: var(--police-titre); }
 .hero p { color: var(--texte-att); margin: 0 0 1.8rem; line-height: 1.5; }
 
 /* ===== Application : en-tête ===== */
@@ -171,7 +185,7 @@ a { color: var(--primaire); }
   display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
   margin-bottom: 0.75rem;
 }
-.app-header h1 { font-size: 1.05rem; margin: 0; display: flex; align-items: center; gap: 0.5rem; letter-spacing: 0.04em; text-transform: uppercase; font-weight: 800; }
+.app-header h1 { font-size: 1.05rem; margin: 0; display: flex; align-items: center; gap: 0.5rem; letter-spacing: 0.04em; text-transform: uppercase; font-weight: 700; font-family: var(--police-titre); }
 .app-header .actions-entete { display: flex; align-items: center; gap: 0.3rem; }
 .app-header .icone-bouton, .app-header .icone-deconnexion {
   background: transparent; border: none; color: var(--texte-att); cursor: pointer;
@@ -192,7 +206,7 @@ a { color: var(--primaire); }
   font-size: 0.88rem;
   cursor: pointer;
 }
-.onglet-type.actif { background: var(--primaire); border-color: var(--primaire); color: var(--sur-primaire); }
+.onglet-type.actif { background: var(--primaire); border-color: var(--primaire); color: var(--sur-primaire); box-shadow: 0 0 12px -2px var(--primaire); }
 
 .recherche { position: relative; }
 .recherche input {
@@ -227,7 +241,7 @@ a { color: var(--primaire); }
   font-size: 0.82rem;
   cursor: pointer;
 }
-.onglet-palier.actif { background: var(--primaire); border-color: var(--primaire); color: var(--sur-primaire); }
+.onglet-palier.actif { background: var(--primaire); border-color: var(--primaire); color: var(--sur-primaire); box-shadow: 0 0 12px -2px var(--primaire); }
 
 /* ===== Filtres (classe / rareté / possédé) ===== */
 .filtres { display: flex; gap: 0.4rem; margin-top: 0.6rem; flex-wrap: wrap; }
@@ -262,7 +276,7 @@ a { color: var(--primaire); }
   font-size: 0.88rem; color: var(--texte-att);
   background: var(--carte); border: 1px solid var(--bordure); border-radius: var(--rayon);
 }
-.compteur-global b { font-size: 1.1rem; }
+.compteur-global b { font-size: 1.1rem; font-family: var(--police-titre); color: var(--primaire); }
 .compteur-global .barre-progression { flex: 1; }
 
 /* ===== Grille de droïdes ===== */
@@ -277,15 +291,16 @@ a { color: var(--primaire); }
 
 .carte-droide {
   background: var(--carte);
-  border-radius: var(--rayon);
   border: 1px solid var(--bordure);
   overflow: hidden;
   padding: 0.9rem 0.8rem;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  /* Coins coupés façon panneau HUD futuriste plutôt qu'arrondis. */
+  clip-path: polygon(var(--coin-hud) 0, 100% 0, 100% calc(100% - var(--coin-hud)), calc(100% - var(--coin-hud)) 100%, 0 100%, 0 var(--coin-hud));
 }
-.carte-droide.possede { border-color: var(--primaire); box-shadow: 0 0 0 2px var(--primaire-clair) inset; }
+.carte-droide.possede { border-color: var(--primaire); box-shadow: 0 0 0 2px var(--primaire-clair) inset, 0 0 12px -3px var(--primaire); }
 .droide-entete { display: flex; align-items: flex-start; gap: 0.5rem; }
 .droide-icone {
   width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0;
@@ -306,15 +321,15 @@ a { color: var(--primaire); }
   font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em;
   padding: 0.15rem 0.5rem; border-radius: 999px;
 }
-.badge-rarete.typique { background: #e5e7eb; color: #4b5563; }
-.badge-rarete.rare { background: #dbeafe; color: #1d4ed8; }
+.badge-rarete.typique { background: #e0f2f4; color: #0e7490; }
+.badge-rarete.rare { background: #cffafe; color: #0891b2; }
 .badge-rarete.epique { background: #ede9fe; color: #7c3aed; }
 .badge-rarete.legendaire { background: #fef3c7; color: #b45309; }
 .badge-rarete.mythique { background: #fce7f3; color: #be185d; }
 .badge-rarete.iconique { background: #d1fae5; color: #047857; }
 @media (prefers-color-scheme: dark) {
-  .badge-rarete.typique { background: #374151; color: #d1d5db; }
-  .badge-rarete.rare { background: #1e3a8a; color: #bfdbfe; }
+  .badge-rarete.typique { background: #123540; color: #7dd3e0; }
+  .badge-rarete.rare { background: #0e3a44; color: #22d3ee; }
   .badge-rarete.epique { background: #4c1d95; color: #ddd6fe; }
   .badge-rarete.legendaire { background: #78350f; color: #fde68a; }
   .badge-rarete.mythique { background: #831843; color: #fbcfe8; }
@@ -339,10 +354,10 @@ a { color: var(--primaire); }
 .item-renaissance {
   background: var(--carte);
   border: 1px solid var(--bordure);
-  border-radius: var(--rayon);
   padding: 0.9rem 1rem;
+  clip-path: polygon(var(--coin-hud) 0, 100% 0, 100% calc(100% - var(--coin-hud)), calc(100% - var(--coin-hud)) 100%, 0 100%, 0 var(--coin-hud));
 }
-.item-renaissance.atteint { border-color: var(--succes); }
+.item-renaissance.atteint { border-color: var(--succes); box-shadow: 0 0 10px -3px var(--succes); }
 .renaissance-entete {
   display: flex; align-items: center; gap: 0.7rem; margin-bottom: 0.4rem;
 }
@@ -378,11 +393,20 @@ a { color: var(--primaire); }
   display: flex; align-items: center; justify-content: center;
   cursor: pointer;
   z-index: 30;
+  animation: pulsationFab 2.4s ease-in-out infinite;
+}
+@keyframes pulsationFab {
+  0%, 100% { box-shadow: 0 6px 18px rgba(184, 134, 11, 0.45), 0 0 0 0 rgba(184, 134, 11, 0.5); }
+  50% { box-shadow: 0 6px 18px rgba(184, 134, 11, 0.45), 0 0 0 8px rgba(184, 134, 11, 0); }
 }
 @media (prefers-color-scheme: dark) {
   .fab { box-shadow: 0 6px 18px rgba(232, 193, 77, 0.4); }
+  @keyframes pulsationFab {
+    0%, 100% { box-shadow: 0 6px 18px rgba(232, 193, 77, 0.4), 0 0 0 0 rgba(232, 193, 77, 0.55); }
+    50% { box-shadow: 0 6px 18px rgba(232, 193, 77, 0.4), 0 0 0 9px rgba(232, 193, 77, 0); }
+  }
 }
-.fab:active { transform: scale(0.94); }
+.fab:active { transform: scale(0.94); animation: none; }
 
 /* ===== Feuille modale (bottom sheet plein écran sur mobile) ===== */
 .voile {
@@ -489,13 +513,13 @@ a { color: var(--primaire); }
 /* ===== Écran admin (admin.html) ===== */
 .bloc-carte {
   background: var(--carte);
-  border-radius: var(--rayon);
   border: 1px solid var(--bordure);
   box-shadow: var(--ombre);
   padding: 1.3rem 1.4rem;
   margin-bottom: 1.3rem;
+  clip-path: polygon(var(--coin-hud) 0, 100% 0, 100% calc(100% - var(--coin-hud)), calc(100% - var(--coin-hud)) 100%, 0 100%, 0 var(--coin-hud));
 }
-.bloc-carte h2 { margin: 0 0 0.3rem; font-size: 1.05rem; }
+.bloc-carte h2 { margin: 0 0 0.3rem; font-size: 1.05rem; font-family: var(--police-titre); letter-spacing: 0.02em; }
 .bloc-carte .sous-titre { margin: 0 0 1.1rem; color: var(--texte-att); font-size: 0.85rem; }
 
 .liste-simple { list-style: none; margin: 0 0 1.1rem; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }

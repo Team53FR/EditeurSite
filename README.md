@@ -204,15 +204,37 @@ sémantique dédiée si besoin.
 
 ## Droid Fortnite (suivi de Star Wars: Droid Tycoon)
 
-Thème visuel « space opera » (or/bronze sur fond très sombre + léger champ
-d'étoiles en CSS pur, titres en majuscules espacées) plutôt que la teinte
-cyan générique de départ — variables `--primaire`/`--fond`/etc. de
-`sites/droid-fortnite/style.css`, `--sur-primaire` ajoutée pour garder un bon
-contraste de texte sur les boutons dorés (texte sombre en thème sombre où
-l'or est clair, texte clair en thème clair où l'or est plus foncé). Aucun
-logo ni police officielle Star Wars utilisés, uniquement une ambiance
-générique (couleurs, étoiles en CSS) — même principe que pour les données et
-les images : pas de contenu sous droit d'auteur d'Epic Games/Lucasfilm.
+**Thème visuel « HUD de space opera »**, inspiré des couleurs réellement
+visibles dans le jeu (capture d'écran fournie par l'utilisateur) plutôt
+qu'une palette générique :
+- **Or** (`--primaire`) comme le logo « DROÏDEX » du jeu — boutons, onglets
+  actifs, titres.
+- **Cyan** (`--secondaire`, nouveau) comme les libellés de rareté du jeu —
+  utilisé sur les badges Typique/Rare.
+- **Orange** (`--accent`) comme les barres de progression du jeu.
+- Fond quasi noir avec un léger champ d'étoiles en CSS pur
+  (`radial-gradient`, thème sombre uniquement).
+- Police d'affichage **Orbitron** (Google Fonts, libre — même mécanisme de
+  `<link>` que la police EB Garamond déjà utilisée par editeur-livre) pour
+  les titres, `--police-titre` dans `style.css`.
+- Coins coupés façon panneau futuriste (`clip-path` polygon, variable
+  `--coin-hud`) sur les cartes de droïde, les paliers de renaissance et les
+  blocs admin, plus des lueurs (`box-shadow`) sur les boutons/onglets actifs
+  et une légère pulsation sur le bouton flottant.
+- `--sur-primaire` (nouvelle variable) garde un texte lisible sur les
+  boutons dorés dans les deux thèmes (texte sombre quand l'or est clair en
+  thème sombre, texte clair quand l'or est plus foncé en thème clair).
+
+Aucun logo, police ou visuel officiel Star Wars/Epic Games utilisé — une
+ambiance générique (couleurs, forme, étoiles en CSS, police libre), même
+principe que pour les données et les images : pas de contenu sous droit
+d'auteur.
+
+**Piège rencontré** : le champ d'étoiles (`background-image`) posé sur `body`
+en thème sombre était écrasé par la règle `body { background: var(--fond); }`
+plus bas dans le fichier — le raccourci `background` réinitialise aussi
+`background-image` à `none`, même si lui ne définit qu'une couleur. Remplacé
+par `background-color: var(--fond)` pour ne cibler que la couleur.
 
 Suivi personnel de progression pour ce mode de jeu Fortnite : un « droidex »
 (catalogue des droïdes, organisé en onglets par palier d'amélioration —
