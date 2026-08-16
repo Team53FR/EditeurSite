@@ -15,7 +15,7 @@
 // app a de toute façon besoin du réseau en permanence (API GitHub), donc le
 // réseau est presque toujours disponible — autant s'en servir pour rester à
 // jour, et ne retomber sur le cache qu'en dernier recours (hors-ligne).
-const CACHE_NOM = "ma-bibliotheque-v2";
+const CACHE_NOM = "ma-bibliotheque-v3";
 const FICHIERS_COQUILLE = [
   "./",
   "./index.html",
@@ -24,6 +24,7 @@ const FICHIERS_COQUILLE = [
   "./style.css",
   "./script.js",
   "./collection.js",
+  "./retour-portail.js",
   "./manifest.json",
   "./icone-192.png",
   "./icone-512.png"
