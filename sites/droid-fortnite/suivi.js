@@ -208,6 +208,7 @@ function afficherDroidex() {
     carte.className = "carte-droide" + (possede ? " possede" : "");
     carte.setAttribute("role", "button");
     carte.setAttribute("aria-pressed", possede ? "true" : "false");
+    if (d.couleur) carte.style.borderColor = d.couleur;
     carte.innerHTML =
       `<div class="droide-entete">` +
         `<div class="droide-icone" id="icone-${d.id}" style="background:${d.image ? "" : couleurDroide(d.id)};color:${d.image ? "" : "#fff"}">${iconeClasse(d.classe)}</div>` +
@@ -360,32 +361,6 @@ function retirerImageDroide() {
   imageSupprimeeDroide = true;
   document.getElementById("apercuModifDroide").innerHTML = iconePlaceholderDroide();
   document.getElementById("boutonSupprimerImageDroide").style.display = "none";
-}
-
-// Redimensionne côté client avant envoi (identique à sites/ma-bibliotheque/collection.js).
-function comprimerImage(fichier, maxDim = 700, quality = 0.82) {
-  return new Promise((resolve, reject) => {
-    const lecteur = new FileReader();
-    lecteur.onerror = () => reject(new Error("Lecture du fichier impossible."));
-    lecteur.onload = () => {
-      const img = new Image();
-      img.onerror = () => reject(new Error("Image invalide."));
-      img.onload = () => {
-        let { width, height } = img;
-        if (width > maxDim || height > maxDim) {
-          if (width >= height) { height = Math.round(height * (maxDim / width)); width = maxDim; }
-          else { width = Math.round(width * (maxDim / height)); height = maxDim; }
-        }
-        const canvas = document.createElement("canvas");
-        canvas.width = width;
-        canvas.height = height;
-        canvas.getContext("2d").drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL("image/jpeg", quality));
-      };
-      img.src = lecteur.result;
-    };
-    lecteur.readAsDataURL(fichier);
-  });
 }
 
 async function enregistrerModifDroide() {

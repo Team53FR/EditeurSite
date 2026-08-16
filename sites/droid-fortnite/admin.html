@@ -31,6 +31,21 @@
       <ul class="liste-simple" id="listeDroides"></ul>
 
       <h2 id="titreFormDroide" style="font-size:0.95rem">Ajouter un droïde</h2>
+
+      <div class="zone-couverture">
+        <div class="apercu-couverture" id="apercuDroideAdmin">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+        </div>
+        <div class="actions-couverture">
+          <button type="button" class="btn btn-secondaire" onclick="declencherChoixImageAdmin('camera')">📷 Prendre une photo</button>
+          <button type="button" class="btn btn-secondaire" onclick="declencherChoixImageAdmin('galerie')">🖼️ Choisir dans la galerie</button>
+          <button type="button" class="btn btn-fantome" id="boutonSupprimerImageAdmin" onclick="retirerImageAdmin()" style="display:none">Retirer l'icône</button>
+        </div>
+      </div>
+      <input type="file" accept="image/*" capture="environment" id="champImageCameraAdmin" style="display:none" onchange="imageChoisieAdmin(event)">
+      <input type="file" accept="image/*" id="champImageGalerieAdmin" style="display:none" onchange="imageChoisieAdmin(event)">
+      <p class="note-source">Photo perso uniquement (pas de visuel officiel du jeu — droits d'auteur Epic Games).</p>
+
       <div class="champ">
         <label for="champNom">Nom</label>
         <input type="text" id="champNom" placeholder="ex. Senate Hovercam">
@@ -53,6 +68,13 @@
           <option value="Mythique">Mythique</option>
           <option value="Iconique">Iconique</option>
         </select>
+      </div>
+      <div class="champ">
+        <label for="champCouleur">Couleur du contour de la carte (optionnel)</label>
+        <div style="display:flex; gap:0.6rem; align-items:center;">
+          <input type="color" id="champCouleur" value="#0891b2" style="width:52px; height:38px; padding:2px; border-radius:8px; border:1px solid var(--bordure); background:var(--fond);" oninput="choisirCouleurAdmin(this.value)">
+          <button type="button" class="btn-mini" id="boutonSupprimerCouleurAdmin" onclick="retirerCouleurAdmin()" style="display:none">Aucune couleur</button>
+        </div>
       </div>
       <div style="display:flex; gap:0.7rem;">
         <button class="btn btn-primaire" id="btnEnregistrerDroide" onclick="enregistrerDroideAdmin()">Ajouter</button>

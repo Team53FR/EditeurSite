@@ -8,11 +8,59 @@ let shaCatalogue = null;
 let paliers = [];
 let shaPaliers = null;
 let modeEditionId = null; // id du droïde en cours de modification, ou null (mode ajout)
+const cacheImages = new Map(); // chemin GitHub -> URL locale (blob:)
+
+// État du formulaire pour l'icône et la couleur de contour, en attente
+// d'enregistrement (pas encore envoyés tant qu'on ne valide pas le formulaire).
+let dataUrlImageAdmin = null;
+let imageSupprimeeAdmin = false;
+let couleurAdmin = null;
 
 function echapper(txt) {
   const d = document.createElement("div");
   d.textContent = txt == null ? "" : String(txt);
   return d.innerHTML;
+}
+
+function iconePlaceholderDroideAdmin() {
+  return `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>`;
+}
+
+function declencherChoixImageAdmin(source) {
+  document.getElementById(source === "camera" ? "champImageCameraAdmin" : "champImageGalerieAdmin").click();
+}
+
+async function imageChoisieAdmin(event) {
+  const fichier = event.target.files[0];
+  event.target.value = "";
+  if (!fichier) return;
+  try {
+    const dataUrl = await comprimerImage(fichier);
+    dataUrlImageAdmin = dataUrl;
+    imageSupprimeeAdmin = false;
+    document.getElementById("apercuDroideAdmin").innerHTML = `<img src="${dataUrl}" alt="">`;
+    document.getElementById("boutonSupprimerImageAdmin").style.display = "block";
+  } catch (e) {
+    document.getElementById("messageDroideAdmin").textContent = "Impossible de charger cette image.";
+  }
+}
+
+function retirerImageAdmin() {
+  dataUrlImageAdmin = null;
+  imageSupprimeeAdmin = true;
+  document.getElementById("apercuDroideAdmin").innerHTML = iconePlaceholderDroideAdmin();
+  document.getElementById("boutonSupprimerImageAdmin").style.display = "none";
+}
+
+function choisirCouleurAdmin(valeur) {
+  couleurAdmin = valeur;
+  document.getElementById("boutonSupprimerCouleurAdmin").style.display = "";
+}
+
+function retirerCouleurAdmin() {
+  couleurAdmin = null;
+  document.getElementById("champCouleur").value = "#0891b2";
+  document.getElementById("boutonSupprimerCouleurAdmin").style.display = "none";
 }
 
 if (token) {
@@ -46,9 +94,12 @@ function afficherDroides() {
   catalogue.slice().sort((a, b) => a.nom.localeCompare(b.nom)).forEach((d) => {
     const li = document.createElement("li");
     li.className = "ligne-item";
+    const pastille = d.couleur
+      ? `<span style="width:14px;height:14px;border-radius:50%;background:${echapper(d.couleur)};border:1px solid var(--bordure);flex-shrink:0;"></span>`
+      : "";
     li.innerHTML =
       `<div class="ligne-info">` +
-        `<div class="ligne-titre">${echapper(d.nom)}</div>` +
+        `<div class="ligne-titre" style="display:flex;align-items:center;gap:0.4rem;">${pastille}${echapper(d.nom)}${d.image ? " 🖼️" : ""}</div>` +
         `<div class="ligne-sous">${echapper(d.classe)} · ${echapper(d.rarete)}</div>` +
       `</div>` +
       `<div class="ligne-actions"></div>`;
@@ -70,25 +121,51 @@ function afficherDroides() {
   });
 }
 
-function editerDroide(id) {
+async function editerDroide(id) {
   const d = catalogue.find((x) => x.id === id);
   if (!d) return;
   modeEditionId = id;
+  dataUrlImageAdmin = null;
+  imageSupprimeeAdmin = false;
+  couleurAdmin = d.couleur || null;
+
   document.getElementById("champNom").value = d.nom;
   document.getElementById("champClasse").value = d.classe;
   document.getElementById("champRarete").value = d.rarete;
+  document.getElementById("champCouleur").value = d.couleur || "#0891b2";
+  document.getElementById("boutonSupprimerCouleurAdmin").style.display = d.couleur ? "" : "none";
   document.getElementById("titreFormDroide").textContent = "Modifier « " + d.nom + " »";
   document.getElementById("btnEnregistrerDroide").textContent = "Enregistrer les modifications";
   document.getElementById("btnAnnulerDroide").style.display = "";
   document.getElementById("messageDroideAdmin").textContent = "";
+
+  const apercu = document.getElementById("apercuDroideAdmin");
+  const boutonRetirer = document.getElementById("boutonSupprimerImageAdmin");
+  apercu.innerHTML = iconePlaceholderDroideAdmin();
+  boutonRetirer.style.display = d.image ? "block" : "none";
+  if (d.image) {
+    try {
+      let url = cacheImages.get(d.image);
+      if (!url) { url = await obtenirUrlImage(d.image, token); cacheImages.set(d.image, url); }
+      if (modeEditionId === id) apercu.innerHTML = `<img src="${url}" alt="">`;
+    } catch (e) { /* reste sur le placeholder */ }
+  }
+
   document.getElementById("champNom").focus();
 }
 
 function annulerEditionDroide() {
   modeEditionId = null;
+  dataUrlImageAdmin = null;
+  imageSupprimeeAdmin = false;
+  couleurAdmin = null;
   document.getElementById("champNom").value = "";
   document.getElementById("champClasse").value = "Ouvrier";
   document.getElementById("champRarete").value = "Typique";
+  document.getElementById("champCouleur").value = "#0891b2";
+  document.getElementById("boutonSupprimerCouleurAdmin").style.display = "none";
+  document.getElementById("apercuDroideAdmin").innerHTML = iconePlaceholderDroideAdmin();
+  document.getElementById("boutonSupprimerImageAdmin").style.display = "none";
   document.getElementById("titreFormDroide").textContent = "Ajouter un droïde";
   document.getElementById("btnEnregistrerDroide").textContent = "Ajouter";
   document.getElementById("btnAnnulerDroide").style.display = "none";
@@ -107,15 +184,33 @@ async function enregistrerDroideAdmin() {
 
   if (!nom) { message.textContent = "Le nom est obligatoire."; return; }
 
-  let copie;
-  if (modeEditionId) {
-    copie = catalogue.map((x) => x.id === modeEditionId ? Object.assign({}, x, { nom, classe, rarete }) : x);
-  } else {
-    copie = catalogue.concat([{ id: genererId("d"), nom, classe, rarete }]);
-  }
+  const id = modeEditionId || genererId("d");
+  const ancien = modeEditionId ? catalogue.find((x) => x.id === modeEditionId) : null;
 
   message.textContent = "Enregistrement...";
   try {
+    let cheminImage = ancien ? ancien.image || null : null;
+    if (dataUrlImageAdmin) {
+      const chemin = `images/${id}.${extraireExtensionDataUrl(dataUrlImageAdmin)}`;
+      await uploaderImageBase64(chemin, dataUrlImageAdmin, token, `Icône du droïde ${nom}`);
+      if (ancien && ancien.image && ancien.image !== chemin) {
+        supprimerFichierGithub(ancien.image, token, "Remplacement de l'icône").catch(() => {});
+      }
+      cacheImages.delete(chemin);
+      cheminImage = chemin;
+    } else if (imageSupprimeeAdmin) {
+      if (ancien && ancien.image) supprimerFichierGithub(ancien.image, token, "Suppression de l'icône").catch(() => {});
+      cheminImage = null;
+    }
+
+    const entree = { id, nom, classe, rarete };
+    if (cheminImage) entree.image = cheminImage;
+    if (couleurAdmin) entree.couleur = couleurAdmin;
+
+    const copie = modeEditionId
+      ? catalogue.map((x) => x.id === modeEditionId ? entree : x)
+      : catalogue.concat([entree]);
+
     shaCatalogue = await sauvegarderAvecFusion("catalogue.json", copie, shaCatalogue, token,
       modeEditionId ? `Modification du droïde ${nom}` : `Ajout du droïde ${nom}`);
     catalogue = copie;

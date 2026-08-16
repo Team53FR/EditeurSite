@@ -274,6 +274,15 @@ que le portail, donc même `localStorage` — aucun changement du relais
 nécessaire). Le bouton flottant d'ajout et le lien ⚙ vers `admin.html` sont
 masqués pour les comptes non-admin dans `suivi.html`.
 
+Le formulaire d'ajout/modification d'un droïde dans `admin.html` permet aussi
+de fixer son **icône** (même mécanisme de photo perso que le bouton ✎ de
+`suivi.html`, toujours pas de visuel officiel du jeu) et la **couleur du
+contour de sa carte** (`<input type="color">`, stockée en `hex` dans le champ
+`couleur` de l'entrée catalogue, appliquée en style inline sur `.carte-droide`
+— l'emporte sur la couleur générée automatiquement par `couleurDroide()`).
+`comprimerImage()` (compression client avant upload) a été déplacée dans
+`script.js` pour être partagée entre `suivi.js` et `admin.js`.
+
 ## App installable (PWA)
 
 **ma-bibliotheque** est installable comme une app sur téléphone (icône sur

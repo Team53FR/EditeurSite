@@ -188,6 +188,34 @@ async function obtenirUrlImage(chemin, token) {
   throw new Error(`Image "${chemin}" introuvable.`);
 }
 
+// Redimensionne côté client avant envoi (identique à sites/ma-bibliotheque/collection.js).
+// Partagé entre suivi.js (photo perso sur une carte) et admin.js (icône lors
+// de l'ajout/modification d'un droïde).
+function comprimerImage(fichier, maxDim = 700, quality = 0.82) {
+  return new Promise((resolve, reject) => {
+    const lecteur = new FileReader();
+    lecteur.onerror = () => reject(new Error("Lecture du fichier impossible."));
+    lecteur.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("Image invalide."));
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          if (width >= height) { height = Math.round(height * (maxDim / width)); width = maxDim; }
+          else { width = Math.round(width * (maxDim / height)); height = maxDim; }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.src = lecteur.result;
+    };
+    lecteur.readAsDataURL(fichier);
+  });
+}
+
 // ===== Connexion (comptes multiples) =====
 // Les identifiants vivent dans DroidFortnite/users.json sur le dépôt BDD :
 //   [{ "login": "...", "password": "...", "nomAffichage": "..." }]
