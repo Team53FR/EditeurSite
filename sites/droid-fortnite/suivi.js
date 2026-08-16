@@ -140,27 +140,6 @@ function echapperHTML(txt) {
   return d.innerHTML;
 }
 
-function classeRareteCss(rarete) {
-  return (rarete || "")
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase();
-}
-
-function iconeClasse(classe) {
-  if (classe === "Astromec") return "📡";
-  if (classe === "Combat") return "⚔️";
-  return "🔧";
-}
-
-// Visuel généré (pas une image du jeu, dont je n'ai pas le droit de
-// distribuer les visuels officiels) : une teinte dérivée du nom du droïde,
-// pour que chaque carte reste distincte visuellement même sans photo perso.
-function couleurDroide(id) {
-  let hash = 0;
-  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
-  return `hsl(${hash % 360}, 55%, 50%)`;
-}
-
 function formaterCredits(n) {
   if (n >= 1e12) return (Math.round((n / 1e12) * 100) / 100) + " T";
   if (n >= 1e9) return (Math.round((n / 1e9) * 100) / 100) + " Md";

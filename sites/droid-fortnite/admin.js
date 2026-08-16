@@ -87,38 +87,46 @@ async function chargerDonnees() {
 }
 
 // ===== Droïdes =====
+// Petites cartes (comme le Droidex de suivi.html) plutôt qu'une longue
+// liste : avec ~70 droïdes, une liste verticale devient vite illisible.
+// Cliquer une carte l'ouvre en modification ; le bouton 🗑 dans le coin
+// supprime directement (avec confirmation).
 function afficherDroides() {
-  const liste = document.getElementById("listeDroides");
-  liste.innerHTML = "";
+  const grille = document.getElementById("listeDroides");
+  grille.innerHTML = "";
 
   catalogue.slice().sort((a, b) => a.nom.localeCompare(b.nom)).forEach((d) => {
-    const li = document.createElement("li");
-    li.className = "ligne-item";
-    const pastille = d.couleur
-      ? `<span style="width:14px;height:14px;border-radius:50%;background:${echapper(d.couleur)};border:1px solid var(--bordure);flex-shrink:0;"></span>`
-      : "";
-    li.innerHTML =
-      `<div class="ligne-info">` +
-        `<div class="ligne-titre" style="display:flex;align-items:center;gap:0.4rem;">${pastille}${echapper(d.nom)}${d.image ? " 🖼️" : ""}</div>` +
-        `<div class="ligne-sous">${echapper(d.classe)} · ${echapper(d.rarete)}</div>` +
+    const carte = document.createElement("div");
+    carte.className = "carte-droide";
+    carte.title = "Modifier";
+    if (d.couleur) carte.style.borderColor = d.couleur;
+    carte.innerHTML =
+      `<div class="droide-entete">` +
+        `<div class="droide-icone" id="icone-admin-${d.id}" style="background:${d.image ? "" : couleurDroide(d.id)};color:${d.image ? "" : "#fff"}">${iconeClasse(d.classe)}</div>` +
+        `<div class="droide-nom">${echapper(d.nom)}</div>` +
+        `<button type="button" class="droide-supprimer" title="Supprimer">🗑</button>` +
       `</div>` +
-      `<div class="ligne-actions"></div>`;
+      `<span class="badge-rarete ${classeRareteCss(d.rarete)}">${echapper(d.rarete)}</span>`;
 
-    const actions = li.querySelector(".ligne-actions");
-    const bEdit = document.createElement("button");
-    bEdit.className = "btn-mini";
-    bEdit.textContent = "Modifier";
-    bEdit.onclick = () => editerDroide(d.id);
-    actions.appendChild(bEdit);
+    carte.addEventListener("click", () => editerDroide(d.id));
+    carte.querySelector(".droide-supprimer").addEventListener("click", (e) => {
+      e.stopPropagation();
+      supprimerDroide(d.id);
+    });
 
-    const bDel = document.createElement("button");
-    bDel.className = "btn-mini danger";
-    bDel.textContent = "Supprimer";
-    bDel.onclick = () => supprimerDroide(d.id);
-    actions.appendChild(bDel);
+    if (d.image) chargerImageAdmin(carte.querySelector(`#icone-admin-${CSS.escape(d.id)}`), d.image);
 
-    liste.appendChild(li);
+    grille.appendChild(carte);
   });
+}
+
+async function chargerImageAdmin(element, chemin) {
+  if (!element) return;
+  try {
+    let url = cacheImages.get(chemin);
+    if (!url) { url = await obtenirUrlImage(chemin, token); cacheImages.set(chemin, url); }
+    element.innerHTML = `<img src="${url}" alt="">`;
+  } catch (e) { /* reste sur l'icône générée, pas bloquant */ }
 }
 
 async function editerDroide(id) {

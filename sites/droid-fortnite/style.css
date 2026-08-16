@@ -1,19 +1,21 @@
 /* ===== Droid Fortnite — mobile-first =====
    Base commune (variables/composants) reprise de sites/ma-bibliotheque/style.css
    pour rester cohérent avec les autres sites du dépôt, avec sa propre teinte
-   (cyan « hologramme ») à la place de l'indigo. */
+   « space opera » (or/bronze sur fond profond, façon générique de space-opera —
+   pas de logo ni de police officielle Star Wars, juste une palette/ambiance). */
 
 :root {
   color-scheme: light dark;
-  --fond: #f4f5f9;
+  --fond: #f6f4ee;
   --carte: #ffffff;
   --texte: #1c1d24;
   --texte-att: #6b6d7a;
-  --bordure: #e3e4ec;
-  --primaire: #0891b2;
-  --primaire-fonce: #0e7490;
-  --primaire-clair: #cffafe;
-  --accent: #f59e0b;
+  --bordure: #e6e1d3;
+  --primaire: #b8860b;
+  --primaire-fonce: #96690a;
+  --primaire-clair: #fbf0d2;
+  --sur-primaire: #fff; /* couleur du texte posé sur un fond --primaire */
+  --accent: #c2410c;
   --danger: #dc2626;
   --danger-fonce: #b91c1c;
   --succes: #16a34a;
@@ -25,16 +27,32 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --fond: #12191b;
-    --carte: #1a2327;
+    --fond: #05060c;
+    --carte: #12131f;
     --texte: #f1f1f5;
-    --texte-att: #9aa5a8;
-    --bordure: #2a3438;
-    --primaire: #22d3ee;
-    --primaire-fonce: #67e8f9;
-    --primaire-clair: #164e63;
-    --accent: #fbbf24;
-    --ombre: 0 4px 20px rgba(0, 0, 0, 0.35);
+    --texte-att: #9b9dac;
+    --bordure: #262838;
+    --primaire: #e8c14d;
+    --primaire-fonce: #f3d375;
+    --primaire-clair: #3a3011;
+    --sur-primaire: #14110a; /* texte sombre sur or clair, plus lisible que du blanc */
+    --accent: #fb923c;
+    --ombre: 0 4px 20px rgba(0, 0, 0, 0.5);
+  }
+
+  /* Léger champ d'étoiles sur fond profond — pur CSS, aucun visuel du jeu. */
+  body {
+    background-image:
+      radial-gradient(1.4px 1.4px at 15% 20%, rgba(255,255,255,0.55), transparent),
+      radial-gradient(1px 1px at 65% 12%, rgba(255,255,255,0.4), transparent),
+      radial-gradient(1.6px 1.6px at 85% 55%, rgba(255,255,255,0.5), transparent),
+      radial-gradient(1px 1px at 30% 70%, rgba(255,255,255,0.35), transparent),
+      radial-gradient(1.2px 1.2px at 50% 85%, rgba(255,255,255,0.45), transparent),
+      radial-gradient(1px 1px at 10% 92%, rgba(255,255,255,0.3), transparent),
+      radial-gradient(1.4px 1.4px at 92% 80%, rgba(255,255,255,0.4), transparent);
+    background-repeat: repeat;
+    background-size: 340px 340px;
+    background-attachment: fixed;
   }
 }
 
@@ -70,7 +88,7 @@ a { color: var(--primaire); }
   user-select: none;
 }
 .btn:active { transform: scale(0.97); }
-.btn-primaire { background: var(--primaire); color: #fff; }
+.btn-primaire { background: var(--primaire); color: var(--sur-primaire); }
 .btn-primaire:hover { background: var(--primaire-fonce); }
 .btn-secondaire { background: var(--primaire-clair); color: var(--primaire); }
 .btn-danger { background: transparent; color: var(--danger); border: 1px solid var(--danger); }
@@ -109,11 +127,11 @@ a { color: var(--primaire); }
   width: 36px; height: 36px;
   border-radius: 10px;
   background: var(--primaire);
-  color: #fff;
+  color: var(--sur-primaire);
   display: flex; align-items: center; justify-content: center;
   font-size: 1.2rem;
 }
-.carte-auth h1 { margin: 0 0 0.3rem; font-size: 1.4rem; }
+.carte-auth h1 { margin: 0 0 0.3rem; font-size: 1.4rem; letter-spacing: 0.02em; }
 .carte-auth .intro { margin: 0 0 1.5rem; color: var(--texte-att); font-size: 0.92rem; }
 
 .champ { margin-bottom: 1.1rem; }
@@ -136,10 +154,10 @@ a { color: var(--primaire); }
 .hero { text-align: center; max-width: 480px; }
 .hero .pastille-lg {
   width: 64px; height: 64px; margin: 0 auto 1.2rem;
-  border-radius: 18px; background: var(--primaire); color: #fff;
+  border-radius: 18px; background: var(--primaire); color: var(--sur-primaire);
   display: flex; align-items: center; justify-content: center; font-size: 1.9rem;
 }
-.hero h1 { margin: 0 0 0.6rem; font-size: 1.7rem; }
+.hero h1 { margin: 0 0 0.6rem; font-size: 1.7rem; letter-spacing: 0.03em; text-transform: uppercase; }
 .hero p { color: var(--texte-att); margin: 0 0 1.8rem; line-height: 1.5; }
 
 /* ===== Application : en-tête ===== */
@@ -153,7 +171,7 @@ a { color: var(--primaire); }
   display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
   margin-bottom: 0.75rem;
 }
-.app-header h1 { font-size: 1.15rem; margin: 0; display: flex; align-items: center; gap: 0.5rem; }
+.app-header h1 { font-size: 1.05rem; margin: 0; display: flex; align-items: center; gap: 0.5rem; letter-spacing: 0.04em; text-transform: uppercase; font-weight: 800; }
 .app-header .actions-entete { display: flex; align-items: center; gap: 0.3rem; }
 .app-header .icone-bouton, .app-header .icone-deconnexion {
   background: transparent; border: none; color: var(--texte-att); cursor: pointer;
@@ -174,7 +192,7 @@ a { color: var(--primaire); }
   font-size: 0.88rem;
   cursor: pointer;
 }
-.onglet-type.actif { background: var(--primaire); border-color: var(--primaire); color: #fff; }
+.onglet-type.actif { background: var(--primaire); border-color: var(--primaire); color: var(--sur-primaire); }
 
 .recherche { position: relative; }
 .recherche input {
@@ -209,7 +227,7 @@ a { color: var(--primaire); }
   font-size: 0.82rem;
   cursor: pointer;
 }
-.onglet-palier.actif { background: var(--primaire); border-color: var(--primaire); color: #fff; }
+.onglet-palier.actif { background: var(--primaire); border-color: var(--primaire); color: var(--sur-primaire); }
 
 /* ===== Filtres (classe / rareté / possédé) ===== */
 .filtres { display: flex; gap: 0.4rem; margin-top: 0.6rem; flex-wrap: wrap; }
@@ -277,6 +295,11 @@ a { color: var(--primaire); }
 }
 .droide-icone img { width: 100%; height: 100%; object-fit: cover; }
 .droide-nom { flex: 1; min-width: 0; font-weight: 600; font-size: 0.9rem; line-height: 1.25; }
+.droide-supprimer {
+  flex-shrink: 0; background: transparent; border: none; color: var(--texte-att);
+  padding: 0.2rem; border-radius: 6px; cursor: pointer; font-size: 0.9rem; line-height: 1;
+}
+.droide-supprimer:hover { color: var(--danger); background: var(--fond); }
 
 .badge-rarete {
   display: inline-flex; align-self: flex-start;
@@ -308,7 +331,7 @@ a { color: var(--primaire); }
   font-size: 0.7rem; color: transparent;
 }
 .carte-droide.possede .droide-case {
-  background: var(--primaire); border-color: var(--primaire); color: #fff;
+  background: var(--primaire); border-color: var(--primaire); color: var(--sur-primaire);
 }
 
 /* ===== Liste renaissance ===== */
@@ -349,12 +372,15 @@ a { color: var(--primaire); }
   width: 58px; height: 58px;
   border-radius: 50%;
   background: var(--primaire);
-  color: #fff;
+  color: var(--sur-primaire);
   border: none;
-  box-shadow: 0 6px 18px rgba(8, 145, 178, 0.45);
+  box-shadow: 0 6px 18px rgba(184, 134, 11, 0.45);
   display: flex; align-items: center; justify-content: center;
   cursor: pointer;
   z-index: 30;
+}
+@media (prefers-color-scheme: dark) {
+  .fab { box-shadow: 0 6px 18px rgba(232, 193, 77, 0.4); }
 }
 .fab:active { transform: scale(0.94); }
 

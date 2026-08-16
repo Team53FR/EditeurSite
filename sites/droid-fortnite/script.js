@@ -228,6 +228,27 @@ function comprimerImage(fichier, maxDim = 700, quality = 0.82) {
   });
 }
 
+// ===== Visuels des droïdes (partagés entre suivi.js et admin.js) =====
+function classeRareteCss(rarete) {
+  return (rarete || "")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+function iconeClasse(classe) {
+  if (classe === "Astromec") return "\u{1F4E1}";
+  if (classe === "Combat") return "\u2694\uFE0F";
+  return "\u{1F527}";
+}
+
+// Visuel généré (pas une image du jeu, dont je n'ai pas le droit de
+// distribuer les visuels officiels) : une teinte dérivée du nom du droïde,
+// pour que chaque carte reste distincte visuellement même sans photo perso.
+function couleurDroide(id) {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+  return `hsl(${hash % 360}, 55%, 50%)`;
+}
 // ===== Connexion (comptes multiples) =====
 // Les identifiants vivent dans DroidFortnite/users.json sur le dépôt BDD :
 //   [{ "login": "...", "password": "...", "nomAffichage": "..." }]

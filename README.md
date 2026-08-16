@@ -204,6 +204,16 @@ sémantique dédiée si besoin.
 
 ## Droid Fortnite (suivi de Star Wars: Droid Tycoon)
 
+Thème visuel « space opera » (or/bronze sur fond très sombre + léger champ
+d'étoiles en CSS pur, titres en majuscules espacées) plutôt que la teinte
+cyan générique de départ — variables `--primaire`/`--fond`/etc. de
+`sites/droid-fortnite/style.css`, `--sur-primaire` ajoutée pour garder un bon
+contraste de texte sur les boutons dorés (texte sombre en thème sombre où
+l'or est clair, texte clair en thème clair où l'or est plus foncé). Aucun
+logo ni police officielle Star Wars utilisés, uniquement une ambiance
+générique (couleurs, étoiles en CSS) — même principe que pour les données et
+les images : pas de contenu sous droit d'auteur d'Epic Games/Lucasfilm.
+
 Suivi personnel de progression pour ce mode de jeu Fortnite : un « droidex »
 (catalogue des droïdes, organisé en onglets par palier d'amélioration —
 Défaut/Or/Diamant/Arc-en-ciel/Beskar/Galactique/Stellar — chaque droïde
@@ -272,7 +282,15 @@ Droid Fortnite, `estAdminCentral()`/`exigerAdminDroidFortnite()` dans
 `script.js` lisent directement `team53_role` en `localStorage` (même origine
 que le portail, donc même `localStorage` — aucun changement du relais
 nécessaire). Le bouton flottant d'ajout et le lien ⚙ vers `admin.html` sont
-masqués pour les comptes non-admin dans `suivi.html`.
+masqués pour les comptes non-admin dans `suivi.html`. La liste des droïdes y
+est affichée en petites cartes (comme le Droidex de `suivi.html`, classes
+`.grille-droides`/`.carte-droide` réutilisées telles quelles) plutôt qu'en
+liste verticale — avec ~70 droïdes, une liste devient vite illisible. Une
+carte cliquée ouvre la modification ; le bouton 🗑 dans son coin supprime
+directement (avec confirmation), `stopPropagation()` empêche qu'il déclenche
+aussi l'ouverture de la modification. `iconeClasse()`/`classeRareteCss()`/
+`couleurDroide()` ont été déplacées dans `script.js` pour être partagées
+entre `suivi.js` (Droidex) et `admin.js` (gestion).
 
 Le formulaire d'ajout/modification d'un droïde dans `admin.html` permet aussi
 de fixer son **icône** (toujours pas de visuel officiel du jeu) et la
