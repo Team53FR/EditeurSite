@@ -65,7 +65,7 @@ mélanger ses données avec celles d'un autre site :
 |-------------------|------------------------------|--------------------------------------------|
 | editeur-livre      | `EditeurLivre/`             | `users.json`, `bibliotheques/<login>.json`, `images/<login>/…` |
 | ma-bibliotheque    | `MaBibliotheque/`           | `users.json`, `bibliotheques/<login>.json`, `images/<login>/…` |
-| droid-fortnite     | `DroidFortnite/`            | `users.json`, `catalogue.json`, `renaissance.json` (partagés), `bibliotheques/<login>.json` (personnel) |
+| droid-fortnite     | `DroidFortnite/`            | `users.json`, `catalogue.json`, `renaissance.json`, `paliers.json` (partagés), `bibliotheques/<login>.json` (personnel) |
 | portail central    | `Web/`                      | `utilisateurs.json`, `sites.json`         |
 
 Les trois sites suivent donc le **même modèle par compte** pour leurs données
@@ -260,6 +260,19 @@ uniquement quand un seul compte écrit jamais un fichier donné, comme
 `bibliotheques/<login>.json`), elle relit le **contenu** distant et y
 fusionne les entrées locales absentes (par `id`), pour ne jamais perdre
 silencieusement l'ajout fait par quelqu'un d'autre entre-temps.
+
+**Panneau admin (`admin.html`)** : ajout, modification et suppression des
+droïdes, plus gestion de la liste des paliers de variante elle-même
+(`DroidFortnite/paliers.json`, amorcée comme les deux autres fichiers
+partagés) — ajout, suppression, réordonnancement (pas de renommage,
+volontairement : ça casserait silencieusement les clés
+`"<idDroide>::<ancienNom>"` déjà enregistrées dans les progressions
+personnelles). Réservé aux admins du portail central : pas de rôle propre à
+Droid Fortnite, `estAdminCentral()`/`exigerAdminDroidFortnite()` dans
+`script.js` lisent directement `team53_role` en `localStorage` (même origine
+que le portail, donc même `localStorage` — aucun changement du relais
+nécessaire). Le bouton flottant d'ajout et le lien ⚙ vers `admin.html` sont
+masqués pour les comptes non-admin dans `suivi.html`.
 
 ## App installable (PWA)
 

@@ -5,6 +5,7 @@ let catalogue = [];
 let shaCatalogue = null;
 let renaissance = [];
 let shaRenaissance = null;
+let paliers = PALIERS_INITIAUX; // remplacé par le contenu réel de paliers.json au chargement
 // droidesPossedes : tableau de clés "<idDroide>::<palier>" — chaque droïde
 // peut être possédé indépendamment à CHAQUE palier (Défaut, Or, Diamant...),
 // comme dans le jeu (le compteur du jeu compte chaque palier séparément).
@@ -12,17 +13,19 @@ let perso = { droidesPossedes: [], renaissanceAtteinte: [] };
 let shaPerso = null;
 
 let ongletActif = "droidex";
-let palierActif = PALIERS_DROIDE[0];
+let palierActif = PALIERS_INITIAUX[0];
 const cacheImages = new Map(); // chemin GitHub -> URL locale (blob:)
 
 function clePossession(idDroide, palier) {
   return idDroide + "::" + palier;
 }
 
-// Les droïdes Iconiques (BB-8, R2-D2, C-3PO...) n'existent qu'au palier
-// Défaut dans le jeu — pas d'amélioration possible pour eux.
+// Les droïdes Iconiques (BB-8, R2-D2, C-3PO...) n'existent qu'au premier
+// palier (Défaut) dans le jeu — pas d'amélioration possible pour eux. On
+// compare au premier élément du tableau CHARGÉ, pas à la chaîne "Défaut" en
+// dur, pour rester correct même si la liste de paliers a été modifiée.
 function estDisponibleAuPalier(d, palier) {
-  return d.rarete !== "Iconique" || palier === "Défaut";
+  return d.rarete !== "Iconique" || palier === paliers[0];
 }
 
 function changerOnglet(type) {
@@ -35,20 +38,30 @@ function changerOnglet(type) {
 }
 
 if (token) {
+  // Lien vers le panneau admin et bouton d'ajout : réservés aux admins du
+  // portail central (voir estAdminCentral() dans script.js).
+  if (estAdminCentral()) {
+    document.getElementById("lienAdmin").style.display = "";
+  } else {
+    document.getElementById("boutonAjouter").style.display = "none";
+  }
   chargerTout();
 }
 
 async function chargerTout() {
   try {
-    const [rCatalogue, rRenaissance, rPerso] = await Promise.all([
+    const [rCatalogue, rRenaissance, rPaliers, rPerso] = await Promise.all([
       chargerOuAmorcer("catalogue.json", CATALOGUE_INITIAL, token, "Amorçage du catalogue de droïdes"),
       chargerOuAmorcer("renaissance.json", RENAISSANCE_INITIALE, token, "Amorçage des paliers de renaissance"),
+      chargerOuAmorcer("paliers.json", PALIERS_INITIAUX, token, "Amorçage de la liste des paliers"),
       chargerBibliothequePerso()
     ]);
     catalogue = Array.isArray(rCatalogue.contenu) ? rCatalogue.contenu : [];
     shaCatalogue = rCatalogue.sha;
     renaissance = Array.isArray(rRenaissance.contenu) ? rRenaissance.contenu : [];
     shaRenaissance = rRenaissance.sha;
+    paliers = (Array.isArray(rPaliers.contenu) && rPaliers.contenu.length) ? rPaliers.contenu : PALIERS_INITIAUX;
+    palierActif = paliers[0];
   } catch (e) {
     document.getElementById("chargement").innerHTML =
       `<p style="color:var(--danger);text-align:center">${echapperHTML(e.message)}</p>`;
@@ -65,7 +78,7 @@ async function chargerTout() {
 function construireOngletsPalier() {
   const zone = document.getElementById("ongletsPalier");
   zone.innerHTML = "";
-  PALIERS_DROIDE.forEach((p) => {
+  paliers.forEach((p) => {
     const bouton = document.createElement("button");
     bouton.type = "button";
     bouton.className = "onglet-palier" + (p === palierActif ? " actif" : "");

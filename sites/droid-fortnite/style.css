@@ -154,10 +154,12 @@ a { color: var(--primaire); }
   margin-bottom: 0.75rem;
 }
 .app-header h1 { font-size: 1.15rem; margin: 0; display: flex; align-items: center; gap: 0.5rem; }
-.app-header .icone-deconnexion {
+.app-header .actions-entete { display: flex; align-items: center; gap: 0.3rem; }
+.app-header .icone-bouton, .app-header .icone-deconnexion {
   background: transparent; border: none; color: var(--texte-att); cursor: pointer;
-  padding: 0.5rem; border-radius: 10px; display: flex;
+  padding: 0.5rem; border-radius: 10px; display: flex; text-decoration: none;
 }
+.app-header .icone-bouton:hover { background: var(--fond); color: var(--primaire); }
 .app-header .icone-deconnexion:hover { background: var(--fond); color: var(--danger); }
 
 .onglets-type { display: flex; gap: 0.4rem; margin-bottom: 0.75rem; }
@@ -462,3 +464,36 @@ a { color: var(--primaire); }
   background: var(--fond); border: 1px dashed var(--bordure); border-radius: 10px;
   padding: 0.6rem 0.8rem; margin-bottom: 0.9rem; line-height: 1.4;
 }
+
+/* ===== Écran admin (admin.html) ===== */
+.bloc-carte {
+  background: var(--carte);
+  border-radius: var(--rayon);
+  border: 1px solid var(--bordure);
+  box-shadow: var(--ombre);
+  padding: 1.3rem 1.4rem;
+  margin-bottom: 1.3rem;
+}
+.bloc-carte h2 { margin: 0 0 0.3rem; font-size: 1.05rem; }
+.bloc-carte .sous-titre { margin: 0 0 1.1rem; color: var(--texte-att); font-size: 0.85rem; }
+
+.liste-simple { list-style: none; margin: 0 0 1.1rem; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.ligne-item {
+  display: flex; align-items: center; gap: 0.7rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--bordure); border-radius: 10px;
+  background: var(--fond);
+}
+.ligne-item .ligne-info { flex: 1; min-width: 0; }
+.ligne-item .ligne-titre { font-weight: 600; font-size: 0.9rem; }
+.ligne-item .ligne-sous { font-size: 0.78rem; color: var(--texte-att); }
+.ligne-item .ligne-actions { display: flex; gap: 0.3rem; flex-shrink: 0; }
+
+.btn-mini {
+  padding: 0.45rem 0.7rem; font-size: 0.8rem; border-radius: 8px;
+  border: 1px solid var(--bordure); background: var(--carte); color: var(--texte);
+  cursor: pointer; font-weight: 600;
+}
+.btn-mini:hover { border-color: var(--primaire); color: var(--primaire); }
+.btn-mini.danger { color: var(--danger); }
+.btn-mini.danger:hover { background: var(--danger); border-color: var(--danger); color: #fff; }

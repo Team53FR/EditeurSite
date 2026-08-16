@@ -256,6 +256,30 @@ function cheminBibliothequeCourante() {
   return `bibliotheques/${slugifierLogin(login)}.json`;
 }
 
+// ===== Admin (réutilise le rôle du portail central) =====
+// sites/droid-fortnite/* et le portail central partagent la même origine
+// GitHub Pages, donc le même localStorage : team53_role posé par
+// ouvrirSessionCentrale() (script.js racine) est directement lisible ici,
+// sans rien ajouter au relais. Pas de rôle propre à Droid Fortnite : « admin »
+// = admin du portail central. Si ce compte n'est jamais passé par le portail
+// sur cet appareil, team53_role est absent -> traité comme non-admin
+// (échec sûr, cohérent avec le reste de l'app qui n'a aucune vraie
+// autorisation côté serveur de toute façon).
+function estAdminCentral() {
+  return localStorage.getItem("team53_role") === "admin";
+}
+
+function exigerAdminDroidFortnite() {
+  const token = exigerConnexion();
+  if (!token) return null;
+  if (!estAdminCentral()) {
+    alert("Accès réservé aux administrateurs du portail.");
+    window.location.href = "suivi.html";
+    return null;
+  }
+  return token;
+}
+
 // ===== Écriture avec fusion, pour les fichiers PARTAGÉS (catalogue.json,
 // renaissance.json) =====
 // Contrairement à un fichier personnel (un seul compte l'écrit jamais, donc
@@ -276,6 +300,23 @@ async function sauvegarderAvecFusion(nomFichier, tableauLocal, sha, token, messa
     const idsLocaux = new Set(tableauLocal.map(x => x.id));
     const fusion = distant.filter(x => !idsLocaux.has(x.id)).concat(tableauLocal);
     return await ecrireFichierJSON(nomFichier, fusion, frais.sha, token, messageCommit);
+  }
+}
+
+// ===== Écriture simple (relire le sha, réécrire), pour un fichier partagé
+// mais admin-only comme paliers.json =====
+// Contrairement à catalogue.json/renaissance.json (modifiables par n'importe
+// quel compte, donc sujets à une vraie collision), paliers.json n'est édité
+// que par un admin, rarement, en général seul — un simple retry suffit, pas
+// besoin de la fusion (et ce tableau de chaînes n'a de toute façon pas
+// d'id sur lequel fusionner).
+async function sauvegarderAvecRetry(nomFichier, contenu, sha, token, messageCommit) {
+  try {
+    return await ecrireFichierJSON(nomFichier, contenu, sha, token, messageCommit);
+  } catch (e) {
+    if (!e.conflit) throw e;
+    const frais = await lireFichierJSON(nomFichier, token);
+    return await ecrireFichierJSON(nomFichier, contenu, frais.sha, token, messageCommit);
   }
 }
 
@@ -424,5 +465,7 @@ const RENAISSANCE_INITIALE = [
 
 // Paliers d'amélioration possibles pour un droïde possédé, du plus faible au
 // plus fort (confirmé par capture d'écran du jeu — au-delà de ce que le
-// tracker communautaire connaît encore, qui s'arrête à Beskar).
-const PALIERS_DROIDE = ["Défaut", "Or", "Diamant", "Arc-en-ciel", "Beskar", "Galactique", "Stellar"];
+// tracker communautaire connaît encore, qui s'arrête à Beskar). Donnée de
+// départ uniquement : la vraie liste vit dans DroidFortnite/paliers.json
+// (partagée, éditable depuis admin.html — ajout/suppression/réordonnancement).
+const PALIERS_INITIAUX = ["Défaut", "Or", "Diamant", "Arc-en-ciel", "Beskar", "Galactique", "Stellar"];

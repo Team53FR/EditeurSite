@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0891b2">
+<title>Gestion — Droid Fortnite</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <header class="app-header">
+    <div class="app-header-ligne">
+      <h1>⚙ Gestion</h1>
+      <div class="actions-entete">
+        <a href="suivi.html" class="icone-bouton" title="Retour">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+        </a>
+        <button class="icone-deconnexion" title="Se déconnecter" onclick="seDeconnecter()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div class="contenu">
+
+    <div class="bloc-carte">
+      <h2>Droïdes</h2>
+      <p class="sous-titre">Catalogue partagé — visible par tous les comptes du site.</p>
+      <ul class="liste-simple" id="listeDroides"></ul>
+
+      <h2 id="titreFormDroide" style="font-size:0.95rem">Ajouter un droïde</h2>
+      <div class="champ">
+        <label for="champNom">Nom</label>
+        <input type="text" id="champNom" placeholder="ex. Senate Hovercam">
+      </div>
+      <div class="champ">
+        <label for="champClasse">Classe</label>
+        <select id="champClasse">
+          <option value="Ouvrier">🔧 Ouvrier</option>
+          <option value="Astromec">📡 Astromec</option>
+          <option value="Combat">⚔️ Combat</option>
+        </select>
+      </div>
+      <div class="champ">
+        <label for="champRarete">Rareté</label>
+        <select id="champRarete">
+          <option value="Typique">Typique</option>
+          <option value="Rare">Rare</option>
+          <option value="Épique">Épique</option>
+          <option value="Légendaire">Légendaire</option>
+          <option value="Mythique">Mythique</option>
+          <option value="Iconique">Iconique</option>
+        </select>
+      </div>
+      <div style="display:flex; gap:0.7rem;">
+        <button class="btn btn-primaire" id="btnEnregistrerDroide" onclick="enregistrerDroideAdmin()">Ajouter</button>
+        <button class="btn btn-fantome" id="btnAnnulerDroide" style="display:none" onclick="annulerEditionDroide()">Annuler</button>
+      </div>
+      <p id="messageDroideAdmin" class="message"></p>
+    </div>
+
+    <div class="bloc-carte">
+      <h2>Paliers de variante</h2>
+      <p class="sous-titre">Ordre du plus faible au plus fort — détermine les onglets du Droidex. Un droïde de rareté Iconique n'existe qu'au premier palier de la liste.</p>
+      <ul class="liste-simple" id="listePaliers"></ul>
+
+      <div class="champ">
+        <label for="champNouveauPalier">Ajouter un palier (en fin de liste)</label>
+        <input type="text" id="champNouveauPalier" placeholder="ex. Nova" onkeydown="if(event.key==='Enter'){ajouterPalier();}">
+      </div>
+      <button class="btn btn-primaire" onclick="ajouterPalier()">Ajouter le palier</button>
+      <p id="messagePaliers" class="message"></p>
+    </div>
+
+  </div>
+
+  <script src="script.js"></script>
+  <script src="admin.js"></script>
+  <script src="retour-portail.js"></script>
+</body>
+</html>
