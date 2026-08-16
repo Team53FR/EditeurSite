@@ -213,16 +213,11 @@ function afficherDroidex() {
       `<div class="droide-entete">` +
         `<div class="droide-icone" id="icone-${d.id}" style="background:${d.image ? "" : couleurDroide(d.id)};color:${d.image ? "" : "#fff"}">${iconeClasse(d.classe)}</div>` +
         `<div class="droide-nom">${echapperHTML(d.nom)}</div>` +
-        `<button type="button" class="droide-modifier" title="Modifier">✎</button>` +
         `<span class="droide-case">✓</span>` +
       `</div>` +
       `<span class="badge-rarete ${classeRareteCss(d.rarete)}">${echapperHTML(d.rarete)}</span>`;
 
     carte.addEventListener("click", () => basculerPossession(d.id));
-    carte.querySelector(".droide-modifier").addEventListener("click", (e) => {
-      e.stopPropagation();
-      ouvrirModifierDroide(d.id);
-    });
 
     if (d.image) chargerImageDroide(carte.querySelector(`#icone-${CSS.escape(d.id)}`), d.image);
 
@@ -294,109 +289,6 @@ async function enregistrerDroide() {
     fermerAjoutDroide();
     afficherDroidex();
     afficherToast("Droïde ajouté.");
-  } catch (e) {
-    message.textContent = e.message;
-  }
-}
-
-// ===== Modifier un droïde (photo perso) =====
-let droideEnEdition = null;
-let dataUrlImageEnMemoireDroide = null;
-let imageSupprimeeDroide = false;
-
-function iconePlaceholderDroide() {
-  return `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>`;
-}
-
-async function ouvrirModifierDroide(id) {
-  const d = catalogue.find((x) => x.id === id);
-  if (!d) return;
-  droideEnEdition = id;
-  dataUrlImageEnMemoireDroide = null;
-  imageSupprimeeDroide = false;
-
-  document.getElementById("titreModifDroide").textContent = "Modifier « " + d.nom + " »";
-  document.getElementById("messageModifDroide").textContent = "";
-  const apercu = document.getElementById("apercuModifDroide");
-  const boutonRetirer = document.getElementById("boutonSupprimerImageDroide");
-  apercu.innerHTML = iconePlaceholderDroide();
-  boutonRetirer.style.display = d.image ? "block" : "none";
-  document.getElementById("voileModifDroide").classList.add("ouvert");
-
-  if (d.image) {
-    try {
-      let url = cacheImages.get(d.image);
-      if (!url) { url = await obtenirUrlImage(d.image, token); cacheImages.set(d.image, url); }
-      if (droideEnEdition === id) apercu.innerHTML = `<img src="${url}" alt="">`;
-    } catch (e) { /* reste sur le placeholder */ }
-  }
-}
-
-function fermerModifierDroide() {
-  document.getElementById("voileModifDroide").classList.remove("ouvert");
-  droideEnEdition = null;
-}
-
-function declencherChoixImageDroide(source) {
-  document.getElementById(source === "camera" ? "champImageCameraDroide" : "champImageGalerieDroide").click();
-}
-
-async function imageChoisieDroide(event) {
-  const fichier = event.target.files[0];
-  event.target.value = "";
-  if (!fichier) return;
-  try {
-    const dataUrl = await comprimerImage(fichier);
-    dataUrlImageEnMemoireDroide = dataUrl;
-    imageSupprimeeDroide = false;
-    document.getElementById("apercuModifDroide").innerHTML = `<img src="${dataUrl}" alt="">`;
-    document.getElementById("boutonSupprimerImageDroide").style.display = "block";
-  } catch (e) {
-    afficherToast("Impossible de charger cette image.", true);
-  }
-}
-
-function retirerImageDroide() {
-  dataUrlImageEnMemoireDroide = null;
-  imageSupprimeeDroide = true;
-  document.getElementById("apercuModifDroide").innerHTML = iconePlaceholderDroide();
-  document.getElementById("boutonSupprimerImageDroide").style.display = "none";
-}
-
-async function enregistrerModifDroide() {
-  const id = droideEnEdition;
-  const d = catalogue.find((x) => x.id === id);
-  const message = document.getElementById("messageModifDroide");
-  if (!d) return;
-
-  message.textContent = "Enregistrement...";
-  try {
-    let nouveauChemin = d.image || null;
-
-    if (dataUrlImageEnMemoireDroide) {
-      const chemin = `images/${id}.${extraireExtensionDataUrl(dataUrlImageEnMemoireDroide)}`;
-      await uploaderImageBase64(chemin, dataUrlImageEnMemoireDroide, token, `Photo du droïde ${d.nom}`);
-      if (d.image && d.image !== chemin) supprimerFichierGithub(d.image, token, "Remplacement de la photo").catch(() => {});
-      cacheImages.delete(chemin);
-      nouveauChemin = chemin;
-    } else if (imageSupprimeeDroide) {
-      if (d.image) supprimerFichierGithub(d.image, token, "Suppression de la photo").catch(() => {});
-      nouveauChemin = null;
-    }
-
-    const copie = catalogue.map((x) => {
-      if (x.id !== id) return x;
-      const maj = Object.assign({}, x);
-      if (nouveauChemin) maj.image = nouveauChemin;
-      else delete maj.image;
-      return maj;
-    });
-
-    shaCatalogue = await sauvegarderAvecFusion("catalogue.json", copie, shaCatalogue, token, `Modification du droïde ${d.nom}`);
-    catalogue = copie;
-    fermerModifierDroide();
-    afficherDroidex();
-    afficherToast("Droïde mis à jour.");
   } catch (e) {
     message.textContent = e.message;
   }

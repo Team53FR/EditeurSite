@@ -123,36 +123,6 @@
     </div>
   </div>
 
-  <!-- ===== Formulaire : modifier un droïde (photo notamment) ===== -->
-  <div class="voile" id="voileModifDroide" onclick="if(event.target===this)fermerModifierDroide()">
-    <div class="feuille">
-      <div class="feuille-entete">
-        <h2 id="titreModifDroide">Modifier</h2>
-        <button onclick="fermerModifierDroide()">✕</button>
-      </div>
-      <div class="feuille-corps">
-        <p class="note-source">Photo perso uniquement — je ne peux pas ajouter les visuels officiels du jeu (droits d'auteur Epic Games).</p>
-        <div class="zone-couverture">
-          <div class="apercu-couverture" id="apercuModifDroide">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
-          </div>
-          <div class="actions-couverture">
-            <button type="button" class="btn btn-secondaire" onclick="declencherChoixImageDroide('camera')">📷 Prendre une photo</button>
-            <button type="button" class="btn btn-secondaire" onclick="declencherChoixImageDroide('galerie')">🖼️ Choisir dans la galerie</button>
-            <button type="button" class="btn btn-fantome" id="boutonSupprimerImageDroide" onclick="retirerImageDroide()" style="display:none">Retirer la photo</button>
-          </div>
-        </div>
-        <input type="file" accept="image/*" capture="environment" id="champImageCameraDroide" style="display:none" onchange="imageChoisieDroide(event)">
-        <input type="file" accept="image/*" id="champImageGalerieDroide" style="display:none" onchange="imageChoisieDroide(event)">
-        <p id="messageModifDroide" class="message"></p>
-      </div>
-      <div class="feuille-pied">
-        <button class="btn btn-fantome" onclick="fermerModifierDroide()">Annuler</button>
-        <button class="btn btn-primaire" onclick="enregistrerModifDroide()">Enregistrer</button>
-      </div>
-    </div>
-  </div>
-
   <!-- ===== Formulaire : ajouter un palier de renaissance ===== -->
   <div class="voile" id="voileRenaissance" onclick="if(event.target===this)fermerAjoutRenaissance()">
     <div class="feuille">

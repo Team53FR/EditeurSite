@@ -188,7 +188,11 @@ async function obtenirUrlImage(chemin, token) {
   throw new Error(`Image "${chemin}" introuvable.`);
 }
 
-// Redimensionne côté client avant envoi (identique à sites/ma-bibliotheque/collection.js).
+// Redimensionne côté client avant envoi (identique à sites/ma-bibliotheque/collection.js),
+// en préservant la transparence si la source en a (ex. icône PNG détourée) :
+// le JPEG n'a pas de canal alpha, l'exporter systématiquement en JPEG
+// aplatirait tout fond transparent en noir. On ne détecte le format qu'une
+// fois l'image redimensionnée, sur les pixels réellement utilisés.
 // Partagé entre suivi.js (photo perso sur une carte) et admin.js (icône lors
 // de l'ajout/modification d'un droïde).
 function comprimerImage(fichier, maxDim = 700, quality = 0.82) {
@@ -207,8 +211,16 @@ function comprimerImage(fichier, maxDim = 700, quality = 0.82) {
         const canvas = document.createElement("canvas");
         canvas.width = width;
         canvas.height = height;
-        canvas.getContext("2d").drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL("image/jpeg", quality));
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+
+        let transparent = false;
+        const pixels = ctx.getImageData(0, 0, width, height).data;
+        for (let i = 3; i < pixels.length; i += 4) {
+          if (pixels[i] < 255) { transparent = true; break; }
+        }
+
+        resolve(transparent ? canvas.toDataURL("image/png") : canvas.toDataURL("image/jpeg", quality));
       };
       img.src = lecteur.result;
     };

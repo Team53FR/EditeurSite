@@ -230,7 +230,7 @@ plus autorisée à être redistribuée que si je les hébergeais moi-même — d
 pas utilisée.
 
 Chaque entrée du catalogue peut en revanche recevoir une **vraie photo perso**
-(bouton ✎ sur la carte, remplace le visuel généré), stockée dans
+(depuis `admin.html`, voir plus bas — remplace le visuel généré), stockée dans
 `DroidFortnite/images/<id>.<ext>`, avec le même mécanisme que les couvertures
 de livres de ma-bibliotheque (compression côté client, upload via l'API
 Contents de GitHub).
@@ -275,13 +275,18 @@ nécessaire). Le bouton flottant d'ajout et le lien ⚙ vers `admin.html` sont
 masqués pour les comptes non-admin dans `suivi.html`.
 
 Le formulaire d'ajout/modification d'un droïde dans `admin.html` permet aussi
-de fixer son **icône** (même mécanisme de photo perso que le bouton ✎ de
-`suivi.html`, toujours pas de visuel officiel du jeu) et la **couleur du
-contour de sa carte** (`<input type="color">`, stockée en `hex` dans le champ
-`couleur` de l'entrée catalogue, appliquée en style inline sur `.carte-droide`
-— l'emporte sur la couleur générée automatiquement par `couleurDroide()`).
-`comprimerImage()` (compression client avant upload) a été déplacée dans
-`script.js` pour être partagée entre `suivi.js` et `admin.js`.
+de fixer son **icône** (toujours pas de visuel officiel du jeu) et la
+**couleur du contour de sa carte** (`<input type="color">`, stockée en `hex`
+dans le champ `couleur` de l'entrée catalogue, appliquée en style inline sur
+`.carte-droide` — l'emporte sur la couleur générée automatiquement par
+`couleurDroide()`). L'édition de l'icône n'est **plus accessible depuis
+`suivi.html`** (le bouton ✎ sur la carte a été retiré) : elle passe
+uniquement par `admin.html` désormais. `comprimerImage()` (compression
+client avant upload, dans `script.js`, partagée entre `suivi.js` et
+`admin.js`) préserve la transparence de la source : elle exporte en PNG si
+l'image redimensionnée contient un pixel non totalement opaque, sinon en
+JPEG (plus léger) — un fond transparent (icône détourée) n'est donc plus
+aplati en noir comme avec un export JPEG systématique.
 
 ## App installable (PWA)
 

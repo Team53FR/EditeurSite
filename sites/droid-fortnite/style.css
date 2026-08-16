@@ -277,11 +277,6 @@ a { color: var(--primaire); }
 }
 .droide-icone img { width: 100%; height: 100%; object-fit: cover; }
 .droide-nom { flex: 1; min-width: 0; font-weight: 600; font-size: 0.9rem; line-height: 1.25; }
-.droide-modifier {
-  flex-shrink: 0; background: transparent; border: none; color: var(--texte-att);
-  padding: 0.2rem; border-radius: 6px; cursor: pointer; font-size: 0.9rem; line-height: 1;
-}
-.droide-modifier:hover { color: var(--primaire); background: var(--fond); }
 
 .badge-rarete {
   display: inline-flex; align-self: flex-start;
