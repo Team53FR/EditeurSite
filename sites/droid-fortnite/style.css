@@ -865,18 +865,9 @@ a { color: var(--primaire); }
 @media (min-width: 520px) { .elements-renaissance { grid-template-columns: repeat(auto-fill, minmax(86px, 1fr)); } }
 
 .element-renaissance { position: relative; }
-/* Un droïde déjà obtenu se distingue au premier coup d'œil : c'est toute
-   l'information utile ici — ce qu'il reste à aller chercher. */
-.element-renaissance:not(.possede) .carte-droide { filter: grayscale(.5); }
-.element-renaissance.possede::after {
-  content: "✓";
-  position: absolute; top: -5px; right: -5px; z-index: 4;
-  width: 17px; height: 17px;
-  display: flex; align-items: center; justify-content: center;
-  border-radius: 50%;
-  background: var(--succes); color: #fff;
-  font-size: 0.6rem; font-weight: 700;
-}
+/* Ici on montre CE QU'IL FAUT, pas ce qu'on possède : la case à cocher de la
+   carte n'aurait rien à dire, et prêterait à confusion. */
+.element-renaissance .dx-case { display: none; }
 .element-palier {
   display: block; margin-top: 0.2rem;
   font-size: 0.58rem; color: var(--texte-att);

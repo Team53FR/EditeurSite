@@ -480,8 +480,9 @@ précédente — on n'ajuste ensuite que ce qui diffère.
 de renaissance est du texte libre, saisi à la main
 (« CB (Défaut), Pit (Or), … »). `analyserElementsRenaissance()` le relit pour
 retrouver les droïdes du catalogue et afficher leurs cartes, avec la couleur du
-palier demandé et une pastille verte sur ceux déjà obtenus — l'information
-utile étant ce qu'il reste à aller chercher. Ce qui ne se laisse pas
+palier demandé. Les cartes y sont montrées telles quelles, sans marquer ce
+qu'on possède déjà : ce qui compte est **ce qu'il faut**, et la case à cocher
+d'une carte n'aurait donc rien à dire ici — elle est masquée. Ce qui ne se laisse pas
 reconnaître (nom absent du catalogue) reste affiché comme étiquette texte
 plutôt que de disparaître de la liste ; un palier omis ou inconnu retombe sur
 le premier.

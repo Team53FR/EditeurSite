@@ -606,12 +606,14 @@ function construireElementsRenaissance(texte) {
         echapperHTML(e.texte) + "</span>");
       return;
     }
-    const possede = perso.droidesPossedes.includes(clePossession(e.droide.id, e.palier));
     const couleur = (paliers.find((p) => p.nom === e.palier) || {}).couleur;
     const enveloppe = document.createElement("div");
-    enveloppe.className = "element-renaissance" + (possede ? " possede" : "");
-    enveloppe.title = e.droide.nom + " — " + e.palier + (possede ? " (possédé)" : " (à obtenir)");
-    enveloppe.appendChild(construireCarteDroide(e.droide, { possede, couleur, palier: e.palier }));
+    enveloppe.className = "element-renaissance";
+    enveloppe.title = e.droide.nom + " — " + e.palier;
+    // On montre CE QU'IL FAUT, pas ce qu'on possède déjà : « possede » ne sert
+    // donc qu'à afficher la carte en pleine lumière, et sa case à cocher est
+    // masquée (voir style.css) puisqu'elle n'aurait rien à dire ici.
+    enveloppe.appendChild(construireCarteDroide(e.droide, { possede: true, couleur, palier: e.palier }));
     enveloppe.insertAdjacentHTML("beforeend",
       '<span class="element-palier">' + echapperHTML(e.palier) + "</span>");
     zone.appendChild(enveloppe);
