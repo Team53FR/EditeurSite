@@ -582,6 +582,61 @@ function placerDansSlot(cle) {
 }
 
 // ===== Onglet Renaissance =====
+// Le champ « elements » d'une renaissance est du texte libre, saisi à la
+// main : « CB (Défaut), Pit (Défaut), DRK-1 Probe (Or) ». On le relit pour
+// retrouver les droïdes du catalogue et montrer leurs visuels plutôt qu'une
+// ligne de texte. Ce qui ne se laisse pas reconnaître reste affiché tel quel :
+// mieux vaut une étiquette texte qu'un élément disparu de la liste.
+function analyserElementsRenaissance(texte) {
+  return String(texte || "")
+    .split(",")
+    .map((morceau) => morceau.trim())
+    .filter(Boolean)
+    .map((morceau) => {
+      const m = morceau.match(/^(.*?)\s*\(([^()]*)\)\s*$/);
+      const nom = (m ? m[1] : morceau).trim();
+      const palier = m ? m[2].trim() : "";
+      const droide = catalogue.find((d) =>
+        d.nom.toLowerCase() === nom.toLowerCase());
+      // Palier absent ou inconnu : on retombe sur le premier, le seul dont on
+      // soit certain qu'il existe.
+      const palierConnu = paliers.some((p) => p.nom === palier);
+      const palierFinal = palierConnu ? palier : (paliers[0] && paliers[0].nom);
+      return { texte: morceau, droide, palier: palierFinal, palierPrecise: palierConnu };
+    });
+}
+
+function construireElementsRenaissance(texte) {
+  const zone = document.createElement("div");
+  zone.className = "elements-renaissance";
+  const elements = analyserElementsRenaissance(texte);
+
+  if (!elements.length) {
+    zone.innerHTML = '<p class="renaissance-elements">Aucun droïde indiqué.</p>';
+    return zone;
+  }
+
+  elements.forEach((e) => {
+    if (!e.droide) {
+      // Nom introuvable au catalogue : on garde le texte, visible et corrigeable.
+      zone.insertAdjacentHTML("beforeend",
+        '<span class="element-inconnu" title="Ce nom ne correspond à aucun droïde du catalogue">' +
+        echapperHTML(e.texte) + "</span>");
+      return;
+    }
+    const possede = perso.droidesPossedes.includes(clePossession(e.droide.id, e.palier));
+    const couleur = (paliers.find((p) => p.nom === e.palier) || {}).couleur;
+    const enveloppe = document.createElement("div");
+    enveloppe.className = "element-renaissance" + (possede ? " possede" : "");
+    enveloppe.title = e.droide.nom + " — " + e.palier + (possede ? " (possédé)" : " (à obtenir)");
+    enveloppe.appendChild(construireCarteDroide(e.droide, { possede, couleur, palier: e.palier }));
+    enveloppe.insertAdjacentHTML("beforeend",
+      '<span class="element-palier">' + echapperHTML(e.palier) + "</span>");
+    zone.appendChild(enveloppe);
+  });
+  return zone;
+}
+
 function afficherRenaissance() {
   const tries = renaissance.slice().sort((a, b) => a.niveau - b.niveau);
   const liste = document.getElementById("listeRenaissance");
@@ -599,9 +654,9 @@ function afficherRenaissance() {
           `<small>${formaterCredits(r.credits)} crédits</small>` +
         `</div>` +
         `<input type="checkbox" class="renaissance-case" ${atteint ? "checked" : ""}>` +
-      `</div>` +
-      `<p class="renaissance-elements">${echapperHTML(r.elements || "")}</p>`;
+      `</div>`;
 
+    item.appendChild(construireElementsRenaissance(r.elements));
     item.querySelector(".renaissance-case").addEventListener("change", () => basculerAtteint(r.id));
     liste.appendChild(item);
   });

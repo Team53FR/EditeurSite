@@ -453,6 +453,16 @@ dernière vérification ; le palier **Stellar**, confirmé en jeu, n'y figurait
 pas encore — un droïde à ce palier retombe donc sur la teinte générée si la
 source d'images externe est utilisée.
 
+**Renaissance : les droïdes requis en visuel.** Le champ `elements` d'un palier
+de renaissance est du texte libre, saisi à la main
+(« CB (Défaut), Pit (Or), … »). `analyserElementsRenaissance()` le relit pour
+retrouver les droïdes du catalogue et afficher leurs cartes, avec la couleur du
+palier demandé et une pastille verte sur ceux déjà obtenus — l'information
+utile étant ce qu'il reste à aller chercher. Ce qui ne se laisse pas
+reconnaître (nom absent du catalogue) reste affiché comme étiquette texte
+plutôt que de disparaître de la liste ; un palier omis ou inconnu retombe sur
+le premier.
+
 **Écriture des fichiers partagés — fusion, pas simple retry** : comme
 plusieurs comptes peuvent ajouter une entrée à `catalogue.json`/
 `renaissance.json`, `sauvegarderAvecFusion()` (dans `sites/droid-fortnite/script.js`)
