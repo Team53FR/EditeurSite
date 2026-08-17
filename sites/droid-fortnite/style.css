@@ -963,3 +963,7 @@ a { color: var(--primaire); }
   align-items: start;
 }
 .ligne-renaissance .r-niveau, .ligne-renaissance .r-credits { margin-top: 0.1rem; }
+
+/* Sélecteur de super renaissance : même aspect que les onglets de palier */
+#selecteurSuper .ajouter-super { border-style: dashed; opacity: .85; }
+#ongletsSuper { margin-bottom: 0.75rem; }

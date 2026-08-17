@@ -453,6 +453,29 @@ dernière vérification ; le palier **Stellar**, confirmé en jeu, n'y figurait
 pas encore — un droïde à ce palier retombe donc sur la teinte générée si la
 source d'images externe est utilisée.
 
+**Super renaissance : les mêmes paliers, d'autres droïdes.** À chaque super
+renaissance, les paliers de renaissance réclament des droïdes différents ;
+niveaux et crédits, eux, ne bougent pas. Le champ `elements` est donc une table
+indexée par numéro de super renaissance :
+
+```json
+{ "id": "niveau-1", "niveau": 1, "credits": 10000,
+  "elements": { "0": "CB (Défaut), Pit (Défaut)", "1": "Mouse (Or), Gonk (Diamant)" } }
+```
+
+L'ancienne forme — une simple chaîne — vaut pour la super renaissance 0 : les
+données déjà saisies restent valables sans migration
+(`elementsParSuper()` dans `script.js`). La progression personnelle suit la
+même dimension (`renaissanceAtteinte` devient une table par super
+renaissance) : atteindre le palier 5 avant une super renaissance ne doit pas
+le laisser coché après, puisqu'on recommence — là encore, un simple tableau
+est relu comme la progression de la super renaissance 0.
+
+Le sélecteur de super renaissance n'apparaît dans le suivi que si les données
+en décrivent plus d'une. Côté gestionnaire, il sert à choisir celle qu'on
+modifie, et un bouton ajoute la suivante en reprenant les droïdes de la
+précédente — on n'ajuste ensuite que ce qui diffère.
+
 **Renaissance : les droïdes requis en visuel.** Le champ `elements` d'un palier
 de renaissance est du texte libre, saisi à la main
 (« CB (Défaut), Pit (Or), … »). `analyserElementsRenaissance()` le relit pour

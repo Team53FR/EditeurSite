@@ -473,6 +473,60 @@ function appliquerContourPalier(el, couleur) {
     "linear-gradient(135deg, " + c.join(", ") + ")";
 }
 
+// ===== Super renaissance =====
+//
+// À chaque super renaissance, les paliers de renaissance demandent des
+// droïdes différents — les niveaux et leurs coûts, eux, ne bougent pas.
+// Le champ « elements » devient donc une table indexée par numéro de super
+// renaissance : { "0": "CB (Défaut), …", "1": "…" }.
+//
+// L'ancienne forme (une simple chaîne) vaut pour la super renaissance 0 :
+// les données déjà saisies restent valables sans migration.
+
+function elementsParSuper(r) {
+  const brut = r && r.elements;
+  if (typeof brut === "string") return { 0: brut };
+  if (brut && typeof brut === "object") {
+    const table = {};
+    Object.keys(brut).forEach((cle) => {
+      const n = Number(cle);
+      if (Number.isInteger(n) && n >= 0) table[n] = String(brut[cle] || "");
+    });
+    return table;
+  }
+  return {};
+}
+
+function elementsPourSuper(r, superN) {
+  return elementsParSuper(r)[Number(superN) || 0] || "";
+}
+
+// Combien de super renaissances la donnée décrit-elle ? Au moins une (la 0),
+// et une de plus dès qu'un palier en mentionne une plus haute.
+function nombreSuperRenaissances(liste) {
+  let maxi = 0;
+  (Array.isArray(liste) ? liste : []).forEach((r) => {
+    Object.keys(elementsParSuper(r)).forEach((n) => { maxi = Math.max(maxi, Number(n)); });
+  });
+  return maxi + 1;
+}
+
+// La progression suit la même dimension : atteindre le palier 5 avant une
+// super renaissance ne doit pas le laisser coché après, puisqu'on recommence.
+// Ancienne forme (un simple tableau) = progression de la super renaissance 0.
+function progressionParSuper(brut) {
+  if (Array.isArray(brut)) return { 0: brut.slice() };
+  if (brut && typeof brut === "object") {
+    const table = {};
+    Object.keys(brut).forEach((cle) => {
+      const n = Number(cle);
+      if (Number.isInteger(n) && n >= 0 && Array.isArray(brut[cle])) table[n] = brut[cle].slice();
+    });
+    return table;
+  }
+  return {};
+}
+
 // Le champ « elements » d'une renaissance est du texte libre, saisi à la
 // main : « CB (Défaut), Pit (Défaut), DRK-1 Probe (Or) ». On le relit pour
 // retrouver les droïdes du catalogue et montrer leurs visuels plutôt qu'une

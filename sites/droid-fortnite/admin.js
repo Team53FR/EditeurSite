@@ -11,6 +11,7 @@ let shaUnites = null;
 let shaRaretes = null;
 let renaissance = [];
 let shaRenaissance = null;
+let superEdite = 0;   // super renaissance dont on edite les droides
 let modeEditionId = null; // id du droïde en cours de modification, ou null (mode ajout)
 const cacheImages = new Map(); // chemin GitHub -> URL locale (blob:)
 
@@ -756,12 +757,12 @@ function serialiserElements(elements) {
   return elements.map((e) => e.texte).join(", ");
 }
 
-function construireChoixDroides(r, surChangement) {
+function construireChoixDroides(texteElements, surChangement) {
   const zone = document.createElement("div");
   zone.className = "choix-droides-requis";
 
   // État de travail : la liste des éléments de CE palier de renaissance.
-  let elements = analyserElementsRenaissance(r.elements).map((e) => ({
+  let elements = analyserElementsRenaissance(texteElements).map((e) => ({
     texte: e.droide ? e.droide.nom + " (" + e.palier + ")" : e.texte,
     droide: e.droide,
     palier: e.palier
@@ -852,9 +853,49 @@ function construireChoixDroides(r, surChangement) {
 // Partagés (renaissance.json), gérés ici et non plus depuis la page de suivi :
 // c'est du catalogue, pas de la progression personnelle.
 
+// Sélecteur de super renaissance : on édite les droïdes d'une super
+// renaissance à la fois, les niveaux et les coûts étant communs à toutes.
+function construireSelecteurSuper() {
+  const zone = document.getElementById("selecteurSuper");
+  if (!zone) return;
+  const nb = nombreSuperRenaissances(renaissance);
+  zone.innerHTML = "";
+
+  for (let n = 0; n < nb; n++) {
+    const bouton = document.createElement("button");
+    bouton.type = "button";
+    bouton.className = "onglet-palier" + (n === superEdite ? " actif" : "");
+    bouton.textContent = n === 0 ? "Avant super" : "Super " + n;
+    bouton.onclick = () => { superEdite = n; afficherRenaissanceAdmin(); };
+    zone.appendChild(bouton);
+  }
+
+  const ajouter = document.createElement("button");
+  ajouter.type = "button";
+  ajouter.className = "onglet-palier ajouter-super";
+  ajouter.textContent = "＋ Super " + nb;
+  ajouter.title = "Ajouter une super renaissance, en reprenant les droïdes de la précédente";
+  ajouter.onclick = () => ajouterSuperRenaissance(nb);
+  zone.appendChild(ajouter);
+}
+
+// La nouvelle super renaissance reprend les droïdes de la précédente : on
+// n'ajuste ensuite que ce qui diffère, plutôt que de tout ressaisir.
+function ajouterSuperRenaissance(n) {
+  if (!confirm("Ajouter la super renaissance " + n + " ?\n\n" +
+      "Elle reprend les droïdes de la précédente, à ajuster ensuite palier par palier.")) return;
+  const copie = renaissance.map((r) => {
+    const table = elementsParSuper(r);
+    return Object.assign({}, r, { elements: Object.assign({}, table, { [n]: table[n - 1] || "" }) });
+  });
+  superEdite = n;
+  sauvegarderRenaissanceAdmin(copie, "Ajout de la super renaissance " + n);
+}
+
 function afficherRenaissanceAdmin() {
   const zone = document.getElementById("listeRenaissanceAdmin");
   zone.innerHTML = "";
+  construireSelecteurSuper();
 
   const tries = renaissance.slice().sort((a, b) => a.niveau - b.niveau);
   if (!tries.length) {
@@ -881,14 +922,16 @@ function afficherRenaissanceAdmin() {
 
     // Les droïdes requis viennent de la zone à pastilles ; le reste des
     // champs de la ligne est lu tel quel.
-    let elementsCourants = r.elements || "";
+    let elementsCourants = elementsPourSuper(r, superEdite);
     const enregistrer = () => {
       const copie = renaissance.map((x) => (x.id === r.id ? {
         id: r.id,
         niveau: Number(ligne.querySelector(".r-niveau").value) || r.niveau,
         credits: composerValeur(ligne.querySelector(".r-credits").value,
                                 ligne.querySelector(".r-unite").value) ?? 0,
-        elements: elementsCourants
+        // Seuls les droïdes changent d'une super renaissance à l'autre :
+        // on ne réécrit que l'entrée de celle qu'on édite.
+        elements: Object.assign(elementsParSuper(x), { [superEdite]: elementsCourants })
       } : x));
       sauvegarderRenaissanceAdmin(copie, "Modification du palier de renaissance " + r.niveau);
     };
@@ -896,7 +939,8 @@ function afficherRenaissanceAdmin() {
       .forEach((c) => c.addEventListener("change", enregistrer));
 
     ligne.querySelector(".cellule-droides").appendChild(
-      construireChoixDroides(r, (texte) => { elementsCourants = texte; enregistrer(); }));
+      construireChoixDroides(elementsPourSuper(r, superEdite),
+        (texte) => { elementsCourants = texte; enregistrer(); }));
 
     ligne.querySelector(".btn-mini.danger").onclick = () => supprimerRenaissanceAdmin(r.id, r.niveau);
     zone.appendChild(ligne);

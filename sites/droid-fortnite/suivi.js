@@ -7,7 +7,8 @@ let paliers = PALIERS_INITIAUX; // remplacé par le contenu réel de paliers.jso
 // droidesPossedes : tableau de clés "<idDroide>::<palier>" — chaque droïde
 // peut être possédé indépendamment à CHAQUE palier (Défaut, Or, Diamant...),
 // comme dans le jeu (le compteur du jeu compte chaque palier séparément).
-let perso = { droidesPossedes: [], renaissanceAtteinte: [], rendement: null };
+let perso = { droidesPossedes: [], renaissanceAtteinte: {}, rendement: null };
+let superActif = 0;   // super renaissance affichée dans l'onglet Renaissance
 let shaPerso = null;
 
 let ongletActif = "droidex";
@@ -74,6 +75,7 @@ async function chargerTout() {
   document.getElementById("zoneDroidex").style.display = "";
   afficherDroidex();
   afficherRendement();
+  construireOngletsSuper();
   afficherRenaissance();
 }
 
@@ -123,13 +125,13 @@ async function chargerBibliothequePerso() {
     }
     perso = {
       droidesPossedes,
-      renaissanceAtteinte: (contenu && Array.isArray(contenu.renaissanceAtteinte)) ? contenu.renaissanceAtteinte : [],
+      renaissanceAtteinte: progressionParSuper(contenu && contenu.renaissanceAtteinte),
       rendement: (contenu && contenu.rendement) || null
     };
     shaPerso = sha;
   } catch (e) {
     if (e.status !== 404) throw e;
-    perso = { droidesPossedes: [], renaissanceAtteinte: [], rendement: null };
+    perso = { droidesPossedes: [], renaissanceAtteinte: {}, rendement: null };
     shaPerso = null;
   }
 }
@@ -617,13 +619,51 @@ function construireElementsRenaissance(texte) {
   return zone;
 }
 
+// Progression de la super renaissance affichée. Le tableau est créé à la
+// volée : une super renaissance jamais entamée n'a pas d'entrée en base.
+function atteintsSuper() {
+  if (!perso.renaissanceAtteinte || typeof perso.renaissanceAtteinte !== "object" ||
+      Array.isArray(perso.renaissanceAtteinte)) {
+    perso.renaissanceAtteinte = progressionParSuper(perso.renaissanceAtteinte);
+  }
+  if (!Array.isArray(perso.renaissanceAtteinte[superActif])) {
+    perso.renaissanceAtteinte[superActif] = [];
+  }
+  return perso.renaissanceAtteinte[superActif];
+}
+
+function construireOngletsSuper() {
+  const zone = document.getElementById("ongletsSuper");
+  const nb = nombreSuperRenaissances(renaissance);
+  // Une seule super renaissance décrite : le sélecteur n'apprend rien.
+  if (nb <= 1) { zone.innerHTML = ""; zone.style.display = "none"; return; }
+  zone.style.display = "";
+  zone.innerHTML = "";
+  for (let n = 0; n < nb; n++) {
+    const bouton = document.createElement("button");
+    bouton.type = "button";
+    bouton.className = "onglet-palier" + (n === superActif ? " actif" : "");
+    bouton.dataset.super = String(n);
+    bouton.textContent = n === 0 ? "Avant super" : "Super " + n;
+    bouton.addEventListener("click", () => changerSuperActif(n));
+    zone.appendChild(bouton);
+  }
+}
+
+function changerSuperActif(n) {
+  superActif = n;
+  document.querySelectorAll("#ongletsSuper .onglet-palier").forEach((b) =>
+    b.classList.toggle("actif", Number(b.dataset.super) === n));
+  afficherRenaissance();
+}
+
 function afficherRenaissance() {
   const tries = renaissance.slice().sort((a, b) => a.niveau - b.niveau);
   const liste = document.getElementById("listeRenaissance");
   liste.innerHTML = "";
 
   tries.forEach((r) => {
-    const atteint = perso.renaissanceAtteinte.includes(r.id);
+    const atteint = atteintsSuper().includes(r.id);
     const item = document.createElement("div");
     item.className = "item-renaissance" + (atteint ? " atteint" : "");
     item.innerHTML =
@@ -636,13 +676,13 @@ function afficherRenaissance() {
         `<input type="checkbox" class="renaissance-case" ${atteint ? "checked" : ""}>` +
       `</div>`;
 
-    item.appendChild(construireElementsRenaissance(r.elements));
+    item.appendChild(construireElementsRenaissance(elementsPourSuper(r, superActif)));
     item.querySelector(".renaissance-case").addEventListener("change", () => basculerAtteint(r.id));
     liste.appendChild(item);
   });
 
   const total = renaissance.length;
-  const atteints = perso.renaissanceAtteinte.length;
+  const atteints = atteintsSuper().length;
   const pct = total ? Math.round((atteints / total) * 100) : 0;
   document.getElementById("compteurRenaissance").innerHTML =
     `<b>${atteints} / ${total}</b>` +
@@ -650,9 +690,10 @@ function afficherRenaissance() {
 }
 
 function basculerAtteint(idRenaissance) {
-  const index = perso.renaissanceAtteinte.indexOf(idRenaissance);
-  if (index === -1) perso.renaissanceAtteinte.push(idRenaissance);
-  else perso.renaissanceAtteinte.splice(index, 1);
+  const liste = atteintsSuper();
+  const index = liste.indexOf(idRenaissance);
+  if (index === -1) liste.push(idRenaissance);
+  else liste.splice(index, 1);
   afficherRenaissance();
   marquerProgressionModifiee();
 }
