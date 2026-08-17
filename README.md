@@ -385,6 +385,14 @@ fond de page et rendait le nom illisible en thème clair.
 3. sinon la **teinte générée** à partir du nom (`couleurDroide()` dans
    `script.js`, un hash → teinte HSL) et l'icône de classe.
 
+Le chargement **réessaie** deux fois avant de renoncer : sur l'onglet « Tous »,
+une centaine de vignettes partent d'un coup et quelques requêtes échouent sous
+cette rafale, sans que le fichier soit en cause. Abandonner au premier échec
+laissait ces droïdes sur leur teinte générée jusqu'au rechargement complet de
+la page — des images « disparues » qui existaient pourtant. Les réessais sont
+espacés et légèrement décalés, et abandonnés si la carte a été remplacée
+entre-temps (changement d'onglet, filtre).
+
 `BASE_IMAGES_EXTERNES` est **vide par défaut, et c'est délibéré** : la
 renseigner ferait charger les visuels depuis un site tiers qui n'a rien
 demandé (son trafic, ses fichiers, des extractions du jeu). Le mécanisme et la

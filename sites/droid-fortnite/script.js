@@ -657,14 +657,32 @@ function ligneChiffresHtml(d, palier) {
 async function appliquerVisuelDroide(zone, d, palier) {
   if (!zone) return;
 
-  const poser = (url) => {
+  // Une centaine de vignettes se chargent d'un coup sur l'onglet « Tous » :
+  // sous cette rafale, quelques requêtes échouent sans que le fichier soit
+  // en cause. Abandonner au premier échec laissait ces droïdes sur leur
+  // teinte générée jusqu'au rechargement complet de la page — d'où des
+  // images « disparues » qui existaient pourtant bien. On réessaie donc,
+  // en espaçant, avant de renoncer.
+  // Nombre de REESSAIS après la tentative initiale : 2 réessais = 3 essais.
+  const REESSAIS_IMAGE = 2;
+
+  const poser = (url, reessaisRestants) => {
     const img = document.createElement("img");
     img.alt = "";
     img.loading = "lazy";
+    img.decoding = "async";
     img.referrerPolicy = "no-referrer";
-    // Une image absente ne doit pas laisser un cadre vide : on retire
-    // l'image et la teinte générée reprend sa place.
-    img.onerror = () => img.remove();
+    img.onerror = () => {
+      img.remove();
+      // La carte a pu être remplacée entre-temps (changement d'onglet,
+      // filtre) : inutile de réessayer dans un élément détaché.
+      if (reessaisRestants > 0 && zone.isConnected) {
+        // Délai croissant et légèrement aléatoire, pour ne pas relancer
+        // toutes les images manquantes au même instant.
+        const attente = (REESSAIS_IMAGE - reessaisRestants + 1) * 400 + Math.random() * 400;
+        setTimeout(() => poser(url, reessaisRestants - 1), attente);
+      }
+    };
     img.onload = () => { const v = zone.querySelector(".dx-vide"); if (v) v.style.display = "none"; };
     img.src = url;
     zone.appendChild(img);
@@ -677,7 +695,7 @@ async function appliquerVisuelDroide(zone, d, palier) {
         url = await obtenirUrlImage(d.image, token);
         cacheImages.set(d.image, url);
       }
-      poser(url);
+      poser(url, REESSAIS_IMAGE);
       return;
     } catch (e) {
       // On continue vers la source externe puis la teinte générée.
@@ -685,7 +703,7 @@ async function appliquerVisuelDroide(zone, d, palier) {
   }
 
   const externe = urlImageExterne(d.nom, palier);
-  if (externe) poser(externe);
+  if (externe) poser(externe, REESSAIS_IMAGE);
 }
 
 // ===== Session : une seule connexion pour tous les sites =====
