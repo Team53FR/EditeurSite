@@ -250,6 +250,57 @@ function couleurDroide(id) {
   return `hsl(${hash % 360}, 55%, 50%)`;
 }
 
+
+// Abrège un montant : 7200 -> « 7.2 k », 3e8 -> « 300 M ».
+// Partagé par le Droidex, le panneau admin et la liste des renaissances.
+function formaterCredits(n) {
+  const abreger = (valeur, unite) => (Math.round(valeur * 100) / 100) + " " + unite;
+  if (n >= 1e12) return abreger(n / 1e12, "T");
+  if (n >= 1e9) return abreger(n / 1e9, "Md");
+  if (n >= 1e6) return abreger(n / 1e6, "M");
+  if (n >= 1e3) return abreger(n / 1e3, "k");
+  return String(n);
+}
+
+// ===== Prix et rendement, palier par palier =====
+//
+// Le rendement d'un droïde monte à chaque amélioration : un même droïde a
+// donc autant de valeurs que de paliers. Les deux tables sont indexées par
+// NOM de palier, comme l'est déjà la possession (voir clePossession) — ce
+// qui les garde cohérentes si un palier est ajouté ou réordonné.
+//
+//   { id: "mouse", ..., prix: { "Défaut": 950, "Or": 4000 },
+//                       rendements: { "Défaut": 2, "Or": 4 } }
+//
+// Les valeurs sont conservées telles qu'elles ont été saisies : la plupart
+// sont des nombres, mais les droïdes Iconiques rapportent un pourcentage du
+// revenu total (« 15% »), que formaterRendement laisse passer tel quel.
+
+function valeurPalier(table, palier) {
+  if (!table || typeof table !== "object") return null;
+  const v = table[palier];
+  return (v === undefined || v === null || v === "") ? null : v;
+}
+
+// Formate un montant : nombre -> abrégé (k, M, Md), texte -> inchangé.
+function formaterValeurSaisie(v) {
+  if (v === null) return null;
+  const n = typeof v === "number" ? v : parseFloat(String(v).replace(",", "."));
+  const brut = String(v).trim();
+  // « 15% » ou toute autre notation libre : on n'y touche pas.
+  if (!isFinite(n) || /[^\d.,\s]/.test(brut)) return brut;
+  return formaterCredits(n);
+}
+
+function formaterPrix(d, palier) {
+  return formaterValeurSaisie(valeurPalier(d.prix, palier));
+}
+
+function formaterRendement(d, palier) {
+  const f = formaterValeurSaisie(valeurPalier(d.rendements, palier));
+  return f === null ? null : f + "/s";
+}
+
 // ===== Carte de droïde : visuel commun au Droidex et au panneau admin =====
 //
 // Reprend la présentation du tracker communautaire Droidex : vignette
@@ -324,13 +375,29 @@ function construireCarteDroide(d, options) {
       `<span class="dx-scan"></span>` +
       `<span class="dx-vide" style="--teinte:${couleurDroide(d.id)}">${iconeClasse(d.classe)}</span>` +
     `</div>` +
-    `<div class="dx-pied">` +
-      `<span class="dx-classe" title="${echapperTexte(d.classe)}">${iconeClasse(d.classe)}</span>` +
-      `<span class="badge-rarete ${classeRareteCss(d.rarete)}">${echapperTexte(d.rarete)}</span>` +
+    `<div class="dx-bas">` +
+      `<div class="dx-pied">` +
+        `<span class="dx-classe" title="${echapperTexte(d.classe)}">${iconeClasse(d.classe)}</span>` +
+        `<span class="badge-rarete ${classeRareteCss(d.rarete)}">${echapperTexte(d.rarete)}</span>` +
+      `</div>` +
+      ligneChiffresHtml(d, o.palier) +
     `</div>`;
 
   appliquerVisuelDroide(carte.querySelector(".dx-visuel"), d, o.palier);
   return carte;
+}
+
+// Prix et rendement du palier affiché, en pied de carte. La ligne
+// disparaît entièrement tant qu'aucune des deux valeurs n'est renseignée,
+// pour ne pas afficher des tirets sur tout un catalogue encore vide.
+function ligneChiffresHtml(d, palier) {
+  const prix = formaterPrix(d, palier);
+  const rendement = formaterRendement(d, palier);
+  if (prix === null && rendement === null) return "";
+  return `<div class="dx-chiffres">` +
+    `<span class="dx-prix">${prix === null ? "" : echapperTexte(prix)}</span>` +
+    `<span class="dx-rendement">${rendement === null ? "" : echapperTexte(rendement)}</span>` +
+  `</div>`;
 }
 
 // Choisit le visuel de la carte, dans l'ordre :

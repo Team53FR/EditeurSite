@@ -386,14 +386,61 @@ a { color: var(--primaire); }
 .carte-droide:hover .dx-scan { opacity: 1; animation: dx-balayage 1.5s linear infinite; }
 @keyframes dx-balayage { from { transform: translateY(0); } to { transform: translateY(100%); } }
 
-/* Pied : icône de classe et rareté, sur un dégradé qui détache le texte */
-.dx-pied {
+/* Bas de carte : classe et rareté, puis prix et rendement du palier
+   affiché. Le tout sur un dégradé qui détache le texte du visuel. */
+.dx-bas {
   position: absolute; bottom: 0; left: 0; right: 0; z-index: 3;
-  display: flex; align-items: center; gap: 3px;
-  padding: 10px 3px 3px;
-  background: linear-gradient(to top, rgba(0, 0, 0, .85), transparent);
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 14px 3px 3px;
+  background: linear-gradient(to top, rgba(0, 0, 0, .88) 55%, transparent);
 }
+.dx-pied { display: flex; align-items: center; gap: 3px; }
 .dx-classe { font-size: 0.7rem; line-height: 1; flex-shrink: 0; }
+
+/* Prix à gauche, rendement à droite — comme sur le tracker de référence. */
+.dx-chiffres {
+  display: flex; align-items: center; justify-content: space-between; gap: 4px;
+  font-size: 0.5rem; font-weight: 700; line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.dx-prix { color: #fcd34d; }
+.dx-rendement { color: #6ee7b7; }
+.dx-prix, .dx-rendement {
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  text-shadow: 0 0 2px rgba(0, 0, 0, .9);
+}
+
+/* Grille de saisie prix/rendement du formulaire admin */
+.grille-paliers { display: flex; flex-direction: column; gap: 0.4rem; }
+.ligne-palier {
+  display: grid;
+  grid-template-columns: minmax(5.5rem, 1fr) 1fr 1fr;
+  align-items: center; gap: 0.4rem;
+}
+.ligne-palier .nom-palier {
+  display: flex; align-items: center; gap: 0.35rem;
+  font-size: 0.82rem; font-weight: 600; color: var(--texte-att);
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ligne-palier .pastille-palier {
+  width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0;
+  border: 1px solid var(--bordure);
+}
+.ligne-palier input {
+  width: 100%; min-width: 0;
+  padding: 0.45rem 0.55rem;
+  border-radius: 8px; border: 1px solid var(--bordure);
+  background: var(--fond); color: var(--texte);
+  font-size: 0.85rem;
+}
+.ligne-palier input:focus { outline: 2px solid var(--primaire); outline-offset: 1px; }
+.entete-paliers {
+  display: grid;
+  grid-template-columns: minmax(5.5rem, 1fr) 1fr 1fr;
+  gap: 0.4rem;
+  font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em;
+  color: var(--texte-att);
+}
 
 /* Sur la carte sombre, la rareté garde ses couleurs de thème sombre dans
    les deux thèmes du site. */

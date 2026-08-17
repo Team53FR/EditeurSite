@@ -142,14 +142,6 @@ function echapperHTML(txt) {
   return d.innerHTML;
 }
 
-function formaterCredits(n) {
-  if (n >= 1e12) return (Math.round((n / 1e12) * 100) / 100) + " T";
-  if (n >= 1e9) return (Math.round((n / 1e9) * 100) / 100) + " Md";
-  if (n >= 1e6) return (Math.round((n / 1e6) * 100) / 100) + " M";
-  if (n >= 1e3) return Math.round(n / 1e3) + " k";
-  return String(n);
-}
-
 let toastTimeout = null;
 function afficherToast(texte, erreur) {
   const toast = document.getElementById("toast");

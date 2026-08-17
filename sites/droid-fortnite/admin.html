@@ -84,6 +84,12 @@
             <option value="Iconique">Iconique</option>
           </select>
         </div>
+        <div class="champ">
+          <label>Prix et rendement, palier par palier</label>
+          <p class="aide-champ" style="margin:-0.2rem 0 0.6rem">Le rendement d'un droïde monte à chaque amélioration : une valeur par palier. Laissez vide ce que vous ne connaissez pas encore.</p>
+          <div class="grille-paliers" id="grillePrixRendement"></div>
+        </div>
+
         <div style="display:flex; gap:0.7rem;">
           <button class="btn btn-primaire" id="btnEnregistrerDroide" onclick="enregistrerDroideAdmin()">Ajouter</button>
           <button class="btn btn-fantome" id="btnAnnulerDroide" style="display:none" onclick="annulerEtRevenir()">Annuler</button>

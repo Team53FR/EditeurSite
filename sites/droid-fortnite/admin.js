@@ -122,6 +122,49 @@ function afficherDroides() {
   });
 }
 
+// ===== Prix et rendement, une ligne par palier =====
+// La grille est reconstruite à chaque ouverture du formulaire : elle suit
+// donc automatiquement les paliers ajoutés, renommés ou réordonnés.
+function construireGrillePrixRendement(d) {
+  const grille = document.getElementById("grillePrixRendement");
+  grille.innerHTML =
+    '<div class="entete-paliers"><span>Palier</span><span>Prix</span><span>Rendement /s</span></div>';
+
+  paliers.forEach((p) => {
+    const ligne = document.createElement("div");
+    ligne.className = "ligne-palier";
+    const prix = d ? (valeurPalier(d.prix, p.nom) ?? "") : "";
+    const rendement = d ? (valeurPalier(d.rendements, p.nom) ?? "") : "";
+    ligne.innerHTML =
+      `<span class="nom-palier">` +
+        `<span class="pastille-palier" style="background:${p.couleur || "transparent"}"></span>` +
+        echapper(p.nom) +
+      `</span>` +
+      `<input type="text" inputmode="decimal" data-palier="${echapper(p.nom)}" data-champ="prix" ` +
+        `value="${echapper(prix)}" placeholder="—" aria-label="Prix au palier ${echapper(p.nom)}">` +
+      `<input type="text" inputmode="decimal" data-palier="${echapper(p.nom)}" data-champ="rendement" ` +
+        `value="${echapper(rendement)}" placeholder="—" aria-label="Rendement au palier ${echapper(p.nom)}">`;
+    grille.appendChild(ligne);
+  });
+}
+
+// Relit la grille : deux tables indexées par nom de palier, sans les cases
+// laissées vides (inutile d'alourdir le catalogue de valeurs nulles).
+function lireGrillePrixRendement() {
+  const prix = {};
+  const rendements = {};
+  document.querySelectorAll("#grillePrixRendement input").forEach((input) => {
+    const valeur = input.value.trim();
+    if (!valeur) return;
+    const cible = input.dataset.champ === "prix" ? prix : rendements;
+    // Un nombre est stocké comme nombre ; le reste (« 15% » des Iconiques)
+    // est conservé tel quel.
+    const n = parseFloat(valeur.replace(",", "."));
+    cible[input.dataset.palier] = (isFinite(n) && !/[^\d.,\s]/.test(valeur)) ? n : valeur;
+  });
+  return { prix, rendements };
+}
+
 async function editerDroide(id) {
   const d = catalogue.find((x) => x.id === id);
   if (!d) return;
@@ -132,6 +175,7 @@ async function editerDroide(id) {
   document.getElementById("champNom").value = d.nom;
   document.getElementById("champClasse").value = d.classe;
   document.getElementById("champRarete").value = d.rarete;
+  construireGrillePrixRendement(d);
   document.getElementById("titreFormDroide").textContent = "Modifier « " + d.nom + " »";
   document.getElementById("btnEnregistrerDroide").textContent = "Enregistrer les modifications";
   document.getElementById("btnAnnulerDroide").style.display = "";
@@ -160,6 +204,7 @@ function annulerEditionDroide() {
   document.getElementById("champNom").value = "";
   document.getElementById("champClasse").value = "Ouvrier";
   document.getElementById("champRarete").value = "Typique";
+  construireGrillePrixRendement(null);
   document.getElementById("apercuDroideAdmin").innerHTML = iconePlaceholderDroideAdmin();
   document.getElementById("boutonSupprimerImageAdmin").style.display = "none";
   document.getElementById("titreFormDroide").textContent = "Ajouter un droïde";
@@ -207,6 +252,9 @@ async function enregistrerDroideAdmin() {
 
     const entree = { id, nom, classe, rarete };
     if (cheminImage) entree.image = cheminImage;
+    const { prix, rendements } = lireGrillePrixRendement();
+    if (Object.keys(prix).length) entree.prix = prix;
+    if (Object.keys(rendements).length) entree.rendements = rendements;
 
     const copie = modeEditionId
       ? catalogue.map((x) => x.id === modeEditionId ? entree : x)
