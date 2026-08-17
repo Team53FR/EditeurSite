@@ -9,7 +9,7 @@ let paliers = PALIERS_INITIAUX; // remplacé par le contenu réel de paliers.jso
 // droidesPossedes : tableau de clés "<idDroide>::<palier>" — chaque droïde
 // peut être possédé indépendamment à CHAQUE palier (Défaut, Or, Diamant...),
 // comme dans le jeu (le compteur du jeu compte chaque palier séparément).
-let perso = { droidesPossedes: [], renaissanceAtteinte: [] };
+let perso = { droidesPossedes: [], renaissanceAtteinte: [], rendement: null };
 let shaPerso = null;
 
 let ongletActif = "droidex";
@@ -34,8 +34,14 @@ function changerOnglet(type) {
   document.querySelectorAll(".onglet-type").forEach((b) => b.classList.toggle("actif", b.dataset.type === type));
   document.getElementById("zoneDroidexFiltres").style.display = type === "droidex" ? "" : "none";
   document.getElementById("zoneDroidex").style.display = type === "droidex" ? "" : "none";
+  document.getElementById("zoneRendement").style.display = type === "rendement" ? "" : "none";
   document.getElementById("zoneRenaissance").style.display = type === "renaissance" ? "" : "none";
+  // Le bouton flottant n'a rien à ajouter dans l'escouade : les emplacements
+  // se règlent section par section, avec les boutons − / +.
+  document.getElementById("boutonAjouter").style.display =
+    (type === "rendement" || !estAdminCentral()) ? "none" : "";
   document.getElementById("boutonAjouter").title = type === "droidex" ? "Ajouter un droïde" : "Ajouter un palier";
+  if (type === "rendement") afficherRendement();
 }
 
 if (token) {
@@ -74,6 +80,7 @@ async function chargerTout() {
   document.getElementById("chargement").style.display = "none";
   document.getElementById("zoneDroidex").style.display = "";
   afficherDroidex();
+  afficherRendement();
   afficherRenaissance();
 }
 
@@ -110,12 +117,13 @@ async function chargerBibliothequePerso() {
     }
     perso = {
       droidesPossedes,
-      renaissanceAtteinte: (contenu && Array.isArray(contenu.renaissanceAtteinte)) ? contenu.renaissanceAtteinte : []
+      renaissanceAtteinte: (contenu && Array.isArray(contenu.renaissanceAtteinte)) ? contenu.renaissanceAtteinte : [],
+      rendement: (contenu && contenu.rendement) || null
     };
     shaPerso = sha;
   } catch (e) {
     if (e.status !== 404) throw e;
-    perso = { droidesPossedes: [], renaissanceAtteinte: [] };
+    perso = { droidesPossedes: [], renaissanceAtteinte: [], rendement: null };
     shaPerso = null;
   }
 }
@@ -248,6 +256,289 @@ async function enregistrerDroide() {
   } catch (e) {
     message.textContent = e.message;
   }
+}
+
+// ===== Onglet Rendement : l'escouade =====
+//
+// Trois sections, une par classe, chacune avec un nombre d'emplacements qui
+// grandit à mesure qu'on en débloque dans le jeu. Un emplacement contient
+// une clé « <idDroide>::<palier> » — la même forme que la possession, car le
+// rendement dépend du palier autant que du droïde.
+//
+// Tout est PERSONNEL (bibliotheques/<login>.json) : le nombre d'emplacements
+// est une progression, propre à chaque compte, et chacun peut donc l'ajuster
+// sans passer par un administrateur.
+
+const CLASSES_ESCOUADE = ["Ouvrier", "Astromec", "Combat"];
+const SLOTS_PAR_DEFAUT = 3;
+const SLOTS_MAX = 30;
+
+// Section et index de l'emplacement en cours de remplissage.
+let slotEnCours = null;
+
+function escouade() {
+  if (!perso.rendement || typeof perso.rendement !== "object") {
+    perso.rendement = { slots: {}, places: {} };
+  }
+  const r = perso.rendement;
+  if (!r.slots || typeof r.slots !== "object") r.slots = {};
+  if (!r.places || typeof r.places !== "object") r.places = {};
+  CLASSES_ESCOUADE.forEach((c) => {
+    if (typeof r.slots[c] !== "number" || r.slots[c] < 0) r.slots[c] = SLOTS_PAR_DEFAUT;
+    if (!Array.isArray(r.places[c])) r.places[c] = [];
+    // Le tableau des places suit toujours le nombre d'emplacements.
+    r.places[c].length = r.slots[c];
+    for (let i = 0; i < r.places[c].length; i++) {
+      if (r.places[c][i] === undefined) r.places[c][i] = null;
+    }
+  });
+  return r;
+}
+
+// « mouse::Or » -> { id: "mouse", palier: "Or" }. Le nom d'un palier peut
+// contenir des tirets ou des espaces, jamais « :: » : on coupe au premier.
+function decouperCle(cle) {
+  if (typeof cle !== "string") return null;
+  const i = cle.indexOf("::");
+  if (i === -1) return null;
+  return { id: cle.slice(0, i), palier: cle.slice(i + 2) };
+}
+
+function droideDeCle(cle) {
+  const d = decouperCle(cle);
+  if (!d) return null;
+  const droide = catalogue.find((x) => x.id === d.id);
+  return droide ? { droide, palier: d.palier } : null;
+}
+
+// Somme des rendements placés. Les droïdes Iconiques rapportent un
+// pourcentage du revenu total (« 15% ») et non des crédits par seconde :
+// impossible de les additionner aux autres, on les compte à part plutôt que
+// de les ignorer en silence ou d'inventer une formule.
+function totalEscouade(cles) {
+  let credits = 0;
+  let pourcentage = 0;
+  let inconnus = 0;
+  cles.forEach((cle) => {
+    const p = droideDeCle(cle);
+    if (!p) return;
+    const brut = valeurPalier(p.droide.rendements, p.palier);
+    if (brut === null) { inconnus++; return; }
+    const texte = String(brut).trim();
+    const pc = texte.match(/^([\d.,]+)\s*%$/);
+    if (pc) { pourcentage += parseFloat(pc[1].replace(",", ".")) || 0; return; }
+    const n = parseFloat(texte.replace(",", "."));
+    if (isFinite(n)) credits += n; else inconnus++;
+  });
+  return { credits, pourcentage, inconnus };
+}
+
+function texteTotal(t) {
+  const morceaux = [];
+  morceaux.push("<b>" + formaterCredits(t.credits) + "/s</b>");
+  if (t.pourcentage) {
+    morceaux.push('<span class="total-bonus">+ ' +
+      (Math.round(t.pourcentage * 100) / 100) + " % du revenu total</span>");
+  }
+  if (t.inconnus) {
+    morceaux.push('<span class="total-inconnu">' + t.inconnus +
+      " sans rendement renseigné</span>");
+  }
+  return morceaux.join(" ");
+}
+
+function afficherRendement() {
+  const r = escouade();
+  const zone = document.getElementById("sectionsRendement");
+  zone.innerHTML = "";
+
+  CLASSES_ESCOUADE.forEach((classe) => {
+    const places = r.places[classe];
+    const total = totalEscouade(places.filter(Boolean));
+
+    const section = document.createElement("section");
+    section.className = "section-escouade";
+    section.innerHTML =
+      '<div class="entete-escouade">' +
+        '<h3>' + iconeClasse(classe) + " " + echapperHTML(classe) + "</h3>" +
+        '<span class="total-section">' + texteTotal(total) + "</span>" +
+        '<div class="reglage-slots">' +
+          '<button type="button" class="btn-slot" data-classe="' + echapperHTML(classe) + '" data-delta="-1"' +
+            (r.slots[classe] <= 0 ? " disabled" : "") + ' aria-label="Retirer un emplacement">−</button>' +
+          '<span class="nb-slots">' + places.filter(Boolean).length + " / " + r.slots[classe] + "</span>" +
+          '<button type="button" class="btn-slot" data-classe="' + echapperHTML(classe) + '" data-delta="1"' +
+            (r.slots[classe] >= SLOTS_MAX ? " disabled" : "") + ' aria-label="Ajouter un emplacement">+</button>' +
+        "</div>" +
+      "</div>" +
+      '<div class="grille-slots"></div>';
+
+    const grille = section.querySelector(".grille-slots");
+    places.forEach((cle, index) => {
+      grille.appendChild(construireSlot(classe, index, cle));
+    });
+    if (!places.length) {
+      const vide = document.createElement("p");
+      vide.className = "aucun-slot";
+      vide.textContent = "Aucun emplacement — utilise + pour en ajouter.";
+      section.appendChild(vide);
+    }
+
+    section.querySelectorAll(".btn-slot").forEach((b) => {
+      b.onclick = () => changerNombreSlots(b.dataset.classe, Number(b.dataset.delta));
+    });
+    zone.appendChild(section);
+  });
+
+  const global = totalEscouade(
+    CLASSES_ESCOUADE.flatMap((c) => r.places[c]).filter(Boolean)
+  );
+  const nbPlaces = CLASSES_ESCOUADE.reduce((n, c) => n + r.places[c].filter(Boolean).length, 0);
+  const nbSlots = CLASSES_ESCOUADE.reduce((n, c) => n + r.slots[c], 0);
+  document.getElementById("compteurRendement").innerHTML =
+    "Rendement total : " + texteTotal(global) +
+    '<span class="compteur-detail">' + nbPlaces + " / " + nbSlots + " emplacements occupés</span>";
+}
+
+function construireSlot(classe, index, cle) {
+  const place = cle ? droideDeCle(cle) : null;
+
+  const slot = document.createElement("div");
+  slot.className = "slot" + (place ? " rempli" : " vide");
+  slot.setAttribute("role", "button");
+  slot.tabIndex = 0;
+
+  if (!place) {
+    slot.innerHTML = '<span class="slot-plus">+</span><span class="slot-libelle">Vide</span>';
+    slot.title = "Placer un droïde";
+    slot.onclick = () => ouvrirChoixSlot(classe, index);
+    slot.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); slot.onclick(); } };
+    return slot;
+  }
+
+  const rendement = formaterRendement(place.droide, place.palier);
+  const couleur = (paliers.find((p) => p.nom === place.palier) || {}).couleur;
+  const carte = construireCarteDroide(place.droide, {
+    possede: true, palier: place.palier, couleur
+  });
+  slot.appendChild(carte);
+  slot.insertAdjacentHTML("beforeend",
+    '<div class="slot-pied">' +
+      '<span class="slot-palier">' + echapperHTML(place.palier) + "</span>" +
+      '<span class="slot-rendement">' + (rendement === null ? "—" : echapperHTML(rendement)) + "</span>" +
+    "</div>" +
+    '<button type="button" class="slot-retirer" title="Retirer">✕</button>');
+
+  slot.querySelector(".slot-retirer").onclick = (e) => {
+    e.stopPropagation();
+    viderSlot(classe, index);
+  };
+  slot.onclick = () => ouvrirChoixSlot(classe, index);
+  slot.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); slot.onclick(); } };
+  return slot;
+}
+
+function changerNombreSlots(classe, delta) {
+  const r = escouade();
+  const cible = Math.min(SLOTS_MAX, Math.max(0, r.slots[classe] + delta));
+  // Réduire le nombre d'emplacements perdrait le droïde du dernier : on
+  // prévient plutôt que de le retirer en silence.
+  if (cible < r.slots[classe]) {
+    const occupant = droideDeCle(r.places[classe][cible]);
+    if (occupant && !confirm("Le dernier emplacement contient « " + occupant.droide.nom +
+        " ». Le retirer quand même ?")) return;
+  }
+  r.slots[classe] = cible;
+  escouade();               // recale le tableau des places
+  afficherRendement();
+  sauvegarderPerso();
+}
+
+function viderSlot(classe, index) {
+  const r = escouade();
+  r.places[classe][index] = null;
+  afficherRendement();
+  sauvegarderPerso();
+}
+
+// ----- Choix du droïde à placer -----
+
+function ouvrirChoixSlot(classe, index) {
+  slotEnCours = { classe, index };
+  document.getElementById("titreChoixSlot").textContent = "Emplacement " + (index + 1) + " — " + classe;
+  document.getElementById("rechercheSlot").value = "";
+  document.getElementById("slotSeulementPossedes").checked = true;
+  afficherChoixSlot();
+  document.getElementById("voileSlot").classList.add("ouvert");
+}
+
+function fermerChoixSlot() {
+  document.getElementById("voileSlot").classList.remove("ouvert");
+  slotEnCours = null;
+}
+
+// Une ligne par combinaison droïde + palier réellement proposable : c'est le
+// couple qui détermine le rendement, pas le droïde seul.
+function combinaisonsProposables(classe, seulementPossedes) {
+  const lignes = [];
+  catalogue
+    .filter((d) => d.classe === classe)
+    .forEach((d) => {
+      paliers.forEach((p) => {
+        if (!estDisponibleAuPalier(d, p.nom)) return;
+        const cle = clePossession(d.id, p.nom);
+        const possede = perso.droidesPossedes.includes(cle);
+        if (seulementPossedes && !possede) return;
+        lignes.push({ droide: d, palier: p.nom, couleur: p.couleur, possede, cle });
+      });
+    });
+  // Le plus rentable d'abord : c'est ce qu'on cherche à placer.
+  lignes.sort((a, b) => {
+    const ra = totalEscouade([a.cle]).credits;
+    const rb = totalEscouade([b.cle]).credits;
+    if (rb !== ra) return rb - ra;
+    return a.droide.nom.localeCompare(b.droide.nom);
+  });
+  return lignes;
+}
+
+function afficherChoixSlot() {
+  if (!slotEnCours) return;
+  const recherche = (document.getElementById("rechercheSlot").value || "").trim().toLowerCase();
+  const seulement = document.getElementById("slotSeulementPossedes").checked;
+  const lignes = combinaisonsProposables(slotEnCours.classe, seulement)
+    .filter((l) => !recherche || l.droide.nom.toLowerCase().includes(recherche));
+
+  const liste = document.getElementById("listeChoixSlot");
+  document.getElementById("videChoixSlot").style.display = lignes.length ? "none" : "";
+  liste.innerHTML = "";
+
+  lignes.forEach((l) => {
+    const rendement = formaterRendement(l.droide, l.palier);
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = "choix-droide";
+    item.innerHTML =
+      '<span class="choix-pastille" style="background:' + (l.couleur || "transparent") + '"></span>' +
+      '<span class="choix-nom">' + echapperHTML(l.droide.nom) +
+        '<small>' + echapperHTML(l.palier) + (l.possede ? " · possédé" : "") + "</small></span>" +
+      '<span class="badge-rarete ' + classeRareteCss(l.droide.rarete) + '">' + echapperHTML(l.droide.rarete) + "</span>" +
+      '<span class="choix-rendement">' + (rendement === null ? "—" : echapperHTML(rendement)) + "</span>";
+    item.onclick = () => placerDansSlot(l.cle);
+    liste.appendChild(item);
+  });
+}
+
+function placerDansSlot(cle) {
+  if (!slotEnCours) return;
+  const r = escouade();
+  // Un même droïde-palier ne peut occuper deux emplacements à la fois.
+  CLASSES_ESCOUADE.forEach((c) => {
+    r.places[c] = r.places[c].map((x) => (x === cle ? null : x));
+  });
+  r.places[slotEnCours.classe][slotEnCours.index] = cle;
+  fermerChoixSlot();
+  afficherRendement();
+  sauvegarderPerso();
 }
 
 // ===== Onglet Renaissance =====

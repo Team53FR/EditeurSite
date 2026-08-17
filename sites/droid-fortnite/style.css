@@ -669,3 +669,109 @@ a { color: var(--primaire); }
 .btn-mini:hover { border-color: var(--primaire); color: var(--primaire); }
 .btn-mini.danger { color: var(--danger); }
 .btn-mini.danger:hover { background: var(--danger); border-color: var(--danger); color: #fff; }
+
+/* ===== Onglet Rendement : l'escouade ===== */
+.compteur-global .compteur-detail {
+  display: block; width: 100%;
+  font-size: 0.78rem; color: var(--texte-att); margin-top: 0.2rem;
+}
+.total-bonus { color: var(--succes); font-weight: 600; }
+.total-inconnu { color: var(--texte-att); font-size: 0.82em; }
+
+.section-escouade { margin-bottom: 1.4rem; }
+/* Le titre et le réglage des emplacements sur une ligne, le total sur la
+   suivante : à trois de front, le total se tassait en colonne illisible
+   dès que la fenêtre se rétrécissait. */
+.entete-escouade {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem 0.5rem;
+  margin-bottom: 0.6rem;
+}
+.entete-escouade h3 {
+  flex: 1; min-width: 0; margin: 0;
+  font-size: 0.95rem; letter-spacing: 0.04em; text-transform: uppercase;
+  font-family: var(--police-titre);
+}
+.total-section {
+  order: 3; flex-basis: 100%;
+  font-size: 0.85rem; color: var(--texte-att); line-height: 1.5;
+}
+.total-section b { color: var(--secondaire); font-size: 0.95rem; }
+
+/* Réglage du nombre d'emplacements : il grandit avec la progression en jeu */
+.reglage-slots { display: flex; align-items: center; gap: 0.4rem; flex-shrink: 0; }
+.btn-slot {
+  width: 30px; height: 30px; flex-shrink: 0;
+  border: 1px solid var(--bordure); border-radius: 8px;
+  background: var(--carte); color: var(--texte);
+  font-size: 1.05rem; line-height: 1; cursor: pointer;
+}
+.btn-slot:hover:not(:disabled) { border-color: var(--primaire); color: var(--primaire); }
+.btn-slot:disabled { opacity: 0.4; cursor: default; }
+.nb-slots {
+  min-width: 3.5em; text-align: center;
+  font-size: 0.82rem; color: var(--texte-att); font-variant-numeric: tabular-nums;
+}
+
+.grille-slots {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 0.5rem;
+}
+@media (min-width: 520px) { .grille-slots { grid-template-columns: repeat(auto-fill, minmax(108px, 1fr)); } }
+
+.slot { position: relative; }
+.slot.vide {
+  aspect-ratio: 5 / 7;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 0.2rem;
+  border: 2px dashed var(--bordure); border-radius: 8px;
+  color: var(--texte-att); cursor: pointer;
+  transition: border-color .15s, color .15s;
+}
+.slot.vide:hover, .slot.vide:focus-visible {
+  border-color: var(--primaire); color: var(--primaire); outline: none;
+}
+.slot-plus { font-size: 1.5rem; line-height: 1; }
+.slot-libelle { font-size: 0.7rem; }
+
+/* Emplacement occupé : la carte du Droidex, surmontée du palier et du
+   rendement effectif de ce palier. */
+.slot.rempli .carte-droide { cursor: pointer; }
+.slot-pied {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.3rem;
+  margin-top: 0.25rem; font-size: 0.62rem;
+}
+.slot-palier { color: var(--texte-att); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.slot-rendement { color: var(--succes); font-weight: 700; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.slot-retirer {
+  position: absolute; top: -6px; right: -6px; z-index: 5;
+  width: 20px; height: 20px; padding: 0;
+  border: 1px solid var(--bordure); border-radius: 50%;
+  background: var(--carte); color: var(--texte-att);
+  font-size: 0.62rem; line-height: 1; cursor: pointer;
+}
+.slot-retirer:hover { background: var(--danger); border-color: var(--danger); color: #fff; }
+.aucun-slot { font-size: 0.82rem; color: var(--texte-att); margin: 0; }
+
+/* ----- Feuille de choix d'un droïde ----- */
+.ligne-case {
+  display: flex; align-items: center; gap: 0.5rem;
+  font-size: 0.85rem; color: var(--texte-att); margin: 0.6rem 0 0.9rem;
+  cursor: pointer;
+}
+.liste-choix { display: flex; flex-direction: column; gap: 0.4rem; }
+.choix-droide {
+  display: flex; align-items: center; gap: 0.55rem; width: 100%;
+  padding: 0.6rem 0.7rem; text-align: left;
+  border: 1px solid var(--bordure); border-radius: 10px;
+  background: var(--carte); color: var(--texte); cursor: pointer;
+}
+.choix-droide:hover { border-color: var(--primaire); }
+.choix-pastille { width: 8px; height: 34px; border-radius: 3px; flex-shrink: 0; }
+.choix-nom { flex: 1; min-width: 0; display: flex; flex-direction: column; font-size: 0.88rem; font-weight: 600; }
+.choix-nom small { font-weight: 400; font-size: 0.72rem; color: var(--texte-att); }
+.choix-rendement {
+  flex-shrink: 0; font-size: 0.8rem; font-weight: 700; color: var(--succes);
+  font-variant-numeric: tabular-nums;
+}
+.choix-droide .badge-rarete { flex-shrink: 0; }

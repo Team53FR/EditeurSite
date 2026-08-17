@@ -28,6 +28,7 @@
 
     <div class="onglets-type" role="tablist">
       <button type="button" class="onglet-type actif" data-type="droidex" onclick="changerOnglet('droidex')">🤖 Droidex</button>
+      <button type="button" class="onglet-type" data-type="rendement" onclick="changerOnglet('rendement')">⚡ Rendement</button>
       <button type="button" class="onglet-type" data-type="renaissance" onclick="changerOnglet('renaissance')">🚀 Renaissance</button>
     </div>
 
@@ -76,6 +77,12 @@
       </div>
     </div>
 
+    <div id="zoneRendement" style="display:none">
+      <p class="note-source">Place tes droïdes dans les emplacements de ton escouade pour connaître le rendement total. Ajoute des emplacements à mesure que tu en débloques dans le jeu.</p>
+      <div class="compteur-global" id="compteurRendement"></div>
+      <div id="sectionsRendement"></div>
+    </div>
+
     <div id="zoneRenaissance" style="display:none">
       <p class="note-source">Paliers de renaissance issus d'un tracker communautaire — la liste peut être incomplète (le jeu évolue). Ajoute les paliers manquants toi-même.</p>
       <div class="compteur-global" id="compteurRenaissance"></div>
@@ -86,6 +93,32 @@
   <button class="fab" id="boutonAjouter" title="Ajouter" onclick="ouvrirAjout()">
     <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
   </button>
+
+  <!-- ===== Choix d'un droïde pour un emplacement ===== -->
+  <div class="voile" id="voileSlot" onclick="if(event.target===this)fermerChoixSlot()">
+    <div class="feuille">
+      <div class="feuille-entete">
+        <h2 id="titreChoixSlot">Choisir un droïde</h2>
+        <button onclick="fermerChoixSlot()">✕</button>
+      </div>
+      <div class="feuille-corps">
+        <div class="recherche">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" id="rechercheSlot" placeholder="Rechercher un droïde..." oninput="afficherChoixSlot()">
+        </div>
+        <label class="ligne-case">
+          <input type="checkbox" id="slotSeulementPossedes" checked onchange="afficherChoixSlot()">
+          Seulement les droïdes que je possède
+        </label>
+        <div class="liste-choix" id="listeChoixSlot"></div>
+        <div class="etat-vide" id="videChoixSlot" style="display:none">
+          <div class="pastille-lg">🤖</div>
+          <h2>Aucun droïde</h2>
+          <p>Décoche le filtre pour voir tous les droïdes de cette classe.</p>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- ===== Formulaire : ajouter un droïde ===== -->
   <div class="voile" id="voileDroide" onclick="if(event.target===this)fermerAjoutDroide()">
