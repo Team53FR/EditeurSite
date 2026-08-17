@@ -435,11 +435,11 @@ dans `unites.json` : ce n'est pas un facteur, c'est une autre nature de valeur.
 > partout). Seul le rendement varie — d'où l'indexation par palier et non par
 > rareté.
 
-**Données partagées, éditables dans l'outil** : `DroidFortnite/catalogue.json`
-et `DroidFortnite/renaissance.json` sont communs à tous les comptes du site
-(contrairement à `bibliotheques/<login>.json`, personnel). N'importe quel
-compte peut ajouter un droïde ou un palier manquant depuis `suivi.html` — pas
-de notion d'administrateur propre à ce site. Ces deux fichiers sont amorcés
+**Données partagées** : `DroidFortnite/catalogue.json` et
+`DroidFortnite/renaissance.json` sont communs à tous les comptes du site
+(contrairement à `bibliotheques/<login>.json`, personnel). Elles se gèrent
+**uniquement depuis `admin.html`** : `suivi.html` ne fait que suivre la
+progression, et n'a plus de bouton d'ajout. Ces deux fichiers sont amorcés
 automatiquement (créés avec des données de départ) au premier chargement
 authentifié si absents — je ne peux pas les créer moi-même directement dans
 `Team53FR/BDD` (pas de token).
@@ -511,7 +511,7 @@ origine que le portail, aucun changement du relais nécessaire). Le bouton
 flottant d'ajout et le lien ⚙ vers `admin.html` sont masqués pour les
 comptes non-admin dans `suivi.html`.
 
-Organisé en **trois onglets** (même pattern `.onglet-type` que Droidex/
+Organisé en **six onglets** (même pattern `.onglet-type` que Droidex/
 Renaissance de `suivi.html`) :
 - **Droïdes** : catalogue en petites cartes (même `construireCarteDroide()`
   que le Droidex — une liste verticale devient vite illisible avec ~70
@@ -525,6 +525,10 @@ Renaissance de `suivi.html`) :
   pas de visuel officiel du jeu) et **grille prix/rendement par palier**.
   Cliquer l'onglet directement repart d'un formulaire vide
   (`ouvrirOngletAjout()`) ; Enregistrer ou Annuler ramène à l'onglet Droïdes.
+- **Renaissance** : un palier par ligne — niveau, crédits (valeur + unité) et
+  droïdes requis. Les modifications s'enregistrent au changement de champ.
+  C'est ici qu'on ajoute un niveau, le bouton flottant de `suivi.html` ayant
+  été retiré.
 - **Paliers** : liste ordonnée avec ↑/↓/Supprimer **et un sélecteur de
   couleur par palier** (`<input type="color">`, change immédiatement à
   l'enregistrement).

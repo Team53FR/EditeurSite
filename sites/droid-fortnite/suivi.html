@@ -83,9 +83,6 @@
     </div>
   </main>
 
-  <button class="fab" id="boutonAjouter" title="Ajouter" onclick="ouvrirAjout()">
-    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-  </button>
 
   <!-- ===== Choix d'un droïde pour un emplacement ===== -->
   <div class="voile" id="voileSlot" onclick="if(event.target===this)fermerChoixSlot()">
@@ -113,69 +110,8 @@
     </div>
   </div>
 
-  <!-- ===== Formulaire : ajouter un droïde ===== -->
-  <div class="voile" id="voileDroide" onclick="if(event.target===this)fermerAjoutDroide()">
-    <div class="feuille">
-      <div class="feuille-entete">
-        <h2>Ajouter un droïde</h2>
-        <button onclick="fermerAjoutDroide()">✕</button>
-      </div>
-      <div class="feuille-corps">
-        <div class="champ">
-          <label for="champDroideNom">Nom</label>
-          <input type="text" id="champDroideNom" placeholder="ex. Senate Hovercam">
-        </div>
-        <div class="champ">
-          <label for="champDroideClasse">Classe</label>
-          <select id="champDroideClasse">
-            <option value="Ouvrier">🔧 Ouvrier</option>
-            <option value="Astromec">📡 Astromec</option>
-            <option value="Combat">⚔️ Combat</option>
-          </select>
-        </div>
-        <div class="champ">
-          <label for="champDroideRarete">Rareté</label>
-          <select id="champDroideRarete">
-        </select>
-        </div>
-        <p id="messageDroide" class="message"></p>
-      </div>
-      <div class="feuille-pied">
-        <button class="btn btn-fantome" onclick="fermerAjoutDroide()">Annuler</button>
-        <button class="btn btn-primaire" onclick="enregistrerDroide()">Ajouter</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ===== Formulaire : ajouter un palier de renaissance ===== -->
-  <div class="voile" id="voileRenaissance" onclick="if(event.target===this)fermerAjoutRenaissance()">
-    <div class="feuille">
-      <div class="feuille-entete">
-        <h2>Ajouter un palier de renaissance</h2>
-        <button onclick="fermerAjoutRenaissance()">✕</button>
-      </div>
-      <div class="feuille-corps">
-        <div class="champ">
-          <label for="champNiveau">Niveau</label>
-          <input type="number" id="champNiveau" min="1">
-        </div>
-        <div class="champ">
-          <label for="champCredits">Crédits requis</label>
-          <input type="number" id="champCredits" min="0" placeholder="ex. 10000">
-        </div>
-        <div class="champ">
-          <label for="champElements">Droïdes requis (texte libre)</label>
-          <input type="text" id="champElements" placeholder="ex. CB (Défaut), Pit (Défaut)">
-        </div>
-        <p id="messageRenaissance" class="message"></p>
-      </div>
-      <div class="feuille-pied">
-        <button class="btn btn-fantome" onclick="fermerAjoutRenaissance()">Annuler</button>
-        <button class="btn btn-primaire" onclick="enregistrerRenaissance()">Ajouter</button>
-      </div>
-    </div>
-  </div>
-
+  
+  
   <div class="toast" id="toast"></div>
 
   <script src="script.js"></script>

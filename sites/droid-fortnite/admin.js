@@ -9,6 +9,8 @@ let paliers = [];
 let shaPaliers = null;
 let shaUnites = null;
 let shaRaretes = null;
+let renaissance = [];
+let shaRenaissance = null;
 let modeEditionId = null; // id du droïde en cours de modification, ou null (mode ajout)
 const cacheImages = new Map(); // chemin GitHub -> URL locale (blob:)
 
@@ -53,7 +55,7 @@ function retirerImageAdmin() {
   document.getElementById("boutonSupprimerImageAdmin").style.display = "none";
 }
 
-// ===== Onglets (Droïdes / Ajouter / Paliers / Unités / Raretés) =====
+// ===== Onglets (Droïdes / Ajouter / Paliers / Renaissance / Unités / Raretés) =====
 let ongletAdminActif = "droides";
 
 function changerOngletAdmin(type) {
@@ -62,6 +64,8 @@ function changerOngletAdmin(type) {
   document.getElementById("zoneDroides").style.display = type === "droides" ? "" : "none";
   document.getElementById("zoneAjout").style.display = type === "ajout" ? "" : "none";
   document.getElementById("zonePaliers").style.display = type === "paliers" ? "" : "none";
+  document.getElementById("zoneRenaissance").style.display = type === "renaissance" ? "" : "none";
+  if (type === "renaissance") preparerAjoutRenaissance();
   document.getElementById("zoneUnites").style.display = type === "unites" ? "" : "none";
   document.getElementById("zoneRaretes").style.display = type === "raretes" ? "" : "none";
 }
@@ -80,11 +84,12 @@ if (token) {
 async function chargerDonnees() {
   const message = document.getElementById("messageDroideAdmin");
   try {
-    const [rCatalogue, rPaliers, rUnites, rRaretes] = await Promise.all([
+    const [rCatalogue, rPaliers, rUnites, rRaretes, rRenaissance] = await Promise.all([
       chargerOuAmorcer("catalogue.json", CATALOGUE_INITIAL, token, "Amorçage du catalogue de droïdes"),
       chargerOuAmorcer("paliers.json", PALIERS_INITIAUX, token, "Amorçage de la liste des paliers"),
       chargerOuAmorcer("unites.json", UNITES_INITIALES, token, "Amorçage des unités de grandeur"),
-      chargerOuAmorcer("raretes.json", RARETES_INITIALES, token, "Amorçage des couleurs de rareté")
+      chargerOuAmorcer("raretes.json", RARETES_INITIALES, token, "Amorçage des couleurs de rareté"),
+      chargerOuAmorcer("renaissance.json", RENAISSANCE_INITIALE, token, "Amorçage des paliers de renaissance")
     ]);
     catalogue = Array.isArray(rCatalogue.contenu) ? rCatalogue.contenu : [];
     shaCatalogue = rCatalogue.sha;
@@ -97,6 +102,8 @@ async function chargerDonnees() {
     raretes = normaliserRaretes(rRaretes.contenu);
     shaRaretes = rRaretes.sha;
     appliquerCouleursRaretes();
+    renaissance = Array.isArray(rRenaissance.contenu) ? rRenaissance.contenu : [];
+    shaRenaissance = rRenaissance.sha;
   } catch (e) {
     message.textContent = e.message;
     return;
@@ -106,6 +113,8 @@ async function chargerDonnees() {
   afficherPaliers();
   afficherUnites();
   afficherRaretes();
+  document.getElementById("champUniteCredits").innerHTML = optionsUnite("", false);
+  afficherRenaissanceAdmin();
 }
 
 // ===== Droïdes =====
@@ -727,5 +736,115 @@ async function sauvegarderRaretes(nouvelles, messageCommit) {
     message.textContent = "Enregistré.";
   } catch (e) {
     message.textContent = e.message;
+  }
+}
+
+// ===== Paliers de renaissance =====
+// Partagés (renaissance.json), gérés ici et non plus depuis la page de suivi :
+// c'est du catalogue, pas de la progression personnelle.
+
+function afficherRenaissanceAdmin() {
+  const zone = document.getElementById("listeRenaissanceAdmin");
+  zone.innerHTML = "";
+
+  const tries = renaissance.slice().sort((a, b) => a.niveau - b.niveau);
+  if (!tries.length) {
+    zone.innerHTML = '<p class="sous-titre">Aucun palier pour le moment.</p>';
+    return;
+  }
+
+  zone.insertAdjacentHTML("beforeend",
+    '<div class="entete-renaissance"><span>Niveau</span><span>Crédits</span>' +
+    "<span>Droïdes requis</span><span></span></div>");
+
+  tries.forEach((r) => {
+    const credits = decomposerPourFormulaire(r.credits);
+    const ligne = document.createElement("div");
+    ligne.className = "ligne-renaissance";
+    ligne.innerHTML =
+      '<input type="number" class="r-niveau" min="1" value="' + echapper(r.niveau) + '" aria-label="Niveau">' +
+      '<span class="duo-valeur">' +
+        '<input type="text" class="r-credits" inputmode="decimal" value="' + echapper(credits.valeur) + '" aria-label="Crédits requis">' +
+        '<select class="r-unite" aria-label="Unité des crédits">' + optionsUnite(credits.unite, false) + "</select>" +
+      "</span>" +
+      '<input type="text" class="r-elements" value="' + echapper(r.elements || "") + '" ' +
+        'placeholder="ex. CB (Défaut), Pit (Or)" aria-label="Droïdes requis">' +
+      '<button type="button" class="btn-mini danger" title="Supprimer">✕</button>';
+
+    const enregistrer = () => {
+      const copie = renaissance.map((x) => (x.id === r.id ? {
+        id: r.id,
+        niveau: Number(ligne.querySelector(".r-niveau").value) || r.niveau,
+        credits: composerValeur(ligne.querySelector(".r-credits").value,
+                                ligne.querySelector(".r-unite").value) ?? 0,
+        elements: ligne.querySelector(".r-elements").value.trim()
+      } : x));
+      sauvegarderRenaissanceAdmin(copie, "Modification du palier de renaissance " + r.niveau);
+    };
+    ligne.querySelectorAll(".r-niveau, .r-credits, .r-unite, .r-elements")
+      .forEach((c) => c.addEventListener("change", enregistrer));
+
+    ligne.querySelector(".btn-mini.danger").onclick = () => supprimerRenaissanceAdmin(r.id, r.niveau);
+    zone.appendChild(ligne);
+  });
+}
+
+// Fichier partagé, modifiable par n'importe quel admin : on fusionne plutôt
+// que d'écraser, comme pour le catalogue.
+async function sauvegarderRenaissanceAdmin(nouvelle, messageCommit) {
+  const message = document.getElementById("messageRenaissanceAdmin");
+  message.className = "message";
+  message.textContent = "Enregistrement...";
+  try {
+    shaRenaissance = await sauvegarderAvecFusion("renaissance.json", nouvelle, shaRenaissance, token, messageCommit);
+    renaissance = nouvelle;
+    afficherRenaissanceAdmin();
+    message.className = "message ok";
+    message.textContent = "Enregistré.";
+  } catch (e) {
+    message.textContent = e.message;
+  }
+}
+
+function ajouterRenaissanceAdmin() {
+  const champNiveau = document.getElementById("champNouveauNiveau");
+  const champCredits = document.getElementById("champNouveauxCredits");
+  const champUnite = document.getElementById("champUniteCredits");
+  const champElements = document.getElementById("champNouveauxElements");
+  const message = document.getElementById("messageRenaissanceAdmin");
+  message.className = "message";
+
+  const niveau = Number(champNiveau.value);
+  const credits = composerValeur(champCredits.value, champUnite.value);
+
+  if (!niveau || niveau < 1) { message.textContent = "Le niveau est obligatoire."; return; }
+  if (renaissance.some((r) => r.niveau === niveau)) {
+    message.textContent = "Le niveau " + niveau + " existe déjà."; return;
+  }
+  if (credits === null) { message.textContent = "Les crédits requis sont obligatoires."; return; }
+
+  const nouveau = {
+    id: genererId("r"), niveau, credits,
+    elements: champElements.value.trim()
+  };
+  champNiveau.value = "";
+  champCredits.value = "";
+  champElements.value = "";
+  sauvegarderRenaissanceAdmin(renaissance.concat([nouveau]), "Ajout du palier de renaissance " + niveau);
+}
+
+function supprimerRenaissanceAdmin(id, niveau) {
+  if (!confirm("Supprimer le palier de renaissance " + niveau + " ?\n\n" +
+      "La progression déjà enregistrée par les comptes qui l'avaient atteint n'est pas " +
+      "supprimée, juste rendue invisible.")) return;
+  sauvegarderRenaissanceAdmin(renaissance.filter((r) => r.id !== id),
+    "Suppression du palier de renaissance " + niveau);
+}
+
+// Propose le niveau suivant, comme le faisait le formulaire de la page de suivi.
+function preparerAjoutRenaissance() {
+  const champ = document.getElementById("champNouveauNiveau");
+  if (champ && !champ.value) {
+    champ.value = renaissance.reduce((max, r) => Math.max(max, r.niveau), 0) + 1;
   }
 }

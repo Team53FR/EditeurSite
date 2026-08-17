@@ -2,9 +2,7 @@
 const token = exigerConnexion(); // redirige vers connexion.html si absent
 
 let catalogue = [];
-let shaCatalogue = null;
 let renaissance = [];
-let shaRenaissance = null;
 let paliers = PALIERS_INITIAUX; // remplacé par le contenu réel de paliers.json au chargement
 // droidesPossedes : tableau de clés "<idDroide>::<palier>" — chaque droïde
 // peut être possédé indépendamment à CHAQUE palier (Défaut, Or, Diamant...),
@@ -31,22 +29,14 @@ function changerOnglet(type) {
   document.getElementById("zoneDroidex").style.display = type === "droidex" ? "" : "none";
   document.getElementById("zoneRendement").style.display = type === "rendement" ? "" : "none";
   document.getElementById("zoneRenaissance").style.display = type === "renaissance" ? "" : "none";
-  // Le bouton flottant n'a rien à ajouter dans l'escouade : les emplacements
-  // se règlent section par section, avec les boutons − / +.
-  document.getElementById("boutonAjouter").style.display =
-    (type === "rendement" || !estAdminCentral()) ? "none" : "";
-  document.getElementById("boutonAjouter").title = type === "droidex" ? "Ajouter un droïde" : "Ajouter un palier";
   if (type === "rendement") afficherRendement();
 }
 
 if (token) {
-  // Lien vers le panneau admin et bouton d'ajout : réservés aux admins du
-  // portail central (voir estAdminCentral() dans script.js).
-  if (estAdminCentral()) {
-    document.getElementById("lienAdmin").style.display = "";
-  } else {
-    document.getElementById("boutonAjouter").style.display = "none";
-  }
+  // Le catalogue, les paliers et les renaissances se gèrent dans admin.html :
+  // cette page ne fait que suivre la progression. Seul le lien vers le
+  // gestionnaire est réservé aux admins du portail central.
+  if (estAdminCentral()) document.getElementById("lienAdmin").style.display = "";
   chargerTout();
 }
 
@@ -61,9 +51,7 @@ async function chargerTout() {
       chargerBibliothequePerso()
     ]);
     catalogue = Array.isArray(rCatalogue.contenu) ? rCatalogue.contenu : [];
-    shaCatalogue = rCatalogue.sha;
     renaissance = Array.isArray(rRenaissance.contenu) ? rRenaissance.contenu : [];
-    shaRenaissance = rRenaissance.sha;
     const paliersCharges = normaliserPaliers(rPaliers.contenu);
     paliers = paliersCharges.length ? paliersCharges : PALIERS_INITIAUX;
     palierActif = paliers[0].nom;
@@ -257,44 +245,7 @@ function basculerPossession(idDroide, palier) {
   sauvegarderPerso();
 }
 
-function ouvrirAjoutDroide() {
-  document.getElementById("champDroideNom").value = "";
-  document.getElementById("champDroideClasse").value = "Ouvrier";
-  document.getElementById("champDroideRarete").value = "Typique";
-  document.getElementById("messageDroide").textContent = "";
-  document.getElementById("voileDroide").classList.add("ouvert");
-  document.getElementById("champDroideNom").focus();
-}
-function fermerAjoutDroide() {
-  document.getElementById("voileDroide").classList.remove("ouvert");
-}
 
-function genererId(prefixe) {
-  return `${prefixe}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
-}
-
-async function enregistrerDroide() {
-  const nom = document.getElementById("champDroideNom").value.trim();
-  const classe = document.getElementById("champDroideClasse").value;
-  const rarete = document.getElementById("champDroideRarete").value;
-  const message = document.getElementById("messageDroide");
-
-  if (!nom) { message.textContent = "Le nom est obligatoire."; return; }
-
-  const nouveau = { id: genererId("d"), nom, classe, rarete };
-  const copie = catalogue.concat([nouveau]);
-
-  message.textContent = "Ajout en cours...";
-  try {
-    shaCatalogue = await sauvegarderAvecFusion("catalogue.json", copie, shaCatalogue, token, `Ajout du droïde ${nom}`);
-    catalogue = copie;
-    fermerAjoutDroide();
-    afficherDroidex();
-    afficherToast("Droïde ajouté.");
-  } catch (e) {
-    message.textContent = e.message;
-  }
-}
 
 // ===== Onglet Rendement : l'escouade =====
 //
@@ -677,44 +628,5 @@ function basculerAtteint(idRenaissance) {
   sauvegarderPerso();
 }
 
-function ouvrirAjoutRenaissance() {
-  const prochainNiveau = renaissance.reduce((max, r) => Math.max(max, r.niveau), 0) + 1;
-  document.getElementById("champNiveau").value = prochainNiveau;
-  document.getElementById("champCredits").value = "";
-  document.getElementById("champElements").value = "";
-  document.getElementById("messageRenaissance").textContent = "";
-  document.getElementById("voileRenaissance").classList.add("ouvert");
-  document.getElementById("champCredits").focus();
-}
-function fermerAjoutRenaissance() {
-  document.getElementById("voileRenaissance").classList.remove("ouvert");
-}
 
-async function enregistrerRenaissance() {
-  const niveau = Number(document.getElementById("champNiveau").value);
-  const credits = Number(document.getElementById("champCredits").value);
-  const elements = document.getElementById("champElements").value.trim();
-  const message = document.getElementById("messageRenaissance");
 
-  if (!niveau || !credits) { message.textContent = "Le niveau et les crédits requis sont obligatoires."; return; }
-
-  const nouveau = { id: genererId("r"), niveau, credits, elements };
-  const copie = renaissance.concat([nouveau]);
-
-  message.textContent = "Ajout en cours...";
-  try {
-    shaRenaissance = await sauvegarderAvecFusion("renaissance.json", copie, shaRenaissance, token, `Ajout du palier de renaissance ${niveau}`);
-    renaissance = copie;
-    fermerAjoutRenaissance();
-    afficherRenaissance();
-    afficherToast("Palier ajouté.");
-  } catch (e) {
-    message.textContent = e.message;
-  }
-}
-
-// ===== Bouton flottant : ouvre le bon formulaire selon l'onglet actif =====
-function ouvrirAjout() {
-  if (ongletActif === "droidex") ouvrirAjoutDroide();
-  else ouvrirAjoutRenaissance();
-}

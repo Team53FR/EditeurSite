@@ -893,3 +893,34 @@ a { color: var(--primaire); }
   color: var(--texte-att); font-size: 0.62rem; line-height: 1.3;
   text-align: center; overflow-wrap: anywhere;
 }
+
+/* ===== Panneau admin : paliers de renaissance ===== */
+.entete-renaissance, .ligne-renaissance {
+  display: grid;
+  grid-template-columns: 4.5rem minmax(7rem, 1fr) minmax(9rem, 2fr) 2rem;
+  gap: 0.4rem;
+  align-items: center;
+}
+.entete-renaissance {
+  font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em;
+  color: var(--texte-att); margin-bottom: 0.3rem;
+}
+.ligne-renaissance { margin-bottom: 0.4rem; }
+.ligne-renaissance input[type="text"], .ligne-renaissance input[type="number"] {
+  width: 100%; min-width: 0;
+  padding: 0.45rem 0.55rem;
+  border-radius: 8px; border: 1px solid var(--bordure);
+  background: var(--fond); color: var(--texte);
+  font-size: 0.85rem;
+}
+.ligne-renaissance input:focus { outline: 2px solid var(--primaire); outline-offset: 1px; }
+
+@media (max-width: 620px) {
+  .entete-renaissance { display: none; }
+  .ligne-renaissance {
+    grid-template-columns: 4.5rem 1fr 2rem;
+    border: 1px solid var(--bordure); border-radius: 10px;
+    padding: 0.5rem; margin-bottom: 0.6rem;
+  }
+  .ligne-renaissance .r-elements { grid-column: 1 / -1; }
+}
