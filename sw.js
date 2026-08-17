@@ -30,6 +30,8 @@ const FICHIERS_COQUILLE = [
   "./index.html",
   "./connexion.html",
   "./tableau-de-bord.html",
+  "./compte.html",
+  "./compte.js",
   "./style.css",
   "./script.js",
   "./manifest.json",

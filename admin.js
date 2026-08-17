@@ -215,80 +215,7 @@ function annulerEdition() {
 // (ce site vérifie que gh_login correspond à une entrée réelle de son propre
 // users.json — voir README.md). N'écrit jamais dans les fichiers du site sauf
 // pour ce seul besoin de synchronisation.
-async function synchroniserEditeurLivre(loginCentral, passwordCentral, nomAffichage) {
-  let liste = [];
-  let sha = null;
-  try {
-    const r = await lireFichierJSONAbsolu("EditeurLivre/users.json", token);
-    liste = Array.isArray(r.contenu) ? r.contenu : [];
-    sha = r.sha;
-  } catch (e) {
-    if (e.status !== 404) throw e;
-  }
 
-  const existant = liste.find(u => u.login === loginCentral);
-  if (existant) {
-    existant.password = passwordCentral;
-    if (nomAffichage) existant.nomAffichage = nomAffichage;
-  } else {
-    liste.push({ login: loginCentral, password: passwordCentral, role: "user", nomAffichage: nomAffichage || "" });
-  }
-
-  await ecrireFichierJSONAbsolu("EditeurLivre/users.json", liste, sha, token,
-    `Synchronisation du compte ${loginCentral} depuis le portail central`);
-}
-
-// Même principe que synchroniserEditeurLivre(), pour Ma Bibliothèque (qui est
-// maintenant, elle aussi, un site à comptes séparés — voir
-// migrerMaBibliothequeVersMultiCompte()). Pas de champ "role" ici : ce site
-// n'a pas de notion d'administrateur propre.
-async function synchroniserMaBibliotheque(loginCentral, passwordCentral, nomAffichage) {
-  let liste = [];
-  let sha = null;
-  try {
-    const r = await lireFichierJSONAbsolu("MaBibliotheque/users.json", token);
-    liste = Array.isArray(r.contenu) ? r.contenu : [];
-    sha = r.sha;
-  } catch (e) {
-    if (e.status !== 404) throw e;
-  }
-
-  const existant = liste.find(u => u.login === loginCentral);
-  if (existant) {
-    existant.password = passwordCentral;
-    if (nomAffichage) existant.nomAffichage = nomAffichage;
-  } else {
-    liste.push({ login: loginCentral, password: passwordCentral, nomAffichage: nomAffichage || "" });
-  }
-
-  await ecrireFichierJSONAbsolu("MaBibliotheque/users.json", liste, sha, token,
-    `Synchronisation du compte ${loginCentral} depuis le portail central`);
-}
-
-// Même principe, pour Droid Fortnite (également à comptes séparés dès sa
-// création). Pas de champ "role" ici non plus.
-async function synchroniserDroidFortnite(loginCentral, passwordCentral, nomAffichage) {
-  let liste = [];
-  let sha = null;
-  try {
-    const r = await lireFichierJSONAbsolu("DroidFortnite/users.json", token);
-    liste = Array.isArray(r.contenu) ? r.contenu : [];
-    sha = r.sha;
-  } catch (e) {
-    if (e.status !== 404) throw e;
-  }
-
-  const existant = liste.find(u => u.login === loginCentral);
-  if (existant) {
-    existant.password = passwordCentral;
-    if (nomAffichage) existant.nomAffichage = nomAffichage;
-  } else {
-    liste.push({ login: loginCentral, password: passwordCentral, nomAffichage: nomAffichage || "" });
-  }
-
-  await ecrireFichierJSONAbsolu("DroidFortnite/users.json", liste, sha, token,
-    `Synchronisation du compte ${loginCentral} depuis le portail central`);
-}
 
 async function enregistrerUtilisateur() {
   const message = document.getElementById("message");
@@ -334,15 +261,15 @@ async function enregistrerUtilisateur() {
 
     // Best-effort : ne doit jamais bloquer l'enregistrement du compte central.
     if (acces.includes("editeur-livre")) {
-      try { await synchroniserEditeurLivre(login, password, nomAffichage); }
+      try { await synchroniserEditeurLivre(login, password, nomAffichage, token); }
       catch (e) { /* ignoré : la synchro pourra être retentée en réenregistrant */ }
     }
     if (acces.includes("ma-bibliotheque")) {
-      try { await synchroniserMaBibliotheque(login, password, nomAffichage); }
+      try { await synchroniserMaBibliotheque(login, password, nomAffichage, token); }
       catch (e) { /* ignoré : la synchro pourra être retentée en réenregistrant */ }
     }
     if (acces.includes("droid-fortnite")) {
-      try { await synchroniserDroidFortnite(login, password, nomAffichage); }
+      try { await synchroniserDroidFortnite(login, password, nomAffichage, token); }
       catch (e) { /* ignoré : la synchro pourra être retentée en réenregistrant */ }
     }
 

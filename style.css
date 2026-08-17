@@ -304,3 +304,25 @@ a { color: var(--primaire); }
   .encart-app-texte { flex-basis: calc(100% - 4rem); }
   .encart-app .btn-primaire { flex: 1; }
 }
+
+/* ===== Mon compte : statistiques ===== */
+.stat-groupe { margin-bottom: 1.1rem; }
+.stat-groupe:last-child { margin-bottom: 0; }
+.stat-groupe h3 {
+  margin: 0 0 0.5rem; font-size: 0.9rem;
+  letter-spacing: 0.03em; text-transform: uppercase; color: var(--texte-att);
+}
+.stat-lignes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.5rem;
+}
+.stat-ligne {
+  display: flex; flex-direction: column; gap: 0.15rem;
+  background: var(--fond);
+  border: 1px solid var(--bordure);
+  border-radius: 10px;
+  padding: 0.6rem 0.75rem;
+}
+.stat-ligne span { font-size: 0.75rem; color: var(--texte-att); }
+.stat-ligne strong { font-size: 1.05rem; font-variant-numeric: tabular-nums; }

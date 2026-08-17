@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#4f46e5">
+<title>Mon compte — Site Guide</title>
+<link rel="stylesheet" href="style.css">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icone-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Site Guide">
+<script>
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+  }
+</script>
+</head>
+<body>
+  <header class="app-header">
+    <div class="app-header-ligne">
+      <h1><span id="entete-pastille">👤</span> Mon compte</h1>
+      <div class="actions-entete">
+        <a href="tableau-de-bord.html" class="icone-bouton" title="Retour au tableau de bord">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+        </a>
+        <button class="icone-bouton deconnexion" title="Se déconnecter" onclick="seDeconnecter()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div class="contenu">
+
+    <div class="bloc-carte">
+      <h2>Mes informations</h2>
+      <p class="sous-titre">L'identifiant de connexion ne change pas. Le pseudo est le nom affiché dans l'application.</p>
+
+      <div class="champ">
+        <label for="champLogin">Identifiant</label>
+        <input type="text" id="champLogin" disabled>
+      </div>
+      <div class="champ">
+        <label for="champPseudo">Pseudo</label>
+        <input type="text" id="champPseudo" placeholder="ex. Robin" autocomplete="nickname">
+      </div>
+      <button class="btn btn-primaire" id="btnPseudo" onclick="enregistrerPseudo()">Enregistrer le pseudo</button>
+      <p id="messagePseudo" class="message"></p>
+    </div>
+
+    <div class="bloc-carte">
+      <h2>Mot de passe</h2>
+      <p class="sous-titre">Il sert à se connecter au portail comme à chacun des sites : le changer les met tous à jour.</p>
+
+      <div class="champ">
+        <label for="champAncien">Mot de passe actuel</label>
+        <input type="password" id="champAncien" autocomplete="current-password">
+      </div>
+      <div class="champ">
+        <label for="champNouveau">Nouveau mot de passe</label>
+        <input type="password" id="champNouveau" autocomplete="new-password">
+      </div>
+      <div class="champ">
+        <label for="champConfirmation">Confirmer le nouveau</label>
+        <input type="password" id="champConfirmation" autocomplete="new-password"
+               onkeydown="if(event.key==='Enter'){changerMotDePasse();}">
+      </div>
+      <button class="btn btn-primaire" id="btnMotDePasse" onclick="changerMotDePasse()">Changer le mot de passe</button>
+      <p id="messageMotDePasse" class="message"></p>
+    </div>
+
+    <div class="bloc-carte">
+      <h2>Mes statistiques</h2>
+      <p class="sous-titre">Ce que contiennent vos données sur chacun des sites auxquels vous avez accès.</p>
+      <div id="zoneStats">
+        <div class="chargement"><span class="spin"></span> Calcul en cours…</div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="script.js"></script>
+  <script src="compte.js"></script>
+</body>
+</html>

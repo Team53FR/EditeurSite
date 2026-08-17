@@ -318,6 +318,103 @@ function ouvrirSessionCentrale(utilisateur, token) {
   localStorage.setItem("team53_acces", JSON.stringify(Array.isArray(utilisateur.acces) ? utilisateur.acces : []));
 }
 
+// ===== Synchronisation d'un compte vers les sites =====
+// Chaque site garde son propre fichier de comptes : un changement de mot de
+// passe ou de pseudo doit y être reporté, sinon le compte central et le site
+// divergent silencieusement. Utilisé par le panneau admin comme par la page
+// « Mon compte ».
+
+async function synchroniserEditeurLivre(loginCentral, passwordCentral, nomAffichage, token) {
+  let liste = [];
+  let sha = null;
+  try {
+    const r = await lireFichierJSONAbsolu("EditeurLivre/users.json", token);
+    liste = Array.isArray(r.contenu) ? r.contenu : [];
+    sha = r.sha;
+  } catch (e) {
+    if (e.status !== 404) throw e;
+  }
+
+  const existant = liste.find(u => u.login === loginCentral);
+  if (existant) {
+    existant.password = passwordCentral;
+    if (nomAffichage) existant.nomAffichage = nomAffichage;
+  } else {
+    liste.push({ login: loginCentral, password: passwordCentral, role: "user", nomAffichage: nomAffichage || "" });
+  }
+
+  await ecrireFichierJSONAbsolu("EditeurLivre/users.json", liste, sha, token,
+    `Synchronisation du compte ${loginCentral} depuis le portail central`);
+}
+
+// Même principe que synchroniserEditeurLivre(), pour Ma Bibliothèque (qui est
+// maintenant, elle aussi, un site à comptes séparés — voir
+// migrerMaBibliothequeVersMultiCompte()). Pas de champ "role" ici : ce site
+// n'a pas de notion d'administrateur propre.
+async function synchroniserMaBibliotheque(loginCentral, passwordCentral, nomAffichage, token) {
+  let liste = [];
+  let sha = null;
+  try {
+    const r = await lireFichierJSONAbsolu("MaBibliotheque/users.json", token);
+    liste = Array.isArray(r.contenu) ? r.contenu : [];
+    sha = r.sha;
+  } catch (e) {
+    if (e.status !== 404) throw e;
+  }
+
+  const existant = liste.find(u => u.login === loginCentral);
+  if (existant) {
+    existant.password = passwordCentral;
+    if (nomAffichage) existant.nomAffichage = nomAffichage;
+  } else {
+    liste.push({ login: loginCentral, password: passwordCentral, nomAffichage: nomAffichage || "" });
+  }
+
+  await ecrireFichierJSONAbsolu("MaBibliotheque/users.json", liste, sha, token,
+    `Synchronisation du compte ${loginCentral} depuis le portail central`);
+}
+
+// Même principe, pour Droid Fortnite (également à comptes séparés dès sa
+// création). Pas de champ "role" ici non plus.
+async function synchroniserDroidFortnite(loginCentral, passwordCentral, nomAffichage, token) {
+  let liste = [];
+  let sha = null;
+  try {
+    const r = await lireFichierJSONAbsolu("DroidFortnite/users.json", token);
+    liste = Array.isArray(r.contenu) ? r.contenu : [];
+    sha = r.sha;
+  } catch (e) {
+    if (e.status !== 404) throw e;
+  }
+
+  const existant = liste.find(u => u.login === loginCentral);
+  if (existant) {
+    existant.password = passwordCentral;
+    if (nomAffichage) existant.nomAffichage = nomAffichage;
+  } else {
+    liste.push({ login: loginCentral, password: passwordCentral, nomAffichage: nomAffichage || "" });
+  }
+
+  await ecrireFichierJSONAbsolu("DroidFortnite/users.json", liste, sha, token,
+    `Synchronisation du compte ${loginCentral} depuis le portail central`);
+}
+
+// Reporte le compte sur les trois sites. Best-effort site par site : qu'un
+// fichier soit indisponible ne doit pas empêcher les autres d'être à jour.
+async function synchroniserTousLesSites(login, password, nomAffichage, token) {
+  const taches = [
+    ["editeur-livre", synchroniserEditeurLivre],
+    ["ma-bibliotheque", synchroniserMaBibliotheque],
+    ["droid-fortnite", synchroniserDroidFortnite]
+  ];
+  const echecs = [];
+  for (const [nom, fn] of taches) {
+    try { await fn(login, password, nomAffichage, token); }
+    catch (e) { echecs.push(nom); }
+  }
+  return echecs;
+}
+
 function seDeconnecter() {
   localStorage.removeItem("team53_token");
   localStorage.removeItem("team53_login");

@@ -484,7 +484,10 @@ function combinaisonsProposables(classe, seulementPossedes) {
         const cle = clePossession(d.id, p.nom);
         const possede = perso.droidesPossedes.includes(cle);
         if (seulementPossedes && !possede) return;
-        lignes.push({ droide: d, palier: p.nom, couleur: p.couleur, possede, cle });
+        const dejaPlaces = CLASSES_ESCOUADE
+          .reduce((n, c) => n + (perso.rendement && perso.rendement.places[c] || [])
+            .filter((x) => x === cle).length, 0);
+        lignes.push({ droide: d, palier: p.nom, couleur: p.couleur, possede, cle, dejaPlaces });
       });
     });
   // Le plus rentable d'abord : c'est ce qu'on cherche à placer.
@@ -516,7 +519,8 @@ function afficherChoixSlot() {
     item.innerHTML =
       '<span class="choix-pastille" style="background:' + (l.couleur || "transparent") + '"></span>' +
       '<span class="choix-nom">' + echapperHTML(l.droide.nom) +
-        '<small>' + echapperHTML(l.palier) + (l.possede ? " · possédé" : "") + "</small></span>" +
+        '<small>' + echapperHTML(l.palier) + (l.possede ? " · possédé" : "") +
+          (l.dejaPlaces ? " · déjà placé " + l.dejaPlaces + "×" : "") + "</small></span>" +
       '<span class="badge-rarete ' + classeRareteCss(l.droide.rarete) + '">' + echapperHTML(l.droide.rarete) + "</span>" +
       '<span class="choix-rendement">' + (rendement === null ? "—" : echapperHTML(rendement)) + "</span>";
     item.onclick = () => placerDansSlot(l.cle);
@@ -527,10 +531,8 @@ function afficherChoixSlot() {
 function placerDansSlot(cle) {
   if (!slotEnCours) return;
   const r = escouade();
-  // Un même droïde-palier ne peut occuper deux emplacements à la fois.
-  CLASSES_ESCOUADE.forEach((c) => {
-    r.places[c] = r.places[c].map((x) => (x === cle ? null : x));
-  });
+  // Un même droïde peut occuper plusieurs emplacements : on en possède
+  // souvent plusieurs exemplaires, et rien n'empêche d'en aligner deux.
   r.places[slotEnCours.classe][slotEnCours.index] = cle;
   fermerChoixSlot();
   afficherRendement();

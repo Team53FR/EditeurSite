@@ -181,6 +181,29 @@ mot de passe existe toujours dans son propre fichier BDD) — cohérent avec le
 fait qu'aucun site de ce dépôt n'a d'autorisation côté serveur, puisqu'il n'y
 a pas de serveur.
 
+## Mon compte
+
+`compte.html` — accessible depuis le tableau de bord, sans droit particulier :
+chacun y change son **pseudo** et son **mot de passe**, et consulte ses
+**statistiques** (rôle, dernière connexion, puis un bloc par site : livres,
+pages et mots écrits ; entrées de la bibliothèque ; droïdes possédés et
+escouade).
+
+Deux précautions :
+
+- L'écriture **relit `Web/utilisateurs.json` juste avant d'écrire** et ne
+  modifie que sa propre entrée, pour ne pas écraser ce qu'un administrateur
+  aurait changé sur d'autres comptes entre-temps.
+- Un changement de mot de passe ou de pseudo est **reporté sur les trois
+  sites** (`synchroniserTousLesSites()` dans `script.js`, déplacé là depuis
+  `admin.js` pour être partagé). Sans ce report, l'ancien mot de passe
+  continuerait de fonctionner sur les sites et le nouveau y serait refusé.
+  Le report est best-effort : un site indisponible est nommé dans le message
+  plutôt que de faire échouer l'ensemble.
+
+L'identifiant de connexion, lui, ne se change pas : il sert de clé aux
+fichiers personnels de chaque site (`bibliotheques/<slug>.json`).
+
 ## Migration de Ma Bibliothèque (compte unique → comptes séparés)
 
 Ma Bibliothèque a été créée avec un seul compte partagé
