@@ -532,8 +532,10 @@ Organisé en **six onglets** (même pattern `.onglet-type` que Droidex/
 Renaissance de `suivi.html`) :
 - **Droïdes** : catalogue en petites cartes (même `construireCarteDroide()`
   que le Droidex — une liste verticale devient vite illisible avec ~70
-  entrées), **triées par rareté** (Typique en premier, `ORDRE_RARETE` dans
-  `script.js`) puis par nom. Une carte cliquée bascule sur l'onglet Ajouter
+  entrées), **dans l'ordre du catalogue**, qui est celui du jeu et donc celui
+  du Droidex. Le retrier par rareté puis par nom donnait une grille sans
+  rapport avec ce qu'on voit en jouant. L'ordre des raretés ne sert donc plus
+  qu'à celui des listes déroulantes. Une carte cliquée bascule sur l'onglet Ajouter
   avec le formulaire pré-rempli (`editerDroide()`) ; le bouton 🗑 dans son
   coin supprime directement (confirmation, `stopPropagation()` pour ne pas
   aussi ouvrir la modification).

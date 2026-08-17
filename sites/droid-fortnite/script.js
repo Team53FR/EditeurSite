@@ -413,14 +413,6 @@ function normaliserRaretes(brutes) {
   });
 }
 
-// Rang d'une rareté dans la liste : sert au tri du catalogue. Une rareté
-// devenue inconnue (retirée alors que des droïdes la portaient) passe en
-// dernier plutôt que de casser le tri.
-function ordreRarete(nom) {
-  const i = raretes.findIndex((r) => r.nom === nom);
-  return i === -1 ? raretes.length : i;
-}
-
 // Remplit un <select> avec les raretés connues, en gardant la valeur
 // choisie si elle existe encore.
 function remplirSelectRaretes(select, valeur, libelleVide) {
@@ -969,7 +961,9 @@ const PALIERS_INITIAUX = [
 
 // Ordre d'affichage des raretés, du plus faible au plus fort (utilisé pour
 // trier la liste des droïdes dans le panneau admin).
-// L'ordre des raretés vient désormais de raretes.json — voir ordreRarete().
+// L'ordre des raretés vient de raretes.json : il donne l'ordre des listes
+// déroulantes (du plus faible au plus fort). Les grilles, elles, suivent
+// l'ordre du catalogue — celui du jeu.
 
 // paliers.json pouvait exister sous l'ancienne forme (tableau de chaînes,
 // avant l'ajout d'une couleur par palier) : on la reconnaît et la convertit

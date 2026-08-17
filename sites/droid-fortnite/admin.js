@@ -120,17 +120,17 @@ async function chargerDonnees() {
 // ===== Droïdes =====
 // Petites cartes (comme le Droidex de suivi.html) plutôt qu'une longue
 // liste : avec ~70 droïdes, une liste verticale devient vite illisible.
-// Triées par rareté (Typique en premier), puis par nom. Cliquer une carte
-// l'ouvre en modification ; le bouton 🗑 dans le coin supprime directement
-// (avec confirmation).
+// Dans l'ordre du catalogue, donc celui du jeu, donc celui du Droidex.
+// Cliquer une carte l'ouvre en modification ; le bouton 🗑 dans le coin
+// supprime directement (avec confirmation).
 function afficherDroides() {
   const grille = document.getElementById("listeDroides");
   grille.innerHTML = "";
 
-  catalogue.slice().sort((a, b) => {
-    const diff = ordreRarete(a.rarete) - ordreRarete(b.rarete);
-    return diff !== 0 ? diff : a.nom.localeCompare(b.nom);
-  }).forEach((d) => {
+  // Ordre du catalogue, tel quel : c'est celui du jeu, donc celui que le
+  // Droidex affiche. Retrier par rareté puis par nom donnait une grille qui
+  // ne ressemblait à rien de ce qu'on voit en jouant.
+  catalogue.forEach((d) => {
     // Le palier « Défaut » sert de référence en admin : c'est celui dont les
     // visuels existent toujours, quel que soit l'avancement d'un compte.
     const carte = construireCarteDroide(d, { admin: true, palier: "Défaut" });
@@ -808,9 +808,9 @@ function construireChoixDroides(r, surChangement) {
 
     const selDroide = document.createElement("select");
     selDroide.className = "sel-droide";
+    // Même ordre que partout ailleurs : celui du catalogue.
     selDroide.innerHTML = '<option value="">Choisir un droïde…</option>' +
-      catalogue.slice().sort((a, b) => a.nom.localeCompare(b.nom))
-        .map((d) => '<option value="' + echapper(d.id) + '">' + echapper(d.nom) + "</option>").join("");
+      catalogue.map((d) => '<option value="' + echapper(d.id) + '">' + echapper(d.nom) + "</option>").join("");
 
     const selPalier = document.createElement("select");
     selPalier.className = "sel-palier";
