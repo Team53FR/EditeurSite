@@ -298,7 +298,8 @@ a { color: var(--primaire); }
   position: relative;
   aspect-ratio: 5 / 7;
   overflow: hidden;
-  background: #0d1117;
+  --fond-carte-droide: #0d1117;
+  background: var(--fond-carte-droide);
   border: 3px solid var(--bordure);
   border-radius: 8px;
   padding: 0;
@@ -464,12 +465,10 @@ a { color: var(--primaire); }
   font-size: 0.55rem; letter-spacing: 0.01em;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.carte-droide .badge-rarete.typique    { background: #123540; color: #7dd3e0; }
-.carte-droide .badge-rarete.rare       { background: #0e3a44; color: #22d3ee; }
-.carte-droide .badge-rarete.epique     { background: #4c1d95; color: #ddd6fe; }
-.carte-droide .badge-rarete.legendaire { background: #78350f; color: #fde68a; }
-.carte-droide .badge-rarete.mythique   { background: #831843; color: #fbcfe8; }
-.carte-droide .badge-rarete.iconique   { background: #065f46; color: #a7f3d0; }
+/* Les couleurs de chaque rareté sont injectées au chargement depuis
+   raretes.json (appliquerCouleursRaretes() dans script.js), pour être
+   modifiables depuis le panneau admin. Rien ici : une règle figée
+   l'emporterait en spécificité et annulerait l'injection. */
 
 /* En admin on gère le catalogue : la notion de « possédé » n'a pas cours,
    toutes les cartes sont donc pleinement visibles. */
@@ -787,3 +786,52 @@ a { color: var(--primaire); }
   font-variant-numeric: tabular-nums;
 }
 .choix-droide .badge-rarete { flex-shrink: 0; }
+
+/* Palier à plusieurs couleurs (« Arc-en-ciel ») : le contour devient un
+   dégradé. border-image en ferait autant mais ignore border-radius, ce qui
+   redonnerait des coins carrés ; on superpose donc deux fonds. */
+.carte-droide.contour-degrade {
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+}
+
+/* Pastilles de palier : un aplat, ou le même dégradé en réduction */
+.pastille-palier, .choix-pastille { background-size: cover; }
+
+/* ===== Panneau admin : couleurs des paliers et des raretés ===== */
+.apercu-palier {
+  width: 100%; max-width: 120px; height: 6px;
+  border-radius: 999px; margin-top: 0.35rem;
+}
+.couleurs-palier { display: flex; align-items: center; gap: 0.25rem; flex-wrap: wrap; }
+.couleur-stop { position: relative; display: inline-flex; }
+.couleur-stop input[type="color"] {
+  width: 34px; height: 34px; padding: 2px;
+  border: 1px solid var(--bordure); border-radius: 8px;
+  background: var(--fond); cursor: pointer;
+}
+.retirer-stop {
+  position: absolute; top: -6px; right: -6px;
+  width: 16px; height: 16px; padding: 0; line-height: 1;
+  border: 1px solid var(--bordure); border-radius: 50%;
+  background: var(--carte); color: var(--texte-att);
+  font-size: 0.55rem; cursor: pointer;
+}
+.retirer-stop:hover { background: var(--danger); border-color: var(--danger); color: #fff; }
+.ajouter-stop { width: 34px; height: 34px; flex-shrink: 0; }
+
+/* Raretés : aperçu du badge, et les deux sélecteurs de couleur */
+.apercu-rarete {
+  display: inline-flex; align-items: center;
+  padding: 0.2rem 0.6rem; border-radius: 999px;
+  font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em;
+}
+.couleur-libelle {
+  display: flex; flex-direction: column; align-items: center; gap: 0.15rem;
+  font-size: 0.65rem; color: var(--texte-att);
+}
+.couleur-libelle input[type="color"] {
+  width: 34px; height: 30px; padding: 2px;
+  border: 1px solid var(--bordure); border-radius: 8px;
+  background: var(--fond); cursor: pointer;
+}

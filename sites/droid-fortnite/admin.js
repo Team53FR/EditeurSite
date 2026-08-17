@@ -8,6 +8,7 @@ let shaCatalogue = null;
 let paliers = [];
 let shaPaliers = null;
 let shaUnites = null;
+let shaRaretes = null;
 let modeEditionId = null; // id du droïde en cours de modification, ou null (mode ajout)
 const cacheImages = new Map(); // chemin GitHub -> URL locale (blob:)
 
@@ -52,7 +53,7 @@ function retirerImageAdmin() {
   document.getElementById("boutonSupprimerImageAdmin").style.display = "none";
 }
 
-// ===== Onglets (Droïdes / Ajouter / Paliers / Unités) =====
+// ===== Onglets (Droïdes / Ajouter / Paliers / Unités / Raretés) =====
 let ongletAdminActif = "droides";
 
 function changerOngletAdmin(type) {
@@ -62,6 +63,7 @@ function changerOngletAdmin(type) {
   document.getElementById("zoneAjout").style.display = type === "ajout" ? "" : "none";
   document.getElementById("zonePaliers").style.display = type === "paliers" ? "" : "none";
   document.getElementById("zoneUnites").style.display = type === "unites" ? "" : "none";
+  document.getElementById("zoneRaretes").style.display = type === "raretes" ? "" : "none";
 }
 
 // Clic sur l'onglet « Ajouter » : repart toujours d'un formulaire vide (pour
@@ -78,10 +80,11 @@ if (token) {
 async function chargerDonnees() {
   const message = document.getElementById("messageDroideAdmin");
   try {
-    const [rCatalogue, rPaliers, rUnites] = await Promise.all([
+    const [rCatalogue, rPaliers, rUnites, rRaretes] = await Promise.all([
       chargerOuAmorcer("catalogue.json", CATALOGUE_INITIAL, token, "Amorçage du catalogue de droïdes"),
       chargerOuAmorcer("paliers.json", PALIERS_INITIAUX, token, "Amorçage de la liste des paliers"),
-      chargerOuAmorcer("unites.json", UNITES_INITIALES, token, "Amorçage des unités de grandeur")
+      chargerOuAmorcer("unites.json", UNITES_INITIALES, token, "Amorçage des unités de grandeur"),
+      chargerOuAmorcer("raretes.json", RARETES_INITIALES, token, "Amorçage des couleurs de rareté")
     ]);
     catalogue = Array.isArray(rCatalogue.contenu) ? rCatalogue.contenu : [];
     shaCatalogue = rCatalogue.sha;
@@ -91,6 +94,9 @@ async function chargerDonnees() {
     const unitesChargees = normaliserUnites(rUnites.contenu);
     unites = unitesChargees.length ? unitesChargees : UNITES_INITIALES;
     shaUnites = rUnites.sha;
+    raretes = normaliserRaretes(rRaretes.contenu);
+    shaRaretes = rRaretes.sha;
+    appliquerCouleursRaretes();
   } catch (e) {
     message.textContent = e.message;
     return;
@@ -98,6 +104,7 @@ async function chargerDonnees() {
   afficherDroides();
   afficherPaliers();
   afficherUnites();
+  afficherRaretes();
 }
 
 // ===== Droïdes =====
@@ -187,7 +194,7 @@ function construireGrillePrixRendement(d) {
 
     ligne.innerHTML =
       '<span class="nom-palier">' +
-        '<span class="pastille-palier" style="background:' + (p.couleur || "transparent") + '"></span>' +
+        '<span class="pastille-palier" style="background:' + fondPalier(p.couleur) + '"></span>' +
         echapper(p.nom) +
       "</span>" +
       '<span class="duo-valeur">' +
@@ -370,11 +377,50 @@ function afficherPaliers() {
     const li = document.createElement("li");
     li.className = "ligne-item";
     li.innerHTML =
-      `<div class="ligne-info"><div class="ligne-titre">${index + 1}. ${echapper(p.nom)}</div></div>` +
-      `<input type="color" class="palier-couleur" value="${echapper(p.couleur || "#9ca3af")}" title="Couleur du contour">` +
+      `<div class="ligne-info">` +
+        `<div class="ligne-titre">${index + 1}. ${echapper(p.nom)}</div>` +
+        `<div class="apercu-palier" style="background:${fondPalier(p.couleur)}"></div>` +
+      `</div>` +
+      `<div class="couleurs-palier"></div>` +
       `<div class="ligne-actions"></div>`;
 
-    li.querySelector(".palier-couleur").addEventListener("change", (e) => changerCouleurPalier(index, e.target.value));
+    // Un sélecteur par couleur : à partir de deux, le contour devient un
+    // dégradé (c'est ainsi qu'« Arc-en-ciel » en porte plusieurs).
+    const couleurs = couleursPalier(p.couleur);
+    if (!couleurs.length) couleurs.push("#9ca3af");
+    const zoneCouleurs = li.querySelector(".couleurs-palier");
+
+    couleurs.forEach((c, iCouleur) => {
+      const enveloppe = document.createElement("span");
+      enveloppe.className = "couleur-stop";
+      const champ = document.createElement("input");
+      champ.type = "color";
+      champ.value = c;
+      champ.title = couleurs.length > 1 ? `Couleur ${iCouleur + 1} du dégradé` : "Couleur du contour";
+      champ.addEventListener("change", () => {
+        const suite = couleurs.slice();
+        suite[iCouleur] = champ.value;
+        changerCouleursPalier(index, suite);
+      });
+      enveloppe.appendChild(champ);
+
+      if (couleurs.length > 1) {
+        const retirer = document.createElement("button");
+        retirer.className = "retirer-stop";
+        retirer.textContent = "✕";
+        retirer.title = "Retirer cette couleur";
+        retirer.onclick = () => changerCouleursPalier(index, couleurs.filter((_, i) => i !== iCouleur));
+        enveloppe.appendChild(retirer);
+      }
+      zoneCouleurs.appendChild(enveloppe);
+    });
+
+    const ajouter = document.createElement("button");
+    ajouter.className = "btn-mini ajouter-stop";
+    ajouter.textContent = "＋";
+    ajouter.title = "Ajouter une couleur (dégradé)";
+    ajouter.onclick = () => changerCouleursPalier(index, couleurs.concat([couleurs[couleurs.length - 1]]));
+    zoneCouleurs.appendChild(ajouter);
 
     const actions = li.querySelector(".ligne-actions");
 
@@ -417,10 +463,15 @@ async function sauvegarderPaliers(copie, messageCommit) {
   }
 }
 
-function changerCouleurPalier(index, couleur) {
+// Une seule couleur est stockée comme chaîne, plusieurs comme tableau :
+// c'est ce que normaliserPaliers() et fondPalier() attendent.
+function changerCouleursPalier(index, couleurs) {
+  const nettoyees = couleurs.filter(Boolean);
   const copie = paliers.slice();
-  copie[index] = Object.assign({}, copie[index], { couleur });
-  sauvegarderPaliers(copie, `Couleur du palier ${copie[index].nom}`);
+  copie[index] = Object.assign({}, copie[index], {
+    couleur: nettoyees.length > 1 ? nettoyees : (nettoyees[0] || null)
+  });
+  sauvegarderPaliers(copie, `Couleurs du palier ${copie[index].nom}`);
 }
 
 function ajouterPalier() {
@@ -531,4 +582,71 @@ function supprimerUnite(index) {
   if (!confirm("Supprimer l'unité « " + u.symbole + " » ?\n\n" +
       "Les montants déjà saisis ne changent pas : ils sont enregistrés en crédits.")) return;
   sauvegarderUnites(unites.filter((_, i) => i !== index), "Suppression de l'unité " + u.symbole);
+}
+
+// ===== Couleurs des raretés =====
+// Partagées (raretes.json). La LISTE des raretés n'est pas modifiable :
+// ORDRE_RARETE structure le tri du catalogue, les filtres du Droidex et le
+// formulaire d'ajout. Seules les couleurs le sont.
+
+function afficherRaretes() {
+  const liste = document.getElementById("listeRaretes");
+  liste.innerHTML = "";
+
+  raretes.forEach((r, index) => {
+    const li = document.createElement("li");
+    li.className = "ligne-item";
+    li.innerHTML =
+      '<div class="ligne-info">' +
+        '<span class="badge-rarete ' + classeRareteCss(r.nom) + ' apercu-rarete">' +
+          echapper(r.nom) +
+        "</span>" +
+      "</div>" +
+      '<div class="ligne-actions">' +
+        '<label class="couleur-libelle">Fond' +
+          '<input type="color" class="rarete-fond" value="' + echapper(r.fond) + '">' +
+        "</label>" +
+        '<label class="couleur-libelle">Texte' +
+          '<input type="color" class="rarete-texte" value="' + echapper(r.texte) + '">' +
+        "</label>" +
+      "</div>";
+
+    // Aperçu immédiat pendant qu'on fait glisser le sélecteur ; on
+    // n'enregistre qu'au relâchement (change), pas à chaque nuance (input).
+    const badge = li.querySelector(".apercu-rarete");
+    const fond = li.querySelector(".rarete-fond");
+    const texte = li.querySelector(".rarete-texte");
+    const apercu = () => {
+      badge.style.background = fond.value;
+      badge.style.color = texte.value;
+    };
+    fond.oninput = apercu;
+    texte.oninput = apercu;
+    fond.onchange = () => changerCouleurRarete(index, { fond: fond.value });
+    texte.onchange = () => changerCouleurRarete(index, { texte: texte.value });
+
+    liste.appendChild(li);
+  });
+}
+
+function changerCouleurRarete(index, modif) {
+  const copie = raretes.map((r, i) => (i === index ? Object.assign({}, r, modif) : r));
+  sauvegarderRaretes(copie, "Couleur de la rareté " + raretes[index].nom);
+}
+
+async function sauvegarderRaretes(nouvelles, messageCommit) {
+  const message = document.getElementById("messageRaretes");
+  message.className = "message";
+  message.textContent = "Enregistrement...";
+  try {
+    shaRaretes = await sauvegarderAvecRetry("raretes.json", nouvelles, shaRaretes, token, messageCommit);
+    raretes = nouvelles;
+    appliquerCouleursRaretes();
+    afficherRaretes();
+    afficherDroides();          // les badges des cartes suivent
+    message.className = "message ok";
+    message.textContent = "Enregistré.";
+  } catch (e) {
+    message.textContent = e.message;
+  }
 }

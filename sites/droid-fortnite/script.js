@@ -365,6 +365,90 @@ function formaterRendement(d, palier) {
   return f === null ? null : f + "/s";
 }
 
+// ===== Couleurs des raretés =====
+//
+// Éditables depuis le panneau admin (DroidFortnite/raretes.json) plutôt que
+// figées dans la feuille de style. Chaque rareté a un fond et une couleur de
+// texte : c'est le couple qui doit rester lisible, pas le fond seul.
+//
+// Les règles sont injectées dans un <style> plutôt qu'appliquées badge par
+// badge : elles valent ainsi partout où un badge apparaît — cartes du
+// Droidex, panneau admin, feuille de choix de l'escouade — sans que chaque
+// endroit ait à y penser.
+const RARETES_INITIALES = [
+  { nom: "Typique",    fond: "#123540", texte: "#7dd3e0" },
+  { nom: "Rare",       fond: "#0e3a44", texte: "#22d3ee" },
+  { nom: "Épique",     fond: "#4c1d95", texte: "#ddd6fe" },
+  { nom: "Légendaire", fond: "#78350f", texte: "#fde68a" },
+  { nom: "Mythique",   fond: "#831843", texte: "#fbcfe8" },
+  { nom: "Iconique",   fond: "#065f46", texte: "#a7f3d0" }
+];
+
+let raretes = RARETES_INITIALES;
+
+function normaliserRaretes(brutes) {
+  const liste = Array.isArray(brutes) ? brutes : [];
+  // La liste des raretés elle-même ne s'édite pas (ORDRE_RARETE structure le
+  // tri, les filtres et le formulaire) : on ne reprend que les couleurs des
+  // raretés connues, et on complète avec les valeurs de départ.
+  return RARETES_INITIALES.map((defaut) => {
+    const trouve = liste.find((r) => r && r.nom === defaut.nom);
+    return {
+      nom: defaut.nom,
+      fond: (trouve && trouve.fond) || defaut.fond,
+      texte: (trouve && trouve.texte) || defaut.texte
+    };
+  });
+}
+
+function appliquerCouleursRaretes() {
+  let style = document.getElementById("stylesRaretes");
+  if (!style) {
+    style = document.createElement("style");
+    style.id = "stylesRaretes";
+    document.head.appendChild(style);
+  }
+  style.textContent = raretes.map((r) =>
+    ".badge-rarete." + classeRareteCss(r.nom) +
+    " { background: " + r.fond + "; color: " + r.texte + "; }"
+  ).join("\n");
+}
+
+// ===== Couleur d'un palier : une teinte, ou plusieurs =====
+//
+// « Arc-en-ciel » n'est pas une couleur : c'est une suite de couleurs. Un
+// palier accepte donc soit une chaîne (cas courant), soit un tableau de
+// chaînes, auquel cas son contour devient un dégradé.
+function couleursPalier(couleur) {
+  if (Array.isArray(couleur)) return couleur.filter(Boolean);
+  return couleur ? [couleur] : [];
+}
+
+// Valeur CSS de fond : une couleur pleine, ou un dégradé.
+function fondPalier(couleur) {
+  const c = couleursPalier(couleur);
+  if (!c.length) return "transparent";
+  if (c.length === 1) return c[0];
+  return "linear-gradient(135deg, " + c.join(", ") + ")";
+}
+
+// Contour d'une carte. Une bordure CSS ne peut pas être un dégradé, et
+// border-image ignore border-radius (coins carrés). On superpose donc deux
+// fonds : l'intérieur opaque rogné sur la boîte de padding, le dégradé rogné
+// sur la boîte de bordure — ce qui donne un contour dégradé aux coins ronds.
+function appliquerContourPalier(el, couleur) {
+  const c = couleursPalier(couleur);
+  el.classList.remove("contour-degrade");
+  el.style.backgroundImage = "";
+  if (!c.length) return;
+  if (c.length === 1) { el.style.borderColor = c[0]; return; }
+  el.classList.add("contour-degrade");
+  el.style.borderColor = "transparent";
+  el.style.backgroundImage =
+    "linear-gradient(var(--fond-carte-droide), var(--fond-carte-droide)), " +
+    "linear-gradient(135deg, " + c.join(", ") + ")";
+}
+
 // ===== Carte de droïde : visuel commun au Droidex et au panneau admin =====
 //
 // Reprend la présentation du tracker communautaire Droidex : vignette
@@ -428,7 +512,7 @@ function construireCarteDroide(d, options) {
   const o = options || {};
   const carte = document.createElement("div");
   carte.className = "carte-droide" + (o.possede ? " possede" : "") + (o.admin ? " admin" : "");
-  if (o.couleur) carte.style.borderColor = o.couleur;
+  appliquerContourPalier(carte, o.couleur);
 
   carte.innerHTML =
     `<div class="dx-nom">${echapperTexte(d.nom)}</div>` +
@@ -820,7 +904,8 @@ const PALIERS_INITIAUX = [
   { nom: "Défaut", couleur: "#9ca3af" },
   { nom: "Or", couleur: "#eab308" },
   { nom: "Diamant", couleur: "#38bdf8" },
-  { nom: "Arc-en-ciel", couleur: "#a855f7" },
+  // Plusieurs couleurs : le contour devient un dégradé (voir fondPalier).
+  { nom: "Arc-en-ciel", couleur: ["#f43f5e", "#f97316", "#facc15", "#22c55e", "#3b82f6", "#a855f7"] },
   { nom: "Beskar", couleur: "#94a3b8" },
   { nom: "Galactique", couleur: "#4f46e5" },
   { nom: "Stellar", couleur: "#f97316" }
@@ -834,7 +919,10 @@ const ORDRE_RARETE = ["Typique", "Rare", "Épique", "Légendaire", "Mythique", "
 // avant l'ajout d'une couleur par palier) : on la reconnaît et la convertit
 // à la volée, sans rien casser pour qui l'a déjà utilisée.
 function normaliserPaliers(bruts) {
-  return (Array.isArray(bruts) ? bruts : []).map((p) =>
-    typeof p === "string" ? { nom: p, couleur: null } : p
-  );
+  return (Array.isArray(bruts) ? bruts : []).map((p) => {
+    if (typeof p === "string") return { nom: p, couleur: null };
+    // couleur peut être une chaîne (une teinte) ou un tableau (un dégradé).
+    const couleurs = couleursPalier(p && p.couleur);
+    return { nom: p.nom, couleur: couleurs.length > 1 ? couleurs : (couleurs[0] || null) };
+  });
 }

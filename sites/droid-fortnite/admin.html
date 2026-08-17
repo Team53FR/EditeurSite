@@ -31,6 +31,7 @@
       <button type="button" class="onglet-type" data-type="ajout" onclick="ouvrirOngletAjout()">➕ Ajouter</button>
       <button type="button" class="onglet-type" data-type="paliers" onclick="changerOngletAdmin('paliers')">🎚️ Paliers</button>
       <button type="button" class="onglet-type" data-type="unites" onclick="changerOngletAdmin('unites')">📏 Unités</button>
+      <button type="button" class="onglet-type" data-type="raretes" onclick="changerOngletAdmin('raretes')">🎨 Raretés</button>
     </div>
   </header>
 
@@ -104,6 +105,15 @@
       </div>
     </div>
 
+    <div id="zoneRaretes" style="display:none">
+      <div class="bloc-carte">
+        <h2>Couleurs des raretés</h2>
+        <p class="sous-titre">Le fond et le texte de chaque pastille de rareté, partout où elle apparaît. La liste des raretés elle-même ne change pas : elle structure le tri, les filtres et le formulaire.</p>
+        <ul class="liste-simple" id="listeRaretes"></ul>
+        <p id="messageRaretes" class="message"></p>
+      </div>
+    </div>
+
     <div id="zoneUnites" style="display:none">
       <div class="bloc-carte">
         <h2>Unités de grandeur</h2>
@@ -126,7 +136,7 @@
     <div id="zonePaliers" style="display:none">
       <div class="bloc-carte">
         <h2>Paliers de variante</h2>
-        <p class="sous-titre">Ordre du plus faible au plus fort — détermine les onglets du Droidex. La couleur de chaque palier teinte le contour des cartes quand son onglet est actif. Un droïde de rareté Iconique n'existe qu'au premier palier de la liste.</p>
+        <p class="sous-titre">Ordre du plus faible au plus fort — détermine les onglets du Droidex. La couleur de chaque palier teinte le contour des cartes quand son onglet est actif. Un droïde de rareté Iconique n'existe qu'au premier palier de la liste. Le bouton ＋ ajoute une couleur à un palier : à partir de deux, son contour devient un dégradé — c'est ainsi qu'« Arc-en-ciel » en porte plusieurs.</p>
         <ul class="liste-simple" id="listePaliers"></ul>
 
         <div class="champ">

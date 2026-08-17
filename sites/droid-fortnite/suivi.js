@@ -52,11 +52,12 @@ if (token) {
 
 async function chargerTout() {
   try {
-    const [rCatalogue, rRenaissance, rPaliers, rPerso] = await Promise.all([
+    const [rCatalogue, rRenaissance, rPaliers, rUnites, rRaretes] = await Promise.all([
       chargerOuAmorcer("catalogue.json", CATALOGUE_INITIAL, token, "Amorçage du catalogue de droïdes"),
       chargerOuAmorcer("renaissance.json", RENAISSANCE_INITIALE, token, "Amorçage des paliers de renaissance"),
       chargerOuAmorcer("paliers.json", PALIERS_INITIAUX, token, "Amorçage de la liste des paliers"),
       chargerOuAmorcer("unites.json", UNITES_INITIALES, token, "Amorçage des unités de grandeur"),
+      chargerOuAmorcer("raretes.json", RARETES_INITIALES, token, "Amorçage des couleurs de rareté"),
       chargerBibliothequePerso()
     ]);
     catalogue = Array.isArray(rCatalogue.contenu) ? rCatalogue.contenu : [];
@@ -66,6 +67,10 @@ async function chargerTout() {
     const paliersCharges = normaliserPaliers(rPaliers.contenu);
     paliers = paliersCharges.length ? paliersCharges : PALIERS_INITIAUX;
     palierActif = paliers[0].nom;
+    const unitesChargees = normaliserUnites(rUnites.contenu);
+    unites = unitesChargees.length ? unitesChargees : UNITES_INITIALES;
+    raretes = normaliserRaretes(rRaretes.contenu);
+    appliquerCouleursRaretes();
   } catch (e) {
     document.getElementById("chargement").innerHTML =
       `<p style="color:var(--danger);text-align:center">${echapperHTML(e.message)}</p>`;
@@ -517,7 +522,7 @@ function afficherChoixSlot() {
     item.type = "button";
     item.className = "choix-droide";
     item.innerHTML =
-      '<span class="choix-pastille" style="background:' + (l.couleur || "transparent") + '"></span>' +
+      '<span class="choix-pastille" style="background:' + fondPalier(l.couleur) + '"></span>' +
       '<span class="choix-nom">' + echapperHTML(l.droide.nom) +
         '<small>' + echapperHTML(l.palier) + (l.possede ? " · possédé" : "") +
           (l.dejaPlaces ? " · déjà placé " + l.dejaPlaces + "×" : "") + "</small></span>" +

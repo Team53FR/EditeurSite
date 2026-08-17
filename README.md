@@ -80,7 +80,7 @@ mélanger ses données avec celles d'un autre site :
 |-------------------|------------------------------|--------------------------------------------|
 | editeur-livre      | `EditeurLivre/`             | `users.json`, `bibliotheques/<login>.json`, `images/<login>/…` |
 | ma-bibliotheque    | `MaBibliotheque/`           | `users.json`, `bibliotheques/<login>.json`, `images/<login>/…` |
-| droid-fortnite     | `DroidFortnite/`            | `users.json`, `catalogue.json`, `renaissance.json`, `paliers.json`, `unites.json` (partagés), `bibliotheques/<login>.json` (personnel) |
+| droid-fortnite     | `DroidFortnite/`            | `users.json`, `catalogue.json`, `renaissance.json`, `paliers.json`, `unites.json`, `raretes.json` (partagés), `bibliotheques/<login>.json` (personnel) |
 | portail central    | `Web/`                      | `utilisateurs.json`, `sites.json`         |
 
 Les trois sites suivent donc le **même modèle par compte** pour leurs données
@@ -455,6 +455,23 @@ uniquement quand un seul compte écrit jamais un fichier donné, comme
 `bibliotheques/<login>.json`), elle relit le **contenu** distant et y
 fusionne les entrées locales absentes (par `id`), pour ne jamais perdre
 silencieusement l'ajout fait par quelqu'un d'autre entre-temps.
+
+**Couleurs des raretés** : le fond et le texte de chaque pastille vivent dans
+`DroidFortnite/raretes.json`, éditables depuis l'onglet **Raretés** du panneau
+admin. Les règles sont injectées dans un `<style>` au chargement
+(`appliquerCouleursRaretes()`) plutôt qu'appliquées badge par badge : elles
+valent ainsi partout — cartes, panneau admin, feuille de choix de l'escouade.
+La feuille de style ne doit donc plus porter de règle `.badge-rarete.<rareté>`,
+qui l'emporterait en spécificité. La **liste** des raretés, elle, n'est pas
+modifiable : `ORDRE_RARETE` structure le tri, les filtres et le formulaire.
+
+**Un palier peut porter plusieurs couleurs.** `couleur` est soit une chaîne,
+soit un tableau ; à partir de deux, le contour des cartes devient un dégradé —
+c'est ainsi qu'« Arc-en-ciel » en est un vrai. Une bordure CSS ne pouvant pas
+être un dégradé, et `border-image` ignorant `border-radius` (coins carrés),
+`appliquerContourPalier()` superpose deux fonds : l'intérieur opaque rogné sur
+la boîte de padding, le dégradé rogné sur la boîte de bordure. Les coins
+restent ronds.
 
 **Panneau admin (`admin.html`)**, réservé aux admins du portail central : pas
 de rôle propre à Droid Fortnite, `estAdminCentral()`/`exigerAdminDroidFortnite()`
