@@ -345,6 +345,13 @@ pouvant être possédé **indépendamment à chaque palier**, comme dans le jeu,
 pas juste à un seul palier « actuel ») et une liste des paliers de
 « renaissance » (crédits + droïdes requis pour chaque niveau).
 
+L'onglet **Tous**, en tête des paliers, affiche chaque droïde à chacun de ses
+paliers — une carte par couple, avec son étiquette de palier et la couleur de
+contour correspondante. Le Droidex raisonne donc sur des couples
+(`combinaisonsDroidex()`) et non sur des droïdes : `basculerPossession()` reçoit
+le palier en paramètre, puisque `palierActif` vaut alors une sentinelle
+(`TOUS_PALIERS`) qui ne désigne aucun palier réel.
+
 La progression personnelle stocke donc des clés composites
 `"<idDroide>::<palier>"` dans `droidesPossedes` (un tableau, une clé par
 combinaison droïde+palier réellement possédée) plutôt qu'un simple palier

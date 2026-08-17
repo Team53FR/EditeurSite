@@ -89,22 +89,35 @@ async function chargerTout() {
   afficherRenaissance();
 }
 
+// Onglet « Tous » : affiche chaque droïde à chacun de ses paliers, comme
+// autant de cartes. La valeur ne peut pas être un nom de palier réel — on
+// prend un caractère qu'un nom ne contiendra jamais.
+const TOUS_PALIERS = "*";
+
 function construireOngletsPalier() {
   const zone = document.getElementById("ongletsPalier");
   zone.innerHTML = "";
-  paliers.forEach((p) => {
+
+  const ajouter = (valeur, libelle) => {
     const bouton = document.createElement("button");
     bouton.type = "button";
-    bouton.className = "onglet-palier" + (p.nom === palierActif ? " actif" : "");
-    bouton.textContent = p.nom;
-    bouton.addEventListener("click", () => changerPalierActif(p.nom));
+    bouton.className = "onglet-palier" + (valeur === palierActif ? " actif" : "");
+    bouton.dataset.palier = valeur;
+    bouton.textContent = libelle;
+    bouton.addEventListener("click", () => changerPalierActif(valeur));
     zone.appendChild(bouton);
-  });
+  };
+
+  ajouter(TOUS_PALIERS, "Tous");
+  paliers.forEach((p) => ajouter(p.nom, p.nom));
 }
 
 function changerPalierActif(nom) {
   palierActif = nom;
-  document.querySelectorAll(".onglet-palier").forEach((b) => b.classList.toggle("actif", b.textContent === nom));
+  // Comparaison sur dataset et non sur le libellé : « Tous » n'est pas un
+  // nom de palier.
+  document.querySelectorAll(".onglet-palier").forEach((b) =>
+    b.classList.toggle("actif", b.dataset.palier === nom));
   afficherDroidex();
 }
 
@@ -165,19 +178,36 @@ function afficherToast(texte, erreur) {
 }
 
 // ===== Onglet Droidex =====
+// Les combinaisons affichées : un couple droïde + palier par carte. Sur un
+// palier donné il y en a une par droïde ; sur « Tous », une par palier où le
+// droïde existe — c'est le couple qui porte la possession, le prix et le
+// rendement.
+function combinaisonsDroidex() {
+  const nomsPaliers = palierActif === TOUS_PALIERS ? paliers.map((p) => p.nom) : [palierActif];
+  const combos = [];
+  nomsPaliers.forEach((nomPalier) => {
+    const couleur = (paliers.find((p) => p.nom === nomPalier) || {}).couleur;
+    catalogue.forEach((d) => {
+      if (estDisponibleAuPalier(d, nomPalier)) combos.push({ droide: d, palier: nomPalier, couleur });
+    });
+  });
+  return combos;
+}
+
 function afficherDroidex() {
   const recherche = (document.getElementById("champRecherche").value || "").trim().toLowerCase();
   const filtreClasse = document.getElementById("filtreClasse").value;
   const filtreRarete = document.getElementById("filtreRarete").value;
   const filtrePossede = document.getElementById("filtrePossede").value;
 
-  const disponibles = catalogue.filter((d) => estDisponibleAuPalier(d, palierActif));
+  const disponibles = combinaisonsDroidex();
 
-  const filtres = disponibles.filter((d) => {
+  const filtres = disponibles.filter((c) => {
+    const d = c.droide;
     if (recherche && !d.nom.toLowerCase().includes(recherche)) return false;
     if (filtreClasse && d.classe !== filtreClasse) return false;
     if (filtreRarete && d.rarete !== filtreRarete) return false;
-    const possede = perso.droidesPossedes.includes(clePossession(d.id, palierActif));
+    const possede = perso.droidesPossedes.includes(clePossession(d.id, c.palier));
     if (filtrePossede === "oui" && !possede) return false;
     if (filtrePossede === "non" && possede) return false;
     return true;
@@ -188,35 +218,38 @@ function afficherDroidex() {
   grille.innerHTML = "";
   vide.style.display = filtres.length ? "none" : "";
 
-  // Le contour des cartes prend la couleur du PALIER actif (définie dans le
-  // gestionnaire), pas une couleur propre à chaque droïde.
-  const palierObjActif = paliers.find((p) => p.nom === palierActif);
-  const couleurPalierActif = palierObjActif && palierObjActif.couleur;
-
-  filtres.forEach((d) => {
-    const possede = perso.droidesPossedes.includes(clePossession(d.id, palierActif));
-    const carte = construireCarteDroide(d, {
-      possede,
-      couleur: couleurPalierActif,
-      palier: palierActif
+  filtres.forEach((c) => {
+    const possede = perso.droidesPossedes.includes(clePossession(c.droide.id, c.palier));
+    // Le contour prend la couleur du palier de LA CARTE : sur « Tous », elles
+    // ne partagent pas le même.
+    const carte = construireCarteDroide(c.droide, {
+      possede, couleur: c.couleur, palier: c.palier
     });
     carte.setAttribute("role", "button");
     carte.setAttribute("aria-pressed", possede ? "true" : "false");
-    carte.addEventListener("click", () => basculerPossession(d.id));
+    // Sur « Tous », le palier n'est pas déductible de la carte : on l'étiquette.
+    if (palierActif === TOUS_PALIERS) {
+      carte.insertAdjacentHTML("beforeend",
+        '<span class="etiquette-palier">' + echapperHTML(c.palier) + "</span>");
+    }
+    carte.addEventListener("click", () => basculerPossession(c.droide.id, c.palier));
     grille.appendChild(carte);
   });
 
   const total = disponibles.length;
-  const possedes = disponibles.filter((d) => perso.droidesPossedes.includes(clePossession(d.id, palierActif))).length;
+  const possedes = disponibles.filter((c) =>
+    perso.droidesPossedes.includes(clePossession(c.droide.id, c.palier))).length;
   const pct = total ? Math.round((possedes / total) * 100) : 0;
   document.getElementById("compteurDroidex").innerHTML =
-    `<b>${possedes} / ${total}</b> au palier ${echapperHTML(palierActif)}` +
+    `<b>${possedes} / ${total}</b> ` +
+    (palierActif === TOUS_PALIERS ? "tous paliers confondus" : `au palier ${echapperHTML(palierActif)}`) +
     `<div class="barre-progression"><span style="width:${pct}%"></span></div>`;
 }
 
-
-function basculerPossession(idDroide) {
-  const cle = clePossession(idDroide, palierActif);
+// Le palier est passé explicitement : sur l'onglet « Tous », palierActif ne
+// désigne aucun palier réel.
+function basculerPossession(idDroide, palier) {
+  const cle = clePossession(idDroide, palier);
   const index = perso.droidesPossedes.indexOf(cle);
   if (index === -1) perso.droidesPossedes.push(cle);
   else perso.droidesPossedes.splice(index, 1);
