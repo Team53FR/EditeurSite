@@ -20,18 +20,10 @@ function formaterDateConnexion(iso) {
   });
 }
 
-function seDeconnecter() {
-  sessionStorage.removeItem("gh_token");
-  sessionStorage.removeItem("gh_login");
-  sessionStorage.removeItem("gh_role");
-  sessionStorage.removeItem("gh_nom");
-  sessionStorage.removeItem("livre_id");
-  window.location.href = "index.html";
-}
 
 async function chargerUtilisateurs() {
-  const token = sessionStorage.getItem("gh_token");
-  const login = sessionStorage.getItem("gh_login");
+  const token = localStorage.getItem("gh_token");
+  const login = localStorage.getItem("gh_login");
   const message = document.getElementById("message");
 
   if (!token || !login) { window.location.href = "connexion.html"; return; }
@@ -58,7 +50,7 @@ async function chargerUtilisateurs() {
 
 function afficherUtilisateurs() {
   const liste = document.getElementById("listeUtilisateurs");
-  const moi = sessionStorage.getItem("gh_login");
+  const moi = localStorage.getItem("gh_login");
   liste.innerHTML = "";
 
   utilisateurs.forEach((u) => {
@@ -148,9 +140,9 @@ function annulerEdition() {
 }
 
 async function enregistrerUtilisateur() {
-  const token = sessionStorage.getItem("gh_token");
+  const token = localStorage.getItem("gh_token");
   const message = document.getElementById("message");
-  const moi = sessionStorage.getItem("gh_login");
+  const moi = localStorage.getItem("gh_login");
 
   const login = document.getElementById("champLogin").value.trim();
   const password = document.getElementById("champPassword").value;
@@ -195,12 +187,12 @@ async function enregistrerUtilisateur() {
 }
 
 async function supprimerUtilisateur(login) {
-  const moi = sessionStorage.getItem("gh_login");
+  const moi = localStorage.getItem("gh_login");
   if (login === moi) return; // garde-fou : pas d'auto-suppression
 
   if (!confirm(`Supprimer l'utilisateur « ${login} » ? Cette action est irréversible.\n\n(Sa bibliothèque n'est pas supprimée.)`)) return;
 
-  const token = sessionStorage.getItem("gh_token");
+  const token = localStorage.getItem("gh_token");
   const message = document.getElementById("message");
   const copie = utilisateurs.filter(u => u.login !== login);
 
@@ -348,7 +340,7 @@ async function ouvrirStatsUtilisateur(login) {
   contenu.innerHTML = '<div class="stats-chargement">Chargement des statistiques…</div>';
 
   const u = utilisateurs.find(x => x.login === login) || { login };
-  const token = sessionStorage.getItem("gh_token");
+  const token = localStorage.getItem("gh_token");
 
   let livres = [];
   let erreur = null;
@@ -405,7 +397,7 @@ function basculerDetailLivre(tr) {
 function rendreStats(u, livres, erreur) {
   const role = u.role === "admin" ? "admin" : "user";
   const initiale = (u.login || "?").slice(0, 2).toUpperCase();
-  const estMoi = u.login === sessionStorage.getItem("gh_login");
+  const estMoi = u.login === localStorage.getItem("gh_login");
   const st = statutConnexion(u.derniereConnexion, estMoi);
 
   const agg = livres.reduce((a, l) => {

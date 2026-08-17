@@ -18,7 +18,7 @@ const DEFAULT_SITES = [
     icone: "📖",
     pageArrivee: "sites/editeur-livre/bibliotheque.html",
     relais: {
-      stockage: "sessionStorage",
+      stockage: "localStorage",
       cles: { token: "gh_token", login: "gh_login", role: "gh_role", nom: "gh_nom" }
     }
   },

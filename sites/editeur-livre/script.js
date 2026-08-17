@@ -6,6 +6,50 @@ const DEPOT_BDD = "BDD";
 const DOSSIER_BDD = "EditeurLivre";
 // =============================================
 
+// ===== Session : une seule connexion pour tous les sites =====
+//
+// Le portail central mémorise sa session dans localStorage sous team53_*.
+// Les sites vivant sur la même origine (GitHub Pages), ils y ont accès
+// directement : inutile de se reconnecter en arrivant ici depuis un
+// signet, ou après avoir fermé le navigateur.
+//
+// L'ordre est : session propre au site (gh_*) d'abord — elle peut être
+// plus récente, par exemple si l'on s'est connecté ici directement —
+// puis la session centrale, adoptée telle quelle.
+//
+// Le token n'est plus cantonné à l'onglet : il fallait le retaper à
+// chaque fermeture du navigateur, ce qui était le principal irritant.
+// Il vit donc sur l'appareil, comme sur les autres sites du portail.
+
+const CLES_SESSION = ["gh_token", "gh_login", "gh_role", "gh_nom"];
+const CLES_CENTRALES = { gh_token: "team53_token", gh_login: "team53_login",
+                         gh_role: "team53_role", gh_nom: "team53_nom" };
+
+// Recopie la session centrale sous les clés de ce site, si la nôtre manque.
+function adopterSessionCentrale() {
+  if (localStorage.getItem("gh_token")) return false;
+  const tokenCentral = localStorage.getItem("team53_token");
+  if (!tokenCentral) return false;
+  for (const cle of CLES_SESSION) {
+    const valeur = localStorage.getItem(CLES_CENTRALES[cle]);
+    if (valeur !== null) localStorage.setItem(cle, valeur);
+  }
+  return true;
+}
+
+// Appelée au chargement de chaque page, avant toute vérification d'accès.
+adopterSessionCentrale();
+
+// Déconnexion : la session est commune, on la ferme donc partout, sans quoi
+// la session centrale reprendrait la main au rechargement suivant.
+function seDeconnecter() {
+  for (const cle of CLES_SESSION) localStorage.removeItem(cle);
+  for (const cle of Object.values(CLES_CENTRALES)) localStorage.removeItem(cle);
+  localStorage.removeItem("team53_acces");
+  sessionStorage.removeItem("livre_id");
+  window.location.href = "../../connexion.html";
+}
+
 // Construit l'URL de l'API GitHub pour un chemin RELATIF à la base.
 // Ex. "users.json" -> .../contents/EditeurLivre/users.json
 // Ainsi le reste du code continue de manipuler des chemins courts
@@ -204,7 +248,7 @@ function slugifierLogin(login) {
 }
 
 function obtenirNomFichierBibliotheque() {
-  const login = sessionStorage.getItem("gh_login");
+  const login = localStorage.getItem("gh_login");
   if (!login) return null;
   return `bibliotheques/${slugifierLogin(login)}.json`;
 }
@@ -220,7 +264,7 @@ function cheminBibliothequeDe(login) {
 // réapparaisse pas indéfiniment sur cet appareil.
 
 function cleTutoLocale(champ) {
-  return `tuto_${champ}_${sessionStorage.getItem("gh_login") || ""}`;
+  return `tuto_${champ}_${localStorage.getItem("gh_login") || ""}`;
 }
 
 function tutoDejaVu(bib, champ) {
@@ -265,7 +309,7 @@ async function lireIndexPublies(token) {
 }
 
 function obtenirPrefixeImagesUtilisateur() {
-  const login = sessionStorage.getItem("gh_login");
+  const login = localStorage.getItem("gh_login");
   return `images/${slugifierLogin(login)}`;
 }
 
@@ -291,10 +335,10 @@ async function seConnecter() {
 
     if (utilisateur) {
       // Le token reste UNIQUEMENT en mémoire de session (jamais écrit dans un fichier)
-      sessionStorage.setItem("gh_token", token);
-      sessionStorage.setItem("gh_login", login);
-      sessionStorage.setItem("gh_role", utilisateur.role === "admin" ? "admin" : "user");
-      sessionStorage.setItem("gh_nom", utilisateur.nomAffichage ? String(utilisateur.nomAffichage) : "");
+      localStorage.setItem("gh_token", token);
+      localStorage.setItem("gh_login", login);
+      localStorage.setItem("gh_role", utilisateur.role === "admin" ? "admin" : "user");
+      localStorage.setItem("gh_nom", utilisateur.nomAffichage ? String(utilisateur.nomAffichage) : "");
 
       // Enregistrer la date de dernière connexion dans users.json (best-effort :
       // ne doit jamais empêcher la connexion en cas d'échec d'écriture).

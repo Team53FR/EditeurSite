@@ -245,10 +245,43 @@ async function seConnecter() {
   }
 }
 
+// ===== Session : une seule connexion pour tous les sites =====
+//
+// Le portail central mémorise sa session dans localStorage sous team53_*.
+// Ce site vivant sur la même origine (GitHub Pages), il y a accès
+// directement : inutile de se reconnecter en arrivant ici depuis un
+// signet, ou après avoir fermé le navigateur.
+//
+// La session propre au site passe d'abord — elle peut être plus récente,
+// si l'on s'est connecté ici directement — puis la session centrale.
+
+const CLES_SESSION = ["mb_token", "mb_login"];
+const CLES_CENTRALES = { mb_token: "team53_token",
+                         mb_login: "team53_login" };
+
+// Recopie la session centrale sous les clés de ce site, si la nôtre manque.
+function adopterSessionCentrale() {
+  if (localStorage.getItem("mb_token")) return false;
+  if (!localStorage.getItem("team53_token")) return false;
+  for (const cle of CLES_SESSION) {
+    const valeur = localStorage.getItem(CLES_CENTRALES[cle]);
+    if (valeur !== null) localStorage.setItem(cle, valeur);
+  }
+  return true;
+}
+
+adopterSessionCentrale();
+
+// La session est commune à tous les sites du portail : on la ferme donc
+// partout, sans quoi la session centrale reprendrait la main au
+// rechargement suivant.
 function seDeconnecter() {
-  localStorage.removeItem("mb_token");
-  localStorage.removeItem("mb_login");
-  window.location.href = "connexion.html";
+  for (const cle of CLES_SESSION) localStorage.removeItem(cle);
+  for (const cle of Object.values(CLES_CENTRALES)) localStorage.removeItem(cle);
+  localStorage.removeItem("team53_role");
+  localStorage.removeItem("team53_nom");
+  localStorage.removeItem("team53_acces");
+  window.location.href = "../../connexion.html";
 }
 
 // Redirige vers la connexion si aucune session mémorisée (token + identité).

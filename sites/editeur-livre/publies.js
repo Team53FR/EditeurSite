@@ -3,10 +3,10 @@
 let listePubliesData = [];
 
 async function chargerPublies() {
-  const token = sessionStorage.getItem("gh_token");
+  const token = localStorage.getItem("gh_token");
   const message = document.getElementById("message");
 
-  if (!token || !sessionStorage.getItem("gh_login")) {
+  if (!token || !localStorage.getItem("gh_login")) {
     window.location.href = "connexion.html";
     return;
   }
@@ -93,7 +93,7 @@ function afficherPublies() {
 
 let cacheImagesPub = {};
 async function chargerImageFondVignette(couvDiv, chemin) {
-  const token = sessionStorage.getItem("gh_token");
+  const token = localStorage.getItem("gh_token");
   if (!token) return;
   try {
     if (!cacheImagesPub[chemin]) cacheImagesPub[chemin] = await obtenirUrlImage(chemin, token);
@@ -110,13 +110,5 @@ function lireLivre(entree) {
   window.location.href = "lecture.html?" + params.toString();
 }
 
-function seDeconnecter() {
-  sessionStorage.removeItem("gh_token");
-  sessionStorage.removeItem("gh_login");
-  sessionStorage.removeItem("gh_role");
-  sessionStorage.removeItem("gh_nom");
-  sessionStorage.removeItem("livre_id");
-  window.location.href = "index.html";
-}
 
 chargerPublies();

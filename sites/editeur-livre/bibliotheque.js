@@ -3,7 +3,7 @@ let shaBiblio = null;
 let nomFichierBiblio = null;
 
 async function chargerBibliotheque() {
-  const token = sessionStorage.getItem("gh_token");
+  const token = localStorage.getItem("gh_token");
   const message = document.getElementById("message");
 
   nomFichierBiblio = obtenirNomFichierBibliotheque();
@@ -51,7 +51,7 @@ async function chargerBibliotheque() {
 // pour qu'il ne réapparaisse jamais, même sur un autre appareil.
 async function marquerTutoVu(champ) {
   if (!bibliotheque || bibliotheque[champ]) return; // déjà marqué : rien à faire
-  const token = sessionStorage.getItem("gh_token");
+  const token = localStorage.getItem("gh_token");
   const nouveauSha = await marquerTutoVuDistant(
     bibliotheque, champ, nomFichierBiblio, shaBiblio, token
   );
@@ -108,8 +108,8 @@ function echapper(txt) {
 }
 
 function nomAffiche() {
-  const login = sessionStorage.getItem("gh_login") || "";
-  const perso = (sessionStorage.getItem("gh_nom") || "").trim();
+  const login = localStorage.getItem("gh_login") || "";
+  const perso = (localStorage.getItem("gh_nom") || "").trim();
   return perso || login || "Auteur";
 }
 
@@ -134,7 +134,7 @@ function remplirProfil() {
 
   // Bouton de gestion des utilisateurs réservé aux admins
   const btnAdmin = document.getElementById("btnAdmin");
-  if (btnAdmin) btnAdmin.style.display = (sessionStorage.getItem("gh_role") === "admin") ? "" : "none";
+  if (btnAdmin) btnAdmin.style.display = (localStorage.getItem("gh_role") === "admin") ? "" : "none";
 
   const livres = (bibliotheque && bibliotheque.livres) || [];
   const totalPages = livres.reduce((n, l) => n + (l.pages ? l.pages.length : 0), 0);
@@ -237,7 +237,7 @@ function dimensionsPageReference(formatKey) {
 // (comme object-fit: contain), avec le zoom et le décalage choisis, le tout
 // mis à l'échelle pour tenir dans la vignette.
 async function chargerImageCouvVignette(couvDiv, chemin, formatKey, data) {
-  const token = sessionStorage.getItem("gh_token");
+  const token = localStorage.getItem("gh_token");
   if (!token) return;
   let url;
   try {
@@ -300,7 +300,7 @@ function ouvrirLivre(id) {
 }
 
 async function creerLivre() {
-  const token = sessionStorage.getItem("gh_token");
+  const token = localStorage.getItem("gh_token");
   const message = document.getElementById("message");
   const champTitre = document.getElementById("titreNouveauLivre");
   const titre = champTitre.value.trim();
@@ -331,7 +331,7 @@ async function creerLivre() {
 }
 
 async function supprimerLivre(id) {
-  const token = sessionStorage.getItem("gh_token");
+  const token = localStorage.getItem("gh_token");
   const message = document.getElementById("message");
   const livre = bibliotheque.livres.find(l => l.id === id);
   if (!livre) return;
@@ -363,7 +363,7 @@ function modifierNom() {
   const edition = document.getElementById("editionNom");
   const champ = document.getElementById("champNom");
   if (!edition || !champ) return;
-  champ.value = sessionStorage.getItem("gh_nom") || "";
+  champ.value = localStorage.getItem("gh_nom") || "";
   edition.style.display = "flex";
   const btn = document.getElementById("btnModifNom");
   if (btn) btn.style.display = "none";
@@ -381,14 +381,14 @@ function annulerNom() {
 }
 
 async function enregistrerNom() {
-  const token = sessionStorage.getItem("gh_token");
-  const login = sessionStorage.getItem("gh_login");
+  const token = localStorage.getItem("gh_token");
+  const login = localStorage.getItem("gh_login");
   const message = document.getElementById("message");
   const champ = document.getElementById("champNom");
   if (!champ) return;
 
   const nouveau = champ.value.trim();
-  const ancien = sessionStorage.getItem("gh_nom") || "";
+  const ancien = localStorage.getItem("gh_nom") || "";
   if (nouveau === ancien) { annulerNom(); return; }
 
   try {
@@ -402,7 +402,7 @@ async function enregistrerNom() {
 
     await ecrireFichierJSON("users.json", utilisateurs, sha, token, "Mise à jour du nom d'affichage");
 
-    sessionStorage.setItem("gh_nom", nouveau);
+    localStorage.setItem("gh_nom", nouveau);
     annulerNom();
     remplirProfil();
     message.textContent = "Nom mis à jour.";
@@ -414,13 +414,5 @@ async function enregistrerNom() {
   }
 }
 
-function seDeconnecter() {
-  sessionStorage.removeItem("gh_token");
-  sessionStorage.removeItem("gh_login");
-  sessionStorage.removeItem("gh_role");
-  sessionStorage.removeItem("gh_nom");
-  sessionStorage.removeItem("livre_id");
-  window.location.href = "index.html";
-}
 
 chargerBibliotheque();

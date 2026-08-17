@@ -456,7 +456,7 @@ function creerCouvertureImpression(livre, mode, f, promessesImages) {
       if (cacheImagesURL[data.imageChemin]) {
         img.src = cacheImagesURL[data.imageChemin];
       } else {
-        const token = sessionStorage.getItem("gh_token");
+        const token = localStorage.getItem("gh_token");
         obtenirUrlImage(data.imageChemin, token).then((url) => {
           cacheImagesURL[data.imageChemin] = url;
           img.src = url;

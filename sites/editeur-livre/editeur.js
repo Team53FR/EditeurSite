@@ -172,7 +172,7 @@ function appliquerReductionSommaire() {
 }
 
 async function chargerLivre() {
-  const token = sessionStorage.getItem("gh_token");
+  const token = localStorage.getItem("gh_token");
   const message = document.getElementById("message");
 
   livreId = sessionStorage.getItem("livre_id");
@@ -728,7 +728,7 @@ function changerFormat(nouveauFormat) {
 // ----- Sauvegarde -----
 
 async function sauvegarder() {
-  const token = sessionStorage.getItem("gh_token");
+  const token = localStorage.getItem("gh_token");
   const message = document.getElementById("message");
 
   flushSpread();
@@ -757,7 +757,7 @@ async function sauvegarder() {
 
 // Résolution d'un conflit d'écriture GitHub (le livre a été modifié ailleurs) (#3)
 async function gererConflitSauvegarde() {
-  const token = sessionStorage.getItem("gh_token");
+  const token = localStorage.getItem("gh_token");
   const message = document.getElementById("message");
 
   const ecraser = confirm(
@@ -883,7 +883,7 @@ function previewCouverture() {
       afficherImageCouverture(cacheImagesURL[cheminImage], cheminImage);
     } else {
       img.style.display = "none";
-      const token = sessionStorage.getItem("gh_token");
+      const token = localStorage.getItem("gh_token");
       const requeteId = ++requeteImageEnCours;
       obtenirUrlImage(cheminImage, token).then((urlImage) => {
         cacheImagesURL[cheminImage] = urlImage;
@@ -1154,7 +1154,7 @@ function initGlissementImageCouverture() {
 function setCouleurFond(couleur) {
   const livre = livreActuel();
   const data = modeCouverture === "couverture" ? livre.couverture : livre.quatrieme;
-  const token = sessionStorage.getItem("gh_token");
+  const token = localStorage.getItem("gh_token");
 
   if (data.imageChemin) {
     supprimerFichierGithub(data.imageChemin, token, "Suppression de l'image de couverture (couleur choisie)").catch(() => {});
@@ -1184,7 +1184,7 @@ function chargerImageFond(event) {
   const fichier = event.target.files[0];
   if (!fichier) return;
 
-  const token = sessionStorage.getItem("gh_token");
+  const token = localStorage.getItem("gh_token");
   const messageCouv = document.getElementById("messageCouv");
   const livre = livreActuel();
   const modeCourant = modeCouverture;
@@ -1226,7 +1226,7 @@ function chargerImageFond(event) {
 function supprimerImageFond() {
   const livre = livreActuel();
   const data = modeCouverture === "couverture" ? livre.couverture : livre.quatrieme;
-  const token = sessionStorage.getItem("gh_token");
+  const token = localStorage.getItem("gh_token");
 
   if (data.imageChemin) {
     supprimerFichierGithub(data.imageChemin, token, "Suppression de l'image de couverture").catch(() => {});
@@ -1244,14 +1244,6 @@ function supprimerImageFond() {
   planifierBrouillon();
 }
 
-function seDeconnecter() {
-  sessionStorage.removeItem("gh_token");
-  sessionStorage.removeItem("gh_login");
-  sessionStorage.removeItem("gh_role");
-  sessionStorage.removeItem("gh_nom");
-  sessionStorage.removeItem("livre_id");
-  window.location.href = "index.html";
-}
 
 // ----- Mode aperçu -----
 
@@ -1534,7 +1526,7 @@ function creerPageCouvertureApercu(mode) {
     img.style.userSelect = "none";
     page.appendChild(img);
 
-    const token = sessionStorage.getItem("gh_token");
+    const token = localStorage.getItem("gh_token");
     if (cacheImagesURL[data.imageChemin]) {
       positionnerImageApercu(img, data, cacheImagesURL[data.imageChemin], page, data.imageChemin);
     } else {
@@ -1579,7 +1571,7 @@ function positionnerImageApercu(img, data, url, page, chemin, dejaRetente) {
   img.onerror = () => {
     if (dejaRetente) return; // on ne retente qu'une fois pour éviter une boucle
     delete cacheImagesURL[chemin];
-    const token = sessionStorage.getItem("gh_token");
+    const token = localStorage.getItem("gh_token");
     obtenirUrlImage(chemin, token).then((nouvelleUrl) => {
       cacheImagesURL[chemin] = nouvelleUrl;
       positionnerImageApercu(img, data, nouvelleUrl, page, chemin, true);
@@ -1628,7 +1620,7 @@ function majIndicateur() {
 let timerBrouillon = null;
 
 function cleBrouillon() {
-  return `brouillon_${sessionStorage.getItem("gh_login")}_${livreId}`;
+  return `brouillon_${localStorage.getItem("gh_login")}_${livreId}`;
 }
 
 function planifierBrouillon() {
@@ -3066,7 +3058,7 @@ function surlignerMatch(match) {
 // ----- Sauvegarde : on régénère les pages dérivées avant d'écrire -----
 
 async function sauvegarder() {
-  const token = sessionStorage.getItem("gh_token");
+  const token = localStorage.getItem("gh_token");
   const message = document.getElementById("message");
 
   // Seule la double-page en cours d'édition peut déborder (flushSpread ne
@@ -3247,7 +3239,7 @@ function synchroniserControlesCouv(data) {
 // bibliothèque), pour qu'il ne réapparaisse jamais, même sur un autre appareil.
 async function marquerTutoEditeurVu() {
   if (!bibliotheque || bibliotheque.tutoEditeurVu) return;
-  const token = sessionStorage.getItem("gh_token");
+  const token = localStorage.getItem("gh_token");
   const nouveauSha = await marquerTutoVuDistant(
     bibliotheque, "tutoEditeurVu", nomFichierBiblio, shaBiblio, token
   );
@@ -3278,8 +3270,8 @@ function majBoutonPublier() {
 async function basculerPublication() {
   if (indexLivre === -1) return;
   const livre = livreActuel();
-  const token = sessionStorage.getItem("gh_token");
-  const login = sessionStorage.getItem("gh_login");
+  const token = localStorage.getItem("gh_token");
+  const login = localStorage.getItem("gh_login");
   const message = document.getElementById("message");
   const btn = document.getElementById("btnPublier");
   const publier = !livre.publie;

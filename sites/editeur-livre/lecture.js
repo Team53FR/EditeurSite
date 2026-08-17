@@ -19,10 +19,10 @@ let cacheImagesURL = {};
 // ---------- Chargement du livre publié ----------
 
 async function chargerLecture() {
-  const token = sessionStorage.getItem("gh_token");
+  const token = localStorage.getItem("gh_token");
   const message = document.getElementById("message");
 
-  if (!token || !sessionStorage.getItem("gh_login")) {
+  if (!token || !localStorage.getItem("gh_login")) {
     // Lecture réservée aux utilisateurs connectés.
     const params = location.search;
     window.location.href = "connexion.html";
@@ -169,7 +169,7 @@ function creerPageCouvertureApercu(mode) {
     img.style.top = "0";
     img.style.left = "0";
     page.appendChild(img);
-    const token = sessionStorage.getItem("gh_token");
+    const token = localStorage.getItem("gh_token");
     if (cacheImagesURL[data.imageChemin]) {
       positionnerImageApercu(img, data, cacheImagesURL[data.imageChemin], page, data.imageChemin);
     } else {
@@ -209,7 +209,7 @@ function positionnerImageApercu(img, data, url, page, chemin, dejaRetente) {
   img.onerror = () => {
     if (dejaRetente) return;
     delete cacheImagesURL[chemin];
-    const token = sessionStorage.getItem("gh_token");
+    const token = localStorage.getItem("gh_token");
     obtenirUrlImage(chemin, token).then((u) => { cacheImagesURL[chemin] = u; positionnerImageApercu(img, data, u, page, chemin, true); }).catch(() => {});
   };
   img.src = url;
