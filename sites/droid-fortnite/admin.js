@@ -107,16 +107,10 @@ function afficherDroides() {
     const diff = ORDRE_RARETE.indexOf(a.rarete) - ORDRE_RARETE.indexOf(b.rarete);
     return diff !== 0 ? diff : a.nom.localeCompare(b.nom);
   }).forEach((d) => {
-    const carte = document.createElement("div");
-    carte.className = "carte-droide";
+    // Le palier « Défaut » sert de référence en admin : c'est celui dont les
+    // visuels existent toujours, quel que soit l'avancement d'un compte.
+    const carte = construireCarteDroide(d, { admin: true, palier: "Défaut" });
     carte.title = "Modifier";
-    carte.innerHTML =
-      `<div class="droide-entete">` +
-        `<div class="droide-icone" id="icone-admin-${d.id}" style="background:${d.image ? "" : couleurDroide(d.id)};color:${d.image ? "" : "#fff"}">${iconeClasse(d.classe)}</div>` +
-        `<div class="droide-nom">${echapper(d.nom)}</div>` +
-        `<button type="button" class="droide-supprimer" title="Supprimer">🗑</button>` +
-      `</div>` +
-      `<span class="badge-rarete ${classeRareteCss(d.rarete)}">${echapper(d.rarete)}</span>`;
 
     carte.addEventListener("click", () => editerDroide(d.id));
     carte.querySelector(".droide-supprimer").addEventListener("click", (e) => {
@@ -124,19 +118,8 @@ function afficherDroides() {
       supprimerDroide(d.id);
     });
 
-    if (d.image) chargerImageAdmin(carte.querySelector(`#icone-admin-${CSS.escape(d.id)}`), d.image);
-
     grille.appendChild(carte);
   });
-}
-
-async function chargerImageAdmin(element, chemin) {
-  if (!element) return;
-  try {
-    let url = cacheImages.get(chemin);
-    if (!url) { url = await obtenirUrlImage(chemin, token); cacheImages.set(chemin, url); }
-    element.innerHTML = `<img src="${url}" alt="">`;
-  } catch (e) { /* reste sur l'icône générée, pas bloquant */ }
 }
 
 async function editerDroide(id) {

@@ -190,23 +190,14 @@ function afficherDroidex() {
 
   filtres.forEach((d) => {
     const possede = perso.droidesPossedes.includes(clePossession(d.id, palierActif));
-    const carte = document.createElement("div");
-    carte.className = "carte-droide" + (possede ? " possede" : "");
+    const carte = construireCarteDroide(d, {
+      possede,
+      couleur: couleurPalierActif,
+      palier: palierActif
+    });
     carte.setAttribute("role", "button");
     carte.setAttribute("aria-pressed", possede ? "true" : "false");
-    if (couleurPalierActif) carte.style.borderColor = couleurPalierActif;
-    carte.innerHTML =
-      `<div class="droide-entete">` +
-        `<div class="droide-icone" id="icone-${d.id}" style="background:${d.image ? "" : couleurDroide(d.id)};color:${d.image ? "" : "#fff"}">${iconeClasse(d.classe)}</div>` +
-        `<div class="droide-nom">${echapperHTML(d.nom)}</div>` +
-        `<span class="droide-case">✓</span>` +
-      `</div>` +
-      `<span class="badge-rarete ${classeRareteCss(d.rarete)}">${echapperHTML(d.rarete)}</span>`;
-
     carte.addEventListener("click", () => basculerPossession(d.id));
-
-    if (d.image) chargerImageDroide(carte.querySelector(`#icone-${CSS.escape(d.id)}`), d.image);
-
     grille.appendChild(carte);
   });
 
@@ -218,19 +209,6 @@ function afficherDroidex() {
     `<div class="barre-progression"><span style="width:${pct}%"></span></div>`;
 }
 
-async function chargerImageDroide(element, chemin) {
-  if (!element) return;
-  try {
-    let url = cacheImages.get(chemin);
-    if (!url) {
-      url = await obtenirUrlImage(chemin, token);
-      cacheImages.set(chemin, url);
-    }
-    element.innerHTML = `<img src="${url}" alt="">`;
-  } catch (e) {
-    // Reste sur l'icône de classe si l'image ne charge pas — pas bloquant.
-  }
-}
 
 function basculerPossession(idDroide) {
   const cle = clePossession(idDroide, palierActif);

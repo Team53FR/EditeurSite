@@ -280,73 +280,148 @@ a { color: var(--primaire); }
 .compteur-global .barre-progression { flex: 1; }
 
 /* ===== Grille de droïdes ===== */
+/* Beaucoup de petites vignettes portrait, comme sur le tracker Droidex :
+   la grille se remplit toute seule selon la largeur disponible. */
 .grille-droides {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 0.8rem;
-}
-@media (min-width: 520px) { .grille-droides { grid-template-columns: repeat(3, 1fr); } }
-@media (min-width: 760px) { .grille-droides { grid-template-columns: repeat(4, 1fr); } }
-@media (min-width: 980px) { .grille-droides { grid-template-columns: repeat(5, 1fr); } }
-
-.carte-droide {
-  background: var(--carte);
-  border: 1px solid var(--bordure);
-  overflow: hidden;
-  padding: 0.9rem 0.8rem;
-  display: flex;
-  flex-direction: column;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
   gap: 0.5rem;
-  /* Coins coupés façon panneau HUD futuriste plutôt qu'arrondis. */
-  clip-path: polygon(var(--coin-hud) 0, 100% 0, 100% calc(100% - var(--coin-hud)), calc(100% - var(--coin-hud)) 100%, 0 100%, 0 var(--coin-hud));
 }
-.carte-droide.possede { border-color: var(--primaire); box-shadow: 0 0 0 2px var(--primaire-clair) inset, 0 0 12px -3px var(--primaire); }
-.droide-entete { display: flex; align-items: flex-start; gap: 0.5rem; }
-.droide-icone {
-  width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0;
-  background: var(--primaire-clair); color: var(--primaire);
-  display: flex; align-items: center; justify-content: center; font-size: 1.1rem;
+@media (min-width: 520px) { .grille-droides { grid-template-columns: repeat(auto-fill, minmax(108px, 1fr)); } }
+@media (min-width: 980px) { .grille-droides { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); } }
+
+/* ===== Carte de droïde =====
+   Vignette au format portrait : le visuel occupe toute la carte, les
+   informations sont posées par-dessus. Le fond reste sombre dans les deux
+   thèmes — c'est un écran, pas un panneau de l'interface. */
+.carte-droide {
+  position: relative;
+  aspect-ratio: 5 / 7;
+  overflow: hidden;
+  background: #0d1117;
+  border: 3px solid var(--bordure);
+  border-radius: 8px;
+  padding: 0;
+  cursor: pointer;
+  -webkit-user-select: none; user-select: none;
+  transition: transform .2s, box-shadow .2s, border-color .2s;
+}
+
+/* Non possédé : c'est le CONTENU qui s'estompe, pas la carte. Baisser
+   l'opacité de la carte entière la délaverait vers le fond de page, illisible
+   en thème clair ; le panneau doit rester sombre dans les deux thèmes. */
+.carte-droide:not(.possede) .dx-visuel { opacity: .3; filter: grayscale(.65); }
+.carte-droide:not(.possede) .dx-nom { color: #8a94a6; }
+.carte-droide:not(.possede) .dx-pied { opacity: .55; }
+.carte-droide:hover { transform: translateY(-2px); }
+.carte-droide.possede:hover { box-shadow: 0 6px 18px -6px rgba(0, 0, 0, .6); }
+.carte-droide:active { transform: scale(0.97); }
+
+/* Nom, en médaillon sur fond sombre pour rester lisible sur tout visuel */
+.dx-nom {
+  position: absolute; top: 3px; left: 3px; z-index: 3;
+  max-width: 74%;
+  padding: 1px 4px; border-radius: 3px;
+  background: rgba(0, 0, 0, .7);
+  color: #fff;
+  font-size: 0.62rem; font-weight: 700; line-height: 1.3;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* Case à cocher (Droidex) ou corbeille (admin), même emplacement */
+.dx-case, .dx-action {
+  position: absolute; top: 3px; right: 3px; z-index: 3;
+  width: 16px; height: 16px;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid #334155; border-radius: 3px;
+  background: #1e293b;
+  font-size: 0.6rem; line-height: 1;
+  color: transparent;
+}
+.carte-droide.possede .dx-case {
+  background: var(--primaire); border-color: var(--primaire); color: var(--sur-primaire);
+}
+.dx-action { color: #94a3b8; cursor: pointer; padding: 0; font-size: 0.55rem; }
+.dx-action:hover { color: #fff; background: var(--danger); border-color: var(--danger); }
+
+/* Zone du visuel : occupe toute la carte, le pied se pose par-dessus */
+.dx-visuel {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
   overflow: hidden;
 }
-.droide-icone img { width: 100%; height: 100%; object-fit: cover; }
-.droide-nom { flex: 1; min-width: 0; font-weight: 600; font-size: 0.9rem; line-height: 1.25; }
-.droide-supprimer {
-  flex-shrink: 0; background: transparent; border: none; color: var(--texte-att);
-  padding: 0.2rem; border-radius: 6px; cursor: pointer; font-size: 0.9rem; line-height: 1;
+.dx-visuel img {
+  width: 100%; height: 100%;
+  object-fit: contain;
+  /* Les visuels sont de petites images : mieux vaut les assumer pixelisées
+     que de les laisser flouter à l'agrandissement. */
+  image-rendering: pixelated;
+  transition: transform .4s;
 }
-.droide-supprimer:hover { color: var(--danger); background: var(--fond); }
+.carte-droide:hover .dx-visuel img { transform: scale(1.06); }
 
-.badge-rarete {
-  display: inline-flex; align-self: flex-start;
-  font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em;
-  padding: 0.15rem 0.5rem; border-radius: 999px;
-}
-.badge-rarete.typique { background: #e0f2f4; color: #0e7490; }
-.badge-rarete.rare { background: #cffafe; color: #0891b2; }
-.badge-rarete.epique { background: #ede9fe; color: #7c3aed; }
-.badge-rarete.legendaire { background: #fef3c7; color: #b45309; }
-.badge-rarete.mythique { background: #fce7f3; color: #be185d; }
-.badge-rarete.iconique { background: #d1fae5; color: #047857; }
-@media (prefers-color-scheme: dark) {
-  .badge-rarete.typique { background: #123540; color: #7dd3e0; }
-  .badge-rarete.rare { background: #0e3a44; color: #22d3ee; }
-  .badge-rarete.epique { background: #4c1d95; color: #ddd6fe; }
-  .badge-rarete.legendaire { background: #78350f; color: #fde68a; }
-  .badge-rarete.mythique { background: #831843; color: #fbcfe8; }
-  .badge-rarete.iconique { background: #065f46; color: #a7f3d0; }
-}
-
-.carte-droide { cursor: pointer; -webkit-user-select: none; user-select: none; }
-.carte-droide:active { transform: scale(0.97); }
-.droide-case {
-  margin-left: auto; flex-shrink: 0;
-  width: 20px; height: 20px; border-radius: 50%;
-  border: 1.5px solid var(--bordure);
+/* Teinte générée, visible tant qu'aucune image n'est disponible */
+.dx-vide {
   display: flex; align-items: center; justify-content: center;
-  font-size: 0.7rem; color: transparent;
+  width: 100%; height: 100%;
+  font-size: 1.7rem;
+  /* La teinte propre au droïde reste une lueur discrète : la carte doit se
+     lire comme un panneau sombre, pas comme un aplat de couleur. */
+  background:
+    radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--teinte) 45%, transparent) 0%, transparent 62%),
+    #0d1117;
 }
-.carte-droide.possede .droide-case {
-  background: var(--primaire); border-color: var(--primaire); color: var(--sur-primaire);
+/* Repli pour les navigateurs sans color-mix() */
+@supports not (background: color-mix(in srgb, red 50%, transparent)) {
+  .dx-vide { background: radial-gradient(circle at 50% 42%, var(--teinte) 0%, #0d1117 72%); opacity: .85; }
+}
+
+/* Ligne de balayage, qui parcourt la vignette au survol */
+.dx-scan {
+  position: absolute; left: 0; right: 0; top: 0; height: 1px; z-index: 2;
+  background: rgba(34, 211, 238, .5);
+  opacity: 0;
+  pointer-events: none;
+}
+.carte-droide:hover .dx-scan { opacity: 1; animation: dx-balayage 1.5s linear infinite; }
+@keyframes dx-balayage { from { transform: translateY(0); } to { transform: translateY(100%); } }
+
+/* Pied : icône de classe et rareté, sur un dégradé qui détache le texte */
+.dx-pied {
+  position: absolute; bottom: 0; left: 0; right: 0; z-index: 3;
+  display: flex; align-items: center; gap: 3px;
+  padding: 10px 3px 3px;
+  background: linear-gradient(to top, rgba(0, 0, 0, .85), transparent);
+}
+.dx-classe { font-size: 0.7rem; line-height: 1; flex-shrink: 0; }
+
+/* Sur la carte sombre, la rareté garde ses couleurs de thème sombre dans
+   les deux thèmes du site. */
+.carte-droide .badge-rarete {
+  flex: 1; min-width: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; text-transform: uppercase;
+  padding: 1px 3px; border-radius: 3px;
+  font-size: 0.55rem; letter-spacing: 0.01em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.carte-droide .badge-rarete.typique    { background: #123540; color: #7dd3e0; }
+.carte-droide .badge-rarete.rare       { background: #0e3a44; color: #22d3ee; }
+.carte-droide .badge-rarete.epique     { background: #4c1d95; color: #ddd6fe; }
+.carte-droide .badge-rarete.legendaire { background: #78350f; color: #fde68a; }
+.carte-droide .badge-rarete.mythique   { background: #831843; color: #fbcfe8; }
+.carte-droide .badge-rarete.iconique   { background: #065f46; color: #a7f3d0; }
+
+/* En admin on gère le catalogue : la notion de « possédé » n'a pas cours,
+   toutes les cartes sont donc pleinement visibles. */
+.carte-droide.admin .dx-visuel { opacity: 1; filter: none; }
+.carte-droide.admin .dx-nom { color: #fff; }
+.carte-droide.admin .dx-pied { opacity: 1; }
+
+@media (prefers-reduced-motion: reduce) {
+  .carte-droide, .dx-visuel, .dx-visuel img { transition: none; }
+  .carte-droide:hover .dx-scan { animation: none; }
+  .carte-droide:hover .dx-visuel img { transform: none; }
 }
 
 /* ===== Liste renaissance ===== */

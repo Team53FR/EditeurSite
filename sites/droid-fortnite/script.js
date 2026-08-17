@@ -249,6 +249,128 @@ function couleurDroide(id) {
   for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
   return `hsl(${hash % 360}, 55%, 50%)`;
 }
+
+// ===== Carte de droïde : visuel commun au Droidex et au panneau admin =====
+//
+// Reprend la présentation du tracker communautaire Droidex : vignette
+// sombre au format portrait, le nom en médaillon en haut à gauche, la
+// classe et la rareté en pied, un contour teinté par le palier, et la
+// carte estompée tant que le droïde n'est pas possédé.
+
+// Correspondance entre les paliers d'ici et les suffixes de fichier
+// employés par Droidex (dont les images sont nommées NOM_PALIER.webp).
+const PALIERS_IMAGE_EXTERNE = {
+  "Défaut": "DEFAULT",
+  "Or": "GOLD",
+  "Diamant": "DIAMOND",
+  "Arc-en-ciel": "RAINBOW",
+  "Beskar": "BESKAR",
+  "Galactique": "GALACTIC"
+};
+
+// Source d'images externe, vide par défaut — et c'est volontaire.
+//
+// Renseignée (par exemple "https://droidex.web.app"), chaque carte va
+// chercher son visuel à l'adresse {base}/droids/{NOM}_{PALIER}.webp, ce qui
+// habille les 379 droïdes d'un coup. Mais ces visuels sont hébergés par un
+// autre site, qui n'a rien demandé : le trafic est à sa charge, il peut
+// renommer ou bloquer ses fichiers du jour au lendemain, et ce sont des
+// extractions des visuels du jeu (c'est précisément pour cela que les cartes
+// se contentaient jusqu'ici d'une teinte générée — voir couleurDroide).
+//
+// À laisser vide, donc, sauf décision explicite. Les images ajoutées droïde
+// par droïde depuis le panneau admin restent prioritaires dans tous les cas.
+let BASE_IMAGES_EXTERNES = "";
+
+// Droidex nomme ses fichiers d'après le NOM du droïde, en majuscules et les
+// espaces remplacés par des tirets bas : « DRK-1 Probe » -> DRK-1_PROBE.
+// (L'identifiant ne conviendrait pas : ses tirets confondent les espaces et
+// les vrais traits d'union — drk-1-probe ne dit pas lequel est lequel.)
+function slugImageDroide(nom) {
+  return (nom || "").trim().toUpperCase().replace(/\s+/g, "_");
+}
+
+function urlImageExterne(nom, palier) {
+  if (!BASE_IMAGES_EXTERNES) return null;
+  const suffixe = PALIERS_IMAGE_EXTERNE[palier];
+  if (!suffixe) return null;   // palier inconnu de cette source
+  return BASE_IMAGES_EXTERNES.replace(/\/+$/, "") +
+    "/droids/" + encodeURIComponent(slugImageDroide(nom) + "_" + suffixe + ".webp");
+}
+
+function echapperTexte(txt) {
+  const d = document.createElement("div");
+  d.textContent = txt == null ? "" : String(txt);
+  return d.innerHTML;
+}
+
+// Construit la carte d'un droïde.
+//   options.possede    : carte en pleine lumière plutôt qu'estompée
+//   options.couleur    : couleur du contour (celle du palier actif)
+//   options.palier     : palier affiché, pour retrouver l'image externe
+//   options.admin      : affiche la corbeille au lieu de la case à cocher
+function construireCarteDroide(d, options) {
+  const o = options || {};
+  const carte = document.createElement("div");
+  carte.className = "carte-droide" + (o.possede ? " possede" : "") + (o.admin ? " admin" : "");
+  if (o.couleur) carte.style.borderColor = o.couleur;
+
+  carte.innerHTML =
+    `<div class="dx-nom">${echapperTexte(d.nom)}</div>` +
+    (o.admin
+      ? `<button type="button" class="dx-action droide-supprimer" title="Supprimer">🗑</button>`
+      : `<span class="dx-case" aria-hidden="true">✓</span>`) +
+    `<div class="dx-visuel">` +
+      `<span class="dx-scan"></span>` +
+      `<span class="dx-vide" style="--teinte:${couleurDroide(d.id)}">${iconeClasse(d.classe)}</span>` +
+    `</div>` +
+    `<div class="dx-pied">` +
+      `<span class="dx-classe" title="${echapperTexte(d.classe)}">${iconeClasse(d.classe)}</span>` +
+      `<span class="badge-rarete ${classeRareteCss(d.rarete)}">${echapperTexte(d.rarete)}</span>` +
+    `</div>`;
+
+  appliquerVisuelDroide(carte.querySelector(".dx-visuel"), d, o.palier);
+  return carte;
+}
+
+// Choisit le visuel de la carte, dans l'ordre :
+//   1. l'image ajoutée pour ce droïde depuis le panneau admin ;
+//   2. l'image de la source externe, si elle est configurée ;
+//   3. la teinte générée et l'icône de classe, déjà en place dans le HTML.
+async function appliquerVisuelDroide(zone, d, palier) {
+  if (!zone) return;
+
+  const poser = (url) => {
+    const img = document.createElement("img");
+    img.alt = "";
+    img.loading = "lazy";
+    img.referrerPolicy = "no-referrer";
+    // Une image absente ne doit pas laisser un cadre vide : on retire
+    // l'image et la teinte générée reprend sa place.
+    img.onerror = () => img.remove();
+    img.onload = () => { const v = zone.querySelector(".dx-vide"); if (v) v.style.display = "none"; };
+    img.src = url;
+    zone.appendChild(img);
+  };
+
+  if (d.image) {
+    try {
+      let url = cacheImages.get(d.image);
+      if (!url) {
+        url = await obtenirUrlImage(d.image, token);
+        cacheImages.set(d.image, url);
+      }
+      poser(url);
+      return;
+    } catch (e) {
+      // On continue vers la source externe puis la teinte générée.
+    }
+  }
+
+  const externe = urlImageExterne(d.nom, palier);
+  if (externe) poser(externe);
+}
+
 // ===== Connexion (comptes multiples) =====
 // Les identifiants vivent dans DroidFortnite/users.json sur le dépôt BDD :
 //   [{ "login": "...", "password": "...", "nomAffichage": "..." }]
