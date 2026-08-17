@@ -545,7 +545,13 @@ Renaissance de `suivi.html`) :
 - **Renaissance** : un palier par ligne — niveau, crédits (valeur + unité) et
   droïdes requis. Les modifications s'enregistrent au changement de champ.
   C'est ici qu'on ajoute un niveau, le bouton flottant de `suivi.html` ayant
-  été retiré.
+  été retiré. Les droïdes requis se choisissent dans deux listes (droïde puis
+  palier, celui-ci limité aux paliers où le droïde existe) et s'affichent en
+  pastilles retirables : les saisir à la main rendait une faute de frappe
+  invisible, le droïde devenant introuvable et perdant son visuel. Le format
+  **enregistré** ne change pas (« CB (Défaut), Pit (Or) ») — les données déjà
+  saisies restent valables, et un nom qui ne correspond à rien est conservé en
+  pastille marquée plutôt que jeté.
 - **Paliers** : liste ordonnée avec ↑/↓/Supprimer **et un sélecteur de
   couleur par palier** (`<input type="color">`, change immédiatement à
   l'enregistrement).

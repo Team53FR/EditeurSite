@@ -924,3 +924,42 @@ a { color: var(--primaire); }
   }
   .ligne-renaissance .r-elements { grid-column: 1 / -1; }
 }
+
+/* ===== Droïdes requis : pastilles + listes déroulantes ===== */
+.choix-droides-requis { display: flex; flex-direction: column; gap: 0.35rem; min-width: 0; }
+.pastilles-droides { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.pastille-droide {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  padding: 0.2rem 0.3rem 0.2rem 0.5rem;
+  border: 2px solid var(--bordure); border-radius: 999px;
+  background: var(--fond);
+  font-size: 0.76rem; line-height: 1.3;
+}
+.pastille-droide.inconnu { border-style: dashed; color: var(--texte-att); }
+.retirer-droide {
+  width: 16px; height: 16px; padding: 0; flex-shrink: 0;
+  border: none; border-radius: 50%;
+  background: transparent; color: var(--texte-att);
+  font-size: 0.6rem; line-height: 1; cursor: pointer;
+}
+.retirer-droide:hover { background: var(--danger); color: #fff; }
+.aucun-droide { font-size: 0.76rem; color: var(--texte-att); font-style: italic; }
+
+.ajout-droide { display: flex; gap: 0.3rem; flex-wrap: wrap; }
+.ajout-droide select {
+  min-width: 0; flex: 1;
+  padding: 0.35rem 0.4rem;
+  border: 1px solid var(--bordure); border-radius: 8px;
+  background: var(--fond); color: var(--texte);
+  font-size: 0.78rem;
+}
+.ajout-droide .sel-palier { flex: 0 1 8rem; }
+.ajout-droide select:disabled { opacity: 0.5; }
+.ajout-droide .btn-mini { flex: 0 0 auto; }
+
+/* La colonne des droïdes requis a besoin de place */
+.entete-renaissance, .ligne-renaissance {
+  grid-template-columns: 4.5rem minmax(7rem, 1fr) minmax(16rem, 2.4fr) 2rem;
+  align-items: start;
+}
+.ligne-renaissance .r-niveau, .ligne-renaissance .r-credits { margin-top: 0.1rem; }

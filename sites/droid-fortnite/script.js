@@ -481,6 +481,30 @@ function appliquerContourPalier(el, couleur) {
     "linear-gradient(135deg, " + c.join(", ") + ")";
 }
 
+// Le champ « elements » d'une renaissance est du texte libre, saisi à la
+// main : « CB (Défaut), Pit (Défaut), DRK-1 Probe (Or) ». On le relit pour
+// retrouver les droïdes du catalogue et montrer leurs visuels plutôt qu'une
+// ligne de texte. Ce qui ne se laisse pas reconnaître reste affiché tel quel :
+// mieux vaut une étiquette texte qu'un élément disparu de la liste.
+function analyserElementsRenaissance(texte) {
+  return String(texte || "")
+    .split(",")
+    .map((morceau) => morceau.trim())
+    .filter(Boolean)
+    .map((morceau) => {
+      const m = morceau.match(/^(.*?)\s*\(([^()]*)\)\s*$/);
+      const nom = (m ? m[1] : morceau).trim();
+      const palier = m ? m[2].trim() : "";
+      const droide = catalogue.find((d) =>
+        d.nom.toLowerCase() === nom.toLowerCase());
+      // Palier absent ou inconnu : on retombe sur le premier, le seul dont on
+      // soit certain qu'il existe.
+      const palierConnu = paliers.some((p) => p.nom === palier);
+      const palierFinal = palierConnu ? palier : (paliers[0] && paliers[0].nom);
+      return { texte: morceau, droide, palier: palierFinal, palierPrecise: palierConnu };
+    });
+}
+
 // ===== Carte de droïde : visuel commun au Droidex et au panneau admin =====
 //
 // Reprend la présentation du tracker communautaire Droidex : vignette

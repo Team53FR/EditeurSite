@@ -739,6 +739,115 @@ async function sauvegarderRaretes(nouvelles, messageCommit) {
   }
 }
 
+// ===== Droïdes requis : choisis dans des listes, pas tapés à la main =====
+//
+// Le format ENREGISTRÉ ne change pas (« CB (Défaut), Pit (Or) ») : le Droidex
+// continue de le relire tel quel, et les données déjà saisies restent
+// valables. Seule la saisie change — une faute de frappe dans un nom rendait
+// le droïde introuvable et le privait de son visuel.
+
+// Paliers où un droïde existe réellement (un Iconique n'a que le premier).
+function paliersPourDroide(droide) {
+  return paliers.filter((p) => estDisponibleAuPalier(droide, p.nom));
+}
+
+// Reconstruit le texte à partir des éléments retenus.
+function serialiserElements(elements) {
+  return elements.map((e) => e.texte).join(", ");
+}
+
+function construireChoixDroides(r, surChangement) {
+  const zone = document.createElement("div");
+  zone.className = "choix-droides-requis";
+
+  // État de travail : la liste des éléments de CE palier de renaissance.
+  let elements = analyserElementsRenaissance(r.elements).map((e) => ({
+    texte: e.droide ? e.droide.nom + " (" + e.palier + ")" : e.texte,
+    droide: e.droide,
+    palier: e.palier
+  }));
+
+  const rendre = () => {
+    zone.innerHTML = "";
+
+    const pastilles = document.createElement("div");
+    pastilles.className = "pastilles-droides";
+    elements.forEach((e, index) => {
+      const chip = document.createElement("span");
+      chip.className = "pastille-droide" + (e.droide ? "" : " inconnu");
+      if (e.droide) {
+        const couleur = (paliers.find((p) => p.nom === e.palier) || {}).couleur;
+        chip.style.borderColor = Array.isArray(couleur) ? "transparent" : (couleur || "");
+        if (Array.isArray(couleur)) chip.style.background = fondPalier(couleur);
+      } else {
+        chip.title = "Ce nom ne correspond à aucun droïde du catalogue";
+      }
+      chip.innerHTML = "<span>" + echapper(e.texte) + "</span>";
+      const retirer = document.createElement("button");
+      retirer.type = "button";
+      retirer.className = "retirer-droide";
+      retirer.textContent = "✕";
+      retirer.title = "Retirer";
+      retirer.onclick = () => {
+        elements = elements.filter((_, i) => i !== index);
+        rendre();
+        surChangement(serialiserElements(elements));
+      };
+      chip.appendChild(retirer);
+      pastilles.appendChild(chip);
+    });
+    if (!elements.length) {
+      pastilles.insertAdjacentHTML("beforeend",
+        '<span class="aucun-droide">Aucun droïde requis</span>');
+    }
+    zone.appendChild(pastilles);
+
+    // Ajout : un droïde, un palier, un bouton.
+    const ajout = document.createElement("div");
+    ajout.className = "ajout-droide";
+
+    const selDroide = document.createElement("select");
+    selDroide.className = "sel-droide";
+    selDroide.innerHTML = '<option value="">Choisir un droïde…</option>' +
+      catalogue.slice().sort((a, b) => a.nom.localeCompare(b.nom))
+        .map((d) => '<option value="' + echapper(d.id) + '">' + echapper(d.nom) + "</option>").join("");
+
+    const selPalier = document.createElement("select");
+    selPalier.className = "sel-palier";
+    selPalier.disabled = true;
+
+    // Le choix des paliers dépend du droïde : un Iconique n'en a qu'un.
+    selDroide.onchange = () => {
+      const d = catalogue.find((x) => x.id === selDroide.value);
+      selPalier.disabled = !d;
+      selPalier.innerHTML = d
+        ? paliersPourDroide(d).map((p) => '<option value="' + echapper(p.nom) + '">' + echapper(p.nom) + "</option>").join("")
+        : "";
+    };
+
+    const bouton = document.createElement("button");
+    bouton.type = "button";
+    bouton.className = "btn-mini";
+    bouton.textContent = "＋";
+    bouton.title = "Ajouter ce droïde";
+    bouton.onclick = () => {
+      const d = catalogue.find((x) => x.id === selDroide.value);
+      if (!d || !selPalier.value) return;
+      elements.push({ texte: d.nom + " (" + selPalier.value + ")", droide: d, palier: selPalier.value });
+      rendre();
+      surChangement(serialiserElements(elements));
+    };
+
+    ajout.appendChild(selDroide);
+    ajout.appendChild(selPalier);
+    ajout.appendChild(bouton);
+    zone.appendChild(ajout);
+  };
+
+  rendre();
+  return zone;
+}
+
 // ===== Paliers de renaissance =====
 // Partagés (renaissance.json), gérés ici et non plus depuis la page de suivi :
 // c'est du catalogue, pas de la progression personnelle.
@@ -767,22 +876,27 @@ function afficherRenaissanceAdmin() {
         '<input type="text" class="r-credits" inputmode="decimal" value="' + echapper(credits.valeur) + '" aria-label="Crédits requis">' +
         '<select class="r-unite" aria-label="Unité des crédits">' + optionsUnite(credits.unite, false) + "</select>" +
       "</span>" +
-      '<input type="text" class="r-elements" value="' + echapper(r.elements || "") + '" ' +
-        'placeholder="ex. CB (Défaut), Pit (Or)" aria-label="Droïdes requis">' +
+      '<div class="cellule-droides"></div>' +
       '<button type="button" class="btn-mini danger" title="Supprimer">✕</button>';
 
+    // Les droïdes requis viennent de la zone à pastilles ; le reste des
+    // champs de la ligne est lu tel quel.
+    let elementsCourants = r.elements || "";
     const enregistrer = () => {
       const copie = renaissance.map((x) => (x.id === r.id ? {
         id: r.id,
         niveau: Number(ligne.querySelector(".r-niveau").value) || r.niveau,
         credits: composerValeur(ligne.querySelector(".r-credits").value,
                                 ligne.querySelector(".r-unite").value) ?? 0,
-        elements: ligne.querySelector(".r-elements").value.trim()
+        elements: elementsCourants
       } : x));
       sauvegarderRenaissanceAdmin(copie, "Modification du palier de renaissance " + r.niveau);
     };
-    ligne.querySelectorAll(".r-niveau, .r-credits, .r-unite, .r-elements")
+    ligne.querySelectorAll(".r-niveau, .r-credits, .r-unite")
       .forEach((c) => c.addEventListener("change", enregistrer));
+
+    ligne.querySelector(".cellule-droides").appendChild(
+      construireChoixDroides(r, (texte) => { elementsCourants = texte; enregistrer(); }));
 
     ligne.querySelector(".btn-mini.danger").onclick = () => supprimerRenaissanceAdmin(r.id, r.niveau);
     zone.appendChild(ligne);
@@ -810,7 +924,6 @@ function ajouterRenaissanceAdmin() {
   const champNiveau = document.getElementById("champNouveauNiveau");
   const champCredits = document.getElementById("champNouveauxCredits");
   const champUnite = document.getElementById("champUniteCredits");
-  const champElements = document.getElementById("champNouveauxElements");
   const message = document.getElementById("messageRenaissanceAdmin");
   message.className = "message";
 
@@ -823,13 +936,11 @@ function ajouterRenaissanceAdmin() {
   }
   if (credits === null) { message.textContent = "Les crédits requis sont obligatoires."; return; }
 
-  const nouveau = {
-    id: genererId("r"), niveau, credits,
-    elements: champElements.value.trim()
-  };
+  // Créé sans droïdes : ils se choisissent ensuite sur la ligne, dans les
+  // listes déroulantes — c'est là qu'on évite les fautes de frappe.
+  const nouveau = { id: genererId("r"), niveau, credits, elements: "" };
   champNiveau.value = "";
   champCredits.value = "";
-  champElements.value = "";
   sauvegarderRenaissanceAdmin(renaissance.concat([nouveau]), "Ajout du palier de renaissance " + niveau);
 }
 
