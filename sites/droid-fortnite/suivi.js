@@ -134,21 +134,73 @@ async function chargerBibliothequePerso() {
   }
 }
 
+// ===== Enregistrement de la progression =====
+//
+// Chaque écriture est un COMMIT sur le dépôt BDD. Enregistrer à chaque clic
+// faisait donc un commit par droïde coché : cocher un palier entier en
+// produisait soixante-dix, et l'historique grossissait au point que GitHub
+// peinait à l'afficher (« Cannot retrieve latest commit at this time »).
+//
+// Les modifications sont donc regroupées : on attend une courte pause, puis
+// on écrit une seule fois. Cinquante clics d'affilée ne font plus qu'un
+// commit.
+const DELAI_SAUVEGARDE = 2000;
+
+let sauvegardeProgrammee = null;   // minuteur en cours
+let sauvegardeEnCours = null;      // écriture en vol
+let modificationsEnAttente = false;
+
+// Appelée à chaque changement : ne fait que programmer l'écriture.
+function marquerProgressionModifiee() {
+  modificationsEnAttente = true;
+  clearTimeout(sauvegardeProgrammee);
+  sauvegardeProgrammee = setTimeout(sauvegarderPerso, DELAI_SAUVEGARDE);
+}
+
 // Fichier personnel : un seul écrivain légitime (le compte lui-même), donc un
 // simple retry (relire le sha, réécrire l'état local) suffit — pas besoin de
 // la fusion utilisée pour les fichiers partagés.
 async function sauvegarderPerso() {
-  try {
-    shaPerso = await ecrireFichierJSON(cheminBibliothequeCourante(), perso, shaPerso, token, "Mise à jour de la progression");
-  } catch (e) {
-    if (e.conflit) {
-      const frais = await lireFichierJSON(cheminBibliothequeCourante(), token);
-      shaPerso = await ecrireFichierJSON(cheminBibliothequeCourante(), perso, frais.sha, token, "Mise à jour de la progression");
-    } else {
-      afficherToast(e.message, true);
-    }
+  clearTimeout(sauvegardeProgrammee);
+  if (!modificationsEnAttente) return;
+  // Une écriture est déjà en vol : on la laisse finir, puis on repart pour
+  // celle-ci — sans quoi deux PUT concurrents se disputeraient le même sha.
+  if (sauvegardeEnCours) {
+    await sauvegardeEnCours.catch(() => {});
+    return sauvegarderPerso();
   }
+  modificationsEnAttente = false;
+
+  sauvegardeEnCours = (async () => {
+    try {
+      shaPerso = await ecrireFichierJSON(cheminBibliothequeCourante(), perso, shaPerso, token, "Mise à jour de la progression");
+    } catch (e) {
+      if (e.conflit) {
+        const frais = await lireFichierJSON(cheminBibliothequeCourante(), token);
+        shaPerso = await ecrireFichierJSON(cheminBibliothequeCourante(), perso, frais.sha, token, "Mise à jour de la progression");
+      } else {
+        // L'état local reste marqué modifié : la prochaine occasion réessaiera.
+        modificationsEnAttente = true;
+        afficherToast(e.message, true);
+      }
+    }
+  })();
+
+  try { await sauvegardeEnCours; } finally { sauvegardeEnCours = null; }
 }
+
+// Filets de sécurité : quitter la page ou masquer l'onglet écrit tout de
+// suite ce qui attend, et l'on prévient si l'écriture n'a pas encore abouti.
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) sauvegarderPerso();
+});
+window.addEventListener("pagehide", () => { sauvegarderPerso(); });
+window.addEventListener("beforeunload", (e) => {
+  if (modificationsEnAttente || sauvegardeEnCours) {
+    e.preventDefault();
+    e.returnValue = "";
+  }
+});
 
 function echapperHTML(txt) {
   const d = document.createElement("div");
@@ -242,7 +294,7 @@ function basculerPossession(idDroide, palier) {
   if (index === -1) perso.droidesPossedes.push(cle);
   else perso.droidesPossedes.splice(index, 1);
   afficherDroidex();
-  sauvegarderPerso();
+  marquerProgressionModifiee();
 }
 
 
@@ -439,14 +491,14 @@ function changerNombreSlots(classe, delta) {
   r.slots[classe] = cible;
   escouade();               // recale le tableau des places
   afficherRendement();
-  sauvegarderPerso();
+  marquerProgressionModifiee();
 }
 
 function viderSlot(classe, index) {
   const r = escouade();
   r.places[classe][index] = null;
   afficherRendement();
-  sauvegarderPerso();
+  marquerProgressionModifiee();
 }
 
 // ----- Choix du droïde à placer -----
@@ -529,7 +581,7 @@ function placerDansSlot(cle) {
   r.places[slotEnCours.classe][slotEnCours.index] = cle;
   fermerChoixSlot();
   afficherRendement();
-  sauvegarderPerso();
+  marquerProgressionModifiee();
 }
 
 // ===== Onglet Renaissance =====
@@ -625,7 +677,7 @@ function basculerAtteint(idRenaissance) {
   if (index === -1) perso.renaissanceAtteinte.push(idRenaissance);
   else perso.renaissanceAtteinte.splice(index, 1);
   afficherRenaissance();
-  sauvegarderPerso();
+  marquerProgressionModifiee();
 }
 
 

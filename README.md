@@ -463,6 +463,23 @@ reconnaître (nom absent du catalogue) reste affiché comme étiquette texte
 plutôt que de disparaître de la liste ; un palier omis ou inconnu retombe sur
 le premier.
 
+**Écriture de la progression — regroupée, jamais à chaque clic.** Chaque
+écriture est un *commit* sur le dépôt BDD. Enregistrer à chaque changement
+faisait un commit par droïde coché : cocher un palier entier en produisait
+soixante-dix, et l'historique grossissait au point que l'interface de GitHub
+finissait par afficher « Cannot retrieve latest commit at this time ».
+
+`marquerProgressionModifiee()` ne fait donc que programmer l'écriture, qui a
+lieu après deux secondes sans nouveau changement — cinquante clics d'affilée ne
+font plus qu'un commit. Trois filets : masquer l'onglet ou quitter la page
+écrit tout de suite ce qui attend, `beforeunload` prévient si l'écriture n'a
+pas abouti, et deux écritures ne peuvent pas partir en même temps (elles se
+disputeraient le même sha).
+
+À noter : `ma-bibliotheque` n'a jamais eu ce défaut — y cocher un tome ou un
+épisode ne modifie que l'état local, l'écriture n'ayant lieu qu'à la validation
+du formulaire.
+
 **Écriture des fichiers partagés — fusion, pas simple retry** : comme
 plusieurs comptes peuvent ajouter une entrée à `catalogue.json`/
 `renaissance.json`, `sauvegarderAvecFusion()` (dans `sites/droid-fortnite/script.js`)
