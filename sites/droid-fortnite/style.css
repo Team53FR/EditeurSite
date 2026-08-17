@@ -417,6 +417,18 @@ a { color: var(--primaire); }
   grid-template-columns: minmax(5.5rem, 1fr) 1fr 1fr;
   align-items: center; gap: 0.4rem;
 }
+/* Valeur + unité : « 4 » et « K » plutôt qu'un « 4K » que rien ne sait
+   additionner. Le sélecteur reste étroit, la valeur prend le reste. */
+.duo-valeur { display: flex; gap: 0.25rem; min-width: 0; }
+.duo-valeur input { flex: 1; min-width: 0; }
+.duo-valeur select {
+  flex: 0 0 auto; width: 4.2rem;
+  padding: 0.45rem 0.3rem;
+  border-radius: 8px; border: 1px solid var(--bordure);
+  background: var(--fond); color: var(--texte);
+  font-size: 0.82rem;
+}
+.duo-valeur select:focus { outline: 2px solid var(--primaire); outline-offset: 1px; }
 .ligne-palier .nom-palier {
   display: flex; align-items: center; gap: 0.35rem;
   font-size: 0.82rem; font-weight: 600; color: var(--texte-att);

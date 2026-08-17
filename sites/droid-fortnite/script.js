@@ -251,15 +251,79 @@ function couleurDroide(id) {
 }
 
 
-// Abrège un montant : 7200 -> « 7.2 k », 3e8 -> « 300 M ».
+// ===== Unités de grandeur (K, M, B, T…) =====
+//
+// Les montants du jeu grimpent vite : on saisit « 4 » + « K » plutôt que
+// « 4000 », et surtout plutôt que « 4K » — cette chaîne était stockée telle
+// quelle et parseFloat("4K") vaut 4, si bien que le total de l'escouade
+// sous-comptait d'un facteur mille sans rien signaler.
+//
+// La valeur enregistrée est donc TOUJOURS un nombre en crédits : l'unité
+// n'est qu'une commodité de saisie et d'affichage, redéduite à l'ouverture
+// du formulaire. Un seul nombre canonique, et tous les calculs restent justes.
+//
+// Liste éditable depuis le panneau admin (DroidFortnite/unites.json), pour
+// le jour où le jeu dépassera le billion.
+const UNITES_INITIALES = [
+  { symbole: "K", facteur: 1e3 },
+  { symbole: "M", facteur: 1e6 },
+  { symbole: "B", facteur: 1e9 },
+  { symbole: "T", facteur: 1e12 }
+];
+
+// Symbole réservé au rendement des Iconiques, qui rapportent un pourcentage
+// du revenu total et non des crédits par seconde. Jamais dans unites.json :
+// ce n'est pas un facteur, c'est une autre nature de valeur.
+const UNITE_POURCENT = "%";
+
+let unites = UNITES_INITIALES;
+
+function normaliserUnites(brutes) {
+  return (Array.isArray(brutes) ? brutes : [])
+    .map((u) => (typeof u === "string"
+      ? { symbole: u, facteur: NaN }
+      : { symbole: String(u && u.symbole || "").trim(), facteur: Number(u && u.facteur) }))
+    .filter((u) => u.symbole && isFinite(u.facteur) && u.facteur > 0)
+    .sort((a, b) => a.facteur - b.facteur);
+}
+
+// Nombre -> { valeur, unite } avec la plus grande unité qui laisse |valeur| >= 1.
+function decomposerValeur(n) {
+  if (typeof n !== "number" || !isFinite(n)) return { valeur: "", unite: "" };
+  if (n === 0) return { valeur: 0, unite: "" };
+  let choisie = { symbole: "", facteur: 1 };
+  unites.forEach((u) => { if (Math.abs(n) >= u.facteur) choisie = u; });
+  const valeur = n / choisie.facteur;
+  // 2 décimales suffisent, et on ne garde pas les zéros inutiles.
+  return { valeur: Math.round(valeur * 100) / 100, unite: choisie.symbole };
+}
+
+// { valeur, unite } -> nombre en crédits, ou « 25% » pour un pourcentage.
+// Retourne null si rien n'a été saisi.
+function composerValeur(valeurBrute, symbole) {
+  const texte = String(valeurBrute == null ? "" : valeurBrute).trim();
+  if (!texte) return null;
+  const n = parseFloat(texte.replace(",", "."));
+  if (!isFinite(n)) return null;
+  if (symbole === UNITE_POURCENT) return (Math.round(n * 100) / 100) + UNITE_POURCENT;
+  const u = unites.find((x) => x.symbole === symbole);
+  return u ? n * u.facteur : n;
+}
+
+// Abrège un montant selon les unités connues : 7200 -> « 7.2 K ».
 // Partagé par le Droidex, le panneau admin et la liste des renaissances.
 function formaterCredits(n) {
-  const abreger = (valeur, unite) => (Math.round(valeur * 100) / 100) + " " + unite;
-  if (n >= 1e12) return abreger(n / 1e12, "T");
-  if (n >= 1e9) return abreger(n / 1e9, "Md");
-  if (n >= 1e6) return abreger(n / 1e6, "M");
-  if (n >= 1e3) return abreger(n / 1e3, "k");
-  return String(n);
+  if (typeof n !== "number" || !isFinite(n)) return String(n);
+  const d = decomposerValeur(n);
+  return d.unite ? d.valeur + " " + d.unite : String(d.valeur);
+}
+
+// Les droïdes Iconiques n'existent qu'au premier palier dans le jeu.
+// Partagé : le Droidex les masque ailleurs, le formulaire admin n'y propose
+// pas de prix ni de rendement.
+function estDisponibleAuPalier(d, palierNom) {
+  const premier = paliers[0] && paliers[0].nom;
+  return d.rarete !== "Iconique" || palierNom === premier;
 }
 
 // ===== Prix et rendement, palier par palier =====

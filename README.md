@@ -80,7 +80,7 @@ mélanger ses données avec celles d'un autre site :
 |-------------------|------------------------------|--------------------------------------------|
 | editeur-livre      | `EditeurLivre/`             | `users.json`, `bibliotheques/<login>.json`, `images/<login>/…` |
 | ma-bibliotheque    | `MaBibliotheque/`           | `users.json`, `bibliotheques/<login>.json`, `images/<login>/…` |
-| droid-fortnite     | `DroidFortnite/`            | `users.json`, `catalogue.json`, `renaissance.json`, `paliers.json` (partagés), `bibliotheques/<login>.json` (personnel) |
+| droid-fortnite     | `DroidFortnite/`            | `users.json`, `catalogue.json`, `renaissance.json`, `paliers.json`, `unites.json` (partagés), `bibliotheques/<login>.json` (personnel) |
 | portail central    | `Web/`                      | `utilisateurs.json`, `sites.json`         |
 
 Les trois sites suivent donc le **même modèle par compte** pour leurs données
@@ -376,9 +376,29 @@ Le formulaire admin affiche une ligne par palier et se reconstruit à chaque
 ouverture : il suit donc les paliers ajoutés ou réordonnés sans rien à changer.
 Les cases vides ne sont pas enregistrées. Les cartes affichent le prix (ambre)
 et le rendement (émeraude) du palier affiché, et la ligne disparaît entièrement
-tant qu'aucune valeur n'est connue. Une valeur non numérique est conservée
-telle quelle : les droïdes **Iconiques** rapportent un pourcentage du revenu
-total (« 15% »), que le jeu n'exprime pas en crédits par seconde.
+tant qu'aucune valeur n'est connue.
+
+**Chaque montant se saisit en deux morceaux — un nombre et une unité — mais
+s'enregistre comme un seul nombre en crédits.** C'est la correction d'un bug
+silencieux : saisir « 4K » d'une traite donnait une chaîne, et `parseFloat("4K")`
+vaut **4**. Le total de l'escouade sous-comptait donc d'un facteur mille sans
+rien signaler. Un seul nombre canonique en base, l'unité n'étant qu'une
+commodité de saisie, redéduite à l'ouverture du formulaire
+(`decomposerValeur()` / `composerValeur()` dans `script.js`).
+
+La liste des unités vit dans **`DroidFortnite/unites.json`** (K, M, B, T au
+départ) et s'édite depuis l'onglet **Unités** du panneau admin, pour le jour où
+les montants du jeu dépasseront le billion. Supprimer une unité ne perd aucune
+donnée : les montants sont en crédits, seule leur présentation change.
+`formaterCredits()` s'appuie sur cette liste — d'où « 1.2 B » et non plus
+« 1.2 Md ».
+
+**Les droïdes Iconiques ne fonctionnent pas comme les autres** : ils n'existent
+qu'au premier palier et leur rendement est un **pourcentage du revenu total**,
+pas des crédits par seconde. Le formulaire ne leur propose donc qu'une seule
+ligne, avec l'unité `%` sélectionnée d'office ; la valeur est alors stockée
+telle quelle (« 25% »). Le `%` n'est jamais proposé pour un prix, ni ajoutable
+dans `unites.json` : ce n'est pas un facteur, c'est une autre nature de valeur.
 
 > À noter : la rareté d'un droïde **ne change pas** d'un palier à l'autre
 > (vérifié sur les 379 entrées du tracker communautaire : Mouse reste Common

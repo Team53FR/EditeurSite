@@ -30,6 +30,7 @@
       <button type="button" class="onglet-type actif" data-type="droides" onclick="changerOngletAdmin('droides')">🤖 Droïdes</button>
       <button type="button" class="onglet-type" data-type="ajout" onclick="ouvrirOngletAjout()">➕ Ajouter</button>
       <button type="button" class="onglet-type" data-type="paliers" onclick="changerOngletAdmin('paliers')">🎚️ Paliers</button>
+      <button type="button" class="onglet-type" data-type="unites" onclick="changerOngletAdmin('unites')">📏 Unités</button>
     </div>
   </header>
 
@@ -75,7 +76,7 @@
         </div>
         <div class="champ">
           <label for="champRarete">Rareté</label>
-          <select id="champRarete">
+          <select id="champRarete" onchange="construireGrillePrixRendement(droideEnEdition())">
             <option value="Typique">Typique</option>
             <option value="Rare">Rare</option>
             <option value="Épique">Épique</option>
@@ -88,6 +89,11 @@
           <label>Prix et rendement, palier par palier</label>
           <p class="aide-champ" style="margin:-0.2rem 0 0.6rem">Le rendement d'un droïde monte à chaque amélioration : une valeur par palier. Laissez vide ce que vous ne connaissez pas encore.</p>
           <div class="grille-paliers" id="grillePrixRendement"></div>
+          <p class="aide-champ" id="noteIconique" style="display:none; margin-top:0.6rem">
+            Un droïde Iconique n'existe qu'au premier palier, et son rendement s'exprime
+            en pourcentage du revenu total — pas en crédits par seconde. L'unité <b>%</b>
+            lui est donc proposée d'office.
+          </p>
         </div>
 
         <div style="display:flex; gap:0.7rem;">
@@ -95,6 +101,25 @@
           <button class="btn btn-fantome" id="btnAnnulerDroide" style="display:none" onclick="annulerEtRevenir()">Annuler</button>
         </div>
         <p id="messageDroideAdmin" class="message"></p>
+      </div>
+    </div>
+
+    <div id="zoneUnites" style="display:none">
+      <div class="bloc-carte">
+        <h2>Unités de grandeur</h2>
+        <p class="sous-titre">Servent à saisir et afficher les prix et rendements : on entre « 4 » + « K » plutôt que 4000. Ajoute une unité le jour où les montants du jeu dépassent les existantes. Le pourcentage des Iconiques n'en est pas une : il est toujours proposé.</p>
+        <ul class="liste-simple" id="listeUnites"></ul>
+
+        <div class="champ">
+          <label for="champNouvelleUnite">Symbole</label>
+          <input type="text" id="champNouvelleUnite" placeholder="ex. Qa" maxlength="4" onkeydown="if(event.key==='Enter'){ajouterUnite();}">
+        </div>
+        <div class="champ">
+          <label for="champFacteurUnite">Vaut combien de crédits ?</label>
+          <input type="text" id="champFacteurUnite" inputmode="numeric" placeholder="ex. 1000000000000000">
+        </div>
+        <button class="btn btn-primaire" onclick="ajouterUnite()">Ajouter l'unité</button>
+        <p id="messageUnites" class="message"></p>
       </div>
     </div>
 

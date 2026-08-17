@@ -24,11 +24,6 @@ function clePossession(idDroide, palier) {
 // palier (Défaut) dans le jeu — pas d'amélioration possible pour eux. On
 // compare au premier élément du tableau CHARGÉ, pas à la chaîne "Défaut" en
 // dur, pour rester correct même si la liste de paliers a été modifiée.
-function estDisponibleAuPalier(d, palierNom) {
-  const premier = paliers[0] && paliers[0].nom;
-  return d.rarete !== "Iconique" || palierNom === premier;
-}
-
 function changerOnglet(type) {
   ongletActif = type;
   document.querySelectorAll(".onglet-type").forEach((b) => b.classList.toggle("actif", b.dataset.type === type));
@@ -61,6 +56,7 @@ async function chargerTout() {
       chargerOuAmorcer("catalogue.json", CATALOGUE_INITIAL, token, "Amorçage du catalogue de droïdes"),
       chargerOuAmorcer("renaissance.json", RENAISSANCE_INITIALE, token, "Amorçage des paliers de renaissance"),
       chargerOuAmorcer("paliers.json", PALIERS_INITIAUX, token, "Amorçage de la liste des paliers"),
+      chargerOuAmorcer("unites.json", UNITES_INITIALES, token, "Amorçage des unités de grandeur"),
       chargerBibliothequePerso()
     ]);
     catalogue = Array.isArray(rCatalogue.contenu) ? rCatalogue.contenu : [];
