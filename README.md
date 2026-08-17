@@ -465,9 +465,11 @@ installable. Ne fonctionne qu'en HTTPS (GitHub Pages), pas en ouvrant le
 fichier en local.
 
 **Le portail** (`manifest.json` + `sw.js` + `icone-192/512.png` à la racine)
-est installable avec une portée à la racine : **une seule icône couvre les
-trois sites**, qui vivent sur la même origine. Le tableau de bord affiche un
-encart au-dessus de la liste des sites :
+est installable sous le nom **« Site Guide »**, avec une portée à la racine :
+**une seule icône couvre les trois sites**, qui vivent sur la même origine.
+Le nom vient du manifeste (`name`/`short_name`) et, sur iOS, du meta
+`apple-mobile-web-app-title` présent sur chaque page du portail. Le tableau de
+bord affiche un encart au-dessus de la liste des sites :
 
 - Sur Android, il retient l'événement `beforeinstallprompt` du navigateur
   (`preventDefault()`) pour déclencher l'installation depuis son propre
@@ -500,8 +502,22 @@ des sites se mettent en cache **à la visite**. Y lister les quarante fichiers
 du dépôt les aurait fait rouiller au premier renommage. Conséquence : il faut
 avoir visité un site **une fois en ligne** pour qu'il s'ouvre hors connexion.
 
-Les icônes sont générées par script (cadenas blanc sur fond indigo) plutôt que
-dessinées à la main — voir l'historique Git si elles doivent être refaites.
+Les icônes sont générées par script (boussole blanche sur fond indigo) plutôt
+que dessinées à la main — voir l'historique Git si elles doivent être refaites.
+
+**Renommer ou changer l'icône** oblige à incrémenter `CACHE_NOM` dans `sw.js` :
+sans ce renommage, l'ancien manifeste et l'ancienne icône continueraient d'être
+servis depuis le cache déjà installé sur les appareils. Et sur le téléphone,
+le nom et l'icône affichés sous l'app ne se rafraîchissent souvent qu'après
+l'avoir désinstallée puis réinstallée.
+
+**Pages de connexion et bouton « retour »** : chaque `connexion.html` (portail
+et sites) commence par une garde qui renvoie vers la page d'arrivée si une
+session existe déjà. Toutes les redirections de garde et de déconnexion
+utilisent `location.replace()` et non `location.href` : pousser une entrée
+d'historique ferait que « retour », dans l'app installée, promène l'utilisateur
+à travers des pages de connexion qu'il a déjà traversées — c'était le cas avant
+correction.
 
 > **Non vérifiable dans l'environnement de développement** : le navigateur
 > intégré refuse toute inscription de service worker (le `sw.js` de

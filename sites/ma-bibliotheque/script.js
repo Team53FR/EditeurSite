@@ -281,7 +281,7 @@ function seDeconnecter() {
   localStorage.removeItem("team53_role");
   localStorage.removeItem("team53_nom");
   localStorage.removeItem("team53_acces");
-  window.location.href = "../../connexion.html";
+  window.location.replace("../../connexion.html");
 }
 
 // Redirige vers la connexion si aucune session mémorisée (token + identité).
@@ -290,7 +290,7 @@ function exigerConnexion() {
   const token = localStorage.getItem("mb_token");
   const login = localStorage.getItem("mb_login");
   if (!token || !login) {
-    window.location.href = "connexion.html";
+    window.location.replace("connexion.html");
     return null;
   }
   return token;

@@ -18,7 +18,9 @@
 // un cache périmé pourrait être réécrit par-dessus la version fraîche et
 // perdre du texte.
 
-const CACHE_NOM = "team53-portail-v1";
+// v2 : changement de nom et d'icone de l'app — sans ce renommage,
+// l'ancienne icone resterait servie depuis le cache deja installe.
+const CACHE_NOM = "site-guide-v2";
 
 // Seule la coquille du portail est préchargée. Les pages des sites se
 // mettent en cache à mesure qu'on les visite (voir le gestionnaire fetch) :

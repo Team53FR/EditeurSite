@@ -26,7 +26,7 @@ async function chargerUtilisateurs() {
   const login = localStorage.getItem("gh_login");
   const message = document.getElementById("message");
 
-  if (!token || !login) { window.location.href = "connexion.html"; return; }
+  if (!token || !login) { window.location.replace("connexion.html"); return; }
 
   try {
     const { contenu, sha } = await lireFichierJSON("users.json", token);

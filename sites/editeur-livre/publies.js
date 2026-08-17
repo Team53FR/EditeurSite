@@ -7,7 +7,7 @@ async function chargerPublies() {
   const message = document.getElementById("message");
 
   if (!token || !localStorage.getItem("gh_login")) {
-    window.location.href = "connexion.html";
+    window.location.replace("connexion.html");
     return;
   }
 

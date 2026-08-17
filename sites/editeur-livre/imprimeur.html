@@ -473,7 +473,7 @@
     // Si une session est ouverte, les boutons mènent directement aux livres.
     (function(){
       try {
-        if (sessionStorage.getItem("gh_token")) {
+        if (localStorage.getItem("gh_token") || localStorage.getItem("team53_token")) {
           document.querySelectorAll('a[href="connexion.html"]').forEach(function(a){
             a.setAttribute("href", "bibliotheque.html");
             if (a.textContent.indexOf("connecter") !== -1) a.textContent = "Mes livres";

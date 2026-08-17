@@ -10,7 +10,7 @@
 <link rel="apple-touch-icon" href="icone-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="Team53">
+<meta name="apple-mobile-web-app-title" content="Site Guide">
 <script>
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
@@ -18,10 +18,17 @@
 </script>
 
 <script>
-  // Déjà connecté sur ce portail central : direction le tableau de bord.
-  if (localStorage.getItem("team53_token")) {
-    window.location.href = "tableau-de-bord.html";
-  }
+  // Déjà connecté : direction le tableau de bord.
+  // location.replace() et non href : pousser une entrée dans l'historique
+  // ferait rebondir « retour » entre cette page et la destination, sans
+  // jamais permettre de remonter plus haut.
+  (function () {
+    try {
+      if (localStorage.getItem("team53_token") || localStorage.getItem("team53_token")) {
+        location.replace("tableau-de-bord.html");
+      }
+    } catch (e) {}
+  })();
 </script>
 </head>
 <body>

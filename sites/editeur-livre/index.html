@@ -212,7 +212,7 @@
     // Si une session est déjà ouverte, on invite à rejoindre ses livres.
     (function(){
       try {
-        if (sessionStorage.getItem("gh_token")) {
+        if (localStorage.getItem("gh_token") || localStorage.getItem("team53_token")) {
           document.querySelectorAll("#ctaNav, #ctaHero, #ctaFin").forEach(function(a){
             a.setAttribute("href", "bibliotheque.html");
           });

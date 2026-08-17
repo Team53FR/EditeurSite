@@ -47,7 +47,7 @@ function seDeconnecter() {
   for (const cle of Object.values(CLES_CENTRALES)) localStorage.removeItem(cle);
   localStorage.removeItem("team53_acces");
   sessionStorage.removeItem("livre_id");
-  window.location.href = "../../connexion.html";
+  window.location.replace("../../connexion.html");
 }
 
 // Construit l'URL de l'API GitHub pour un chemin RELATIF à la base.

@@ -324,14 +324,14 @@ function seDeconnecter() {
   localStorage.removeItem("team53_role");
   localStorage.removeItem("team53_nom");
   localStorage.removeItem("team53_acces");
-  window.location.href = "connexion.html";
+  window.location.replace("connexion.html");
 }
 
 // Redirige vers la connexion si aucune session centrale n'est mémorisée.
 function exigerConnexionCentrale() {
   const token = localStorage.getItem("team53_token");
   if (!token) {
-    window.location.href = "connexion.html";
+    window.location.replace("connexion.html");
     return null;
   }
   return token;

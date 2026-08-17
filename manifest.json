@@ -1,7 +1,7 @@
 {
-  "name": "Team53FR",
-  "short_name": "Team53",
-  "description": "Un seul compte pour accéder à tous les sites du portail : éditeur de livre, bibliothèque, Droid Fortnite.",
+  "name": "Site Guide",
+  "short_name": "Site Guide",
+  "description": "Le guide de vos sites : un seul compte pour accéder à l'éditeur de livre, à votre bibliothèque et à Droid Fortnite.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

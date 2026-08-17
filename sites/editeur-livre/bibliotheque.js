@@ -9,7 +9,7 @@ async function chargerBibliotheque() {
   nomFichierBiblio = obtenirNomFichierBibliotheque();
 
   if (!token || !nomFichierBiblio) {
-    window.location.href = "connexion.html";
+    window.location.replace("connexion.html");
     return;
   }
 

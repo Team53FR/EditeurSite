@@ -25,7 +25,7 @@ async function chargerLecture() {
   if (!token || !localStorage.getItem("gh_login")) {
     // Lecture réservée aux utilisateurs connectés.
     const params = location.search;
-    window.location.href = "connexion.html";
+    window.location.replace("connexion.html");
     return;
   }
 

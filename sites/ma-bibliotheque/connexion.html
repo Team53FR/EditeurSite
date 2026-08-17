@@ -6,6 +6,20 @@
 <meta name="theme-color" content="#4f46e5">
 <title>Connexion — Ma Bibliothèque</title>
 <link rel="stylesheet" href="style.css">
+<script>
+  // Déjà connecté : cette page n'a pas lieu d'être affichée.
+  // location.replace() et non href : pousser une entrée dans l'historique
+  // ferait rebondir « retour » entre cette page et la destination, sans
+  // jamais permettre de remonter plus haut.
+  (function () {
+    try {
+      if (localStorage.getItem("mb_token") || localStorage.getItem("team53_token")) {
+        location.replace("collection.html");
+      }
+    } catch (e) {}
+  })();
+</script>
+
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icone-192.png">
 <link rel="apple-touch-icon" href="icone-192.png">
