@@ -607,6 +607,24 @@ PNG si l'image redimensionnée contient un pixel non totalement opaque,
 sinon en JPEG (plus léger) — un fond transparent (icône détourée) n'est
 donc pas aplati en noir comme avec un export JPEG systématique.
 
+## Favicon
+
+Sans `<link rel="icon">`, un navigateur réclame `/favicon.ico` **à la racine du
+domaine** — donc `team53fr.github.io/favicon.ico`, qui n'appartient pas à ce
+dépôt (les pages, elles, vivent sous `/EditeurSite/`). D'où un 404 sur chaque
+page. Chaque page déclare donc son icône, et chaque site a la sienne dans son
+propre dossier :
+
+| Site | Icône |
+|------|-------|
+| portail | boussole blanche sur indigo |
+| editeur-livre | livre ouvert sur terracotta |
+| droid-fortnite | tête de droïde sur bleu nuit |
+| ma-bibliotheque | la sienne, antérieure |
+
+Toutes sont générées par script plutôt que dessinées à la main — voir
+l'historique Git si elles doivent être refaites.
+
 ## App installable (PWA)
 
 Un site web ne peut pas livrer un fichier d'app (`.apk` / `.ipa`) : cela
