@@ -101,6 +101,7 @@ async function chargerDonnees() {
     message.textContent = e.message;
     return;
   }
+  remplirSelectRaretes(document.getElementById("champRarete"), raretes[0] && raretes[0].nom);
   afficherDroides();
   afficherPaliers();
   afficherUnites();
@@ -118,7 +119,7 @@ function afficherDroides() {
   grille.innerHTML = "";
 
   catalogue.slice().sort((a, b) => {
-    const diff = ORDRE_RARETE.indexOf(a.rarete) - ORDRE_RARETE.indexOf(b.rarete);
+    const diff = ordreRarete(a.rarete) - ordreRarete(b.rarete);
     return diff !== 0 ? diff : a.nom.localeCompare(b.nom);
   }).forEach((d) => {
     // Le palier « Défaut » sert de référence en admin : c'est celui dont les
@@ -175,13 +176,16 @@ function construireGrillePrixRendement(d) {
   // sans cela, basculer un droïde en Iconique ne reconstruisait pas la grille.
   const champRarete = document.getElementById("champRarete");
   const rarete = (champRarete && champRarete.value) || (d ? d.rarete : "");
-  const iconique = rarete === "Iconique";
+  // Certaines raretés n'existent qu'au premier palier (les Iconiques, et
+  // toute rareté marquée comme telle) : inutile de proposer les autres.
+  const rarInfo = raretes.find((r) => r.nom === rarete);
+  const iconique = !!(rarInfo && rarInfo.premierPalierSeulement);
 
   grille.innerHTML =
     '<div class="entete-paliers"><span>Palier</span><span>Prix</span><span>Rendement /s</span></div>';
 
   // Un Iconique n'existe qu'au premier palier : inutile de proposer les autres.
-  const lignes = paliers.filter((p) => !iconique || estDisponibleAuPalier({ rarete: "Iconique" }, p.nom));
+  const lignes = paliers.filter((p) => estDisponibleAuPalier({ rarete }, p.nom));
 
   lignes.forEach((p) => {
     const ligne = document.createElement("div");
@@ -585,15 +589,20 @@ function supprimerUnite(index) {
 }
 
 // ===== Couleurs des raretés =====
-// Partagées (raretes.json). La LISTE des raretés n'est pas modifiable :
-// ORDRE_RARETE structure le tri du catalogue, les filtres du Droidex et le
-// formulaire d'ajout. Seules les couleurs le sont.
+// Partagées (raretes.json). Leur ORDRE est celui du plus faible au plus fort :
+// il sert au tri du catalogue et à l'ordre des filtres. Ajout, suppression et
+// réordonnancement sont possibles ; le renommage ne l'est pas, car chaque
+// droïde stocke le NOM de sa rareté (même raison que pour les paliers).
 
 function afficherRaretes() {
   const liste = document.getElementById("listeRaretes");
   liste.innerHTML = "";
 
   raretes.forEach((r, index) => {
+    // Une rareté encore portée par des droïdes ne doit pas disparaître sans
+    // qu'on le sache : ils se retrouveraient avec une rareté inconnue.
+    const utilisee = catalogue.filter((d) => d.rarete === r.nom).length;
+
     const li = document.createElement("li");
     li.className = "ligne-item";
     li.innerHTML =
@@ -601,32 +610,101 @@ function afficherRaretes() {
         '<span class="badge-rarete ' + classeRareteCss(r.nom) + ' apercu-rarete">' +
           echapper(r.nom) +
         "</span>" +
+        '<div class="ligne-sous">' + (utilisee ? utilisee + " droïde(s)" : "aucun droïde") +
+          (r.premierPalierSeulement ? " · premier palier seulement" : "") + "</div>" +
       "</div>" +
       '<div class="ligne-actions">' +
-        '<label class="couleur-libelle">Fond' +
-          '<input type="color" class="rarete-fond" value="' + echapper(r.fond) + '">' +
-        "</label>" +
-        '<label class="couleur-libelle">Texte' +
-          '<input type="color" class="rarete-texte" value="' + echapper(r.texte) + '">' +
-        "</label>" +
+        '<label class="couleur-libelle">Fond<input type="color" class="rarete-fond" value="' + echapper(r.fond) + '"></label>' +
+        '<label class="couleur-libelle">Texte<input type="color" class="rarete-texte" value="' + echapper(r.texte) + '"></label>' +
       "</div>";
 
-    // Aperçu immédiat pendant qu'on fait glisser le sélecteur ; on
-    // n'enregistre qu'au relâchement (change), pas à chaque nuance (input).
     const badge = li.querySelector(".apercu-rarete");
     const fond = li.querySelector(".rarete-fond");
     const texte = li.querySelector(".rarete-texte");
-    const apercu = () => {
-      badge.style.background = fond.value;
-      badge.style.color = texte.value;
-    };
+    // Aperçu pendant qu'on fait glisser ; on n'enregistre qu'au relâchement.
+    const apercu = () => { badge.style.background = fond.value; badge.style.color = texte.value; };
     fond.oninput = apercu;
     texte.oninput = apercu;
     fond.onchange = () => changerCouleurRarete(index, { fond: fond.value });
     texte.onchange = () => changerCouleurRarete(index, { texte: texte.value });
 
+    const actions = li.querySelector(".ligne-actions");
+
+    const bHaut = document.createElement("button");
+    bHaut.className = "btn-mini";
+    bHaut.textContent = "↑";
+    bHaut.title = "Rareté plus faible";
+    bHaut.disabled = index === 0;
+    bHaut.onclick = () => deplacerRarete(index, -1);
+    actions.appendChild(bHaut);
+
+    const bBas = document.createElement("button");
+    bBas.className = "btn-mini";
+    bBas.textContent = "↓";
+    bBas.title = "Rareté plus forte";
+    bBas.disabled = index === raretes.length - 1;
+    bBas.onclick = () => deplacerRarete(index, 1);
+    actions.appendChild(bBas);
+
+    const bPalier = document.createElement("button");
+    bPalier.className = "btn-mini" + (r.premierPalierSeulement ? " actif" : "");
+    bPalier.textContent = "⭑";
+    bPalier.title = r.premierPalierSeulement
+      ? "N'existe qu'au premier palier — cliquer pour permettre les améliorations"
+      : "Marquer comme n'existant qu'au premier palier (comme les Iconiques)";
+    bPalier.onclick = () => changerCouleurRarete(index, { premierPalierSeulement: !r.premierPalierSeulement });
+    actions.appendChild(bPalier);
+
+    const bSuppr = document.createElement("button");
+    bSuppr.className = "btn-mini danger";
+    bSuppr.textContent = "✕";
+    bSuppr.title = utilisee ? "Supprimer (des droïdes la portent)" : "Supprimer";
+    bSuppr.onclick = () => supprimerRarete(index, utilisee);
+    actions.appendChild(bSuppr);
+
     liste.appendChild(li);
   });
+}
+
+function deplacerRarete(index, delta) {
+  const cible = index + delta;
+  if (cible < 0 || cible >= raretes.length) return;
+  const copie = raretes.slice();
+  [copie[index], copie[cible]] = [copie[cible], copie[index]];
+  sauvegarderRaretes(copie, "Réordonnancement des raretés");
+}
+
+function ajouterRarete() {
+  const champ = document.getElementById("champNouvelleRarete");
+  const message = document.getElementById("messageRaretes");
+  message.className = "message";
+
+  const nom = champ.value.trim();
+  if (!nom) { message.textContent = "Le nom est obligatoire."; return; }
+  if (raretes.some((r) => r.nom.toLowerCase() === nom.toLowerCase())) {
+    message.textContent = "Cette rareté existe déjà."; return;
+  }
+  champ.value = "";
+  // Ajoutée en fin de liste, donc comme la plus forte : c'est le cas courant.
+  sauvegarderRaretes(
+    raretes.concat([{ nom, fond: "#334155", texte: "#e2e8f0", premierPalierSeulement: false }]),
+    "Ajout de la rareté " + nom);
+}
+
+function supprimerRarete(index, utilisee) {
+  const r = raretes[index];
+  if (!r) return;
+  if (raretes.length <= 1) {
+    document.getElementById("messageRaretes").textContent = "Il faut au moins une rareté.";
+    return;
+  }
+  const avertissement = utilisee
+    ? "\n\n" + utilisee + " droïde(s) portent cette rareté. Ils la garderont, mais elle " +
+      "n'aura plus de couleur et passera en dernier dans le tri. Modifie-les d'abord si tu " +
+      "veux éviter cela."
+    : "";
+  if (!confirm("Supprimer la rareté « " + r.nom + " » ?" + avertissement)) return;
+  sauvegarderRaretes(raretes.filter((_, i) => i !== index), "Suppression de la rareté " + r.nom);
 }
 
 function changerCouleurRarete(index, modif) {
@@ -643,7 +721,8 @@ async function sauvegarderRaretes(nouvelles, messageCommit) {
     raretes = nouvelles;
     appliquerCouleursRaretes();
     afficherRaretes();
-    afficherDroides();          // les badges des cartes suivent
+    remplirSelectRaretes(document.getElementById("champRarete"));
+    afficherDroides();          // tri et badges suivent
     message.className = "message ok";
     message.textContent = "Enregistré.";
   } catch (e) {

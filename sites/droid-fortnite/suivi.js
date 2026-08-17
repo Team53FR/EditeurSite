@@ -71,6 +71,10 @@ async function chargerTout() {
     unites = unitesChargees.length ? unitesChargees : UNITES_INITIALES;
     raretes = normaliserRaretes(rRaretes.contenu);
     appliquerCouleursRaretes();
+    // Les deux listes déroulantes suivent la liste des raretés, qui peut
+    // s'allonger depuis le panneau admin.
+    remplirSelectRaretes(document.getElementById("filtreRarete"), "", "Toutes les raretés");
+    remplirSelectRaretes(document.getElementById("champDroideRarete"), raretes[0] && raretes[0].nom);
   } catch (e) {
     document.getElementById("chargement").innerHTML =
       `<p style="color:var(--danger);text-align:center">${echapperHTML(e.message)}</p>`;

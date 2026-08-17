@@ -835,3 +835,8 @@ a { color: var(--primaire); }
   border: 1px solid var(--bordure); border-radius: 8px;
   background: var(--fond); cursor: pointer;
 }
+
+/* Bouton d'état actif dans les listes admin (rareté au premier palier) */
+.btn-mini.actif {
+  background: var(--primaire); border-color: var(--primaire); color: var(--sur-primaire);
+}

@@ -77,14 +77,8 @@
         </div>
         <div class="champ">
           <label for="champRarete">Rareté</label>
-          <select id="champRarete" onchange="construireGrillePrixRendement(droideEnEdition())">
-            <option value="Typique">Typique</option>
-            <option value="Rare">Rare</option>
-            <option value="Épique">Épique</option>
-            <option value="Légendaire">Légendaire</option>
-            <option value="Mythique">Mythique</option>
-            <option value="Iconique">Iconique</option>
-          </select>
+          <!-- Rempli au chargement depuis raretes.json (remplirSelectRaretes) -->
+          <select id="champRarete" onchange="construireGrillePrixRendement(droideEnEdition())"></select>
         </div>
         <div class="champ">
           <label>Prix et rendement, palier par palier</label>
@@ -108,8 +102,14 @@
     <div id="zoneRaretes" style="display:none">
       <div class="bloc-carte">
         <h2>Couleurs des raretés</h2>
-        <p class="sous-titre">Le fond et le texte de chaque pastille de rareté, partout où elle apparaît. La liste des raretés elle-même ne change pas : elle structure le tri, les filtres et le formulaire.</p>
+        <p class="sous-titre">Le fond et le texte de chaque pastille de rareté, partout où elle apparaît. L'ordre va du plus faible au plus fort et sert au tri du catalogue. Le bouton ⭑ marque une rareté qui n'existe qu'au premier palier, comme les Iconiques. Le renommage n'est pas possible : chaque droïde stocke le nom de sa rareté.</p>
         <ul class="liste-simple" id="listeRaretes"></ul>
+
+        <div class="champ">
+          <label for="champNouvelleRarete">Ajouter une rareté (en fin de liste, donc la plus forte)</label>
+          <input type="text" id="champNouvelleRarete" placeholder="ex. Suprême" onkeydown="if(event.key==='Enter'){ajouterRarete();}">
+        </div>
+        <button class="btn btn-primaire" onclick="ajouterRarete()">Ajouter la rareté</button>
         <p id="messageRaretes" class="message"></p>
       </div>
     </div>

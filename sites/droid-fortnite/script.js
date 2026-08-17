@@ -322,8 +322,10 @@ function formaterCredits(n) {
 // Partagé : le Droidex les masque ailleurs, le formulaire admin n'y propose
 // pas de prix ni de rendement.
 function estDisponibleAuPalier(d, palierNom) {
+  const rarete = raretes.find((r) => r.nom === (d && d.rarete));
+  if (!rarete || !rarete.premierPalierSeulement) return true;
   const premier = paliers[0] && paliers[0].nom;
-  return d.rarete !== "Iconique" || palierNom === premier;
+  return palierNom === premier;
 }
 
 // ===== Prix et rendement, palier par palier =====
@@ -381,24 +383,54 @@ const RARETES_INITIALES = [
   { nom: "Épique",     fond: "#4c1d95", texte: "#ddd6fe" },
   { nom: "Légendaire", fond: "#78350f", texte: "#fde68a" },
   { nom: "Mythique",   fond: "#831843", texte: "#fbcfe8" },
-  { nom: "Iconique",   fond: "#065f46", texte: "#a7f3d0" }
+  // « premierPalierSeulement » remplace le test sur le nom : dans le jeu, les
+  // Iconiques ne s'améliorent pas. Une rareté ajoutée plus tard peut se voir
+  // attribuer le même comportement sans toucher au code.
+  { nom: "Iconique",   fond: "#065f46", texte: "#a7f3d0", premierPalierSeulement: true }
 ];
 
 let raretes = RARETES_INITIALES;
 
+// La liste stockée fait foi : son ORDRE est celui du plus faible au plus
+// fort, et sert de tri partout. Une entrée incomplète est complétée par la
+// rareté de départ du même nom, ou par des couleurs neutres.
 function normaliserRaretes(brutes) {
-  const liste = Array.isArray(brutes) ? brutes : [];
-  // La liste des raretés elle-même ne s'édite pas (ORDRE_RARETE structure le
-  // tri, les filtres et le formulaire) : on ne reprend que les couleurs des
-  // raretés connues, et on complète avec les valeurs de départ.
-  return RARETES_INITIALES.map((defaut) => {
-    const trouve = liste.find((r) => r && r.nom === defaut.nom);
+  const liste = (Array.isArray(brutes) ? brutes : [])
+    .map((r) => (typeof r === "string" ? { nom: r } : r))
+    .filter((r) => r && String(r.nom || "").trim());
+  if (!liste.length) return RARETES_INITIALES.slice();
+  return liste.map((r) => {
+    const nom = String(r.nom).trim();
+    const defaut = RARETES_INITIALES.find((d) => d.nom === nom) || {};
     return {
-      nom: defaut.nom,
-      fond: (trouve && trouve.fond) || defaut.fond,
-      texte: (trouve && trouve.texte) || defaut.texte
+      nom,
+      fond: r.fond || defaut.fond || "#334155",
+      texte: r.texte || defaut.texte || "#e2e8f0",
+      premierPalierSeulement: r.premierPalierSeulement !== undefined
+        ? !!r.premierPalierSeulement
+        : !!defaut.premierPalierSeulement
     };
   });
+}
+
+// Rang d'une rareté dans la liste : sert au tri du catalogue. Une rareté
+// devenue inconnue (retirée alors que des droïdes la portaient) passe en
+// dernier plutôt que de casser le tri.
+function ordreRarete(nom) {
+  const i = raretes.findIndex((r) => r.nom === nom);
+  return i === -1 ? raretes.length : i;
+}
+
+// Remplit un <select> avec les raretés connues, en gardant la valeur
+// choisie si elle existe encore.
+function remplirSelectRaretes(select, valeur, libelleVide) {
+  if (!select) return;
+  const choisi = valeur !== undefined ? valeur : select.value;
+  select.innerHTML =
+    (libelleVide ? '<option value="">' + libelleVide + "</option>" : "") +
+    raretes.map((r) => '<option value="' + r.nom.replace(/"/g, "&quot;") + '">' +
+      r.nom + "</option>").join("");
+  if (choisi && raretes.some((r) => r.nom === choisi)) select.value = choisi;
 }
 
 function appliquerCouleursRaretes() {
@@ -913,7 +945,7 @@ const PALIERS_INITIAUX = [
 
 // Ordre d'affichage des raretés, du plus faible au plus fort (utilisé pour
 // trier la liste des droïdes dans le panneau admin).
-const ORDRE_RARETE = ["Typique", "Rare", "Épique", "Légendaire", "Mythique", "Iconique"];
+// L'ordre des raretés vient désormais de raretes.json — voir ordreRarete().
 
 // paliers.json pouvait exister sous l'ancienne forme (tableau de chaînes,
 // avant l'ajout d'une couleur par palier) : on la reconnaît et la convertit

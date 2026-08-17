@@ -456,14 +456,28 @@ uniquement quand un seul compte écrit jamais un fichier donné, comme
 fusionne les entrées locales absentes (par `id`), pour ne jamais perdre
 silencieusement l'ajout fait par quelqu'un d'autre entre-temps.
 
-**Couleurs des raretés** : le fond et le texte de chaque pastille vivent dans
-`DroidFortnite/raretes.json`, éditables depuis l'onglet **Raretés** du panneau
-admin. Les règles sont injectées dans un `<style>` au chargement
-(`appliquerCouleursRaretes()`) plutôt qu'appliquées badge par badge : elles
-valent ainsi partout — cartes, panneau admin, feuille de choix de l'escouade.
-La feuille de style ne doit donc plus porter de règle `.badge-rarete.<rareté>`,
-qui l'emporterait en spécificité. La **liste** des raretés, elle, n'est pas
-modifiable : `ORDRE_RARETE` structure le tri, les filtres et le formulaire.
+**Raretés** : `DroidFortnite/raretes.json` porte la liste complète, éditable
+depuis l'onglet **Raretés** du panneau admin — ajout, suppression,
+réordonnancement et couleurs (fond + texte).
+
+- **L'ordre fait le tri** : du plus faible au plus fort, il sert au classement
+  du catalogue (`ordreRarete()`, qui a remplacé la constante `ORDRE_RARETE`) et
+  à l'ordre des listes déroulantes, remplies au chargement
+  (`remplirSelectRaretes()`) plutôt qu'écrites en dur dans le HTML.
+- **Pas de renommage**, comme pour les paliers et pour la même raison : chaque
+  droïde stocke le *nom* de sa rareté. Supprimer une rareté encore portée est
+  possible mais averti, avec le nombre de droïdes concernés ; ils la gardent,
+  simplement sans couleur et en dernier au tri (`ordreRarete()` renvoie alors
+  un rang au-delà de la liste, plutôt que -1 qui les aurait remontés en tête).
+- **`premierPalierSeulement`** est une propriété de la rareté, pas un test sur
+  le nom « Iconique » : une rareté ajoutée plus tard peut recevoir le même
+  comportement (bouton ⭑) sans toucher au code.
+- Les couleurs sont injectées dans un `<style>` au chargement
+  (`appliquerCouleursRaretes()`) plutôt qu'appliquées badge par badge : elles
+  valent ainsi partout — cartes, panneau admin, feuille de choix de l'escouade,
+  où les badges n'avaient d'ailleurs aucune couleur avant. La feuille de style
+  ne doit donc plus porter de règle `.badge-rarete.<rareté>`, qui l'emporterait
+  en spécificité.
 
 **Un palier peut porter plusieurs couleurs.** `couleur` est soit une chaîne,
 soit un tableau ; à partir de deux, le contour des cartes devient un dégradé —
