@@ -6,6 +6,17 @@
 <meta name="theme-color" content="#4f46e5">
 <title>Tableau de bord — Team53FR</title>
 <link rel="stylesheet" href="style.css">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icone-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Team53">
+<script>
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+  }
+</script>
+
 </head>
 <body>
   <header class="app-header">
@@ -23,6 +34,16 @@
   </header>
 
   <div class="contenu">
+    <div id="encart-app" class="encart-app" hidden>
+      <img src="icone-192.png" alt="" width="48" height="48">
+      <div class="encart-app-texte">
+        <strong>Installer l'application</strong>
+        <span id="encart-app-detail">Le portail s'ajoute à votre écran d'accueil et s'ouvre en plein écran.</span>
+      </div>
+      <button type="button" class="btn btn-primaire" id="btn-installer">Installer</button>
+      <button type="button" class="btn btn-fantome" id="btn-fermer-encart" aria-label="Masquer">✕</button>
+    </div>
+
     <div id="zone-sites"></div>
   </div>
 
@@ -84,6 +105,60 @@
     }
 
     initTableauDeBord();
+  </script>
+
+  <script>
+    // ===== Installation de l'application =====
+    // Un site web ne peut pas livrer un fichier d'app : il s'INSTALLE.
+    // Sur Android/Chrome le navigateur propose l'installation via
+    // beforeinstallprompt, que l'on retient pour l'offrir sur ce bouton.
+    // Safari iOS n'expose rien de tel : on y explique le geste à faire.
+    (function () {
+      const encart = document.getElementById("encart-app");
+      const detail = document.getElementById("encart-app-detail");
+      const bouton = document.getElementById("btn-installer");
+      const fermer = document.getElementById("btn-fermer-encart");
+      let invite = null;
+
+      const dejaInstallee = () =>
+        window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+
+      const estIOS = () =>
+        /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+        // iPadOS 13+ se presente comme un Mac tactile
+        (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+      // Masque volontairement pose : on ne re-propose pas a chaque visite.
+      if (dejaInstallee() || localStorage.getItem("team53_encart_app") === "masque") return;
+
+      window.addEventListener("beforeinstallprompt", (e) => {
+        e.preventDefault();          // on declenche nous-memes, sur le bouton
+        invite = e;
+        encart.hidden = false;
+      });
+
+      if (estIOS()) {
+        detail.textContent = "Sur iPhone : bouton Partager, puis « Sur l'écran d'accueil ».";
+        bouton.hidden = true;
+        encart.hidden = false;
+      }
+
+      bouton.addEventListener("click", async () => {
+        if (!invite) return;
+        bouton.disabled = true;
+        invite.prompt();
+        try { await invite.userChoice; } catch (e) { /* choix indisponible */ }
+        invite = null;
+        encart.hidden = true;
+      });
+
+      fermer.addEventListener("click", () => {
+        encart.hidden = true;
+        localStorage.setItem("team53_encart_app", "masque");
+      });
+
+      window.addEventListener("appinstalled", () => { encart.hidden = true; });
+    })();
   </script>
 </body>
 </html>
