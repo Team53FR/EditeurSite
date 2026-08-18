@@ -373,12 +373,34 @@ function totalEscouade(cles) {
     const n = parseFloat(texte.replace(",", "."));
     if (isFinite(n)) credits += n; else inconnus++;
   });
-  return { credits, pourcentage, inconnus };
+  // Les Iconiques majorent le revenu total d'un pourcentage : on l'applique
+  // à la somme des droïdes qui produisent des crédits.
+  const effectif = credits * (1 + pourcentage / 100);
+  return { credits, pourcentage, inconnus, effectif };
 }
 
+// Total global : le pourcentage des Iconiques est APPLIQUÉ, et le détail du
+// calcul reste affiché — sans quoi on ne saurait pas d'où sort le chiffre.
 function texteTotal(t) {
   const morceaux = [];
-  morceaux.push("<b>" + formaterCredits(t.credits) + "/s</b>");
+  morceaux.push("<b>" + formaterCredits(arrondirCredits(t.effectif)) + "/s</b>");
+  if (t.pourcentage) {
+    morceaux.push('<span class="total-detail">' + formaterCredits(arrondirCredits(t.credits)) +
+      "/s + " + (Math.round(t.pourcentage * 100) / 100) + " %</span>");
+  }
+  if (t.inconnus) {
+    morceaux.push('<span class="total-inconnu">' + t.inconnus +
+      " sans rendement renseigné</span>");
+  }
+  return morceaux.join(" ");
+}
+
+// Total d'une section : le pourcentage ne s'y applique pas — il porte sur le
+// revenu TOTAL, pas sur celui de la classe. On indique donc ce que la section
+// apporte, et à part ce qu'elle contribue en pourcentage.
+function texteTotalSection(t) {
+  const morceaux = [];
+  morceaux.push("<b>" + formaterCredits(arrondirCredits(t.credits)) + "/s</b>");
   if (t.pourcentage) {
     morceaux.push('<span class="total-bonus">+ ' +
       (Math.round(t.pourcentage * 100) / 100) + " % du revenu total</span>");
@@ -388,6 +410,13 @@ function texteTotal(t) {
       " sans rendement renseigné</span>");
   }
   return morceaux.join(" ");
+}
+
+// Une majoration donne vite des décimales sans intérêt (278399.99…) :
+// on arrondit avant d'abréger.
+function arrondirCredits(n) {
+  if (!isFinite(n)) return 0;
+  return Math.abs(n) >= 1000 ? Math.round(n) : Math.round(n * 100) / 100;
 }
 
 function afficherRendement() {
@@ -404,7 +433,7 @@ function afficherRendement() {
     section.innerHTML =
       '<div class="entete-escouade">' +
         '<h3>' + iconeClasse(classe) + " " + echapperHTML(classe) + "</h3>" +
-        '<span class="total-section">' + texteTotal(total) + "</span>" +
+        '<span class="total-section">' + texteTotalSection(total) + "</span>" +
         '<div class="reglage-slots">' +
           '<button type="button" class="btn-slot" data-classe="' + echapperHTML(classe) + '" data-delta="-1"' +
             (r.slots[classe] <= 0 ? " disabled" : "") + ' aria-label="Retirer un emplacement">−</button>' +

@@ -958,3 +958,6 @@ a { color: var(--primaire); }
 /* Sélecteur de super renaissance : même aspect que les onglets de palier */
 #selecteurSuper .ajouter-super { border-style: dashed; opacity: .85; }
 #ongletsSuper { margin-bottom: 0.75rem; }
+
+/* Détail du calcul, sous le total majoré */
+.total-detail { color: var(--texte-att); font-size: 0.82em; }
