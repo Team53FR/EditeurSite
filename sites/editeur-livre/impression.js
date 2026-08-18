@@ -34,10 +34,12 @@ const AIDE_IMPRESSION = {
       "Empilez les feuilles dans l'ordre, puis tapotez la pile sur une table pour aligner parfaitement le bord de reliure.",
       "Serrez la pile entre deux planchettes, en laissant dépasser 2 à 3 mm du bord à encoller.",
       "Encollez la tranche (colle vinylique blanche, ou colle thermofusible), en croisant les passages. Laissez sécher sous presse au moins une heure.",
-      "Collez la couverture par-dessus, puis marquez le pli du dos avec un plioir."
+      "Imprimez la couverture avec « Couverture seule » : 4e de couverture, dos et 1re viennent sur une seule feuille, les traits de pli marquant la tranche.",
+      "Collez la couverture par-dessus, puis marquez les deux plis du dos avec un plioir."
     ],
     bon: ["Aucune limite de pages : c'est le procédé des vrais livres.", "Dos plat, le livre tient debout sur une étagère.", "Rendu le plus proche d'un ouvrage édité."],
-    limites: ["Demande de la colle, une presse improvisée et du temps de séchage.",
+    limites: ["La couverture à plat est plus large qu'une A4 : il faut du A3, ou une impression chez un copiste.",
+              "Demande de la colle, une presse improvisée et du temps de séchage.",
               "Le collage doit être régulier, sous peine de pages qui se détachent.",
               "Une marge intérieure est réservée à la reliure : ne réduisez pas les marges."],
     reglages: "Dans la fenêtre d'impression : échelle 100 % (surtout pas « ajuster à la page »), et recto-verso « retourner sur les bords longs »."
@@ -88,7 +90,9 @@ const MODES_IMPRESSION = [
       { libelle: "Recto-verso automatique", detail: "Votre imprimante retourne les feuilles toute seule.",
         action: "exporterImpression", mode: "auto" },
       { libelle: "En deux fois", detail: "Sans recto-verso : les rectos d'abord, puis les versos.",
-        action: "exporterImpression", mode: "passes" }
+        action: "exporterImpression", mode: "passes" },
+      { libelle: "Couverture seule", detail: "4e de couverture, dos et 1re sur une seule feuille, avec les plis.",
+        action: "exporterCouvertureSeule", mode: "" }
     ]
   },
   {
@@ -595,6 +599,112 @@ function avecPaginationImprimeur(livre, travail) {
     appliquerFormatPage(livre.format || "149x210");
     repaginerTout();
   }
+}
+
+// ----- Couverture seule (reliure maison) -----
+//
+// Le dos collé se fabrique en deux temps : les pages d'un côté, la couverture
+// de l'autre. Elle doit sortir OUVERTE À PLAT — 4e de couverture, dos, 1re —
+// pour qu'une fois pliée sur les deux traits, la tranche tombe au milieu.
+//
+// C'est la planche de l'export imprimeur, sans le contrôle avant envoi qui
+// n'a pas lieu d'être ici : on ne demande que l'épaisseur du dos.
+
+function exporterCouvertureSeule() {
+  flushSpread();
+  const livre = livreActuel();
+  const f = FORMATS[livre.format || "149x210"] || FORMATS["149x210"];
+  // Le nombre de pages à l'écran suffit à estimer le dos : inutile de relancer
+  // la pagination imprimeur, qui coûte plusieurs secondes sur un gros livre et
+  // ne changerait l'épaisseur que d'une fraction de millimètre.
+  const nbPages = (livre.pages || []).length;
+  ouvrirDialogueCouvertureSeule(livre, f, nbPages);
+}
+
+function ouvrirDialogueCouvertureSeule(livre, f, nbPages) {
+  const ancien = document.getElementById("dialogueCouverture");
+  if (ancien) ancien.remove();
+
+  const dos = epaisseurDosMm(nbPages, GRAMMAGE_DEFAUT, MAIN_DEFAUT);
+  const largSupport = (larg) => 2 * f.larg + larg + 2 * MARGE_TECHNIQUE_MM;
+  const hautSupport = f.haut + 2 * MARGE_TECHNIQUE_MM;
+
+  let html = '<div class="modal-impression-carte ci-carte" role="dialog" aria-modal="true">' +
+    '<button class="mi-fermer" aria-label="Fermer">&#10005;</button>' +
+    "<h3>Imprimer la couverture</h3>" +
+    '<p class="mi-intro">Une seule feuille, ouverte à plat : 4e de couverture, dos, ' +
+      "1re de couverture. Deux traits marquent les plis du dos, quatre autres les coupes.</p>";
+
+  html += '<div class="ci-resume">' +
+    "<div><span>Format du livre</span><strong>" + f.larg + " × " + f.haut + " mm</strong></div>" +
+    '<div><span>Feuille à prévoir</span><strong class="dc-support">' +
+      largSupport(dos).toFixed(0) + " × " + hautSupport + " mm</strong></div>" +
+  "</div>";
+
+  html += '<div class="ci-dos">' +
+    "<h4>Épaisseur du dos</h4>" +
+    '<div class="ci-champs">' +
+      '<label>Grammage <input type="number" id="dcGrammage" value="' + GRAMMAGE_DEFAUT + '" min="50" max="200" step="5"> g/m²</label>' +
+      '<label>Main <input type="number" id="dcMain" value="' + MAIN_DEFAUT + '" min="0.8" max="2.5" step="0.05"></label>' +
+      '<label>Dos <input type="number" id="dcDos" value="' + dos.toFixed(1) + '" min="0" max="60" step="0.1"> mm</label>' +
+    "</div>" +
+    '<p class="ci-note">Calculé pour ' + nbPages + " pages sur du papier ordinaire. " +
+      "Mesurez la tranche de votre pile une fois imprimée et reportez la valeur ici : " +
+      "c'est elle qui place les plis.</p>" +
+  "</div>";
+
+  html += '<p class="ci-note dc-papier"></p>';
+
+  html += '<p class="ci-reglages"><strong>Dans la fenêtre d&rsquo;impression :</strong> échelle 100 % ' +
+    "(jamais « ajuster à la page »), marges « aucune », et décochez les en-têtes et pieds de page " +
+    "du navigateur. Sans quoi les plis ne tomberaient plus au bon endroit.</p>";
+
+  html += '<div class="ci-actions">' +
+    '<button class="ci-annuler">Annuler</button>' +
+    '<button class="ci-generer">Imprimer la couverture</button>' +
+  "</div></div>";
+
+  const fond = document.createElement("div");
+  fond.id = "dialogueCouverture";
+  fond.className = "modal-impression";
+  fond.innerHTML = html;
+  fond.addEventListener("click", (e) => { if (e.target === fond) fond.remove(); });
+  document.body.appendChild(fond);
+
+  const champDos = fond.querySelector("#dcDos");
+
+  // La feuille à plat dépasse presque toujours l'A4 : mieux vaut le dire ici
+  // que devant une couverture tronquée.
+  const majSupport = () => {
+    const d = parseFloat(champDos.value);
+    const dosMm = (isFinite(d) && d >= 0) ? d : dos;
+    const l = largSupport(dosMm);
+    fond.querySelector(".dc-support").textContent = l.toFixed(0) + " × " + hautSupport + " mm";
+    fond.querySelector(".dc-papier").textContent = l > 297 || hautSupport > 210
+      ? "Cette feuille ne tient pas sur une A4 : imprimez sur A3, ou faites-la sortir chez un copiste."
+      : "Cette feuille tient sur une A4 en paysage.";
+  };
+
+  const recalculer = () => {
+    const g = parseFloat(fond.querySelector("#dcGrammage").value) || GRAMMAGE_DEFAUT;
+    const m = parseFloat(fond.querySelector("#dcMain").value) || MAIN_DEFAUT;
+    champDos.value = epaisseurDosMm(nbPages, g, m).toFixed(1);
+    majSupport();
+  };
+  fond.querySelector("#dcGrammage").oninput = recalculer;
+  fond.querySelector("#dcMain").oninput = recalculer;
+  champDos.oninput = majSupport;
+  majSupport();
+
+  fond.querySelector(".mi-fermer").onclick = () => fond.remove();
+  fond.querySelector(".ci-annuler").onclick = () => fond.remove();
+  fond.querySelector(".ci-generer").onclick = () => {
+    const saisi = parseFloat(champDos.value);
+    const dosMm = (isFinite(saisi) && saisi >= 0) ? saisi : dos;
+    fond.remove();
+    // Aucune page intérieure à fournir : la planche de couverture n'en utilise pas.
+    setTimeout(() => genererFichierImprimeur("couverture", dosMm, livre, f, []), 50);
+  };
 }
 
 // ----- Panneau de contrôle avant génération -----
