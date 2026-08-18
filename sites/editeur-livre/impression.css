@@ -255,7 +255,8 @@
     overflow: hidden;
   }
 
-  /* Titre au dos : lisible de haut en bas, dos vers soi */
+  /* Titre au dos. Par défaut il se lit de haut en bas, dos vers soi, comme
+     chez la plupart des éditeurs ; « montant » donne l'autre sens. */
   .dos-texte-pro {
     writing-mode: vertical-rl;
     white-space: nowrap;
@@ -264,6 +265,7 @@
     overflow: hidden;
     max-height: 90%;
   }
+  .dos-texte-pro.montant { transform: rotate(180deg); }
 
   /* Folio remonté à 8 mm du bord rogné (blanc tournant de 7 mm exigé).
      line-height fixé à 1 pour que la hauteur de la bande soit prévisible et

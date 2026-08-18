@@ -1105,6 +1105,197 @@ function creerPagePro(contenu, numero, f, margeInt, margeExt) {
   return feuille;
 }
 
+// ----- La tranche (le dos du livre) -----
+//
+// Troisième face visible d'un livre relié, et la seule qu'on voie une fois
+// rangé dans une bibliothèque. Elle se règle donc comme les deux autres, à
+// ceci près qu'elle est haute et étroite : pas d'image de fond ici, une
+// bande de quelques millimètres n'en montrerait rien.
+//
+// Chaque réglage peut valoir « comme la couverture » (valeur nulle) : un
+// livre déjà écrit garde exactement l'aspect qu'il avait, sans migration.
+
+function donneesTranche(livre) {
+  const t = (livre && livre.tranche) || {};
+  const couv = (livre && livre.couverture) || {};
+  return {
+    fond: t.fond || couv.fond || "#1a1a2e",
+    texte: t.texte || couv.texte || "#ffffff",
+    // Le contenu par défaut est celui d'avant ce réglage : « Titre — Auteur ».
+    contenu: typeof t.contenu === "string" && t.contenu.trim()
+      ? t.contenu
+      : [livre && livre.titre, livre && livre.auteur].filter(Boolean).join(" — "),
+    // Sens de lecture. Les deux existent en rayon : de haut en bas chez la
+    // plupart des éditeurs actuels, de bas en haut dans la tradition
+    // française. On garde le premier par défaut, qui est ce que le dos
+    // faisait avant d'être réglable.
+    sens: t.sens === "montant" ? "montant" : "descendant",
+    taille: Number(t.taille) > 0 ? Number(t.taille) : 10,
+    // En dessous de 6 mm, l'usage est de laisser le dos nu : le texte
+    // tomberait sur les plis. On peut passer outre en connaissance de cause.
+    forcerTexte: !!t.forcerTexte
+  };
+}
+
+// Le texte tient-il sur ce dos ? En dessous de 6 mm, non — sauf insistance.
+function tranchePorteTexte(reglages, dosMm) {
+  return !!reglages.contenu.trim() && (dosMm >= 6 || reglages.forcerTexte);
+}
+
+// ----- Réglage de la tranche -----
+//
+// La couverture et la 4e ouvrent une vue entière : elles ont une image de
+// fond à cadrer. La tranche, elle, n'a que quatre réglages et une bande de
+// quelques millimètres à montrer — un panneau suffit, avec son aperçu à
+// côté des champs.
+
+function ouvrirTranche() {
+  if (modeApercu || modeCouverture) return;
+  flushSpread();
+
+  const livre = livreActuel();
+  if (!livre) return;
+  if (!livre.tranche) livre.tranche = {};
+  const t = livre.tranche;
+  const defauts = donneesTranche(livre);
+
+  const ancien = document.getElementById("dialogueTranche");
+  if (ancien) ancien.remove();
+
+  // Épaisseur d'aperçu : celle qu'aura le dos pour le nombre de pages actuel,
+  // pour juger si le texte y tiendra vraiment.
+  const dosMm = epaisseurDosMm((livre.pages || []).length, GRAMMAGE_DEFAUT, MAIN_DEFAUT);
+
+  let html = '<div class="modal-impression-carte ci-carte" role="dialog" aria-modal="true">' +
+    '<button class="mi-fermer" aria-label="Fermer">&#10005;</button>' +
+    "<h3>La tranche</h3>" +
+    '<p class="mi-intro">Le dos du livre : la seule face visible une fois rangé ' +
+    "dans une bibliothèque. Laissé tel quel, il reprend les couleurs de la couverture.</p>" +
+    '<div class="tranche-atelier">' +
+      '<div class="tranche-reglages">' +
+        '<label class="label-couv" for="trContenu">Texte du dos</label>' +
+        '<input type="text" id="trContenu" value="' + echapperTitre(defauts.contenu) + '">' +
+        '<p class="aide-champ">Vide, il reprend « Titre — Auteur ».</p>' +
+
+        '<div class="tranche-duo">' +
+          '<label>Fond <input type="color" id="trFond" value="' + defauts.fond + '"></label>' +
+          '<label>Texte <input type="color" id="trTexte" value="' + defauts.texte + '"></label>' +
+        "</div>" +
+        '<button type="button" class="btn-lien" id="trReset">Reprendre les couleurs de la couverture</button>' +
+
+        '<div class="tranche-duo">' +
+          '<label>Sens <select id="trSens">' +
+            '<option value="descendant">De haut en bas</option>' +
+            '<option value="montant">De bas en haut</option>' +
+          "</select></label>" +
+          '<label>Taille <input type="number" id="trTaille" min="5" max="24" step="0.5" value="' +
+            defauts.taille + '"> pt</label>' +
+        "</div>" +
+
+        '<label class="tranche-case"><input type="checkbox" id="trForcer"' +
+          (defauts.forcerTexte ? " checked" : "") + "> Écrire même sur un dos très fin</label>" +
+        '<p class="aide-champ" id="trNoteDos"></p>' +
+      "</div>" +
+      '<div class="tranche-apercu">' +
+        '<div class="tranche-bande" id="trBande"><span id="trBandeTexte"></span></div>' +
+        '<small id="trLegende"></small>' +
+      "</div>" +
+    "</div>" +
+    '<div class="ci-actions">' +
+      '<button class="ci-annuler">Annuler</button>' +
+      '<button class="ci-generer">Enregistrer</button>' +
+    "</div></div>";
+
+  const fond = document.createElement("div");
+  fond.id = "dialogueTranche";
+  fond.className = "modal-impression";
+  fond.innerHTML = html;
+  fond.addEventListener("click", (e) => { if (e.target === fond) fond.remove(); });
+  document.body.appendChild(fond);
+
+  fond.querySelector("#trSens").value = defauts.sens;
+
+  const lire = () => ({
+    contenu: fond.querySelector("#trContenu").value,
+    fond: fond.querySelector("#trFond").value,
+    texte: fond.querySelector("#trTexte").value,
+    sens: fond.querySelector("#trSens").value,
+    taille: parseFloat(fond.querySelector("#trTaille").value) || defauts.taille,
+    forcerTexte: fond.querySelector("#trForcer").checked
+  });
+
+  // L'aperçu montre la bande à l'échelle : le dos réel fait quelques
+  // millimètres de large pour 210 mm de haut, illisible tel quel à l'écran.
+  const LARGEUR_MIN_APERCU = 14;   // px, pour que la bande reste visible
+  const HAUTEUR_APERCU = 260;      // px
+
+  const rafraichir = () => {
+    const r = lire();
+    const bande = fond.querySelector("#trBande");
+    const texte = fond.querySelector("#trBandeTexte");
+    const echelle = HAUTEUR_APERCU / (FORMATS[livre.format || "149x210"] || FORMATS["149x210"]).haut;
+
+    bande.style.height = HAUTEUR_APERCU + "px";
+    bande.style.width = Math.max(LARGEUR_MIN_APERCU, dosMm * echelle) + "px";
+    bande.style.background = r.fond;
+    texte.style.color = r.texte;
+    texte.style.fontSize = (r.taille * echelle * 25.4 / 72).toFixed(2) + "px";
+    texte.classList.toggle("montant", r.sens === "montant");
+
+    const affiche = tranchePorteTexte(
+      Object.assign({}, r, { contenu: r.contenu.trim() || defauts.contenu }), dosMm);
+    texte.textContent = affiche ? (r.contenu.trim() || defauts.contenu) : "";
+
+    fond.querySelector("#trLegende").textContent =
+      "Dos de " + dosMm.toFixed(1).replace(".", ",") + " mm (" + (livre.pages || []).length + " pages)";
+    fond.querySelector("#trNoteDos").textContent = dosMm >= 6
+      ? "Le dos est assez épais pour porter du texte."
+      : "Sous 6 mm, l'usage est de laisser le dos nu : le texte tomberait sur les plis.";
+  };
+
+  fond.querySelectorAll("input, select").forEach((c) => {
+    c.addEventListener("input", rafraichir);
+    c.addEventListener("change", rafraichir);
+  });
+
+  fond.querySelector("#trReset").onclick = () => {
+    const couv = livre.couverture || {};
+    fond.querySelector("#trFond").value = couv.fond || "#1a1a2e";
+    fond.querySelector("#trTexte").value = couv.texte || "#ffffff";
+    rafraichir();
+  };
+
+  rafraichir();
+
+  fond.querySelector(".mi-fermer").onclick = () => fond.remove();
+  fond.querySelector(".ci-annuler").onclick = () => fond.remove();
+  fond.querySelector(".ci-generer").onclick = () => {
+    const r = lire();
+    const couv = livre.couverture || {};
+    // Une couleur identique à celle de la couverture n'est pas enregistrée :
+    // la tranche continue alors de la suivre si on retouche la couverture.
+    t.fond = r.fond === (couv.fond || "#1a1a2e") ? null : r.fond;
+    t.texte = r.texte === (couv.texte || "#ffffff") ? null : r.texte;
+    // Idem pour le texte : « Titre — Auteur » reste automatique.
+    const parDefaut = [livre.titre, livre.auteur].filter(Boolean).join(" — ");
+    t.contenu = r.contenu.trim() === parDefaut ? "" : r.contenu;
+    t.sens = r.sens;
+    t.taille = r.taille;
+    t.forcerTexte = r.forcerTexte;
+
+    fond.remove();
+    marquerModifie();
+    planifierBrouillon();
+    const message = document.getElementById("message");
+    if (message) {
+      message.textContent = "Tranche enregistrée.";
+      setTimeout(() => {
+        if (message.textContent.indexOf("Tranche") !== -1) message.textContent = "";
+      }, 3000);
+    }
+  };
+}
+
 // Couverture ouverte à plat : 4e de couverture | dos | 1re de couverture.
 function creerCouverturePlat(livre, f, dosMm, promessesImages) {
   const largTrim = 2 * f.larg + dosMm;
@@ -1127,17 +1318,18 @@ function creerCouverturePlat(livre, f, dosMm, promessesImages) {
 
   zone.appendChild(creerPanneauCouverture(livre, "quatrieme", f, promessesImages));
 
+  const reglages = donneesTranche(livre);
   const dos = document.createElement("div");
   dos.className = "dos-pro";
   dos.style.width = dosMm + "mm";
   dos.style.height = f.haut + "mm";
-  dos.style.background = fondCouleur;
-  // Sous 6 mm, l'usage est de laisser le dos nu : le texte tomberait sur les plis.
-  if (dosMm >= 6) {
+  dos.style.background = reglages.fond;
+  if (tranchePorteTexte(reglages, dosMm)) {
     const t = document.createElement("div");
-    t.className = "dos-texte-pro";
-    t.style.color = (livre.couverture && livre.couverture.texte) || "#ffffff";
-    t.textContent = [livre.titre, livre.auteur].filter(Boolean).join(" — ");
+    t.className = "dos-texte-pro" + (reglages.sens === "montant" ? " montant" : "");
+    t.style.color = reglages.texte;
+    t.style.fontSize = reglages.taille + "pt";
+    t.textContent = reglages.contenu;
     dos.appendChild(t);
   }
   zone.appendChild(dos);

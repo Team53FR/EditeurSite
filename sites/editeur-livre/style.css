@@ -1819,3 +1819,63 @@ button.danger {
 
 /* Avertissement du dialogue « Imprimer la couverture » */
 .dc-alerte { color: #b45309; font-weight: 600; }
+
+
+/* ===== Réglage de la tranche ===== */
+.tranche-atelier {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1.2rem;
+  align-items: start;
+  margin: 0.9rem 0;
+}
+.tranche-reglages { min-width: 0; }
+.tranche-reglages input[type="text"] {
+  width: 100%; box-sizing: border-box;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--bordure, #d8d8d8); border-radius: 6px;
+}
+.tranche-duo {
+  display: flex; flex-wrap: wrap; gap: 0.9rem;
+  align-items: center; margin: 0.7rem 0;
+}
+.tranche-duo label { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.86rem; }
+.tranche-duo input[type="color"] {
+  width: 40px; height: 30px; padding: 2px;
+  border: 1px solid var(--bordure, #d8d8d8); border-radius: 6px; background: none;
+}
+.tranche-duo input[type="number"] { width: 4.2rem; padding: 0.3rem 0.4rem;
+  border: 1px solid var(--bordure, #d8d8d8); border-radius: 6px; }
+.tranche-case { display: flex; align-items: center; gap: 0.45rem; font-size: 0.86rem; margin: 0.5rem 0 0.2rem; }
+.tranche-reglages .aide-champ { font-size: 0.78rem; opacity: 0.75; margin: 0.25rem 0 0; line-height: 1.35; }
+.tranche-reglages .label-couv { display: block; margin-bottom: 0.3rem; }
+
+/* L'aperçu du dos, à l'échelle de la page : quelques millimètres de large
+   pour toute la hauteur du livre. */
+.tranche-apercu { display: flex; flex-direction: column; align-items: center; gap: 0.4rem; }
+.tranche-bande {
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 2px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+}
+.tranche-bande span {
+  writing-mode: vertical-rl;
+  white-space: nowrap;
+  letter-spacing: 0.06em;
+  max-height: 92%;
+  overflow: hidden;
+}
+.tranche-bande span.montant { transform: rotate(180deg); }
+.tranche-apercu small { font-size: 0.72rem; opacity: 0.7; }
+
+.btn-lien {
+  background: none; border: none; padding: 0;
+  color: var(--accent, #7a4a2a); font-size: 0.8rem;
+  text-decoration: underline; cursor: pointer;
+}
+
+@media (max-width: 560px) {
+  .tranche-atelier { grid-template-columns: minmax(0, 1fr); }
+  .tranche-apercu { order: -1; }
+}
