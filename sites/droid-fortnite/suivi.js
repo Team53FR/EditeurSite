@@ -634,7 +634,55 @@ function placerDansSlot(cle) {
 
 // ===== Onglet Renaissance =====
 
-function construireElementsRenaissance(texte) {
+// ----- Garder ou vendre ? -----
+//
+// Une fois un palier fait, un droïde ne sert plus à rien s'il n'est demandé
+// par aucun palier suivant : autant le vendre. Encore faut-il le savoir sans
+// relire les trente-quatre paliers restants un par un.
+//
+// On raisonne sur le DROÏDE, pas sur le couple droïde+palier : un droïde
+// redemandé plus loin à un palier supérieur se garde et s'améliore, il ne se
+// rachète pas.
+function besoinsUlterieurs() {
+  const parDroide = new Map();   // id -> [{ niveau, palier }, …]
+  renaissance.forEach((r) => {
+    analyserElementsRenaissance(elementsPourSuper(r, superActif)).forEach((e) => {
+      if (!e.droide) return;
+      if (!parDroide.has(e.droide.id)) parDroide.set(e.droide.id, []);
+      parDroide.get(e.droide.id).push({ niveau: r.niveau, palier: e.palier });
+    });
+  });
+  parDroide.forEach((liste) => liste.sort((a, b) => a.niveau - b.niveau));
+  return parDroide;
+}
+
+// Le droïde est-il posé dans l'escouade ? Le vendre y ferait un trou : on le
+// signale, sans pour autant cacher qu'il ne sert plus aux renaissances.
+function poseDansEscouade(idDroide) {
+  const r = escouade();
+  return CLASSES_ESCOUADE.some((c) => r.places[c].some((cle) => {
+    const d = cle && droideDeCle(cle);
+    return d && d.droide && d.droide.id === idDroide;
+  }));
+}
+
+function marqueurUtilite(droide, niveauCourant, besoins) {
+  const suite = (besoins.get(droide.id) || []).filter((b) => b.niveau > niveauCourant);
+  if (suite.length) {
+    return '<span class="element-utilite garder" title="' +
+      echapperHTML("À garder : encore requis au palier " + suite[0].niveau +
+                   " (" + suite[0].palier + ")") + '">🔒</span>';
+  }
+  if (poseDansEscouade(droide.id)) {
+    return '<span class="element-utilite reserve" title="' +
+      echapperHTML("Plus requis par les renaissances, mais posé dans ton rendement") +
+      '">💰</span>';
+  }
+  return '<span class="element-utilite vendable" title="' +
+    echapperHTML("Vendable : aucun palier suivant ne le demande") + '">💰</span>';
+}
+
+function construireElementsRenaissance(texte, niveauCourant, besoins) {
   const zone = document.createElement("div");
   zone.className = "elements-renaissance";
   const elements = analyserElementsRenaissance(texte);
@@ -660,6 +708,7 @@ function construireElementsRenaissance(texte) {
     // donc qu'à afficher la carte en pleine lumière, et sa case à cocher est
     // masquée (voir style.css) puisqu'elle n'aurait rien à dire ici.
     enveloppe.appendChild(construireCarteDroide(e.droide, { possede: true, couleur, palier: e.palier }));
+    enveloppe.insertAdjacentHTML("beforeend", marqueurUtilite(e.droide, niveauCourant, besoins));
     enveloppe.insertAdjacentHTML("beforeend",
       '<span class="element-palier">' + echapperHTML(e.palier) + "</span>");
     zone.appendChild(enveloppe);
@@ -721,6 +770,7 @@ function afficherRenaissance(options) {
   const tries = renaissance.slice().sort((a, b) => a.niveau - b.niveau);
   const liste = document.getElementById("listeRenaissance");
   liste.innerHTML = "";
+  const besoins = besoinsUlterieurs();
 
   tries.forEach((r) => {
     const atteint = atteintsSuper().includes(r.id);
@@ -741,7 +791,10 @@ function afficherRenaissance(options) {
         `<input type="checkbox" class="renaissance-case" ${atteint ? "checked" : ""}>` +
       `</div>`;
 
-    if (!replie) item.appendChild(construireElementsRenaissance(elementsPourSuper(r, superActif)));
+    if (!replie) {
+      item.appendChild(construireElementsRenaissance(
+        elementsPourSuper(r, superActif), r.niveau, besoins));
+    }
     item.querySelector(".renaissance-case").addEventListener("change", () => basculerAtteint(r.id));
 
     const plier = item.querySelector(".renaissance-plier");

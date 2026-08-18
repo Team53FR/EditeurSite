@@ -893,6 +893,31 @@ a { color: var(--primaire); }
 @media (min-width: 520px) { .elements-renaissance { grid-template-columns: repeat(auto-fill, minmax(86px, 1fr)); } }
 
 .element-renaissance { position: relative; }
+
+/* Garder ou vendre : même emplacement que la case à cocher du Droidex, qui
+   est masquée ici. Le signe est petit — c'est un rappel, pas un verdict. */
+.element-utilite {
+  position: absolute; top: 3px; right: 3px; z-index: 4;
+  width: 19px; height: 19px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 5px;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, .25);
+  font-size: 0.72rem; line-height: 1;
+  cursor: help;
+}
+.element-utilite.garder   { background: rgba(15, 23, 42, .88); }
+.element-utilite.vendable { background: rgba(22, 163, 74, .92); }
+/* Vendable pour les renaissances, mais posé dans l'escouade : on prévient. */
+.element-utilite.reserve  { background: rgba(217, 119, 6, .92); }
+
+.legende-utilite {
+  display: flex; flex-wrap: wrap; gap: 0.25rem 0.9rem;
+  margin: 0 0 0.6rem;
+  font-size: 0.74rem; color: var(--texte-att);
+}
+.legende-utilite span { display: inline-flex; align-items: center; gap: 0.3rem; }
+/* Dans la légende, le signe se pose dans le texte au lieu du coin d'une carte. */
+.legende-utilite .element-utilite { position: static; flex-shrink: 0; }
 /* Ici on montre CE QU'IL FAUT, pas ce qu'on possède : la case à cocher de la
    carte n'aurait rien à dire, et prêterait à confusion. */
 .element-renaissance .dx-case { display: none; }
