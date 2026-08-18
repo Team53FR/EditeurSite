@@ -1131,6 +1131,19 @@ function donneesTranche(livre) {
     // faisait avant d'être réglable.
     sens: t.sens === "montant" ? "montant" : "descendant",
     taille: Number(t.taille) > 0 ? Number(t.taille) : 10,
+    // Blocs facultatifs, dans l'ordre où ils se posent sur le dos.
+    // Tous vides par défaut : un livre déjà écrit ne change pas d'aspect.
+    bandeau: Number(t.bandeau) > 0 ? Number(t.bandeau) : 0,
+    pastille: typeof t.pastille === "string" ? t.pastille : "",
+    pastilleFond: t.pastilleFond || "#22c55e",
+    pastilleTexte: t.pastilleTexte || "#0b1220",
+    pastilleTaille: Number(t.pastilleTaille) > 0 ? Number(t.pastilleTaille) : 9,
+    surtitre: typeof t.surtitre === "string" ? t.surtitre : "",
+    surtitreTaille: Number(t.surtitreTaille) > 0 ? Number(t.surtitreTaille) : 6,
+    credits: typeof t.credits === "string" ? t.credits : "",
+    creditsTaille: Number(t.creditsTaille) > 0 ? Number(t.creditsTaille) : 5.5,
+    pied: typeof t.pied === "string" ? t.pied : "",
+    piedTaille: Number(t.piedTaille) > 0 ? Number(t.piedTaille) : 6,
     // En dessous de 6 mm, l'usage est de laisser le dos nu : le texte
     // tomberait sur les plis. On peut passer outre en connaissance de cause.
     forcerTexte: !!t.forcerTexte
@@ -1142,12 +1155,135 @@ function tranchePorteTexte(reglages, dosMm) {
   return !!reglages.contenu.trim() && (dosMm >= 6 || reglages.forcerTexte);
 }
 
+// Le dos, tel qu'il s'imprime. Un seul constructeur sert la planche de
+// couverture ET l'aperçu du panneau de réglage : ce qu'on voit à l'écran est
+// exactement ce qui sortira, à l'échelle près.
+//
+// L'ordre des blocs est celui d'un livre en rayon : le bandeau d'image en
+// tête, la pastille de tome, le titre au centre, les crédits en dessous, la
+// marque de l'éditeur au pied.
+function construireDosLivre(livre, dosMm, hautMm, promessesImages) {
+  const r = donneesTranche(livre);
+  const dos = document.createElement("div");
+  dos.className = "dos-pro";
+  dos.style.width = dosMm + "mm";
+  dos.style.height = hautMm + "mm";
+  dos.style.background = r.fond;
+  dos.style.color = r.texte;
+
+  const montant = r.sens === "montant";
+  // Un texte tourné se lit dans le sens choisi ; la pastille et le pied
+  // restent droits, comme sur les livres qu'ils imitent.
+  const tourne = (el) => {
+    el.classList.add("dos-vertical");
+    if (montant) el.classList.add("montant");
+    return el;
+  };
+
+  // 1) Bandeau : le haut de l'image de couverture, qui se prolonge sur le dos.
+  if (r.bandeau > 0 && livre.couverture && livre.couverture.imageChemin) {
+    const bande = document.createElement("div");
+    bande.className = "dos-bandeau";
+    bande.style.height = r.bandeau + "mm";
+    const img = document.createElement("img");
+    bande.appendChild(img);
+    dos.appendChild(bande);
+    chargerImageCouverture(img, livre.couverture.imageChemin, promessesImages);
+  }
+
+  // 2) Pastille : le numéro de tome, droit, sur son propre aplat.
+  if (r.pastille.trim()) {
+    const p = document.createElement("div");
+    p.className = "dos-pastille";
+    p.style.background = r.pastilleFond;
+    p.style.color = r.pastilleTexte;
+    p.style.fontSize = r.pastilleTaille + "pt";
+    p.textContent = r.pastille;
+    dos.appendChild(p);
+  }
+
+  // 3) Le titre, au centre, éventuellement précédé d'un surtitre en plus
+  //    petit — les deux côte à côte sur la largeur du dos.
+  const centre = document.createElement("div");
+  centre.className = "dos-centre";
+  if (tranchePorteTexte(r, dosMm)) {
+    const groupe = tourne(document.createElement("div"));
+    groupe.className += " dos-titre-groupe";
+
+    if (r.surtitre.trim()) {
+      const st = document.createElement("div");
+      st.className = "dos-ligne";
+      st.style.fontSize = r.surtitreTaille + "pt";
+      st.textContent = r.surtitre;
+      groupe.appendChild(st);
+    }
+    const t = document.createElement("div");
+    t.className = "dos-ligne dos-titre";
+    t.style.fontSize = r.taille + "pt";
+    t.textContent = r.contenu;
+    groupe.appendChild(t);
+
+    centre.appendChild(groupe);
+  }
+  dos.appendChild(centre);
+
+  // 4) Crédits : une colonne par ligne saisie (« Scénariste YC »).
+  const lignes = r.credits.split("\n").map((l) => l.trim()).filter(Boolean);
+  if (lignes.length && tranchePorteTexte(r, dosMm)) {
+    const groupe = tourne(document.createElement("div"));
+    groupe.className += " dos-credits";
+    groupe.style.fontSize = r.creditsTaille + "pt";
+    lignes.forEach((l) => {
+      const d = document.createElement("div");
+      d.className = "dos-ligne";
+      d.textContent = l;
+      groupe.appendChild(d);
+    });
+    dos.appendChild(groupe);
+  }
+
+  // 5) Pied : la marque de l'éditeur, droite comme la pastille.
+  if (r.pied.trim()) {
+    const p = document.createElement("div");
+    p.className = "dos-pied";
+    p.style.fontSize = r.piedTaille + "pt";
+    p.textContent = r.pied;
+    dos.appendChild(p);
+  }
+
+  return dos;
+}
+
+// L'image de couverture, résolue depuis GitHub comme pour les autres faces.
+// Sans tableau de promesses (aperçu à l'écran), on n'attend rien.
+function chargerImageCouverture(img, chemin, promessesImages) {
+  const poser = (url) => { img.src = url; };
+  if (cacheImagesURL[chemin]) {
+    poser(cacheImagesURL[chemin]);
+    return;
+  }
+  const token = localStorage.getItem("gh_token");
+  const promesse = new Promise((resoudre) => {
+    const secours = setTimeout(resoudre, 8000);
+    img.onload = () => { clearTimeout(secours); resoudre(); };
+    img.onerror = () => { clearTimeout(secours); img.remove(); resoudre(); };
+    obtenirUrlImage(chemin, token).then((url) => {
+      cacheImagesURL[chemin] = url;
+      poser(url);
+    }).catch(() => { clearTimeout(secours); img.remove(); resoudre(); });
+  });
+  if (promessesImages) promessesImages.push(promesse);
+}
+
 // ----- Réglage de la tranche -----
 //
 // La couverture et la 4e ouvrent une vue entière : elles ont une image de
-// fond à cadrer. La tranche, elle, n'a que quatre réglages et une bande de
-// quelques millimètres à montrer — un panneau suffit, avec son aperçu à
-// côté des champs.
+// fond à cadrer. La tranche, elle, s'ajuste sur un panneau, avec l'aperçu à
+// côté des champs — un aperçu qui n'est pas une imitation : c'est le dos
+// réel, construit par le même code que la planche d'impression, simplement
+// réduit à l'échelle.
+
+const HAUTEUR_APERCU_DOS = 300; // px
 
 function ouvrirTranche() {
   if (modeApercu || modeCouverture) return;
@@ -1157,48 +1293,96 @@ function ouvrirTranche() {
   if (!livre) return;
   if (!livre.tranche) livre.tranche = {};
   const t = livre.tranche;
-  const defauts = donneesTranche(livre);
+  const d = donneesTranche(livre);
+  const f = FORMATS[livre.format || "149x210"] || FORMATS["149x210"];
 
   const ancien = document.getElementById("dialogueTranche");
   if (ancien) ancien.remove();
 
-  // Épaisseur d'aperçu : celle qu'aura le dos pour le nombre de pages actuel,
-  // pour juger si le texte y tiendra vraiment.
+  // Épaisseur d'aperçu : celle qu'aura le dos pour le nombre de pages actuel.
   const dosMm = epaisseurDosMm((livre.pages || []).length, GRAMMAGE_DEFAUT, MAIN_DEFAUT);
+  const aImage = !!(livre.couverture && livre.couverture.imageChemin);
 
-  let html = '<div class="modal-impression-carte ci-carte" role="dialog" aria-modal="true">' +
+  const champ = (id, libelle, valeur, attrs) =>
+    '<label class="tr-champ"><span>' + libelle + "</span>" +
+    '<input id="' + id + '" value="' + echapperTitre(valeur) + '" ' + (attrs || "") + "></label>";
+
+  const nombre = (id, libelle, valeur, min, max) =>
+    '<label class="tr-champ tr-court"><span>' + libelle + "</span>" +
+    '<input type="number" id="' + id + '" value="' + valeur + '" min="' + min +
+    '" max="' + max + '" step="0.5"></label>';
+
+  let html = '<div class="modal-impression-carte ci-carte tr-carte" role="dialog" aria-modal="true">' +
     '<button class="mi-fermer" aria-label="Fermer">&#10005;</button>' +
     "<h3>La tranche</h3>" +
     '<p class="mi-intro">Le dos du livre : la seule face visible une fois rangé ' +
-    "dans une bibliothèque. Laissé tel quel, il reprend les couleurs de la couverture.</p>" +
+    "dans une bibliothèque. Chaque bloc est facultatif — laissez vide ce dont " +
+    "vous ne voulez pas.</p>" +
     '<div class="tranche-atelier">' +
       '<div class="tranche-reglages">' +
-        '<label class="label-couv" for="trContenu">Texte du dos</label>' +
-        '<input type="text" id="trContenu" value="' + echapperTitre(defauts.contenu) + '">' +
-        '<p class="aide-champ">Vide, il reprend « Titre — Auteur ».</p>' +
 
+      '<fieldset class="tr-bloc"><legend>Fond</legend>' +
         '<div class="tranche-duo">' +
-          '<label>Fond <input type="color" id="trFond" value="' + defauts.fond + '"></label>' +
-          '<label>Texte <input type="color" id="trTexte" value="' + defauts.texte + '"></label>' +
+          '<label>Couleur <input type="color" id="trFond" value="' + d.fond + '"></label>' +
+          '<label>Texte <input type="color" id="trTexte" value="' + d.texte + '"></label>' +
+          '<button type="button" class="btn-lien" id="trReset">Comme la couverture</button>' +
         "</div>" +
-        '<button type="button" class="btn-lien" id="trReset">Reprendre les couleurs de la couverture</button>' +
+        '<div class="tranche-duo">' +
+          nombre("trBandeau", "Bandeau d'image (mm)", d.bandeau, 0, 200) +
+        "</div>" +
+        '<p class="aide-champ">' + (aImage
+          ? "Le haut de l'image de couverture se prolonge sur le dos. 0 = aucun bandeau."
+          : "Aucune image sur la couverture : le bandeau n'aurait rien à montrer.") + "</p>" +
+      "</fieldset>" +
 
+      '<fieldset class="tr-bloc"><legend>Pastille</legend>' +
+        '<div class="tranche-duo">' +
+          champ("trPastille", "Texte", d.pastille, 'maxlength="6" class="tr-mini"') +
+          '<label>Fond <input type="color" id="trPastilleFond" value="' + d.pastilleFond + '"></label>' +
+          '<label>Texte <input type="color" id="trPastilleTexte" value="' + d.pastilleTexte + '"></label>' +
+          nombre("trPastilleTaille", "pt", d.pastilleTaille, 4, 24) +
+        "</div>" +
+        '<p class="aide-champ">Le numéro de tome, posé droit sur son aplat de couleur.</p>' +
+      "</fieldset>" +
+
+      '<fieldset class="tr-bloc"><legend>Titre</legend>' +
+        '<div class="tranche-duo">' +
+          champ("trSurtitre", "Surtitre", d.surtitre) +
+          nombre("trSurtitreTaille", "pt", d.surtitreTaille, 4, 24) +
+        "</div>" +
+        '<div class="tranche-duo">' +
+          champ("trContenu", "Titre", d.contenu) +
+          nombre("trTaille", "pt", d.taille, 4, 36) +
+        "</div>" +
         '<div class="tranche-duo">' +
           '<label>Sens <select id="trSens">' +
             '<option value="descendant">De haut en bas</option>' +
             '<option value="montant">De bas en haut</option>' +
           "</select></label>" +
-          '<label>Taille <input type="number" id="trTaille" min="5" max="24" step="0.5" value="' +
-            defauts.taille + '"> pt</label>' +
+          '<label class="tranche-case"><input type="checkbox" id="trForcer"' +
+            (d.forcerTexte ? " checked" : "") + "> Écrire même sur un dos très fin</label>" +
         "</div>" +
+        '<p class="aide-champ">Le surtitre se pose à côté du titre, en travers du dos. ' +
+          "Vide, le titre reprend « Titre — Auteur ».</p>" +
+      "</fieldset>" +
 
-        '<label class="tranche-case"><input type="checkbox" id="trForcer"' +
-          (defauts.forcerTexte ? " checked" : "") + "> Écrire même sur un dos très fin</label>" +
-        '<p class="aide-champ" id="trNoteDos"></p>' +
+      '<fieldset class="tr-bloc"><legend>Crédits et éditeur</legend>' +
+        '<label class="tr-champ tr-large"><span>Crédits</span>' +
+          '<textarea id="trCredits" rows="2">' + echapperTitre(d.credits) + "</textarea></label>" +
+        '<div class="tranche-duo">' +
+          nombre("trCreditsTaille", "pt", d.creditsTaille, 4, 20) +
+          champ("trPied", "Éditeur (au pied)", d.pied) +
+          nombre("trPiedTaille", "pt", d.piedTaille, 4, 20) +
+        "</div>" +
+        '<p class="aide-champ">Une ligne par colonne : « Scénariste YC » puis ' +
+          "« Dessinateur RAK HYUN » donnent deux colonnes côte à côte.</p>" +
+      "</fieldset>" +
+
       "</div>" +
       '<div class="tranche-apercu">' +
-        '<div class="tranche-bande" id="trBande"><span id="trBandeTexte"></span></div>' +
-        '<small id="trLegende"></small>' +
+        '<div class="tranche-scene" id="trScene"></div>' +
+        "<small id='trLegende'></small>" +
+        '<p class="aide-champ" id="trNoteDos"></p>' +
       "</div>" +
     "</div>" +
     '<div class="ci-actions">' +
@@ -1213,47 +1397,62 @@ function ouvrirTranche() {
   fond.addEventListener("click", (e) => { if (e.target === fond) fond.remove(); });
   document.body.appendChild(fond);
 
-  fond.querySelector("#trSens").value = defauts.sens;
+  fond.querySelector("#trSens").value = d.sens;
+
+  const val = (id) => fond.querySelector("#" + id).value;
+  const num = (id, defaut) => {
+    const n = parseFloat(val(id));
+    return isFinite(n) && n >= 0 ? n : defaut;
+  };
 
   const lire = () => ({
-    contenu: fond.querySelector("#trContenu").value,
-    fond: fond.querySelector("#trFond").value,
-    texte: fond.querySelector("#trTexte").value,
-    sens: fond.querySelector("#trSens").value,
-    taille: parseFloat(fond.querySelector("#trTaille").value) || defauts.taille,
+    fond: val("trFond"),
+    texte: val("trTexte"),
+    bandeau: aImage ? num("trBandeau", 0) : 0,
+    pastille: val("trPastille"),
+    pastilleFond: val("trPastilleFond"),
+    pastilleTexte: val("trPastilleTexte"),
+    pastilleTaille: num("trPastilleTaille", d.pastilleTaille),
+    surtitre: val("trSurtitre"),
+    surtitreTaille: num("trSurtitreTaille", d.surtitreTaille),
+    contenu: val("trContenu"),
+    taille: num("trTaille", d.taille),
+    sens: val("trSens"),
+    credits: val("trCredits"),
+    creditsTaille: num("trCreditsTaille", d.creditsTaille),
+    pied: val("trPied"),
+    piedTaille: num("trPiedTaille", d.piedTaille),
     forcerTexte: fond.querySelector("#trForcer").checked
   });
 
-  // L'aperçu montre la bande à l'échelle : le dos réel fait quelques
-  // millimètres de large pour 210 mm de haut, illisible tel quel à l'écran.
-  const LARGEUR_MIN_APERCU = 14;   // px, pour que la bande reste visible
-  const HAUTEUR_APERCU = 260;      // px
-
+  // L'aperçu : le VRAI dos, construit par le constructeur d'impression sur
+  // un livre provisoire, puis réduit. Aucune imitation à maintenir en
+  // parallèle du rendu réel.
   const rafraichir = () => {
     const r = lire();
-    const bande = fond.querySelector("#trBande");
-    const texte = fond.querySelector("#trBandeTexte");
-    const echelle = HAUTEUR_APERCU / (FORMATS[livre.format || "149x210"] || FORMATS["149x210"]).haut;
+    const provisoire = Object.assign({}, livre, { tranche: r });
+    const scene = fond.querySelector("#trScene");
+    scene.innerHTML = "";
 
-    bande.style.height = HAUTEUR_APERCU + "px";
-    bande.style.width = Math.max(LARGEUR_MIN_APERCU, dosMm * echelle) + "px";
-    bande.style.background = r.fond;
-    texte.style.color = r.texte;
-    texte.style.fontSize = (r.taille * echelle * 25.4 / 72).toFixed(2) + "px";
-    texte.classList.toggle("montant", r.sens === "montant");
-
-    const affiche = tranchePorteTexte(
-      Object.assign({}, r, { contenu: r.contenu.trim() || defauts.contenu }), dosMm);
-    texte.textContent = affiche ? (r.contenu.trim() || defauts.contenu) : "";
+    // Un dos très fin resterait un trait : l'aperçu ne descend pas sous 3 mm,
+    // la légende donnant l'épaisseur réelle juste en dessous.
+    const dosApercu = Math.max(dosMm, 3);
+    const dos = construireDosLivre(provisoire, dosApercu, f.haut, null);
+    const echelle = HAUTEUR_APERCU_DOS / (f.haut * PX_PAR_MM);
+    dos.style.transform = "scale(" + echelle + ")";
+    dos.style.transformOrigin = "top left";
+    scene.style.height = HAUTEUR_APERCU_DOS + "px";
+    scene.style.width = (dosApercu * PX_PAR_MM * echelle) + "px";
+    scene.appendChild(dos);
 
     fond.querySelector("#trLegende").textContent =
-      "Dos de " + dosMm.toFixed(1).replace(".", ",") + " mm (" + (livre.pages || []).length + " pages)";
+      "Dos de " + dosMm.toFixed(1).replace(".", ",") + " mm · " + (livre.pages || []).length + " pages";
     fond.querySelector("#trNoteDos").textContent = dosMm >= 6
-      ? "Le dos est assez épais pour porter du texte."
+      ? "Assez épais pour porter du texte."
       : "Sous 6 mm, l'usage est de laisser le dos nu : le texte tomberait sur les plis.";
   };
 
-  fond.querySelectorAll("input, select").forEach((c) => {
+  fond.querySelectorAll("input, select, textarea").forEach((c) => {
     c.addEventListener("input", rafraichir);
     c.addEventListener("change", rafraichir);
   });
@@ -1265,6 +1464,7 @@ function ouvrirTranche() {
     rafraichir();
   };
 
+  if (!aImage) fond.querySelector("#trBandeau").disabled = true;
   rafraichir();
 
   fond.querySelector(".mi-fermer").onclick = () => fond.remove();
@@ -1272,15 +1472,26 @@ function ouvrirTranche() {
   fond.querySelector(".ci-generer").onclick = () => {
     const r = lire();
     const couv = livre.couverture || {};
-    // Une couleur identique à celle de la couverture n'est pas enregistrée :
-    // la tranche continue alors de la suivre si on retouche la couverture.
+    // Ce qui vaut le réglage par défaut n'est pas enregistré : la tranche
+    // continue alors de suivre la couverture et le titre du livre.
     t.fond = r.fond === (couv.fond || "#1a1a2e") ? null : r.fond;
     t.texte = r.texte === (couv.texte || "#ffffff") ? null : r.texte;
-    // Idem pour le texte : « Titre — Auteur » reste automatique.
     const parDefaut = [livre.titre, livre.auteur].filter(Boolean).join(" — ");
     t.contenu = r.contenu.trim() === parDefaut ? "" : r.contenu;
-    t.sens = r.sens;
+
+    t.bandeau = r.bandeau;
+    t.pastille = r.pastille;
+    t.pastilleFond = r.pastilleFond;
+    t.pastilleTexte = r.pastilleTexte;
+    t.pastilleTaille = r.pastilleTaille;
+    t.surtitre = r.surtitre;
+    t.surtitreTaille = r.surtitreTaille;
     t.taille = r.taille;
+    t.sens = r.sens;
+    t.credits = r.credits;
+    t.creditsTaille = r.creditsTaille;
+    t.pied = r.pied;
+    t.piedTaille = r.piedTaille;
     t.forcerTexte = r.forcerTexte;
 
     fond.remove();
@@ -1318,21 +1529,7 @@ function creerCouverturePlat(livre, f, dosMm, promessesImages) {
 
   zone.appendChild(creerPanneauCouverture(livre, "quatrieme", f, promessesImages));
 
-  const reglages = donneesTranche(livre);
-  const dos = document.createElement("div");
-  dos.className = "dos-pro";
-  dos.style.width = dosMm + "mm";
-  dos.style.height = f.haut + "mm";
-  dos.style.background = reglages.fond;
-  if (tranchePorteTexte(reglages, dosMm)) {
-    const t = document.createElement("div");
-    t.className = "dos-texte-pro" + (reglages.sens === "montant" ? " montant" : "");
-    t.style.color = reglages.texte;
-    t.style.fontSize = reglages.taille + "pt";
-    t.textContent = reglages.contenu;
-    dos.appendChild(t);
-  }
-  zone.appendChild(dos);
+  zone.appendChild(construireDosLivre(livre, dosMm, f.haut, promessesImages));
 
   zone.appendChild(creerPanneauCouverture(livre, "couverture", f, promessesImages));
 

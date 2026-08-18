@@ -1822,52 +1822,66 @@ button.danger {
 
 
 /* ===== Réglage de la tranche ===== */
+.tr-carte { max-width: 900px; max-height: 88vh; overflow-y: auto; }
 .tranche-atelier {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 1.2rem;
+  gap: 1.4rem;
   align-items: start;
   margin: 0.9rem 0;
 }
 .tranche-reglages { min-width: 0; }
-.tranche-reglages input[type="text"] {
-  width: 100%; box-sizing: border-box;
-  padding: 0.45rem 0.6rem;
-  border: 1px solid var(--bordure, #d8d8d8); border-radius: 6px;
+
+.tr-bloc {
+  border: 1px solid var(--bordure, #d8d8d8);
+  border-radius: 8px;
+  padding: 0.5rem 0.8rem 0.7rem;
+  margin: 0 0 0.7rem;
 }
+.tr-bloc legend { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em; opacity: 0.7; padding: 0 0.3rem; }
+
 .tranche-duo {
-  display: flex; flex-wrap: wrap; gap: 0.9rem;
-  align-items: center; margin: 0.7rem 0;
+  display: flex; flex-wrap: wrap; gap: 0.5rem 0.9rem;
+  align-items: flex-end; margin: 0.4rem 0;
 }
-.tranche-duo label { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.86rem; }
+.tranche-duo > label { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.84rem; }
 .tranche-duo input[type="color"] {
-  width: 40px; height: 30px; padding: 2px;
+  width: 38px; height: 28px; padding: 2px;
   border: 1px solid var(--bordure, #d8d8d8); border-radius: 6px; background: none;
 }
-.tranche-duo input[type="number"] { width: 4.2rem; padding: 0.3rem 0.4rem;
-  border: 1px solid var(--bordure, #d8d8d8); border-radius: 6px; }
-.tranche-case { display: flex; align-items: center; gap: 0.45rem; font-size: 0.86rem; margin: 0.5rem 0 0.2rem; }
-.tranche-reglages .aide-champ { font-size: 0.78rem; opacity: 0.75; margin: 0.25rem 0 0; line-height: 1.35; }
-.tranche-reglages .label-couv { display: block; margin-bottom: 0.3rem; }
 
-/* L'aperçu du dos, à l'échelle de la page : quelques millimètres de large
-   pour toute la hauteur du livre. */
-.tranche-apercu { display: flex; flex-direction: column; align-items: center; gap: 0.4rem; }
-.tranche-bande {
-  display: flex; align-items: center; justify-content: center;
+/* Champ avec son étiquette au-dessus : les lignes de réglages restent
+   lisibles même quand elles en portent quatre. */
+.tr-champ { display: inline-flex; flex-direction: column; gap: 0.15rem; flex: 1 1 10rem; min-width: 0; }
+.tr-champ > span { font-size: 0.74rem; opacity: 0.7; }
+.tr-champ input, .tr-champ textarea {
+  width: 100%; box-sizing: border-box;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--bordure, #d8d8d8); border-radius: 6px;
+  font: inherit; font-size: 0.86rem;
+}
+.tr-champ.tr-court { flex: 0 0 4.6rem; }
+.tr-champ.tr-large { display: flex; margin-bottom: 0.3rem; }
+.tr-champ textarea { height: 3.4rem; resize: vertical; line-height: 1.35; }
+.tr-champ input.tr-mini { max-width: 5rem; }
+.tranche-case { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.82rem; }
+.tranche-reglages .aide-champ { font-size: 0.76rem; opacity: 0.72; margin: 0.2rem 0 0; line-height: 1.35; }
+
+/* L'aperçu : le vrai dos, réduit. La scène ne fait que réserver la place. */
+.tranche-apercu { display: flex; flex-direction: column; align-items: center; gap: 0.4rem; width: 11rem; }
+.tranche-scene {
+  position: relative;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
   border-radius: 2px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
   overflow: hidden;
+  align-self: center;
 }
-.tranche-bande span {
-  writing-mode: vertical-rl;
-  white-space: nowrap;
-  letter-spacing: 0.06em;
-  max-height: 92%;
-  overflow: hidden;
-}
-.tranche-bande span.montant { transform: rotate(180deg); }
-.tranche-apercu small { font-size: 0.72rem; opacity: 0.7; }
+/* Le dos est construit en millimètres puis réduit. Une transformation ne
+   change pas la place occupée : on le cale en haut à gauche et c'est la
+   scène qui porte la taille réduite. */
+.tranche-scene > .dos-pro { position: absolute; top: 0; left: 0; }
+.tranche-apercu small { font-size: 0.72rem; opacity: 0.7; text-align: center; }
+.tranche-apercu .aide-champ { font-size: 0.72rem; opacity: 0.7; text-align: center; line-height: 1.3; }
 
 .btn-lien {
   background: none; border: none; padding: 0;
@@ -1875,7 +1889,7 @@ button.danger {
   text-decoration: underline; cursor: pointer;
 }
 
-@media (max-width: 560px) {
+@media (max-width: 700px) {
   .tranche-atelier { grid-template-columns: minmax(0, 1fr); }
-  .tranche-apercu { order: -1; }
+  .tranche-apercu { order: -1; width: auto; }
 }
