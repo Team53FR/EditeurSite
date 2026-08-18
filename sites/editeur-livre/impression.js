@@ -11,7 +11,8 @@ const AIDE_IMPRESSION = {
     principe: "Chaque feuille reçoit DEUX pages côte à côte, et porte quatre pages une fois " +
               "imprimée des deux côtés. Les pages ne sont pas imprimées dans l'ordre : elles " +
               "sont réparties pour retomber dans le bon ordre une fois la pile pliée. C'est " +
-              "pour cela que la première feuille montre la fin du livre à gauche.",
+              "pour cela que la première feuille montre la fin du livre à gauche. " +
+              "Seul le texte est imprimé : la couverture se sort à part.",
     etapes: [
       "Imprimez en recto-verso. Si votre imprimante ne le fait pas seule, choisissez « En deux fois » : les rectos sortent d'abord, puis vous remettez la pile dans le bac pour les versos.",
       "Ne changez surtout pas l'ordre des feuilles en les récupérant.",
@@ -20,14 +21,16 @@ const AIDE_IMPRESSION = {
       "Facultatif : égalisez le bord extérieur au massicot, les feuilles intérieures dépassant toujours un peu."
     ],
     bon: ["Rapide, sans colle ni matériel particulier.", "Les pages tombent dans l'ordre toutes seules.", "Idéal pour une nouvelle, un carnet, un tirage d'essai."],
-    limites: ["Le nombre de pages est complété à un multiple de 4 (des pages blanches sont ajoutées si besoin).",
+    limites: ["La couverture n'est pas comprise : imprimez-la avec « Couverture seule », dans la catégorie du dos collé.",
+              "Le nombre de pages est complété à un multiple de 4 (des pages blanches sont ajoutées si besoin).",
               "Au-delà d'une quarantaine de pages, le pli gonfle et les pages centrales ressortent nettement.",
               "Le dos est agrafé, pas plat : le livre ne tient pas debout comme un roman."],
     reglages: "Dans la fenêtre d'impression : format paysage, échelle 100 % (surtout pas « ajuster à la page »), et recto-verso « retourner sur les bords courts »."
   },
   doscolle: {
     titre: "Le dos collé, comment ça marche",
-    principe: "Les feuilles sont encollées sur la tranche, comme un vrai roman de poche. Deux façons " +
+    principe: "Seul le texte sort ici : la couverture s'imprime à part, avec « Couverture seule ». " +
+              "Les feuilles sont encollées sur la tranche, comme un vrai roman de poche. Deux façons " +
               "de les imprimer : UNE PAGE par feuille, dans l'ordre de lecture, rien à découper ; ou DEUX " +
               "PAGES par feuille, à couper au milieu — moitié moins de papier. Dans ce second cas les " +
               "pages ne sont pas côte à côte dans l'ordre : la colonne de gauche porte la première moitié " +
@@ -86,7 +89,7 @@ const AIDE_IMPRESSION = {
 const MODES_IMPRESSION = [
   {
     categorie: "Livret à agrafer", aideCle: "livret",
-    aide: "Deux pages par feuille. On plie la pile en deux et on agrafe au centre.",
+    aide: "Le texte seul, deux pages par feuille. On plie la pile en deux et on agrafe au centre.",
     choix: [
       { libelle: "Recto-verso automatique", detail: "Votre imprimante retourne les feuilles toute seule.",
         action: "exporterLivret", mode: "auto" },
@@ -98,11 +101,11 @@ const MODES_IMPRESSION = [
     categorie: "Page à page (dos collé)", aideCle: "doscolle",
     aide: "À relier ou à faire relier. Une page par feuille, ou deux à couper au milieu.",
     choix: [
-      { libelle: "Une page par feuille", detail: "Recto-verso automatique. Rien à découper.",
+      { libelle: "Une page par feuille", detail: "Le texte seul, recto-verso automatique. Rien à découper.",
         action: "exporterImpression", mode: "auto" },
       { libelle: "Une page — en deux fois", detail: "Sans recto-verso : les rectos d'abord, puis les versos.",
         action: "exporterImpression", mode: "passes" },
-      { libelle: "Deux pages par feuille", detail: "Recto-verso automatique. À couper au milieu : moitié de papier.",
+      { libelle: "Deux pages par feuille", detail: "Le texte seul, à couper au milieu : moitié de papier.",
         action: "exporterDeuxPages", mode: "auto" },
       { libelle: "Deux pages — en deux fois", detail: "Sans recto-verso : les rectos d'abord, puis les versos.",
         action: "exporterDeuxPages", mode: "passes" },
@@ -395,20 +398,18 @@ function exporterImpression(modeRectoVerso) {
 
   const promessesImages = [];
 
-  // Feuille 1 : couverture (recto) + intérieur de couverture blanc (verso)
-  ajouterPage(creerCouvertureImpression(livre, "couverture", f, promessesImages));
-  ajouterPage(creerPageBlancheImpression(f));
-
-  // Corps du livre : page impaire = recto (droite), page paire = verso (gauche)
+  // Le texte seul. Les couvertures s'impriment à part — sur un autre papier,
+  // souvent chez un copiste — et « Couverture seule » les sort ouvertes à
+  // plat : les intercaler ici gâchait deux feuilles et forçait à les extraire
+  // de la pile avant l'encollage.
   const pages = livre.pages || [];
   pages.forEach((page, i) => {
     ajouterPage(creerPageTexteImpression(page, i + 1, f, margeInt, margeExt));
   });
 
-  // Compléter pour que la 4e de couverture tombe au verso de la dernière feuille
+  // Un nombre impair laisserait le dernier verso à imprimer dans le vide :
+  // la feuille blanche ferme la pile proprement.
   if (pages.length % 2 === 1) ajouterPage(creerPageBlancheImpression(f));
-  ajouterPage(creerPageBlancheImpression(f));
-  ajouterPage(creerCouvertureImpression(livre, "quatrieme", f, promessesImages));
 
   const message = document.getElementById("message");
   if (message) message.textContent = "Préparation de l'impression...";
@@ -465,19 +466,17 @@ function exporterLivret(modeRectoVerso) {
   // Position 1 = couverture, position 2 = son verso blanc, puis le texte,
   // des blanches de complément (total multiple de 4), et la 4e en dernier.
   const suite = [];
-  suite.push({ type: "couverture" });
-  suite.push({ type: "blanche" });
   (livre.pages || []).forEach((page, i) => suite.push({ type: "texte", page, numero: i + 1 }));
-  while ((suite.length + 2) % 4 !== 0) suite.push({ type: "blanche" });
-  suite.push({ type: "blanche" });
-  suite.push({ type: "quatrieme" });
+  // Un cahier plié se compte par quatre : on complète par des blanches, qui
+  // se retrouvent à la fin du livret.
+  while (suite.length % 4 !== 0) suite.push({ type: "blanche" });
 
   const total = suite.length;
 
   // Imposition : feuille k, recto = [dernière-2k | 2k+1], verso = [2k+2 | dernière-2k-1]
   for (let k = 0; k < total / 4; k++) {
-    ajouterFace(creerFaceLivret(suite[total - 2 * k - 1], suite[2 * k], livre, f, margeInt, margeExt, promessesImages));
-    ajouterFace(creerFaceLivret(suite[2 * k + 1], suite[total - 2 * k - 2], livre, f, margeInt, margeExt, promessesImages));
+    ajouterFace(creerFaceLivret(suite[total - 2 * k - 1], suite[2 * k], f, margeInt, margeExt));
+    ajouterFace(creerFaceLivret(suite[2 * k + 1], suite[total - 2 * k - 2], f, margeInt, margeExt));
   }
 
   const message = document.getElementById("message");
@@ -545,20 +544,20 @@ function afficherPanneauVersos() {
   };
 }
 
-function creerFaceLivret(demiGauche, demiDroite, livre, f, margeInt, margeExt, promessesImages) {
+function creerFaceLivret(demiGauche, demiDroite, f, margeInt, margeExt) {
   const feuille = document.createElement("div");
   feuille.className = "feuille-impression";
   feuille.style.width = (f.larg * 2) + "mm";
   feuille.style.height = f.haut + "mm";
-  feuille.appendChild(creerDemiPageLivret(demiGauche, livre, f, margeInt, margeExt, promessesImages));
-  feuille.appendChild(creerDemiPageLivret(demiDroite, livre, f, margeInt, margeExt, promessesImages));
+  feuille.appendChild(creerDemiPageLivret(demiGauche, f, margeInt, margeExt));
+  feuille.appendChild(creerDemiPageLivret(demiDroite, f, margeInt, margeExt));
   return feuille;
 }
 
-function creerDemiPageLivret(demi, livre, f, margeInt, margeExt, promessesImages) {
+// Une demi-feuille : une page de texte, ou une blanche de complément. Les
+// couvertures ne passent plus par ici — elles ont leur propre export.
+function creerDemiPageLivret(demi, f, margeInt, margeExt) {
   if (!demi || demi.type === "blanche") return creerPageBlancheImpression(f);
-  if (demi.type === "couverture") return creerCouvertureImpression(livre, "couverture", f, promessesImages);
-  if (demi.type === "quatrieme") return creerCouvertureImpression(livre, "quatrieme", f, promessesImages);
   return creerPageTexteImpression(demi.page, demi.numero, f, margeInt, margeExt);
 }
 
@@ -807,25 +806,19 @@ function exporterDeuxPages(modeRectoVerso) {
   const margeExt = Math.max(6, f.margeH - DELTA_RELIURE_MM);
   const promessesImages = [];
 
-  // La suite des faces, dans l'ordre de lecture : couverture, son verso
-  // blanc, le texte, puis la 4e au dos de la dernière feuille.
+  // Les faces, dans l'ordre de lecture — le texte seul, les couvertures
+  // s'imprimant à part.
   const suite = [];
-  suite.push({ type: "couverture" });
-  suite.push({ type: "blanche" });
   (livre.pages || []).forEach((page, i) => suite.push({ type: "texte", page, numero: i + 1 }));
-  suite.push({ type: "blanche" });
-  suite.push({ type: "quatrieme" });
   // Une feuille porte quatre faces : le compte doit tomber juste, sinon la
   // coupe décale tout le second tas.
-  while (suite.length % 4 !== 0) suite.splice(suite.length - 2, 0, { type: "blanche" });
+  while (suite.length % 4 !== 0) suite.push({ type: "blanche" });
 
   const moitie = suite.length / 2;
 
   for (let k = 0; k < suite.length / 4; k++) {
-    const recto = creerFaceLivret(suite[2 * k], suite[moitie + 2 * k],
-                                  livre, f, margeInt, margeExt, promessesImages);
-    const verso = creerFaceLivret(suite[2 * k + 1], suite[moitie + 2 * k + 1],
-                                  livre, f, margeInt, margeExt, promessesImages);
+    const recto = creerFaceLivret(suite[2 * k], suite[moitie + 2 * k], f, margeInt, margeExt);
+    const verso = creerFaceLivret(suite[2 * k + 1], suite[moitie + 2 * k + 1], f, margeInt, margeExt);
     [recto, verso].forEach((face) => {
       ajouterTraitMilieu(face, f.larg, f.haut);
       zone.appendChild(papier ? poserSurPapier(face, papier, largFeuille, f.haut) : face);
