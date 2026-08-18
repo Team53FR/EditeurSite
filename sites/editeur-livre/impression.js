@@ -17,11 +17,12 @@ const AIDE_IMPRESSION = {
       "Imprimez en recto-verso. Si votre imprimante ne le fait pas seule, choisissez « En deux fois » : les rectos sortent d'abord, puis vous remettez la pile dans le bac pour les versos.",
       "Ne changez surtout pas l'ordre des feuilles en les récupérant.",
       "Pliez toute la pile en deux d'un seul geste, bien au milieu.",
+      "Imprimez la couverture avec « Couverture du livret », pliez-la en deux et glissez le cahier dedans avant d'agrafer.",
       "Agrafez sur le pli, avec deux agrafes réparties (une agrafeuse à long bras aide beaucoup ; sinon, agrafez à plat puis pliez).",
       "Facultatif : égalisez le bord extérieur au massicot, les feuilles intérieures dépassant toujours un peu."
     ],
     bon: ["Rapide, sans colle ni matériel particulier.", "Les pages tombent dans l'ordre toutes seules.", "Idéal pour une nouvelle, un carnet, un tirage d'essai."],
-    limites: ["La couverture n'est pas comprise : imprimez-la avec « Couverture seule », dans la catégorie du dos collé.",
+    limites: ["La couverture s'imprime à part, avec « Couverture du livret » : elle se plie autour du cahier au lieu d'y être intercalée.",
               "Le nombre de pages est complété à un multiple de 4 (des pages blanches sont ajoutées si besoin).",
               "Au-delà d'une quarantaine de pages, le pli gonfle et les pages centrales ressortent nettement.",
               "Le dos est agrafé, pas plat : le livre ne tient pas debout comme un roman."],
@@ -94,7 +95,9 @@ const MODES_IMPRESSION = [
       { libelle: "Recto-verso automatique", detail: "Votre imprimante retourne les feuilles toute seule.",
         action: "exporterLivret", mode: "auto" },
       { libelle: "En deux fois", detail: "Sans recto-verso : les rectos d'abord, puis les versos.",
-        action: "exporterLivret", mode: "passes" }
+        action: "exporterLivret", mode: "passes" },
+      { libelle: "Couverture du livret", detail: "4e et 1re sur une feuille, à plier en deux et agrafer avec le cahier.",
+        action: "exporterCouvertureLivret", mode: "" }
     ]
   },
   {
@@ -861,22 +864,37 @@ function exporterCouvertureSeule() {
   // la pagination imprimeur, qui coûte plusieurs secondes sur un gros livre et
   // ne changerait l'épaisseur que d'une fraction de millimètre.
   const nbPages = (livre.pages || []).length;
-  ouvrirDialogueCouvertureSeule(livre, f, nbPages);
+  ouvrirDialogueCouvertureSeule(livre, f, nbPages, false);
 }
 
-function ouvrirDialogueCouvertureSeule(livre, f, nbPages) {
+// La même couverture, pour un cahier agrafé. Un livret n'a pas de dos plat :
+// la planche vaut exactement deux pages, à plier en deux et à agrafer avec le
+// cahier. Plutôt que de demander à l'auteur d'y penser et de saisir 0, le
+// bouton du livret ouvre le panneau avec le dos déjà écarté.
+function exporterCouvertureLivret() {
+  flushSpread();
+  const livre = livreActuel();
+  const f = FORMATS[livre.format || "149x210"] || FORMATS["149x210"];
+  ouvrirDialogueCouvertureSeule(livre, f, (livre.pages || []).length, true);
+}
+
+function ouvrirDialogueCouvertureSeule(livre, f, nbPages, agrafe) {
   const ancien = document.getElementById("dialogueCouverture");
   if (ancien) ancien.remove();
 
-  const dos = epaisseurDosMm(nbPages, GRAMMAGE_DEFAUT, MAIN_DEFAUT);
+  const dos = agrafe ? 0 : epaisseurDosMm(nbPages, GRAMMAGE_DEFAUT, MAIN_DEFAUT);
   const largSupport = (larg) => 2 * f.larg + larg + 2 * MARGE_TECHNIQUE_MM;
   const hautSupport = f.haut + 2 * MARGE_TECHNIQUE_MM;
 
   let html = '<div class="modal-impression-carte ci-carte" role="dialog" aria-modal="true">' +
     '<button class="mi-fermer" aria-label="Fermer">&#10005;</button>' +
-    "<h3>Imprimer la couverture</h3>" +
-    '<p class="mi-intro">Une seule feuille, ouverte à plat : 4e de couverture, dos, ' +
-      "1re de couverture. Deux traits marquent les plis du dos, quatre autres les coupes.</p>";
+    "<h3>" + (agrafe ? "Couverture du livret" : "Imprimer la couverture") + "</h3>" +
+    '<p class="mi-intro">' + (agrafe
+      ? "Une seule feuille, ouverte à plat : 4e de couverture et 1re, à plier en deux " +
+        "et à agrafer avec le cahier. Le trait du milieu marque le pli, les quatre " +
+        "autres les coupes."
+      : "Une seule feuille, ouverte à plat : 4e de couverture, dos, 1re de couverture. " +
+        "Deux traits marquent les plis du dos, quatre autres les coupes.") + "</p>";
 
   html += '<div class="ci-resume">' +
     "<div><span>Format du livre</span><strong>" + f.larg + " × " + f.haut + " mm</strong></div>" +
@@ -902,15 +920,20 @@ function ouvrirDialogueCouvertureSeule(livre, f, nbPages) {
   html += '<div class="ci-dos">' +
     "<h4>Épaisseur du dos</h4>" +
     '<div class="ci-champs">' +
-      '<label>Grammage <input type="number" id="dcGrammage" value="' + GRAMMAGE_DEFAUT + '" min="50" max="200" step="5"> g/m²</label>' +
-      '<label>Main <input type="number" id="dcMain" value="' + MAIN_DEFAUT + '" min="0.8" max="2.5" step="0.05"></label>' +
-      '<label>Dos <input type="number" id="dcDos" value="' + dos.toFixed(1) + '" min="0" max="60" step="0.1"> mm</label>' +
+      '<label>Grammage <input type="number" id="dcGrammage" value="' + GRAMMAGE_DEFAUT +
+        '" min="50" max="200" step="5"' + (agrafe ? " disabled" : "") + "> g/m²</label>" +
+      '<label>Main <input type="number" id="dcMain" value="' + MAIN_DEFAUT +
+        '" min="0.8" max="2.5" step="0.05"' + (agrafe ? " disabled" : "") + "></label>" +
+      '<label>Dos <input type="number" id="dcDos" value="' + dos.toFixed(1) +
+        '" min="0" max="60" step="0.1"' + (agrafe ? " disabled" : "") + "> mm</label>" +
     "</div>" +
-    '<p class="ci-note">Calculé pour ' + nbPages + " pages sur du papier ordinaire. " +
-      "Mesurez la tranche de votre pile une fois imprimée et reportez la valeur ici : " +
-      "c'est elle qui place les plis.<br>" +
-      "<strong>Livret à agrafer :</strong> mettez 0. Le cahier n'a pas de dos plat — la " +
-      "couverture se plie en deux et s'agrafe avec les pages.</p>" +
+    '<p class="ci-note">' + (agrafe
+      ? "Un cahier agrafé n'a pas de dos plat : la planche vaut exactement deux pages, " +
+        "et le pli tombe en son milieu. Pour un dos collé, passez par « Couverture " +
+        "seule » dans la catégorie du dos collé."
+      : "Calculé pour " + nbPages + " pages sur du papier ordinaire. " +
+        "Mesurez la tranche de votre pile une fois imprimée et reportez la valeur ici : " +
+        "c'est elle qui place les plis.") + "</p>" +
   "</div>";
 
   html += '<p class="ci-note dc-papier"></p>';
