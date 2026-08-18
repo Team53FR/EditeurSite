@@ -439,7 +439,10 @@ telle quelle (« 25% »). Le `%` n'est jamais proposé pour un prix, ni ajoutabl
 dans `unites.json` : ce n'est pas un facteur, c'est une autre nature de valeur.
 
 Ce pourcentage est **appliqué** au rendement total de l'escouade :
-`effectif = crédits × (1 + %/100)`. Le détail du calcul reste affiché sous le
+`effectif = crédits × (1 + %/100)`. Ce total, et lui seul, est mis en avant
+**par heure** — l'échelle à laquelle on compare des escouades — avec la valeur
+par seconde à côté pour recouper avec le jeu. Les sections et les cartes
+restent par seconde, comme le jeu les affiche et comme on les saisit. Le détail du calcul reste affiché sous le
 résultat (« 185.6 K/s + 50 % ») — sans quoi on ne saurait pas d'où sort le
 chiffre. Il ne majore que le **total**, jamais le sous-total d'une classe :
 il porte sur le revenu global, pas sur celui d'une section, qui indique donc

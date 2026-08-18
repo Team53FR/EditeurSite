@@ -379,11 +379,23 @@ function totalEscouade(cles) {
   return { credits, pourcentage, inconnus, effectif };
 }
 
+// Les rendements sont saisis et stockés par SECONDE, comme le jeu les
+// affiche. À l'échelle d'une session, l'heure parle davantage : SEUL le
+// rendement total la met en avant, en gardant la seconde à côté pour pouvoir
+// recouper avec le jeu. Les sections et les cartes restent par seconde.
+const SECONDES_PAR_HEURE = 3600;
+
+function texteParHeure(creditsParSeconde) {
+  return formaterCredits(arrondirCredits(creditsParSeconde * SECONDES_PAR_HEURE)) + "/h";
+}
+
 // Total global : le pourcentage des Iconiques est APPLIQUÉ, et le détail du
 // calcul reste affiché — sans quoi on ne saurait pas d'où sort le chiffre.
 function texteTotal(t) {
   const morceaux = [];
-  morceaux.push("<b>" + formaterCredits(arrondirCredits(t.effectif)) + "/s</b>");
+  morceaux.push("<b>" + texteParHeure(t.effectif) + "</b>");
+  morceaux.push('<span class="total-seconde">' +
+    formaterCredits(arrondirCredits(t.effectif)) + "/s</span>");
   if (t.pourcentage) {
     morceaux.push('<span class="total-detail">' + formaterCredits(arrondirCredits(t.credits)) +
       "/s + " + (Math.round(t.pourcentage * 100) / 100) + " %</span>");
@@ -400,6 +412,8 @@ function texteTotal(t) {
 // apporte, et à part ce qu'elle contribue en pourcentage.
 function texteTotalSection(t) {
   const morceaux = [];
+  // Par seconde ici, comme les cartes : seul le rendement TOTAL est mis en
+  // avant à l'heure, l'échelle à laquelle on compare des escouades.
   morceaux.push("<b>" + formaterCredits(arrondirCredits(t.credits)) + "/s</b>");
   if (t.pourcentage) {
     morceaux.push('<span class="total-bonus">+ ' +

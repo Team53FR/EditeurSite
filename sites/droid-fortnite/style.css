@@ -961,3 +961,6 @@ a { color: var(--primaire); }
 
 /* Détail du calcul, sous le total majoré */
 .total-detail { color: var(--texte-att); font-size: 0.82em; }
+
+/* Rendement par seconde, à côté du total horaire */
+.total-seconde { color: var(--texte-att); font-size: 0.85em; }
