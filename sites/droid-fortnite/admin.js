@@ -740,113 +740,178 @@ async function sauvegarderRaretes(nouvelles, messageCommit) {
   }
 }
 
-// ===== Droïdes requis : choisis dans des listes, pas tapés à la main =====
+// ===== Droïdes requis : des emplacements, comme dans l'escouade =====
 //
-// Le format ENREGISTRÉ ne change pas (« CB (Défaut), Pit (Or) ») : le Droidex
-// continue de le relire tel quel, et les données déjà saisies restent
-// valables. Seule la saisie change — une faute de frappe dans un nom rendait
-// le droïde introuvable et le privait de son visuel.
+// Un palier de renaissance demande trois droïdes. Deux listes déroulantes et
+// un bouton « + » par ligne donnaient un empilement illisible dès qu'on avait
+// vingt paliers à l'écran. On affiche donc trois EMPLACEMENTS : on clique une
+// case, on choisit le droïde puis son palier dans une feuille, et c'est tout.
+//
+// Le format ENREGISTRÉ ne change pas (« CB (Défaut), Pit (Or) »).
+
+const EMPLACEMENTS_RENAISSANCE = 3;
+
+// Palier de renaissance et rang de l'emplacement en cours de remplissage.
+let slotRenaissanceEnCours = null;
 
 // Paliers où un droïde existe réellement (un Iconique n'a que le premier).
 function paliersPourDroide(droide) {
   return paliers.filter((p) => estDisponibleAuPalier(droide, p.nom));
 }
 
-// Reconstruit le texte à partir des éléments retenus.
 function serialiserElements(elements) {
   return elements.map((e) => e.texte).join(", ");
 }
 
-function construireChoixDroides(texteElements, surChangement) {
-  const zone = document.createElement("div");
-  zone.className = "choix-droides-requis";
-
-  // État de travail : la liste des éléments de CE palier de renaissance.
-  let elements = analyserElementsRenaissance(texteElements).map((e) => ({
+// Les éléments d'un palier, complétés à trois cases vides. Un palier qui en
+// contiendrait davantage garde les siens : on n'efface rien au prétexte que
+// le jeu n'en demande que trois.
+function emplacementsDe(texteElements) {
+  const elements = analyserElementsRenaissance(texteElements).map((e) => ({
     texte: e.droide ? e.droide.nom + " (" + e.palier + ")" : e.texte,
     droide: e.droide,
     palier: e.palier
   }));
+  while (elements.length < EMPLACEMENTS_RENAISSANCE) elements.push(null);
+  return elements;
+}
+
+function construireEmplacementsDroides(texteElements, surChangement) {
+  const zone = document.createElement("div");
+  zone.className = "emplacements-droides";
+  let elements = emplacementsDe(texteElements);
+
+  const enregistrer = () => surChangement(serialiserElements(elements.filter(Boolean)));
 
   const rendre = () => {
     zone.innerHTML = "";
-
-    const pastilles = document.createElement("div");
-    pastilles.className = "pastilles-droides";
     elements.forEach((e, index) => {
-      const chip = document.createElement("span");
-      chip.className = "pastille-droide" + (e.droide ? "" : " inconnu");
-      if (e.droide) {
-        const couleur = (paliers.find((p) => p.nom === e.palier) || {}).couleur;
-        chip.style.borderColor = Array.isArray(couleur) ? "transparent" : (couleur || "");
-        if (Array.isArray(couleur)) chip.style.background = fondPalier(couleur);
+      const case_ = document.createElement("button");
+      case_.type = "button";
+      case_.className = "case-droide" + (e ? (e.droide ? " remplie" : " remplie inconnue") : " vide");
+
+      if (!e) {
+        case_.innerHTML = '<span class="case-plus">+</span>';
+        case_.title = "Choisir un droïde";
       } else {
-        chip.title = "Ce nom ne correspond à aucun droïde du catalogue";
+        const couleur = (paliers.find((p) => p.nom === e.palier) || {}).couleur;
+        if (couleur) case_.style.borderColor = Array.isArray(couleur) ? "transparent" : couleur;
+        if (Array.isArray(couleur)) case_.style.background = fondPalier(couleur);
+        case_.innerHTML =
+          '<span class="case-nom">' + echapper(e.droide ? e.droide.nom : e.texte) + "</span>" +
+          '<span class="case-palier">' + echapper(e.droide ? e.palier : "à corriger") + "</span>";
+        case_.title = e.droide
+          ? "Remplacer " + e.droide.nom + " (" + e.palier + ")"
+          : "Ce nom ne correspond à aucun droïde du catalogue";
       }
-      chip.innerHTML = "<span>" + echapper(e.texte) + "</span>";
-      const retirer = document.createElement("button");
-      retirer.type = "button";
-      retirer.className = "retirer-droide";
-      retirer.textContent = "✕";
-      retirer.title = "Retirer";
-      retirer.onclick = () => {
-        elements = elements.filter((_, i) => i !== index);
-        rendre();
-        surChangement(serialiserElements(elements));
-      };
-      chip.appendChild(retirer);
-      pastilles.appendChild(chip);
+
+      case_.onclick = () => ouvrirChoixDroideRenaissance(elements, index, () => { rendre(); enregistrer(); });
+
+      if (e) {
+        const vider = document.createElement("span");
+        vider.className = "case-vider";
+        vider.textContent = "✕";
+        vider.title = "Vider l'emplacement";
+        vider.onclick = (ev) => {
+          ev.stopPropagation();
+          // Les cases suivantes remontent : trois emplacements, pas de trous.
+          elements.splice(index, 1);
+          while (elements.length < EMPLACEMENTS_RENAISSANCE) elements.push(null);
+          rendre();
+          enregistrer();
+        };
+        case_.appendChild(vider);
+      }
+      zone.appendChild(case_);
     });
-    if (!elements.length) {
-      pastilles.insertAdjacentHTML("beforeend",
-        '<span class="aucun-droide">Aucun droïde requis</span>');
-    }
-    zone.appendChild(pastilles);
-
-    // Ajout : un droïde, un palier, un bouton.
-    const ajout = document.createElement("div");
-    ajout.className = "ajout-droide";
-
-    const selDroide = document.createElement("select");
-    selDroide.className = "sel-droide";
-    // Même ordre que partout ailleurs : celui du catalogue.
-    selDroide.innerHTML = '<option value="">Choisir un droïde…</option>' +
-      catalogue.map((d) => '<option value="' + echapper(d.id) + '">' + echapper(d.nom) + "</option>").join("");
-
-    const selPalier = document.createElement("select");
-    selPalier.className = "sel-palier";
-    selPalier.disabled = true;
-
-    // Le choix des paliers dépend du droïde : un Iconique n'en a qu'un.
-    selDroide.onchange = () => {
-      const d = catalogue.find((x) => x.id === selDroide.value);
-      selPalier.disabled = !d;
-      selPalier.innerHTML = d
-        ? paliersPourDroide(d).map((p) => '<option value="' + echapper(p.nom) + '">' + echapper(p.nom) + "</option>").join("")
-        : "";
-    };
-
-    const bouton = document.createElement("button");
-    bouton.type = "button";
-    bouton.className = "btn-mini";
-    bouton.textContent = "＋";
-    bouton.title = "Ajouter ce droïde";
-    bouton.onclick = () => {
-      const d = catalogue.find((x) => x.id === selDroide.value);
-      if (!d || !selPalier.value) return;
-      elements.push({ texte: d.nom + " (" + selPalier.value + ")", droide: d, palier: selPalier.value });
-      rendre();
-      surChangement(serialiserElements(elements));
-    };
-
-    ajout.appendChild(selDroide);
-    ajout.appendChild(selPalier);
-    ajout.appendChild(bouton);
-    zone.appendChild(ajout);
   };
 
   rendre();
   return zone;
+}
+
+// ----- Feuille de choix : le droïde, puis son palier -----
+
+function ouvrirChoixDroideRenaissance(elements, index, surChoix) {
+  slotRenaissanceEnCours = { elements, index, surChoix, droide: null };
+  document.getElementById("rechercheDroideRenaissance").value = "";
+  afficherEtapeDroide();
+  document.getElementById("voileDroideRenaissance").classList.add("ouvert");
+}
+
+function fermerChoixDroideRenaissance() {
+  document.getElementById("voileDroideRenaissance").classList.remove("ouvert");
+  slotRenaissanceEnCours = null;
+}
+
+// Étape 1 : quel droïde.
+function afficherEtapeDroide() {
+  if (!slotRenaissanceEnCours) return;
+  slotRenaissanceEnCours.droide = null;
+  document.getElementById("titreChoixDroideRenaissance").textContent = "Choisir un droïde";
+  document.getElementById("rechercheDroideRenaissance").parentElement.style.display = "";
+
+  const recherche = (document.getElementById("rechercheDroideRenaissance").value || "")
+    .trim().toLowerCase();
+  const liste = document.getElementById("listeChoixDroideRenaissance");
+  liste.innerHTML = "";
+
+  // Ordre du catalogue, donc celui du jeu — comme partout ailleurs.
+  catalogue
+    .filter((d) => !recherche || d.nom.toLowerCase().includes(recherche))
+    .forEach((d) => {
+      const item = document.createElement("button");
+      item.type = "button";
+      item.className = "choix-droide";
+      item.innerHTML =
+        '<span class="choix-nom">' + echapper(d.nom) + "<small>" + echapper(d.classe) + "</small></span>" +
+        '<span class="badge-rarete ' + classeRareteCss(d.rarete) + '">' + echapper(d.rarete) + "</span>";
+      item.onclick = () => afficherEtapePalier(d);
+      liste.appendChild(item);
+    });
+
+  if (!liste.children.length) {
+    liste.innerHTML = '<p class="sous-titre">Aucun droïde ne correspond.</p>';
+  }
+}
+
+// Étape 2 : à quel palier. Seuls ceux où le droïde existe sont proposés.
+function afficherEtapePalier(droide) {
+  if (!slotRenaissanceEnCours) return;
+  slotRenaissanceEnCours.droide = droide;
+  document.getElementById("titreChoixDroideRenaissance").textContent = droide.nom + " — quel palier ?";
+  document.getElementById("rechercheDroideRenaissance").parentElement.style.display = "none";
+
+  const liste = document.getElementById("listeChoixDroideRenaissance");
+  liste.innerHTML = "";
+
+  const retour = document.createElement("button");
+  retour.type = "button";
+  retour.className = "choix-droide retour-choix";
+  retour.innerHTML = '<span class="choix-nom">← Changer de droïde</span>';
+  retour.onclick = () => afficherEtapeDroide();
+  liste.appendChild(retour);
+
+  paliersPourDroide(droide).forEach((p) => {
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = "choix-droide";
+    item.innerHTML =
+      '<span class="choix-pastille" style="background:' + fondPalier(p.couleur) + '"></span>' +
+      '<span class="choix-nom">' + echapper(p.nom) + "</span>";
+    item.onclick = () => {
+      const { elements, index, surChoix } = slotRenaissanceEnCours;
+      // Remplir une case vide alors qu'une précédente l'est aussi laisserait
+      // un trou, que l'enregistrement comblerait : la carte sauterait d'une
+      // case au rechargement. On la pose donc directement au bon rang.
+      const rang = elements[index] ? index
+        : Math.min(index, elements.findIndex((e) => !e));
+      elements[rang] = { texte: droide.nom + " (" + p.nom + ")", droide, palier: p.nom };
+      fermerChoixDroideRenaissance();
+      surChoix();
+    };
+    liste.appendChild(item);
+  });
 }
 
 // ===== Paliers de renaissance =====
@@ -903,25 +968,24 @@ function afficherRenaissanceAdmin() {
     return;
   }
 
-  zone.insertAdjacentHTML("beforeend",
-    '<div class="entete-renaissance"><span>Niveau</span><span>Crédits</span>' +
-    "<span>Droïdes requis</span><span></span></div>");
-
   tries.forEach((r) => {
     const credits = decomposerPourFormulaire(r.credits);
     const ligne = document.createElement("div");
     ligne.className = "ligne-renaissance";
     ligne.innerHTML =
-      '<input type="number" class="r-niveau" min="1" value="' + echapper(r.niveau) + '" aria-label="Niveau">' +
-      '<span class="duo-valeur">' +
-        '<input type="text" class="r-credits" inputmode="decimal" value="' + echapper(credits.valeur) + '" aria-label="Crédits requis">' +
-        '<select class="r-unite" aria-label="Unité des crédits">' + optionsUnite(credits.unite, false) + "</select>" +
-      "</span>" +
-      '<div class="cellule-droides"></div>' +
-      '<button type="button" class="btn-mini danger" title="Supprimer">✕</button>';
+      '<div class="entete-palier-renaissance">' +
+        '<span class="etiquette-niveau">Palier</span>' +
+        '<input type="number" class="r-niveau" min="1" value="' + echapper(r.niveau) + '" aria-label="Niveau">' +
+        '<span class="duo-valeur">' +
+          '<input type="text" class="r-credits" inputmode="decimal" value="' + echapper(credits.valeur) + '" aria-label="Crédits requis">' +
+          '<select class="r-unite" aria-label="Unité des crédits">' + optionsUnite(credits.unite, false) + "</select>" +
+        "</span>" +
+        '<button type="button" class="btn-mini danger" title="Supprimer ce palier">✕</button>' +
+      "</div>" +
+      '<div class="cellule-droides"></div>';
 
-    // Les droïdes requis viennent de la zone à pastilles ; le reste des
-    // champs de la ligne est lu tel quel.
+    // Les droïdes requis viennent des emplacements ; le reste des champs
+    // de la ligne est lu tel quel.
     let elementsCourants = elementsPourSuper(r, superEdite);
     const enregistrer = () => {
       const copie = renaissance.map((x) => (x.id === r.id ? {
@@ -939,7 +1003,7 @@ function afficherRenaissanceAdmin() {
       .forEach((c) => c.addEventListener("change", enregistrer));
 
     ligne.querySelector(".cellule-droides").appendChild(
-      construireChoixDroides(elementsPourSuper(r, superEdite),
+      construireEmplacementsDroides(elementsPourSuper(r, superEdite),
         (texte) => { elementsCourants = texte; enregistrer(); }));
 
     ligne.querySelector(".btn-mini.danger").onclick = () => supprimerRenaissanceAdmin(r.id, r.niveau);

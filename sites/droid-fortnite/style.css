@@ -896,75 +896,76 @@ a { color: var(--primaire); }
   text-align: center; overflow-wrap: anywhere;
 }
 
-/* ===== Panneau admin : paliers de renaissance ===== */
-.entete-renaissance, .ligne-renaissance {
+/* ===== Panneau admin : paliers de renaissance =====
+   Chaque palier est une CARTE, pas une ligne de tableau : empilés et serrés,
+   les paliers se confondaient les uns avec les autres. */
+.ligne-renaissance {
+  border: 1px solid var(--bordure);
+  border-radius: 14px;
+  background: var(--fond);
+  padding: 0.85rem 0.9rem 0.9rem;
+  margin-bottom: 1rem;
+}
+.entete-palier-renaissance {
   display: grid;
-  grid-template-columns: 4.5rem minmax(7rem, 1fr) minmax(9rem, 2fr) 2rem;
-  gap: 0.4rem;
+  grid-template-columns: auto 4.5rem minmax(7rem, 1fr) 2rem;
+  gap: 0.45rem;
   align-items: center;
+  padding-bottom: 0.7rem;
+  margin-bottom: 0.75rem;
+  border-bottom: 1px dashed var(--bordure);
 }
-.entete-renaissance {
+.etiquette-niveau {
   font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em;
-  color: var(--texte-att); margin-bottom: 0.3rem;
+  color: var(--texte-att);
 }
-.ligne-renaissance { margin-bottom: 0.4rem; }
 .ligne-renaissance input[type="text"], .ligne-renaissance input[type="number"] {
   width: 100%; min-width: 0;
   padding: 0.45rem 0.55rem;
   border-radius: 8px; border: 1px solid var(--bordure);
-  background: var(--fond); color: var(--texte);
+  background: var(--carte); color: var(--texte);
   font-size: 0.85rem;
 }
 .ligne-renaissance input:focus { outline: 2px solid var(--primaire); outline-offset: 1px; }
 
-@media (max-width: 620px) {
-  .entete-renaissance { display: none; }
-  .ligne-renaissance {
-    grid-template-columns: 4.5rem 1fr 2rem;
-    border: 1px solid var(--bordure); border-radius: 10px;
-    padding: 0.5rem; margin-bottom: 0.6rem;
-  }
-  .ligne-renaissance .r-elements { grid-column: 1 / -1; }
+/* ----- Droïdes requis : trois emplacements qu'on remplit d'un clic -----
+   Un palier n'en demande jamais plus de trois ; les listes déroulantes
+   empilées prenaient plus de place que l'information elle-même. */
+.emplacements-droides {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
 }
+.case-droide {
+  position: relative;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 0.15rem;
+  min-height: 4.2rem;
+  padding: 0.5rem 0.4rem;
+  border: 2px solid var(--bordure); border-radius: 12px;
+  background: var(--carte); color: var(--texte);
+  font: inherit; text-align: center; cursor: pointer;
+  background-size: cover;
+}
+.case-droide.vide { border-style: dashed; color: var(--texte-att); }
+.case-droide.vide:hover { border-color: var(--primaire); color: var(--primaire); }
+.case-plus { font-size: 1.3rem; line-height: 1; }
+.case-nom { font-size: 0.78rem; font-weight: 600; line-height: 1.2; overflow-wrap: anywhere; }
+.case-palier { font-size: 0.68rem; color: var(--texte-att); }
+.case-droide.inconnue { border-style: dashed; }
+.case-droide.inconnue .case-palier { color: var(--danger); }
+.case-vider {
+  position: absolute; top: -7px; right: -7px;
+  width: 18px; height: 18px;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid var(--bordure); border-radius: 50%;
+  background: var(--carte); color: var(--texte-att);
+  font-size: 0.6rem; line-height: 1;
+}
+.case-vider:hover { background: var(--danger); border-color: var(--danger); color: #fff; }
 
-/* ===== Droïdes requis : pastilles + listes déroulantes ===== */
-.choix-droides-requis { display: flex; flex-direction: column; gap: 0.35rem; min-width: 0; }
-.pastilles-droides { display: flex; flex-wrap: wrap; gap: 0.3rem; }
-.pastille-droide {
-  display: inline-flex; align-items: center; gap: 0.3rem;
-  padding: 0.2rem 0.3rem 0.2rem 0.5rem;
-  border: 2px solid var(--bordure); border-radius: 999px;
-  background: var(--fond);
-  font-size: 0.76rem; line-height: 1.3;
-}
-.pastille-droide.inconnu { border-style: dashed; color: var(--texte-att); }
-.retirer-droide {
-  width: 16px; height: 16px; padding: 0; flex-shrink: 0;
-  border: none; border-radius: 50%;
-  background: transparent; color: var(--texte-att);
-  font-size: 0.6rem; line-height: 1; cursor: pointer;
-}
-.retirer-droide:hover { background: var(--danger); color: #fff; }
-.aucun-droide { font-size: 0.76rem; color: var(--texte-att); font-style: italic; }
-
-.ajout-droide { display: flex; gap: 0.3rem; flex-wrap: wrap; }
-.ajout-droide select {
-  min-width: 0; flex: 1;
-  padding: 0.35rem 0.4rem;
-  border: 1px solid var(--bordure); border-radius: 8px;
-  background: var(--fond); color: var(--texte);
-  font-size: 0.78rem;
-}
-.ajout-droide .sel-palier { flex: 0 1 8rem; }
-.ajout-droide select:disabled { opacity: 0.5; }
-.ajout-droide .btn-mini { flex: 0 0 auto; }
-
-/* La colonne des droïdes requis a besoin de place */
-.entete-renaissance, .ligne-renaissance {
-  grid-template-columns: 4.5rem minmax(7rem, 1fr) minmax(16rem, 2.4fr) 2rem;
-  align-items: start;
-}
-.ligne-renaissance .r-niveau, .ligne-renaissance .r-credits { margin-top: 0.1rem; }
+/* Retour à l'étape « quel droïde » depuis la liste des paliers */
+.choix-droide.retour-choix { justify-content: flex-start; color: var(--texte-att); }
 
 /* Sélecteur de super renaissance : même aspect que les onglets de palier */
 #selecteurSuper .ajouter-super { border-style: dashed; opacity: .85; }
@@ -1006,15 +1007,17 @@ a { color: var(--primaire); }
   .ligne-palier .duo-valeur::before { content: "Prix"; }
   .ligne-palier .duo-valeur + .duo-valeur::before { content: "Rendement"; }
 
-  /* Renaissance : niveau et suppression sur une ligne, crédits puis droïdes
-     en dessous — chacun sur toute la largeur. */
-  .ligne-renaissance { grid-template-columns: minmax(0, 1fr) 2rem; row-gap: 0.45rem; }
-  .ligne-renaissance .r-niveau { grid-column: 1; grid-row: 1; }
-  .ligne-renaissance .btn-mini.danger { grid-column: 2; grid-row: 1; }
-  .ligne-renaissance .duo-valeur { grid-column: 1 / -1; }
-  .ligne-renaissance .duo-valeur::before { content: "Crédits"; }
-  .ligne-renaissance .cellule-droides { grid-column: 1 / -1; }
-
-  .ajout-droide { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; }
-  .ajout-droide .sel-palier { flex: initial; }
+  /* Renaissance : niveau et suppression sur une ligne, crédits en dessous.
+     Les trois emplacements restent côte à côte, ils tiennent en largeur. */
+  .entete-palier-renaissance {
+    grid-template-columns: auto minmax(0, 1fr) 2rem;
+    row-gap: 0.5rem;
+  }
+  /* Le niveau et sa suppression tiennent sur la première rangée ; les
+     crédits prennent la largeur en dessous. */
+  .entete-palier-renaissance .btn-mini.danger { grid-column: 3; grid-row: 1; }
+  .entete-palier-renaissance .duo-valeur { grid-column: 1 / -1; grid-row: 2; }
+  .entete-palier-renaissance .duo-valeur::before { content: "Crédits"; }
+  .case-droide { min-height: 3.8rem; padding: 0.45rem 0.25rem; }
+  .case-nom { font-size: 0.72rem; }
 }

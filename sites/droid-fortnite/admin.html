@@ -120,7 +120,7 @@
     <div id="zoneRenaissance" style="display:none">
       <div class="bloc-carte">
         <h2>Paliers de renaissance</h2>
-        <p class="sous-titre">Crédits et droïdes requis pour chaque niveau. Les droïdes requis se choisissent dans une liste, palier compris — le Droidex en affiche les visuels. Ils changent à chaque super renaissance : le sélecteur ci-dessous indique celle qu'on modifie. Niveaux et crédits, eux, sont communs à toutes. Les modifications s'enregistrent dès qu'un champ est quitté.</p>
+        <p class="sous-titre">Crédits et droïdes requis pour chaque niveau. Chaque palier a trois emplacements : on clique une case pour y placer un droïde et son palier. Ils changent à chaque super renaissance : le sélecteur ci-dessous indique celle qu'on modifie. Niveaux et crédits, eux, sont communs à toutes. Les modifications s'enregistrent dès qu'un champ est quitté.</p>
         <div class="onglets-palier" id="selecteurSuper" style="margin-bottom:0.9rem"></div>
         <div id="listeRenaissanceAdmin"></div>
 
@@ -135,7 +135,7 @@
             <select id="champUniteCredits"></select>
           </div>
         </div>
-        <p class="aide-champ" style="margin:0 0 1rem">Les droïdes requis se choisissent ensuite, sur la ligne du palier.</p>
+        <p class="aide-champ" style="margin:0 0 1rem">Les droïdes requis se choisissent ensuite, dans les emplacements du palier.</p>
         <button class="btn btn-primaire" onclick="ajouterRenaissanceAdmin()">Ajouter le palier</button>
         <p id="messageRenaissanceAdmin" class="message"></p>
       </div>
@@ -179,6 +179,23 @@
       </div>
     </div>
 
+  </div>
+
+  <!-- Choix d'un droïde requis : le droïde, puis son palier -->
+  <div class="voile" id="voileDroideRenaissance" onclick="if(event.target===this)fermerChoixDroideRenaissance()">
+    <div class="feuille">
+      <div class="feuille-entete">
+        <h2 id="titreChoixDroideRenaissance">Choisir un droïde</h2>
+        <button type="button" onclick="fermerChoixDroideRenaissance()">✕</button>
+      </div>
+      <div class="feuille-corps">
+        <div class="recherche">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" id="rechercheDroideRenaissance" placeholder="Rechercher un droïde..." oninput="afficherEtapeDroide()">
+        </div>
+        <div class="liste-choix" id="listeChoixDroideRenaissance"></div>
+      </div>
+    </div>
   </div>
 
   <script src="script.js"></script>
