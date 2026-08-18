@@ -927,10 +927,14 @@ function previewCouverture() {
     const el = document.getElementById(id);
     if (el) el.style.display = visibleTitre;
   });
+  // Inversement, le texte libre n'existe que sur la 4e.
+  const blocResume = document.getElementById("blocResume");
+  if (blocResume) blocResume.style.display = mode === "quatrieme" ? "block" : "none";
 
   const apercu = document.getElementById("previewCouverture");
   apercu.innerHTML = `
     ${mode === "couverture" && afficherTitre ? `<div class="apercu-titre" style="color:${couleurTexte};${styleTexteCouv(data, "titre")}">${livre.titre || "Titre"}</div>` : ""}
+    ${mode === "quatrieme" ? htmlResumeCouv(data, couleurTexte, "apercu-resume") : ""}
     ${afficherAuteur ? `<div class="apercu-auteur" style="color:${couleurTexte};${styleTexteCouv(data, "auteur")}">${livre.auteur || "Auteur"}</div>` : ""}
   `;
 }
@@ -1545,6 +1549,7 @@ function creerPageCouvertureApercu(mode) {
   const afficherAuteur = !data || data.afficherAuteur !== false;
   couche.innerHTML = `
     ${mode === "couverture" && afficherTitre ? `<div class="apercu-titre" style="color:${couleurTexte};${styleTexteCouv(data, "titre")}">${livre.titre || "Titre"}</div>` : ""}
+    ${mode === "quatrieme" ? htmlResumeCouv(data, couleurTexte, "apercu-resume") : ""}
     ${afficherAuteur ? `<div class="apercu-auteur" style="color:${couleurTexte};${styleTexteCouv(data, "auteur")}">${livre.auteur || "Auteur"}</div>` : ""}
   `;
   page.appendChild(couche);
@@ -3385,13 +3390,50 @@ function setPoliceTexteCouv(cle, valeur) {
   planifierBrouillon();
 }
 
+// « titre » -> « Titre » : les identifiants des contrôles suivent la clé,
+// ce qui évite une table de correspondance à rallonger à chaque élément.
+function suffixeCouv(cle) {
+  return cle.charAt(0).toUpperCase() + cle.slice(1);
+}
+
 function setTailleTexteCouv(cle, valeur) {
   const data = donneesCouvCourante();
   if (!data) return;
   const v = Math.max(50, Math.min(250, parseInt(valeur, 10) || 100));
   data[cle + "Taille"] = v;
-  const etiquette = document.getElementById(cle === "titre" ? "valTailleTitre" : "valTailleAuteur");
+  const etiquette = document.getElementById("valTaille" + suffixeCouv(cle));
   if (etiquette) etiquette.textContent = v;
+  previewCouverture();
+  marquerModifie();
+  planifierBrouillon();
+}
+
+// Le texte libre de la 4e de couverture, et sa largeur de colonne.
+function setTexteResumeCouv(valeur) {
+  const data = donneesCouvCourante();
+  if (!data) return;
+  data.resumeTexte = valeur;
+  previewCouverture();
+  marquerModifie();
+  planifierBrouillon();
+}
+
+function setLargeurResumeCouv(valeur) {
+  const data = donneesCouvCourante();
+  if (!data) return;
+  const v = Math.max(20, Math.min(100, parseInt(valeur, 10) || 80));
+  data.resumeLargeur = v;
+  const etiquette = document.getElementById("valLargeurResume");
+  if (etiquette) etiquette.textContent = v;
+  previewCouverture();
+  marquerModifie();
+  planifierBrouillon();
+}
+
+function setAlignResumeCouv(valeur) {
+  const data = donneesCouvCourante();
+  if (!data) return;
+  data.resumeAlign = valeur;
   previewCouverture();
   marquerModifie();
   planifierBrouillon();
@@ -3404,9 +3446,7 @@ function setPositionTexteCouv(cle, axe, valeur) {
   const brut = parseInt(valeur, 10) || 0;
   const v = (A === "X") ? Math.max(-50, Math.min(50, brut)) : Math.max(0, Math.min(100, brut));
   data[cle + A] = v;
-  const etiquette = document.getElementById(
-    "valPos" + (cle === "titre" ? "Titre" : "Auteur") + A
-  );
+  const etiquette = document.getElementById("valPos" + suffixeCouv(cle) + A);
   if (etiquette) etiquette.textContent = v;
   previewCouverture();
   marquerModifie();
@@ -3419,8 +3459,8 @@ function synchroniserControlesCouv(data) {
   const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
   const txt = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
 
-  ["titre", "auteur"].forEach(cle => {
-    const suffixe = cle === "titre" ? "Titre" : "Auteur";
+  ["titre", "auteur", "resume"].forEach(cle => {
+    const suffixe = suffixeCouv(cle);
     const taille = typeof data[cle + "Taille"] === "number" ? data[cle + "Taille"] : 100;
     const x = typeof data[cle + "X"] === "number" ? data[cle + "X"] : 0;
     const y = typeof data[cle + "Y"] === "number" ? data[cle + "Y"] : 0;
@@ -3429,6 +3469,11 @@ function synchroniserControlesCouv(data) {
     set("pos" + suffixe + "X", x);        txt("valPos" + suffixe + "X", x);
     set("pos" + suffixe + "Y", y);        txt("valPos" + suffixe + "Y", y);
   });
+
+  const largeur = typeof data.resumeLargeur === "number" ? data.resumeLargeur : 80;
+  set("texteResume", data.resumeTexte || "");
+  set("largeurResume", largeur);  txt("valLargeurResume", largeur);
+  set("alignResume", data.resumeAlign || "left");
 }
 
 // Persiste « tutoriel éditeur vu » dans le JSON de l'utilisateur (sa

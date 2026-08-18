@@ -238,6 +238,57 @@
               <span class="val-pos" id="valTailleAuteur">100</span>
             </div>
 
+            <div id="blocResume" style="display:none">
+              <label class="label-couv" for="texteResume">Texte de la 4e de couverture</label>
+              <textarea id="texteResume" class="zone-resume" rows="5" placeholder="Le résumé, une citation, ce que vous voulez…"
+                        oninput="setTexteResumeCouv(this.value)"></textarea>
+
+              <label class="label-couv">Texte — police et taille</label>
+              <select id="policeResume" class="select-couv" onchange="setPoliceTexteCouv('resume', this.value)">
+                <option value="">Garamond (défaut)</option>
+                <option value="Georgia, serif">Georgia</option>
+                <option value="'Times New Roman', serif">Times</option>
+                <option value="Arial, sans-serif">Arial</option>
+                <option value="'Courier New', monospace">Courier</option>
+                <option value="'Trebuchet MS', sans-serif">Trebuchet</option>
+                <option value="Impact, sans-serif">Impact</option>
+              </select>
+              <div class="reglage-pos">
+                <span class="ico-pos" title="Taille">A</span>
+                <input type="range" id="taillePosResume" min="50" max="250" step="5" value="100"
+                       oninput="setTailleTexteCouv('resume', this.value)">
+                <span class="val-pos" id="valTailleResume">100</span>
+              </div>
+
+              <label class="label-couv">Largeur et alignement</label>
+              <div class="reglage-pos">
+                <span class="ico-pos" title="Largeur de la colonne">⇥</span>
+                <input type="range" id="largeurResume" min="20" max="100" step="5" value="80"
+                       oninput="setLargeurResumeCouv(this.value)">
+                <span class="val-pos" id="valLargeurResume">80</span>
+              </div>
+              <select id="alignResume" class="select-couv" onchange="setAlignResumeCouv(this.value)">
+                <option value="left">Aligné à gauche</option>
+                <option value="center">Centré</option>
+                <option value="right">Aligné à droite</option>
+                <option value="justify">Justifié</option>
+              </select>
+
+              <label class="label-couv">Position du texte</label>
+              <div class="reglage-pos">
+                <span class="ico-pos" title="Gauche / droite">↔</span>
+                <input type="range" id="posResumeX" min="-50" max="50" step="1" value="0"
+                       oninput="setPositionTexteCouv('resume','X',this.value)">
+                <span class="val-pos" id="valPosResumeX">0</span>
+              </div>
+              <div class="reglage-pos">
+                <span class="ico-pos" title="Bas / haut">↕</span>
+                <input type="range" id="posResumeY" min="0" max="100" step="1" value="0"
+                       oninput="setPositionTexteCouv('resume','Y',this.value)">
+                <span class="val-pos" id="valPosResumeY">0</span>
+              </div>
+            </div>
+
             <div id="blocPosTitre">
               <label class="label-couv">Position du titre</label>
               <div class="reglage-pos">

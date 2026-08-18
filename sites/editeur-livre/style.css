@@ -604,6 +604,18 @@ button.danger {
   word-break: break-word;
 }
 
+/* Texte libre de la 4e de couverture. Il part du bas comme le titre et
+   l'auteur, et le curseur ↕ le fait monter : le même repère que les autres
+   réglages, et jamais de texte poussé hors de la page au premier essai. */
+.apercu-resume {
+  font-family: "EB Garamond", Georgia, serif;
+  font-size: calc(13px * var(--mult-resume, 1));
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin-bottom: 12px;
+}
+
 .apercu-auteur {
   font-family: "EB Garamond", Georgia, serif;
   font-size: calc(14px * var(--mult-auteur, 1));
@@ -1892,4 +1904,13 @@ button.danger {
 @media (max-width: 700px) {
   .tranche-atelier { grid-template-columns: minmax(0, 1fr); }
   .tranche-apercu { order: -1; width: auto; }
+}
+
+/* Le champ de saisie du texte de 4e, dans le panneau d'édition */
+.zone-resume {
+  width: 100%; box-sizing: border-box;
+  min-height: 6rem; resize: vertical;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--bordure, #d8d8d8); border-radius: 6px;
+  font: inherit; font-size: 0.88rem; line-height: 1.4;
 }

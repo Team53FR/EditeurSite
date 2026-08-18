@@ -173,6 +173,15 @@
     word-break: break-word;
   }
 
+  /* Texte libre de la 4e : part du bas comme l'auteur, le curseur ↕ le monte. */
+  .resume-impression {
+    font-size: calc(11pt * var(--mult-resume, 1));
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin-bottom: 6mm;
+  }
+
   .auteur-impression {
     font-size: calc(12pt * var(--mult-auteur, 1));
     text-align: center;

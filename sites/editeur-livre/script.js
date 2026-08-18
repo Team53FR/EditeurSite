@@ -366,6 +366,29 @@ async function seConnecter() {
 //  - taille   : en % (100 = taille par défaut). Exposée comme MULTIPLICATEUR
 //      CSS, car chaque contexte a sa propre taille de base (page, vignette,
 //      impression) : le réglage s'y adapte au lieu d'être figé en pixels.
+// Le texte libre de la 4e de couverture (le « résumé »). Il obéit aux mêmes
+// réglages que le titre et l'auteur — police, taille, position — plus une
+// largeur, sans laquelle un paragraphe courrait d'un bord à l'autre.
+//
+// Rendu par l'éditeur, l'aperçu, la lecture et l'impression : une seule
+// fonction, pour que les quatre montrent la même chose.
+function htmlResumeCouv(data, couleurTexte, classe) {
+  const texte = data && data.resumeTexte;
+  if (!texte || !texte.trim()) return "";
+  const largeur = typeof data.resumeLargeur === "number" ? data.resumeLargeur : 80;
+  const align = data.resumeAlign || "left";
+  return '<div class="' + classe + '" style="color:' + couleurTexte + ";" +
+    styleTexteCouv(data, "resume") +
+    "max-width:" + largeur + "%;text-align:" + align + ';">' +
+    echapperHtmlCouv(texte) + "</div>";
+}
+
+function echapperHtmlCouv(txt) {
+  const d = document.createElement("div");
+  d.textContent = txt == null ? "" : String(txt);
+  return d.innerHTML;
+}
+
 function styleTexteCouv(data, cle) {
   if (!data) return "";
   let css = "";
