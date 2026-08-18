@@ -604,16 +604,29 @@ button.danger {
   word-break: break-word;
 }
 
-/* Texte libre de la 4e de couverture. Il part du bas comme le titre et
-   l'auteur, et le curseur ↕ le fait monter : le même repère que les autres
-   réglages, et jamais de texte poussé hors de la page au premier essai. */
-.apercu-resume {
+/* Texte libre de la 4e de couverture.
+   Il se pose sur la page entière, jamais dans le flux des autres textes :
+   sa position ne dépend donc ni des marges de la couche ni du nombre de
+   lignes. Le corps se mesure en cqw — un pourcentage de la largeur de page —
+   pour que l'aperçu à l'écran et le tirage sur papier donnent la MÊME
+   composition, au même endroit. Un corps en pixels d'un côté et en points de
+   l'autre faisait tomber le texte ailleurs qu'à l'endroit choisi. */
+.couche-resume {
+  position: absolute;
+  inset: 0;
+  container-type: size;
+  pointer-events: none;
+  overflow: hidden;
+}
+.apercu-resume, .resume-impression {
+  position: absolute;
+  transform: translateX(-50%);
   font-family: "EB Garamond", Georgia, serif;
-  font-size: calc(13px * var(--mult-resume, 1));
+  font-size: calc(2.6cqw * var(--mult-resume, 1));
   line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-word;
-  margin-bottom: 12px;
+  box-sizing: border-box;
 }
 
 .apercu-auteur {

@@ -188,10 +188,12 @@ function creerPageCouvertureApercu(mode) {
   const afficherAuteur = !data || data.afficherAuteur !== false;
   couche.innerHTML = `
     ${mode === "couverture" && afficherTitre ? `<div class="apercu-titre" style="color:${couleurTexte};${styleTexteCouv(data, "titre")}">${livre.titre || "Titre"}</div>` : ""}
-    ${mode === "quatrieme" ? htmlResumeCouv(data, couleurTexte, "apercu-resume") : ""}
     ${afficherAuteur ? `<div class="apercu-auteur" style="color:${couleurTexte};${styleTexteCouv(data, "auteur")}">${livre.auteur || "Auteur"}</div>` : ""}
   `;
   page.appendChild(couche);
+  if (mode === "quatrieme") {
+    page.insertAdjacentHTML("beforeend", htmlResumeCouv(data, couleurTexte, "apercu-resume"));
+  }
   return page;
 }
 

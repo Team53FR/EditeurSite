@@ -531,10 +531,12 @@ function creerCouvertureImpression(livre, mode, f, promessesImages) {
   const afficherAuteur = !data || data.afficherAuteur !== false;
   couche.innerHTML = `
     ${mode === "couverture" && afficherTitre ? `<div class="titre-impression" style="color:${couleurTexte};${styleTexteCouv(data,'titre')}">${livre.titre || ""}</div>` : ""}
-    ${mode === "quatrieme" ? htmlResumeCouv(data, couleurTexte, "resume-impression") : ""}
     ${afficherAuteur ? `<div class="auteur-impression" style="color:${couleurTexte};${styleTexteCouv(data,'auteur')}">${livre.auteur || ""}</div>` : ""}
   `;
   div.appendChild(couche);
+  if (mode === "quatrieme") {
+    div.insertAdjacentHTML("beforeend", htmlResumeCouv(data, couleurTexte, "resume-impression"));
+  }
 
   return div;
 }

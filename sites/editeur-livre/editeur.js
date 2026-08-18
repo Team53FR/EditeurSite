@@ -934,9 +934,17 @@ function previewCouverture() {
   const apercu = document.getElementById("previewCouverture");
   apercu.innerHTML = `
     ${mode === "couverture" && afficherTitre ? `<div class="apercu-titre" style="color:${couleurTexte};${styleTexteCouv(data, "titre")}">${livre.titre || "Titre"}</div>` : ""}
-    ${mode === "quatrieme" ? htmlResumeCouv(data, couleurTexte, "apercu-resume") : ""}
     ${afficherAuteur ? `<div class="apercu-auteur" style="color:${couleurTexte};${styleTexteCouv(data, "auteur")}">${livre.auteur || "Auteur"}</div>` : ""}
   `;
+
+  // Le texte de 4e se pose sur la page elle-même, hors de la couche des
+  // textes : c'est la seule façon que sa position soit celle qu'on a réglée.
+  const page = document.getElementById("previewCouv");
+  const ancienne = page.querySelector(".couche-resume");
+  if (ancienne) ancienne.remove();
+  if (mode === "quatrieme") {
+    page.insertAdjacentHTML("beforeend", htmlResumeCouv(data, couleurTexte, "apercu-resume"));
+  }
 }
 
 function toggleAffichageTexte(champ, valeur) {
@@ -1549,10 +1557,12 @@ function creerPageCouvertureApercu(mode) {
   const afficherAuteur = !data || data.afficherAuteur !== false;
   couche.innerHTML = `
     ${mode === "couverture" && afficherTitre ? `<div class="apercu-titre" style="color:${couleurTexte};${styleTexteCouv(data, "titre")}">${livre.titre || "Titre"}</div>` : ""}
-    ${mode === "quatrieme" ? htmlResumeCouv(data, couleurTexte, "apercu-resume") : ""}
     ${afficherAuteur ? `<div class="apercu-auteur" style="color:${couleurTexte};${styleTexteCouv(data, "auteur")}">${livre.auteur || "Auteur"}</div>` : ""}
   `;
   page.appendChild(couche);
+  if (mode === "quatrieme") {
+    page.insertAdjacentHTML("beforeend", htmlResumeCouv(data, couleurTexte, "apercu-resume"));
+  }
 
   return page;
 }

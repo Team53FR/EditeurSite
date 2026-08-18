@@ -377,10 +377,24 @@ function htmlResumeCouv(data, couleurTexte, classe) {
   if (!texte || !texte.trim()) return "";
   const largeur = typeof data.resumeLargeur === "number" ? data.resumeLargeur : 80;
   const align = data.resumeAlign || "left";
-  return '<div class="' + classe + '" style="color:' + couleurTexte + ";" +
-    styleTexteCouv(data, "resume") +
-    "max-width:" + largeur + "%;text-align:" + align + ';">' +
-    echapperHtmlCouv(texte) + "</div>";
+  const x = typeof data.resumeX === "number" ? data.resumeX : 0;
+  const y = typeof data.resumeY === "number" ? data.resumeY : 0;
+  const taille = typeof data.resumeTaille === "number" ? data.resumeTaille : 100;
+  const police = data.resumePolice ? "font-family:" + data.resumePolice + ";" : "";
+
+  // Le bloc se place sur la PAGE, pas dans le flux des textes de couverture :
+  // sa position ne dépend donc plus de la hauteur des lignes ni des marges de
+  // la couche, qui n'étaient pas les mêmes à l'écran et à l'impression — le
+  // texte n'atterrissait pas où on l'avait posé.
+  //
+  // Tout est en pourcentage de la page, y compris le corps (cqw), pour que
+  // l'aperçu et le tirage montrent exactement la même chose.
+  return '<div class="couche-resume"><div class="' + classe + '" style="' +
+    "color:" + couleurTexte + ";" + police +
+    "left:calc(50% + " + x + "%);bottom:calc(8% + " + y + "%);" +
+    "width:" + largeur + "%;text-align:" + align + ";" +
+    "--mult-resume:" + (taille / 100) + ';">' +
+    echapperHtmlCouv(texte) + "</div></div>";
 }
 
 function echapperHtmlCouv(txt) {
