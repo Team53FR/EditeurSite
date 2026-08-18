@@ -1901,6 +1901,17 @@ button.danger {
   text-decoration: underline; cursor: pointer;
 }
 
+/* Un <input type=file> déguisé en bouton : le champ natif est illisible et
+   affiche « Aucun fichier sélectionné » en permanence. */
+.btn-fichier {
+  display: inline-flex; align-items: center;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--bordure, #d8d8d8); border-radius: 6px;
+  font-size: 0.8rem; cursor: pointer;
+  white-space: nowrap;
+}
+.btn-fichier:hover { border-color: var(--accent, #7a4a2a); }
+
 @media (max-width: 700px) {
   .tranche-atelier { grid-template-columns: minmax(0, 1fr); }
   .tranche-apercu { order: -1; width: auto; }

@@ -1135,6 +1135,9 @@ function donneesTranche(livre) {
     // Blocs facultatifs, dans l'ordre où ils se posent sur le dos.
     // Tous vides par défaut : un livre déjà écrit ne change pas d'aspect.
     bandeau: Number(t.bandeau) > 0 ? Number(t.bandeau) : 0,
+    // Image du bandeau : la sienne si on lui en a donné une, sinon celle de
+    // la couverture, qui se prolonge alors sur le dos.
+    imageChemin: t.imageChemin || null,
     pastille: typeof t.pastille === "string" ? t.pastille : "",
     pastilleFond: t.pastilleFond || "#22c55e",
     pastilleTexte: t.pastilleTexte || "#0b1220",
@@ -1182,14 +1185,16 @@ function construireDosLivre(livre, dosMm, hautMm, promessesImages) {
   };
 
   // 1) Bandeau : le haut de l'image de couverture, qui se prolonge sur le dos.
-  if (r.bandeau > 0 && livre.couverture && livre.couverture.imageChemin) {
+  const cheminBandeau = r.imageChemin ||
+    (livre.couverture && livre.couverture.imageChemin) || null;
+  if (r.bandeau > 0 && cheminBandeau) {
     const bande = document.createElement("div");
     bande.className = "dos-bandeau";
     bande.style.height = r.bandeau + "mm";
     const img = document.createElement("img");
     bande.appendChild(img);
     dos.appendChild(bande);
-    chargerImageCouverture(img, livre.couverture.imageChemin, promessesImages);
+    chargerImageCouverture(img, cheminBandeau, promessesImages);
   }
 
   // 2) Pastille : le numéro de tome, droit, sur son propre aplat.
@@ -1330,10 +1335,11 @@ function ouvrirTranche() {
         "</div>" +
         '<div class="tranche-duo">' +
           nombre("trBandeau", "Bandeau d'image (mm)", d.bandeau, 0, 200) +
+          '<label class="btn-fichier">Choisir une image' +
+            '<input type="file" id="trImage" accept="image/*" hidden></label>' +
+          '<button type="button" class="btn-lien" id="trImageRetirer">Retirer</button>' +
         "</div>" +
-        '<p class="aide-champ">' + (aImage
-          ? "Le haut de l'image de couverture se prolonge sur le dos. 0 = aucun bandeau."
-          : "Aucune image sur la couverture : le bandeau n'aurait rien à montrer.") + "</p>" +
+        '<p class="aide-champ" id="trImageNote"></p>' +
       "</fieldset>" +
 
       '<fieldset class="tr-bloc"><legend>Pastille</legend>' +
@@ -1431,7 +1437,10 @@ function ouvrirTranche() {
   // parallèle du rendu réel.
   const rafraichir = () => {
     const r = lire();
-    const provisoire = Object.assign({}, livre, { tranche: r });
+    // L'image reste celle qui est enregistrée : elle s'envoie à part, pas au
+    // moment d'appuyer sur « Enregistrer ».
+    const provisoire = Object.assign({}, livre,
+      { tranche: Object.assign({}, r, { imageChemin: t.imageChemin || null }) });
     const scene = fond.querySelector("#trScene");
     scene.innerHTML = "";
 
@@ -1465,7 +1474,41 @@ function ouvrirTranche() {
     rafraichir();
   };
 
-  if (!aImage) fond.querySelector("#trBandeau").disabled = true;
+  // Le bandeau n'a de sens que s'il y a une image à montrer — la sienne ou,
+  // à défaut, celle de la couverture.
+  const majImage = () => {
+    const propre = !!t.imageChemin;
+    const source = propre ? "sienne" : (aImage ? "couverture" : "aucune");
+    fond.querySelector("#trBandeau").disabled = source === "aucune";
+    fond.querySelector("#trImageRetirer").style.display = propre ? "" : "none";
+    fond.querySelector("#trImageNote").textContent =
+      source === "sienne"
+        ? "Image propre à la tranche. « Retirer » revient à celle de la couverture."
+        : source === "couverture"
+          ? "À défaut d'image propre, le haut de celle de la couverture se prolonge sur le dos. 0 mm = aucun bandeau."
+          : "Aucune image disponible : choisissez-en une, ou donnez-en une à la couverture.";
+  };
+
+  fond.querySelector("#trImage").addEventListener("change", (e) => {
+    envoyerImageTranche(e, livre, t, () => { majImage(); rafraichir(); },
+      fond.querySelector("#trImageNote"));
+  });
+
+  fond.querySelector("#trImageRetirer").onclick = () => {
+    const ancien = t.imageChemin;
+    t.imageChemin = null;
+    if (ancien) {
+      supprimerFichierGithub(ancien, localStorage.getItem("gh_token"),
+        "Retrait de l'image de tranche").catch(() => {});
+      delete cacheImagesURL[ancien];
+    }
+    marquerModifie();
+    planifierBrouillon();
+    majImage();
+    rafraichir();
+  };
+
+  majImage();
   rafraichir();
 
   fond.querySelector(".mi-fermer").onclick = () => fond.remove();
@@ -1506,6 +1549,43 @@ function ouvrirTranche() {
       }, 3000);
     }
   };
+}
+
+// Envoi de l'image de tranche. Elle vit dans le même dossier que celles des
+// couvertures, sous un nom qui lui est propre : remplacer l'une ne touche
+// jamais l'autre.
+function envoyerImageTranche(event, livre, tranche, surFin, note) {
+  const fichier = event.target.files[0];
+  event.target.value = "";
+  if (!fichier) return;
+
+  const token = localStorage.getItem("gh_token");
+  const ancien = tranche.imageChemin;
+
+  const lecteur = new FileReader();
+  lecteur.onload = async (e) => {
+    const dataUrl = e.target.result;
+    const extension = extraireExtensionDataUrl(dataUrl);
+    const chemin = obtenirPrefixeImagesUtilisateur() + "/" + livre.id + "_tranche." + extension;
+
+    if (note) note.textContent = "Envoi de l'image en cours…";
+    try {
+      await uploaderImageBase64(chemin, dataUrl, token,
+        "Image de tranche — " + (livre.titre || livre.id));
+      if (ancien && ancien !== chemin) {
+        supprimerFichierGithub(ancien, token, "Remplacement de l'image de tranche").catch(() => {});
+        delete cacheImagesURL[ancien];
+      }
+      tranche.imageChemin = chemin;
+      cacheImagesURL[chemin] = dataUrl;   // aperçu immédiat, sans requête
+      marquerModifie();
+      planifierBrouillon();
+      surFin();
+    } catch (erreur) {
+      if (note) note.textContent = erreur.message;
+    }
+  };
+  lecteur.readAsDataURL(fichier);
 }
 
 // Couverture ouverte à plat : 4e de couverture | dos | 1re de couverture.
