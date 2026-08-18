@@ -908,7 +908,9 @@ function ouvrirDialogueCouvertureSeule(livre, f, nbPages) {
     "</div>" +
     '<p class="ci-note">Calculé pour ' + nbPages + " pages sur du papier ordinaire. " +
       "Mesurez la tranche de votre pile une fois imprimée et reportez la valeur ici : " +
-      "c'est elle qui place les plis.</p>" +
+      "c'est elle qui place les plis.<br>" +
+      "<strong>Livret à agrafer :</strong> mettez 0. Le cahier n'a pas de dos plat — la " +
+      "couverture se plie en deux et s'agrafe avec les pages.</p>" +
   "</div>";
 
   html += '<p class="ci-note dc-papier"></p>';
