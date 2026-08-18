@@ -2856,6 +2856,202 @@ function supprimerChapitre(indexChapitre) {
   }
 }
 
+// ===== Casse des titres de chapitre =====
+//
+// « Chapitre 1 - Fin de l'Ère d'Harmonie » : la seconde moitié d'un titre est
+// souvent saisie en capitales de titre, à l'anglaise. En français, seule la
+// première lettre et les noms propres en portent.
+//
+// Deviner ce qui est un nom propre est impossible dans l'absolu : le livre
+// lui-même sert de dictionnaire. Un mot capitalisé AU MILIEU d'une phrase du
+// texte courant ne peut guère être qu'un nom propre — c'est ainsi que
+// « Harmonie » ou « Sylvandar » sont reconnus, tandis que « Ère » ne l'est
+// pas. La proposition reste modifiable avant d'être appliquée : l'éditeur
+// propose, l'auteur décide.
+
+function echapperTitre(txt) {
+  return String(txt == null ? "" : txt)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+// Tirets et deux-points qui séparent le numéro du titre proprement dit.
+const SEPARATEURS_TITRE = /\s[-–—:]\s/;
+
+// Un « mot » au sens de la casse : lettres accentuées, apostrophes exclues
+// (« l'Ère » compte pour deux mots, et c'est bien « Ère » qu'on examine).
+const MOT_TITRE = /[\p{L}][\p{L}\p{M}-]*/gu;
+
+// Fin de phrase : le mot qui suit porte une majuscule sans être un nom propre.
+const FIN_DE_PHRASE = /[.!?…:;»"]\s*$|^\s*$/;
+
+// Noms propres du livre : tout mot capitalisé qui n'ouvre pas une phrase.
+function nomsPropresDuLivre() {
+  const boite = document.createElement("div");
+  boite.innerHTML = contenuCompletLivre();
+  // Les titres sont justement ce qu'on cherche à corriger : ils ne peuvent pas
+  // servir de référence.
+  boite.querySelectorAll("h2").forEach((h) => h.remove());
+  const texte = boite.textContent || "";
+
+  const noms = new Set();
+  let m;
+  const balayeur = new RegExp(MOT_TITRE.source, "gu");
+  while ((m = balayeur.exec(texte)) !== null) {
+    const mot = m[0];
+    const avant = texte.slice(Math.max(0, m.index - 40), m.index);
+    const premierDePhrase = FIN_DE_PHRASE.test(avant);
+    if (!premierDePhrase && mot[0] !== mot[0].toLowerCase()) {
+      noms.add(mot.toLowerCase());
+    }
+  }
+  return noms;
+}
+
+// La proposition pour un titre. Le texte avant le séparateur n'est pas touché
+// (« Chapitre 1 » garde sa majuscule), pas plus que le premier mot d'après.
+function titreEnCasseFrancaise(titre, noms) {
+  const sep = titre.match(SEPARATEURS_TITRE);
+  const debut = sep ? sep.index + sep[0].length : 0;
+  // Sans séparateur, il n'y a rien à corriger : le titre est déjà « le titre ».
+  if (!sep) return titre;
+
+  let premier = true;
+  const suite = titre.slice(debut).replace(new RegExp(MOT_TITRE.source, "gu"), (mot) => {
+    if (premier) { premier = false; return mot; }
+    if (mot[0] === mot[0].toLowerCase()) return mot;          // déjà en minuscule
+    if (noms.has(mot.toLowerCase())) return mot;              // nom propre du livre
+    if (mot === mot.toUpperCase() && mot.length > 1) return mot; // sigle (ADN, IA…)
+    return mot[0].toLowerCase() + mot.slice(1);
+  });
+  return titre.slice(0, debut) + suite;
+}
+
+// Réécrit un titre SANS toucher à son balisage : on ne change que la casse,
+// donc les longueurs concordent et chaque nœud de texte reçoit sa tranche.
+// Remplacer textContent perdrait les italiques ou les petites capitales.
+function reecrireCasse(h2, nouveauTexte) {
+  if ((h2.textContent || "").length !== nouveauTexte.length) {
+    h2.textContent = nouveauTexte;   // sécurité : mieux vaut le texte juste
+    return;
+  }
+  let position = 0;
+  const parcours = document.createTreeWalker(h2, NodeFilter.SHOW_TEXT);
+  let noeud;
+  while ((noeud = parcours.nextNode())) {
+    const n = noeud.nodeValue.length;
+    noeud.nodeValue = nouveauTexte.substr(position, n);
+    position += n;
+  }
+}
+
+function corrigerCasseTitres() {
+  if (modeApercu || modeCouverture) return;
+  flushSpread();
+
+  const conteneur = document.createElement("div");
+  conteneur.innerHTML = contenuCompletLivre();
+  const titres = [...conteneur.querySelectorAll("h2")]
+    .filter((h) => (h.textContent || "").trim());
+
+  if (!titres.length) {
+    alert("Aucun titre de chapitre à corriger.");
+    return;
+  }
+
+  const noms = nomsPropresDuLivre();
+  const propositions = titres.map((h) => {
+    const avant = h.textContent;
+    return { h2: h, avant, apres: titreEnCasseFrancaise(avant, noms) };
+  });
+
+  const changes = propositions.filter((p) => p.avant !== p.apres);
+  if (!changes.length) {
+    alert("Rien à corriger : aucun titre ne porte de majuscule superflue après le tiret.");
+    return;
+  }
+
+  ouvrirDialogueCasse(changes, conteneur);
+}
+
+function ouvrirDialogueCasse(changes, conteneur) {
+  const ancien = document.getElementById("dialogueCasse");
+  if (ancien) ancien.remove();
+
+  let html = '<div class="modal-impression-carte ci-carte" role="dialog" aria-modal="true">' +
+    '<button class="mi-fermer" aria-label="Fermer">&#10005;</button>' +
+    "<h3>Majuscules des titres</h3>" +
+    '<p class="mi-intro">Les majuscules superflues après le tiret sont retirées. ' +
+    "Les noms propres sont reconnus parce qu'ils apparaissent en majuscule au milieu " +
+    "d'une phrase du livre ; ceux qui n'y figurent nulle part passent en minuscule. " +
+    "Corrigez librement les propositions avant d'appliquer.</p>" +
+    '<div class="dcasse-liste">';
+
+  changes.forEach((c, i) => {
+    html += '<div class="dcasse-ligne">' +
+      '<label class="dcasse-case"><input type="checkbox" data-i="' + i + '" checked> Appliquer</label>' +
+      '<div class="dcasse-avant">' + echapperTitre(c.avant) + "</div>" +
+      '<input type="text" class="dcasse-apres" data-i="' + i + '" value="' + echapperTitre(c.apres) + '">' +
+    "</div>";
+  });
+
+  html += "</div>" +
+    '<div class="ci-actions">' +
+      '<button class="ci-annuler">Annuler</button>' +
+      '<button class="ci-generer">Appliquer aux ' + changes.length + " titres</button>" +
+    "</div></div>";
+
+  const fond = document.createElement("div");
+  fond.id = "dialogueCasse";
+  fond.className = "modal-impression";
+  fond.innerHTML = html;
+  fond.addEventListener("click", (e) => { if (e.target === fond) fond.remove(); });
+  document.body.appendChild(fond);
+
+  fond.querySelector(".mi-fermer").onclick = () => fond.remove();
+  fond.querySelector(".ci-annuler").onclick = () => fond.remove();
+  fond.querySelector(".ci-generer").onclick = () => {
+    let n = 0;
+    fond.querySelectorAll(".dcasse-apres").forEach((champ) => {
+      const i = +champ.dataset.i;
+      const case_ = fond.querySelector('.dcasse-case input[data-i="' + i + '"]');
+      if (!case_.checked) return;
+      const valeur = champ.value;
+      if (!valeur.trim() || valeur === changes[i].avant) return;
+      reecrireCasse(changes[i].h2, valeur);
+      n++;
+    });
+    fond.remove();
+    if (n) appliquerContenuComplet(conteneur.innerHTML, n);
+  };
+}
+
+// Repose le livre entier après une retouche globale, comme le fait la
+// suppression d'un chapitre : on réécrit le texte continu, puis on repagine.
+function appliquerContenuComplet(html, nbTitres) {
+  const livre = livreActuel();
+  livre.spreads = [html || ""];
+  indexSpread = 0;
+  repaginerTout();
+
+  const spreads = spreadsLivre();
+  if (numSpread() >= spreads.length) indexSpread = Math.max(0, (spreads.length - 1) * 2);
+
+  afficherSpread();
+  afficherSommaire();
+  majCompteurMots();
+  marquerModifie();
+  planifierBrouillon();
+
+  const message = document.getElementById("message");
+  if (message) {
+    message.textContent = nbTitres + " titre" + (nbTitres > 1 ? "s corrigés" : " corrigé") + ".";
+    setTimeout(() => {
+      if (message.textContent.indexOf("corrig") !== -1) message.textContent = "";
+    }, 3000);
+  }
+}
+
 // Ajoute un chapitre : un titre qui DÉMARRE SUR UNE NOUVELLE PAGE
 // (saut de colonne forcé — une colonne = une page dans cette mise en page).
 function ajouterChapitre() {
