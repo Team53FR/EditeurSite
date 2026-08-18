@@ -246,14 +246,31 @@ function papierParCle(cle) {
   return PAPIERS.find((p) => p.cle === cle) || null;
 }
 
-// Le plus petit papier de la liste où le travail entre sans être réduit.
+// Le plus petit papier où le travail entre sans être réduit — et, à taille de
+// feuille égale, celui qui laisse le plus de blanc sur son côté le plus juste.
 //
-// La tolérance sert au livret : deux pages de roman font 298 mm de large pour
-// une A4 paysage de 297. Refuser ce millimètre enverrait sur de l'A3 une
-// imposition qui tient sur une A4 depuis toujours.
+// L'orientation compte : une imposition de poche (210 × 148 mm) entre dans une
+// A4 portrait, mais bord à bord en largeur — impossible d'y poser un repère de
+// coupe. La même A4 en paysage lui laisse 43 mm de chaque côté et 31 en haut
+// et en bas, donc de vrais traits aux quatre angles. Même feuille, même
+// imprimante, juste tournée.
+//
+// La tolérance sert au livret de roman : deux pages font 298 mm pour une A4
+// paysage de 297. Refuser ce millimètre l'enverrait sur de l'A3 alors qu'il
+// tient sur une A4 depuis toujours.
 function papierMinimal(largMm, hautMm, toleranceMm) {
   const t = toleranceMm || 0;
-  return PAPIERS.find((p) => p.larg + t >= largMm && p.haut + t >= hautMm) || null;
+  const possibles = PAPIERS.filter((p) => p.larg + t >= largMm && p.haut + t >= hautMm);
+  if (!possibles.length) return null;
+
+  const aire = (p) => p.larg * p.haut;
+  const pluspetite = Math.min(...possibles.map(aire));
+  // La plus petite marge décide : c'est elle qui manque quand il n'y a pas la
+  // place d'imprimer un trait.
+  const margeMini = (p) => Math.min(p.larg - largMm, p.haut - hautMm);
+  return possibles
+    .filter((p) => aire(p) === pluspetite)
+    .sort((a, b) => margeMini(b) - margeMini(a))[0];
 }
 
 // Enveloppe un élément dans une feuille de papier, où il est centré.
