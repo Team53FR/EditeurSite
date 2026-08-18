@@ -59,6 +59,13 @@
     break-after: auto;
   }
 
+  /* Traits de coupe posés dans la marge de la feuille. Filet fin et noir pur :
+     ils doivent se voir pour couper droit, sans épaissir le trait de lame. */
+  .feuille-papier { position: relative; }
+  .trait-coupe { position: absolute; box-sizing: content-box; }
+  .trait-coupe.trait-h { border-top: 0.25pt solid #000; }
+  .trait-coupe.trait-v { border-left: 0.25pt solid #000; }
+
   /* Le saut de page appartient à la feuille, pas à ce qu'elle porte. */
   .feuille-papier > .page-impression,
   .feuille-papier > .feuille-pro {

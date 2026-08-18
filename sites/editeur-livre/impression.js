@@ -31,6 +31,7 @@ const AIDE_IMPRESSION = {
               "Les feuilles sont ensuite encollées sur la tranche, comme un vrai roman de poche.",
     etapes: [
       "Imprimez en recto-verso, dans l'ordre. Si votre imprimante ne le fait pas seule, choisissez « En deux fois ».",
+      "Massicotez les feuilles sur les traits de coupe imprimés dans la marge : la page retrouve alors son format exact.",
       "Empilez les feuilles dans l'ordre, puis tapotez la pile sur une table pour aligner parfaitement le bord de reliure.",
       "Serrez la pile entre deux planchettes, en laissant dépasser 2 à 3 mm du bord à encoller.",
       "Encollez la tranche (colle vinylique blanche, ou colle thermofusible), en croisant les passages. Laissez sécher sous presse au moins une heure.",
@@ -42,7 +43,8 @@ const AIDE_IMPRESSION = {
               "Demande de la colle, une presse improvisée et du temps de séchage.",
               "Le collage doit être régulier, sous peine de pages qui se détachent.",
               "Une marge intérieure est réservée à la reliure : ne réduisez pas les marges."],
-    reglages: "Les pages et la couverture sont posées sur un format de papier réel, à leur taille exacte : " +
+    reglages: "Les pages et la couverture sont posées sur un format de papier réel, à leur taille exacte, " +
+              "avec des traits de coupe dans la marge pour savoir où massicoter : " +
               "choisissez la même feuille dans la fenêtre d'impression, marges « aucune », échelle 100 % " +
               "(surtout pas « ajuster à la page »), et recto-verso « retourner sur les bords longs »."
   },
@@ -251,13 +253,63 @@ function papierMinimal(largMm, hautMm) {
 
 // Enveloppe un élément dans une feuille de papier, où il est centré.
 // L'enveloppe porte le saut de page ; l'élément garde sa taille exacte.
-function poserSurPapier(element, papier) {
+//
+// Le blanc autour n'est pas perdu : il reçoit les traits de coupe, sans quoi
+// il faut deviner au réglet où s'arrête la page une fois imprimée.
+function poserSurPapier(element, papier, largMm, hautMm) {
   const feuille = document.createElement("div");
   feuille.className = "feuille-papier";
   feuille.style.width  = papier.larg + "mm";
   feuille.style.height = papier.haut + "mm";
   feuille.appendChild(element);
+  if (largMm && hautMm) ajouterTraitsDecoupe(feuille, largMm, hautMm, papier);
   return feuille;
+}
+
+// Traits de coupe aux quatre angles de la zone imprimée. Ils se posent dans
+// la marge, jamais sur la page — un trait qui la traverse se retrouverait sur
+// le livre fini. Chaque côté n'est tracé que si sa marge en laisse la place ;
+// une marge étroite raccourcit le trait plutôt que de le supprimer.
+const ECART_TRAIT_MM = 2;      // blanc laissé entre la page et le trait
+const LONGUEUR_TRAIT_MM = 5;   // longueur visée
+
+function ajouterTraitsDecoupe(feuille, largMm, hautMm, papier) {
+  const margeX = (papier.larg - largMm) / 2;
+  const margeY = (papier.haut - hautMm) / 2;
+
+  // Longueur réellement traçable de chaque côté, écart compris.
+  const longX = Math.min(LONGUEUR_TRAIT_MM, margeX - ECART_TRAIT_MM);
+  const longY = Math.min(LONGUEUR_TRAIT_MM, margeY - ECART_TRAIT_MM);
+  if (longX < 1 && longY < 1) return;   // la page occupe toute la feuille
+
+  const trait = (classe, gauche, haut, largeur, hauteur) => {
+    const t = document.createElement("div");
+    t.className = "trait-coupe " + classe;
+    t.style.left = gauche + "mm";
+    t.style.top = haut + "mm";
+    if (largeur) t.style.width = largeur + "mm";
+    if (hauteur) t.style.height = hauteur + "mm";
+    feuille.appendChild(t);
+  };
+
+  const x0 = margeX, x1 = margeX + largMm;
+  const y0 = margeY, y1 = margeY + hautMm;
+
+  // Traits horizontaux : ils prolongent les bords haut et bas, à gauche et à
+  // droite de la page.
+  if (longX >= 1) {
+    [y0, y1].forEach((y) => {
+      trait("trait-h", x0 - ECART_TRAIT_MM - longX, y, longX, 0);
+      trait("trait-h", x1 + ECART_TRAIT_MM, y, longX, 0);
+    });
+  }
+  // Traits verticaux : idem pour les bords gauche et droit.
+  if (longY >= 1) {
+    [x0, x1].forEach((x) => {
+      trait("trait-v", x, y0 - ECART_TRAIT_MM - longY, 0, longY);
+      trait("trait-v", x, y1 + ECART_TRAIT_MM, 0, longY);
+    });
+  }
 }
 
 function reglerPagePapier(stylePage, papier) {
@@ -292,7 +344,8 @@ function exporterImpression(modeRectoVerso) {
 
   // Chaque page part sur sa feuille : le recto-verso en deux passes compte
   // les enfants directs de la zone, il faut donc un enfant par page.
-  const ajouterPage = (el) => zone.appendChild(papier ? poserSurPapier(el, papier) : el);
+  const ajouterPage = (el) =>
+    zone.appendChild(papier ? poserSurPapier(el, papier, f.larg, f.haut) : el);
 
   // La somme des deux marges reste identique à l'éditeur pour que le bloc
   // de texte garde exactement la même largeur (pas de re-débordement).
@@ -983,7 +1036,9 @@ function genererFichierImprimeur(cible, dosMm, livre, f, pagesPro, papier) {
       // qui doit faire cette taille : pas d'enveloppe.
       if (papier) {
         reglerPagePapier(stylePage, papier);
-        zone.appendChild(poserSurPapier(planche, papier));
+        // La planche porte déjà ses propres repères de coupe et de pli : ce
+        // sont ses bords rognés qui comptent, pas ceux du support.
+        zone.appendChild(poserSurPapier(planche, papier, largSupport, hautSupport));
       } else {
         stylePage.textContent = "@page { size: " + largSupport + "mm " + hautSupport + "mm; margin: 0; }";
         zone.appendChild(planche);
