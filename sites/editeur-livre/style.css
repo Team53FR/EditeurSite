@@ -1816,3 +1816,6 @@ button.danger {
   .dcasse-ligne { grid-template-columns: minmax(0, 1fr); }
   .dcasse-case { grid-row: auto; }
 }
+
+/* Avertissement du dialogue « Imprimer la couverture » */
+.dc-alerte { color: #b45309; font-weight: 600; }

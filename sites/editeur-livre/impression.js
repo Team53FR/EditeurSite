@@ -42,7 +42,9 @@ const AIDE_IMPRESSION = {
               "Demande de la colle, une presse improvisée et du temps de séchage.",
               "Le collage doit être régulier, sous peine de pages qui se détachent.",
               "Une marge intérieure est réservée à la reliure : ne réduisez pas les marges."],
-    reglages: "Dans la fenêtre d'impression : échelle 100 % (surtout pas « ajuster à la page »), et recto-verso « retourner sur les bords longs »."
+    reglages: "Les pages et la couverture sont posées sur un format de papier réel, à leur taille exacte : " +
+              "choisissez la même feuille dans la fenêtre d'impression, marges « aucune », échelle 100 % " +
+              "(surtout pas « ajuster à la page »), et recto-verso « retourner sur les bords longs »."
   },
   imprimeur: {
     titre: "Le fichier pour un imprimeur professionnel",
@@ -219,6 +221,49 @@ const DELTA_RELIURE_MM = 4; // ajouté côté reliure, retiré côté extérieur
 const TOLERANCE_MM = 2;
 const PIED_PAGE_MM = 32 * 25.4 / 96 - TOLERANCE_MM; // ≈ 6,47 mm
 
+// ----- Poser le travail sur une VRAIE feuille -----
+//
+// Un navigateur ne demande pas au pilote d'imprimante de respecter la taille
+// déclarée par @page : si elle ne correspond pas au papier chargé, il met le
+// tout à l'échelle du papier. Deux exports de tailles différentes — les pages
+// (173 × 234 mm) et la couverture à plat (322 × 234 mm) — ressortent alors à
+// deux échelles différentes sur la même A4, et la couverture ne tombe plus
+// autour des pages.
+//
+// La parade est de ne plus jamais déclarer autre chose qu'un format de papier
+// réel : le travail est CENTRÉ dessus, à sa taille exacte, et la mise à
+// l'échelle du navigateur n'a plus rien à faire.
+const PAPIERS = [
+  { cle: "a4p", nom: "A4 portrait",  larg: 210, haut: 297 },
+  { cle: "a4l", nom: "A4 paysage",   larg: 297, haut: 210 },
+  { cle: "a3p", nom: "A3 portrait",  larg: 297, haut: 420 },
+  { cle: "a3l", nom: "A3 paysage",   larg: 420, haut: 297 }
+];
+
+function papierParCle(cle) {
+  return PAPIERS.find((p) => p.cle === cle) || null;
+}
+
+// Le plus petit papier de la liste où le travail entre sans être réduit.
+function papierMinimal(largMm, hautMm) {
+  return PAPIERS.find((p) => p.larg >= largMm && p.haut >= hautMm) || null;
+}
+
+// Enveloppe un élément dans une feuille de papier, où il est centré.
+// L'enveloppe porte le saut de page ; l'élément garde sa taille exacte.
+function poserSurPapier(element, papier) {
+  const feuille = document.createElement("div");
+  feuille.className = "feuille-papier";
+  feuille.style.width  = papier.larg + "mm";
+  feuille.style.height = papier.haut + "mm";
+  feuille.appendChild(element);
+  return feuille;
+}
+
+function reglerPagePapier(stylePage, papier) {
+  stylePage.textContent = "@page { size: " + papier.larg + "mm " + papier.haut + "mm; margin: 0; }";
+}
+
 function exporterImpression(modeRectoVerso) {
   flushSpread();
   repaginerTout(); // découpage exact avant impression (flushSpread ne découpe pas)
@@ -232,13 +277,22 @@ function exporterImpression(modeRectoVerso) {
     stylePage.id = "stylePageImpression";
     document.head.appendChild(stylePage);
   }
-  stylePage.textContent = `@page { size: ${f.larg}mm ${f.haut}mm; margin: 0; }`;
+  // Le papier est choisi pour contenir le format du livre sans réduction ;
+  // à défaut (format plus grand qu'une A3), on garde la taille exacte et
+  // l'impression sera mise à l'échelle comme avant.
+  const papier = papierMinimal(f.larg, f.haut);
+  if (papier) reglerPagePapier(stylePage, papier);
+  else stylePage.textContent = `@page { size: ${f.larg}mm ${f.haut}mm; margin: 0; }`;
 
   let zone = document.getElementById("zoneImpression");
   if (zone) zone.remove();
   zone = document.createElement("div");
   zone.id = "zoneImpression";
   document.body.appendChild(zone);
+
+  // Chaque page part sur sa feuille : le recto-verso en deux passes compte
+  // les enfants directs de la zone, il faut donc un enfant par page.
+  const ajouterPage = (el) => zone.appendChild(papier ? poserSurPapier(el, papier) : el);
 
   // La somme des deux marges reste identique à l'éditeur pour que le bloc
   // de texte garde exactement la même largeur (pas de re-débordement).
@@ -248,19 +302,19 @@ function exporterImpression(modeRectoVerso) {
   const promessesImages = [];
 
   // Feuille 1 : couverture (recto) + intérieur de couverture blanc (verso)
-  zone.appendChild(creerCouvertureImpression(livre, "couverture", f, promessesImages));
-  zone.appendChild(creerPageBlancheImpression(f));
+  ajouterPage(creerCouvertureImpression(livre, "couverture", f, promessesImages));
+  ajouterPage(creerPageBlancheImpression(f));
 
   // Corps du livre : page impaire = recto (droite), page paire = verso (gauche)
   const pages = livre.pages || [];
   pages.forEach((page, i) => {
-    zone.appendChild(creerPageTexteImpression(page, i + 1, f, margeInt, margeExt));
+    ajouterPage(creerPageTexteImpression(page, i + 1, f, margeInt, margeExt));
   });
 
   // Compléter pour que la 4e de couverture tombe au verso de la dernière feuille
-  if (pages.length % 2 === 1) zone.appendChild(creerPageBlancheImpression(f));
-  zone.appendChild(creerPageBlancheImpression(f));
-  zone.appendChild(creerCouvertureImpression(livre, "quatrieme", f, promessesImages));
+  if (pages.length % 2 === 1) ajouterPage(creerPageBlancheImpression(f));
+  ajouterPage(creerPageBlancheImpression(f));
+  ajouterPage(creerCouvertureImpression(livre, "quatrieme", f, promessesImages));
 
   const message = document.getElementById("message");
   if (message) message.textContent = "Préparation de l'impression...";
@@ -637,8 +691,23 @@ function ouvrirDialogueCouvertureSeule(livre, f, nbPages) {
 
   html += '<div class="ci-resume">' +
     "<div><span>Format du livre</span><strong>" + f.larg + " × " + f.haut + " mm</strong></div>" +
-    '<div><span>Feuille à prévoir</span><strong class="dc-support">' +
+    '<div><span>Planche à plat</span><strong class="dc-support">' +
       largSupport(dos).toFixed(0) + " × " + hautSupport + " mm</strong></div>" +
+  "</div>";
+
+  html += '<div class="ci-dos">' +
+    "<h4>Papier chargé dans l'imprimante</h4>" +
+    '<div class="ci-champs">' +
+      '<label>Feuille <select id="dcPapier">' +
+        PAPIERS.map((pa) => '<option value="' + pa.cle + '">' + pa.nom +
+          " (" + pa.larg + " × " + pa.haut + " mm)</option>").join("") +
+        '<option value="exact">Taille exacte de la planche (pour un PDF)</option>' +
+      "</select></label>" +
+    "</div>" +
+    '<p class="ci-note">La planche est centrée sur cette feuille, à sa taille réelle. ' +
+      "C'est ce qui garantit que la couverture tombe autour des pages : sans papier " +
+      "déclaré, le navigateur met le travail à l'échelle de la feuille et chaque " +
+      "export sort à une échelle différente.</p>" +
   "</div>";
 
   html += '<div class="ci-dos">' +
@@ -675,15 +744,32 @@ function ouvrirDialogueCouvertureSeule(livre, f, nbPages) {
 
   // La feuille à plat dépasse presque toujours l'A4 : mieux vaut le dire ici
   // que devant une couverture tronquée.
+  const selPapier = fond.querySelector("#dcPapier");
+
   const majSupport = () => {
     const d = parseFloat(champDos.value);
     const dosMm = (isFinite(d) && d >= 0) ? d : dos;
     const l = largSupport(dosMm);
     fond.querySelector(".dc-support").textContent = l.toFixed(0) + " × " + hautSupport + " mm";
-    fond.querySelector(".dc-papier").textContent = l > 297 || hautSupport > 210
-      ? "Cette feuille ne tient pas sur une A4 : imprimez sur A3, ou faites-la sortir chez un copiste."
-      : "Cette feuille tient sur une A4 en paysage.";
+
+    const papier = papierParCle(selPapier.value);
+    const note = fond.querySelector(".dc-papier");
+    if (!papier) {
+      note.textContent = "Taille exacte : à réserver au PDF. Sur une imprimante, le pilote " +
+        "ramènera la planche au format du papier chargé, et la couverture ne fera plus la " +
+        "bonne taille.";
+      note.classList.add("dc-alerte");
+    } else if (papier.larg < l || papier.haut < hautSupport) {
+      note.textContent = "La planche (" + l.toFixed(0) + " × " + hautSupport +
+        " mm) ne tient pas sur cette feuille : elle sera rognée. Prenez du " +
+        (papierMinimal(l, hautSupport) || { nom: "plus grand" }).nom + ".";
+      note.classList.add("dc-alerte");
+    } else {
+      note.textContent = "La planche tient sur cette feuille, à sa taille réelle.";
+      note.classList.remove("dc-alerte");
+    }
   };
+  selPapier.onchange = majSupport;
 
   const recalculer = () => {
     const g = parseFloat(fond.querySelector("#dcGrammage").value) || GRAMMAGE_DEFAUT;
@@ -694,6 +780,8 @@ function ouvrirDialogueCouvertureSeule(livre, f, nbPages) {
   fond.querySelector("#dcGrammage").oninput = recalculer;
   fond.querySelector("#dcMain").oninput = recalculer;
   champDos.oninput = majSupport;
+  const parDefaut = papierMinimal(largSupport(dos), hautSupport);
+  if (parDefaut) selPapier.value = parDefaut.cle;
   majSupport();
 
   fond.querySelector(".mi-fermer").onclick = () => fond.remove();
@@ -703,7 +791,8 @@ function ouvrirDialogueCouvertureSeule(livre, f, nbPages) {
     const dosMm = (isFinite(saisi) && saisi >= 0) ? saisi : dos;
     fond.remove();
     // Aucune page intérieure à fournir : la planche de couverture n'en utilise pas.
-    setTimeout(() => genererFichierImprimeur("couverture", dosMm, livre, f, []), 50);
+    const papier = papierParCle(selPapier.value);
+    setTimeout(() => genererFichierImprimeur("couverture", dosMm, livre, f, [], papier), 50);
   };
 }
 
@@ -861,7 +950,7 @@ function ouvrirControleImprimeur(cible, livre, f, pagesEcran, pagesPro) {
 
 // ----- Génération du fichier -----
 
-function genererFichierImprimeur(cible, dosMm, livre, f, pagesPro) {
+function genererFichierImprimeur(cible, dosMm, livre, f, pagesPro, papier) {
   const message = document.getElementById("message");
   if (message) message.textContent = "Préparation du fichier imprimeur...";
 
@@ -885,8 +974,17 @@ function genererFichierImprimeur(cible, dosMm, livre, f, pagesPro) {
     if (cible === "couverture") {
       const largSupport = 2 * f.larg + dosMm + 2 * MARGE_TECHNIQUE_MM;
       const hautSupport = f.haut + 2 * MARGE_TECHNIQUE_MM;
-      stylePage.textContent = "@page { size: " + largSupport + "mm " + hautSupport + "mm; margin: 0; }";
-      zone.appendChild(creerCouverturePlat(livre, f, dosMm, promessesImages));
+      const planche = creerCouverturePlat(livre, f, dosMm, promessesImages);
+      // Sur une imprimante, la planche est centrée sur une feuille réelle pour
+      // sortir à sa taille exacte. Pour l'imprimeur, c'est le support lui-même
+      // qui doit faire cette taille : pas d'enveloppe.
+      if (papier) {
+        reglerPagePapier(stylePage, papier);
+        zone.appendChild(poserSurPapier(planche, papier));
+      } else {
+        stylePage.textContent = "@page { size: " + largSupport + "mm " + hautSupport + "mm; margin: 0; }";
+        zone.appendChild(planche);
+      }
       return;
     }
 

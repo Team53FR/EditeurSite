@@ -39,6 +39,34 @@
     break-after: auto;
   }
 
+  /* Feuille de papier réelle : le travail y est centré à sa taille exacte.
+     Sans cela, le navigateur met le format déclaré à l'échelle du papier
+     chargé — et deux exports de tailles différentes ressortent à deux
+     échelles différentes, la couverture ne tombant plus autour des pages. */
+  .feuille-papier {
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    background: white;
+    page-break-after: always;
+    break-after: page;
+  }
+
+  .feuille-papier:last-child {
+    page-break-after: auto;
+    break-after: auto;
+  }
+
+  /* Le saut de page appartient à la feuille, pas à ce qu'elle porte. */
+  .feuille-papier > .page-impression,
+  .feuille-papier > .feuille-pro {
+    page-break-after: auto;
+    break-after: auto;
+    flex-shrink: 0;
+  }
+
   /* Mode livret : deux demi-pages côte à côte sur une même feuille */
   .feuille-impression {
     display: flex;
