@@ -68,6 +68,7 @@
 
   /* Le saut de page appartient à la feuille, pas à ce qu'elle porte. */
   .feuille-papier > .page-impression,
+  .feuille-papier > .feuille-impression,
   .feuille-papier > .feuille-pro {
     page-break-after: auto;
     break-after: auto;

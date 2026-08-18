@@ -247,8 +247,13 @@ function papierParCle(cle) {
 }
 
 // Le plus petit papier de la liste où le travail entre sans être réduit.
-function papierMinimal(largMm, hautMm) {
-  return PAPIERS.find((p) => p.larg >= largMm && p.haut >= hautMm) || null;
+//
+// La tolérance sert au livret : deux pages de roman font 298 mm de large pour
+// une A4 paysage de 297. Refuser ce millimètre enverrait sur de l'A3 une
+// imposition qui tient sur une A4 depuis toujours.
+function papierMinimal(largMm, hautMm, toleranceMm) {
+  const t = toleranceMm || 0;
+  return PAPIERS.find((p) => p.larg + t >= largMm && p.haut + t >= hautMm) || null;
 }
 
 // Enveloppe un élément dans une feuille de papier, où il est centré.
@@ -282,6 +287,14 @@ function ajouterTraitsDecoupe(feuille, largMm, hautMm, papier) {
   const longY = Math.min(LONGUEUR_TRAIT_MM, margeY - ECART_TRAIT_MM);
   if (longX < 1 && longY < 1) return;   // la page occupe toute la feuille
 
+  // Un bord sans marge — le livret de poche est aussi large que sa feuille —
+  // placerait le repère à l'extrême bord, là où aucune imprimante ne dépose
+  // d'encre. On le rentre alors de quelques millimètres : il ne désigne plus
+  // le bord de la page, seulement la hauteur (ou la largeur) où couper.
+  const RENTRE_MM = 4;
+  const cadrerX = (x) => Math.min(Math.max(x, RENTRE_MM), papier.larg - RENTRE_MM);
+  const cadrerY = (y) => Math.min(Math.max(y, RENTRE_MM), papier.haut - RENTRE_MM);
+
   const trait = (classe, gauche, haut, largeur, hauteur) => {
     const t = document.createElement("div");
     t.className = "trait-coupe " + classe;
@@ -298,14 +311,14 @@ function ajouterTraitsDecoupe(feuille, largMm, hautMm, papier) {
   // Traits horizontaux : ils prolongent les bords haut et bas, à gauche et à
   // droite de la page.
   if (longX >= 1) {
-    [y0, y1].forEach((y) => {
+    [cadrerY(y0), cadrerY(y1)].forEach((y) => {
       trait("trait-h", x0 - ECART_TRAIT_MM - longX, y, longX, 0);
       trait("trait-h", x1 + ECART_TRAIT_MM, y, longX, 0);
     });
   }
   // Traits verticaux : idem pour les bords gauche et droit.
   if (longY >= 1) {
-    [x0, x1].forEach((x) => {
+    [cadrerX(x0), cadrerX(x1)].forEach((x) => {
       trait("trait-v", x, y0 - ECART_TRAIT_MM - longY, 0, longY);
       trait("trait-v", x, y1 + ECART_TRAIT_MM, 0, longY);
     });
@@ -396,13 +409,25 @@ function exporterLivret(modeRectoVerso) {
     stylePage.id = "stylePageImpression";
     document.head.appendChild(stylePage);
   }
-  stylePage.textContent = `@page { size: ${f.larg * 2}mm ${f.haut}mm; margin: 0; }`;
+  // Une imposition de poche fait 210 × 148 mm : posée sur une A4, elle laisse
+  // 74 mm de blanc en haut et en bas, qu'il faudra massicoter. Comme les
+  // autres exports, elle se pose donc sur un papier réel, à sa taille exacte,
+  // avec ses traits de coupe dans la marge.
+  const largFeuille = f.larg * 2;
+  const papier = papierMinimal(largFeuille, f.haut, 2);
+  if (papier) reglerPagePapier(stylePage, papier);
+  else stylePage.textContent = `@page { size: ${largFeuille}mm ${f.haut}mm; margin: 0; }`;
 
   let zone = document.getElementById("zoneImpression");
   if (zone) zone.remove();
   zone = document.createElement("div");
   zone.id = "zoneImpression";
   document.body.appendChild(zone);
+
+  // Une face de feuille par enfant direct : l'impression en deux passes
+  // compte les enfants de la zone pour séparer rectos et versos.
+  const ajouterFace = (el) =>
+    zone.appendChild(papier ? poserSurPapier(el, papier, largFeuille, f.haut) : el);
 
   const margeInt = f.margeH + DELTA_RELIURE_MM;
   const margeExt = Math.max(6, f.margeH - DELTA_RELIURE_MM);
@@ -423,8 +448,8 @@ function exporterLivret(modeRectoVerso) {
 
   // Imposition : feuille k, recto = [dernière-2k | 2k+1], verso = [2k+2 | dernière-2k-1]
   for (let k = 0; k < total / 4; k++) {
-    zone.appendChild(creerFaceLivret(suite[total - 2 * k - 1], suite[2 * k], livre, f, margeInt, margeExt, promessesImages));
-    zone.appendChild(creerFaceLivret(suite[2 * k + 1], suite[total - 2 * k - 2], livre, f, margeInt, margeExt, promessesImages));
+    ajouterFace(creerFaceLivret(suite[total - 2 * k - 1], suite[2 * k], livre, f, margeInt, margeExt, promessesImages));
+    ajouterFace(creerFaceLivret(suite[2 * k + 1], suite[total - 2 * k - 2], livre, f, margeInt, margeExt, promessesImages));
   }
 
   const message = document.getElementById("message");
