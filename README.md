@@ -563,6 +563,14 @@ c'est ainsi qu'« Arc-en-ciel » en est un vrai. Une bordure CSS ne pouvant pas
 la boîte de padding, le dégradé rogné sur la boîte de bordure. Les coins
 restent ronds.
 
+**Le gestionnaire sur mobile.** Ses grilles à colonnes (prix/rendement par
+palier, paliers de renaissance) sont pensées pour un écran large : en dessous
+de 620 px, la colonne de saisie tombait à une vingtaine de pixels — un champ
+où l'on ne voyait pas ce qu'on tapait. Elles s'empilent donc, chaque valeur
+précédée de son intitulé puisque les en-têtes de colonnes sont masqués. Et la
+barre d'onglets défile horizontalement au lieu de s'étirer : à six onglets,
+`flex: 1` les comprimait jusqu'à pousser toute la page hors de l'écran.
+
 **Panneau admin (`admin.html`)**, réservé aux admins du portail central : pas
 de rôle propre à Droid Fortnite, `estAdminCentral()`/`exigerAdminDroidFortnite()`
 dans `script.js` lisent directement `team53_role` en `localStorage` (même

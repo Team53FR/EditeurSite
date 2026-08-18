@@ -194,9 +194,20 @@ a { color: var(--primaire); }
 .app-header .icone-bouton:hover { background: var(--fond); color: var(--primaire); }
 .app-header .icone-deconnexion:hover { background: var(--fond); color: var(--danger); }
 
-.onglets-type { display: flex; gap: 0.4rem; margin-bottom: 0.75rem; }
+/* Les onglets défilent horizontalement plutôt que d'élargir la page : à six
+   onglets (le gestionnaire), « flex: 1 » les comprimait jusqu'au débordement,
+   et c'est toute la page qui se décalait. */
+.onglets-type {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 0.75rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.onglets-type::-webkit-scrollbar { display: none; }
 .onglet-type {
-  flex: 1;
+  flex: 1 0 auto;
+  white-space: nowrap;
   padding: 0.55rem 0.6rem;
   border-radius: 10px;
   border: 1px solid var(--bordure);
@@ -964,3 +975,46 @@ a { color: var(--primaire); }
 
 /* Rendement par seconde, à côté du total horaire */
 .total-seconde { color: var(--texte-att); font-size: 0.85em; }
+
+/* ===== Panneau admin sur mobile =====
+   Les grilles à colonnes sont pensées pour un écran large. En dessous de
+   620 px, la colonne de saisie tombait à une vingtaine de pixels — un champ
+   où l'on ne voyait pas ce qu'on tapait. On empile donc. */
+@media (max-width: 620px) {
+  .entete-paliers { display: none; }
+
+  .ligne-palier {
+    grid-template-columns: 1fr;
+    gap: 0.35rem;
+    border: 1px solid var(--bordure);
+    border-radius: 10px;
+    padding: 0.6rem;
+    margin-bottom: 0.6rem;
+  }
+  .ligne-palier .nom-palier { font-size: 0.9rem; color: var(--texte); }
+
+  /* Chaque montant sur sa ligne, précédé de son intitulé — les en-têtes de
+     colonnes étant masqués, sans eux on ne saurait plus ce qu'on saisit.
+     La valeur garde la part variable : c'est elle qu'on doit pouvoir lire. */
+  .duo-valeur {
+    display: grid;
+    grid-template-columns: 5rem minmax(0, 1fr) 4.5rem;
+    align-items: center;
+  }
+  .duo-valeur::before { font-size: 0.75rem; color: var(--texte-att); }
+  .duo-valeur select { width: 100%; }
+  .ligne-palier .duo-valeur::before { content: "Prix"; }
+  .ligne-palier .duo-valeur + .duo-valeur::before { content: "Rendement"; }
+
+  /* Renaissance : niveau et suppression sur une ligne, crédits puis droïdes
+     en dessous — chacun sur toute la largeur. */
+  .ligne-renaissance { grid-template-columns: minmax(0, 1fr) 2rem; row-gap: 0.45rem; }
+  .ligne-renaissance .r-niveau { grid-column: 1; grid-row: 1; }
+  .ligne-renaissance .btn-mini.danger { grid-column: 2; grid-row: 1; }
+  .ligne-renaissance .duo-valeur { grid-column: 1 / -1; }
+  .ligne-renaissance .duo-valeur::before { content: "Crédits"; }
+  .ligne-renaissance .cellule-droides { grid-column: 1 / -1; }
+
+  .ajout-droide { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; }
+  .ajout-droide .sel-palier { flex: initial; }
+}
