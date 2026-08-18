@@ -801,7 +801,7 @@ a { color: var(--primaire); }
 /* Palier à plusieurs couleurs (« Arc-en-ciel ») : le contour devient un
    dégradé. border-image en ferait autant mais ignore border-radius, ce qui
    redonnerait des coins carrés ; on superpose donc deux fonds. */
-.carte-droide.contour-degrade {
+.contour-degrade {
   background-origin: border-box;
   background-clip: padding-box, border-box;
 }
@@ -945,7 +945,15 @@ a { color: var(--primaire); }
   border: 2px solid var(--bordure); border-radius: 12px;
   background: var(--carte); color: var(--texte);
   font: inherit; text-align: center; cursor: pointer;
-  background-size: cover;
+  /* Le contour dégradé des paliers multicolores réutilise la mécanique des
+     cartes du Droidex : l'intérieur reste plein, seul le bord est peint. */
+  --fond-carte-droide: var(--carte);
+}
+/* La règle .contour-degrade est déclarée plus haut, mais le raccourci
+   « background » ci-dessus la remet à zéro : on la repose ici. */
+.case-droide.contour-degrade {
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
 }
 .case-droide.vide { border-style: dashed; color: var(--texte-att); }
 .case-droide.vide:hover { border-color: var(--primaire); color: var(--primaire); }

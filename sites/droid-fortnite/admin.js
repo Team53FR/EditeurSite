@@ -794,9 +794,9 @@ function construireEmplacementsDroides(texteElements, surChangement) {
         case_.innerHTML = '<span class="case-plus">+</span>';
         case_.title = "Choisir un droïde";
       } else {
-        const couleur = (paliers.find((p) => p.nom === e.palier) || {}).couleur;
-        if (couleur) case_.style.borderColor = Array.isArray(couleur) ? "transparent" : couleur;
-        if (Array.isArray(couleur)) case_.style.background = fondPalier(couleur);
+        // Le palier se lit au CONTOUR : un « Arc-en-ciel » en aplat de fond
+        // rendait le nom du droïde illisible.
+        appliquerContourPalier(case_, (paliers.find((p) => p.nom === e.palier) || {}).couleur);
         case_.innerHTML =
           '<span class="case-nom">' + echapper(e.droide ? e.droide.nom : e.texte) + "</span>" +
           '<span class="case-palier">' + echapper(e.droide ? e.palier : "à corriger") + "</span>";
