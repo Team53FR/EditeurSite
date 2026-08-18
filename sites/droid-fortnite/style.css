@@ -289,6 +289,15 @@ a { color: var(--primaire); }
 }
 .compteur-global b { font-size: 1.1rem; font-family: var(--police-titre); color: var(--primaire); }
 .compteur-global .barre-progression { flex: 1; }
+.btn-decocher {
+  flex-shrink: 0;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--bordure); border-radius: 999px;
+  background: var(--fond); color: var(--texte-att);
+  font-size: 0.76rem; cursor: pointer;
+}
+.btn-decocher:hover:not(:disabled) { border-color: var(--danger); color: var(--danger); }
+.btn-decocher:disabled { opacity: 0.4; cursor: default; }
 
 /* ===== Grille de droïdes ===== */
 /* Beaucoup de petites vignettes portrait, comme sur le tracker Droidex :

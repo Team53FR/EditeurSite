@@ -815,7 +815,11 @@ function afficherRenaissance(options) {
   const pct = total ? Math.round((atteints / total) * 100) : 0;
   document.getElementById("compteurRenaissance").innerHTML =
     `<b>${atteints} / ${total}</b>` +
-    `<div class="barre-progression"><span style="width:${pct}%"></span></div>`;
+    `<div class="barre-progression"><span style="width:${pct}%"></span></div>` +
+    `<button type="button" class="btn-decocher" ${atteints ? "" : "disabled"}` +
+    ` title="Décocher tous les paliers de cette super renaissance">Tout décocher</button>`;
+  const decocher = document.querySelector("#compteurRenaissance .btn-decocher");
+  if (decocher) decocher.addEventListener("click", toutDecocherRenaissance);
 }
 
 // Amène le premier palier non validé sous les yeux. Replier ceux du dessus
@@ -825,6 +829,22 @@ function recadrerSurPalierCourant() {
   const courant = document.querySelector(".item-renaissance:not(.atteint)");
   if (!courant) return;
   courant.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+// Une super renaissance remet la progression à zéro : décocher trente-cinq
+// paliers un par un serait absurde. Le bouton ne touche QUE la super
+// renaissance affichée — les autres gardent la leur.
+function toutDecocherRenaissance() {
+  const liste = atteintsSuper();
+  if (!liste.length) return;
+  const message = liste.length === 1
+    ? "Décocher le palier validé de cette super renaissance ?"
+    : "Décocher les " + liste.length + " paliers validés de cette super renaissance ?";
+  if (!window.confirm(message)) return;
+  liste.length = 0;
+  paliersDeplies = new Set();
+  afficherRenaissance({ recadrer: true });
+  marquerProgressionModifiee();
 }
 
 function basculerAtteint(idRenaissance) {
