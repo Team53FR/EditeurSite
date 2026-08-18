@@ -31,6 +31,9 @@ function changerOnglet(type) {
   document.getElementById("zoneRendement").style.display = type === "rendement" ? "" : "none";
   document.getElementById("zoneRenaissance").style.display = type === "renaissance" ? "" : "none";
   if (type === "rendement") afficherRendement();
+  // Le recadrage attend l'ouverture de l'onglet : tant qu'il est masqué, ses
+  // paliers n'ont pas de position à l'écran.
+  if (type === "renaissance") recadrerSurPalierCourant();
 }
 
 if (token) {
@@ -697,20 +700,33 @@ function construireOngletsSuper() {
 
 function changerSuperActif(n) {
   superActif = n;
+  paliersDeplies = new Set();
   document.querySelectorAll("#ongletsSuper .onglet-palier").forEach((b) =>
     b.classList.toggle("actif", Number(b.dataset.super) === n));
-  afficherRenaissance();
+  afficherRenaissance({ recadrer: true });
 }
 
-function afficherRenaissance() {
+// Paliers repliés à la main, en plus de ceux qui le sont d'office parce
+// qu'ils sont validés. Réinitialisé à chaque changement de super renaissance.
+let paliersDeplies = new Set();
+
+// Trente-cinq paliers déroulés en entier, c'est un écran de défilement rien
+// que pour retrouver où l'on en est. Un palier validé se replie donc sur son
+// en-tête ; on peut le rouvrir d'un clic pour revoir ce qu'il demandait.
+function estReplie(r, atteint) {
+  return atteint && !paliersDeplies.has(r.id);
+}
+
+function afficherRenaissance(options) {
   const tries = renaissance.slice().sort((a, b) => a.niveau - b.niveau);
   const liste = document.getElementById("listeRenaissance");
   liste.innerHTML = "";
 
   tries.forEach((r) => {
     const atteint = atteintsSuper().includes(r.id);
+    const replie = estReplie(r, atteint);
     const item = document.createElement("div");
-    item.className = "item-renaissance" + (atteint ? " atteint" : "");
+    item.className = "item-renaissance" + (atteint ? " atteint" : "") + (replie ? " replie" : "");
     item.innerHTML =
       `<div class="renaissance-entete">` +
         `<div class="renaissance-niveau">${r.niveau}</div>` +
@@ -718,13 +734,28 @@ function afficherRenaissance() {
           `<strong>Palier ${r.niveau}</strong>` +
           `<small>${formaterCredits(r.credits)} crédits</small>` +
         `</div>` +
+        (atteint
+          ? `<button type="button" class="renaissance-plier" aria-expanded="${replie ? "false" : "true"}" ` +
+            `title="${replie ? "Revoir les droïdes requis" : "Replier ce palier"}">▾</button>`
+          : "") +
         `<input type="checkbox" class="renaissance-case" ${atteint ? "checked" : ""}>` +
       `</div>`;
 
-    item.appendChild(construireElementsRenaissance(elementsPourSuper(r, superActif)));
+    if (!replie) item.appendChild(construireElementsRenaissance(elementsPourSuper(r, superActif)));
     item.querySelector(".renaissance-case").addEventListener("change", () => basculerAtteint(r.id));
+
+    const plier = item.querySelector(".renaissance-plier");
+    if (plier) {
+      plier.addEventListener("click", () => {
+        if (paliersDeplies.has(r.id)) paliersDeplies.delete(r.id);
+        else paliersDeplies.add(r.id);
+        afficherRenaissance();
+      });
+    }
     liste.appendChild(item);
   });
+
+  if (options && options.recadrer) recadrerSurPalierCourant();
 
   const total = renaissance.length;
   const atteints = atteintsSuper().length;
@@ -734,12 +765,27 @@ function afficherRenaissance() {
     `<div class="barre-progression"><span style="width:${pct}%"></span></div>`;
 }
 
+// Amène le premier palier non validé sous les yeux. Replier ceux du dessus
+// fait remonter tout ce qui suit : sans cela, on se retrouve à regarder un
+// palier au hasard, plus bas dans la liste.
+function recadrerSurPalierCourant() {
+  const courant = document.querySelector(".item-renaissance:not(.atteint)");
+  if (!courant) return;
+  courant.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
 function basculerAtteint(idRenaissance) {
   const liste = atteintsSuper();
   const index = liste.indexOf(idRenaissance);
-  if (index === -1) liste.push(idRenaissance);
-  else liste.splice(index, 1);
-  afficherRenaissance();
+  if (index === -1) {
+    liste.push(idRenaissance);
+    // Un palier qu'on rouvre puis qu'on valide n'a plus de raison de rester
+    // déplié : il se replie comme les autres.
+    paliersDeplies.delete(idRenaissance);
+  } else {
+    liste.splice(index, 1);
+  }
+  afficherRenaissance({ recadrer: true });
   marquerProgressionModifiee();
 }
 
