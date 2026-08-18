@@ -32,8 +32,15 @@ const PX_PAR_MM = 96 / 25.4;
 // tournant de 7 mm exigé par les imprimeurs (voir impression.js).
 let PIED_PAGE_PX = 32;
 
+// Le livre courant compose selon SON format.
+function typoDuLivre() {
+  const livre = (typeof indexLivre === "number" && indexLivre !== -1) ? livreActuel() : null;
+  return typoDuFormat(livre && livre.format);
+}
+
 function appliquerFormatPage(formatKey) {
   const f = FORMATS[formatKey] || FORMATS["149x210"];
+  appliquerTypoFormat(formatKey);
 
   // --- Dimensions LOGIQUES fixes (indépendantes de la fenêtre) ---
   const largPx   = Math.round(f.larg * PX_PAR_MM);
@@ -704,6 +711,9 @@ function changerFormat(nouveauFormat) {
 
   // Met à jour hauteurTextePx et les dimensions du mesureur de pagination.
   appliquerFormatPage(nouveauFormat);
+  // L'espace au-dessus des titres suit le format, tant que l'auteur n'a pas
+  // réglé le sien : un blanc de 65 px sur un poche mangerait la page.
+  initEspaceTitre();
 
   // Repagination complète depuis la première page selon la nouvelle hauteur.
   normaliserPagination(0);
@@ -3146,6 +3156,7 @@ function changerFormat(nouveauFormat) {
 
   livre.format = nouveauFormat;
   appliquerFormatPage(nouveauFormat); // met à jour la géométrie des colonnes
+  initEspaceTitre();
   repaginerTout();
 
   const spreads = spreadsLivre();
@@ -3333,7 +3344,6 @@ function ouvrirApercu() {
 //  pagination, aperçu et impression.
 // =====================================================================
 
-const ESPACE_TITRE_DEFAUT = 65;
 let timerEspaceTitre = null;
 
 function appliquerEspaceTitre(px) {
@@ -3342,7 +3352,9 @@ function appliquerEspaceTitre(px) {
 
 function initEspaceTitre() {
   const livre = livreActuel();
-  let px = livre && typeof livre.espaceTitre === "number" ? livre.espaceTitre : ESPACE_TITRE_DEFAUT;
+  let px = livre && typeof livre.espaceTitre === "number"
+    ? livre.espaceTitre
+    : typoDuFormat(livre && livre.format).espaceTitre;
   px = Math.max(0, Math.min(160, px));
   appliquerEspaceTitre(px);
   const slider = document.getElementById("sliderEspaceTitre");
@@ -3662,9 +3674,22 @@ function nettoyerTaillesHtml(html) {
 
 function reinitialiserTailles() {
   if (indexLivre === -1 || modeApercu || modeCouverture) return;
-  if (!confirm("Remettre tout le texte du livre aux tailles par défaut (titre, sous-titre, paragraphe) ?\n\nLes tailles de police que vous avez réglées à la main seront perdues.")) return;
+
+  // Les valeurs annoncées sont celles du FORMAT du livre : remettre un poche
+  // aux tailles d'un roman n'aurait aucun sens.
+  const t = typoDuLivre();
+  if (!confirm(
+      "Remettre tout le texte du livre aux tailles par défaut de ce format ?\n\n" +
+      "Titre " + t.titre + " · sous-titre " + t.sousTitre + " · paragraphe " + t.paragraphe +
+      ", et l'espace au-dessus des titres à " + t.espaceTitre + ".\n\n" +
+      "Les tailles de police que vous avez réglées à la main seront perdues.")) return;
 
   flushSpread();
+
+  // L'espace au-dessus des titres fait partie de la mise en page du format :
+  // il revient lui aussi à sa valeur.
+  livreActuel().espaceTitre = t.espaceTitre;
+  initEspaceTitre();
 
   const spreads = spreadsLivre();
   for (let i = 0; i < spreads.length; i++) spreads[i] = nettoyerTaillesHtml(spreads[i]);
@@ -3683,7 +3708,7 @@ function reinitialiserTailles() {
 
   const message = document.getElementById("message");
   if (message) {
-    message.textContent = "Tailles remises par défaut sur tout le livre.";
+    message.textContent = "Tailles remises aux valeurs du format sur tout le livre.";
     setTimeout(() => { if (message.textContent.startsWith("Tailles remises")) message.textContent = ""; }, 2500);
   }
 }

@@ -61,6 +61,9 @@ async function chargerLecture() {
 
 function appliquerFormatPage(formatKey) {
   const f = FORMATS[formatKey] || FORMATS["149x210"];
+  // La lecture compose comme l'éditeur : mêmes tailles, donc mêmes coupes
+  // de page que celles enregistrées avec le livre.
+  appliquerTypoFormat(formatKey);
   const largPx = Math.round(f.larg * PX_PAR_MM);
   const hautPx = Math.round(f.haut * PX_PAR_MM);
   const margeVPx = Math.round(f.margeV * PX_PAR_MM);

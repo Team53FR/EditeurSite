@@ -403,6 +403,47 @@ function echapperHtmlCouv(txt) {
   return d.innerHTML;
 }
 
+// =====================================================================
+//  Typographie par format
+//
+//  Un roman et un livre de poche ne se composent pas pareil : le poche est
+//  deux fois plus petit, ses titres et son texte doivent suivre, sinon un
+//  titre de 20 pt mange le tiers de la page.
+//
+//  Chaque format porte donc ses tailles. Elles pilotent des variables CSS
+//  utilisées à la fois par la zone d'édition, le mesureur de pagination,
+//  l'aperçu et l'impression — la moindre différence entre ces quatre-là
+//  ferait déborder le texte hors des pages découpées.
+//
+//  Les formats sans réglage propre gardent ceux du roman, seules valeurs de
+//  l'éditeur jusqu'ici : aucun livre existant ne bouge.
+const TYPO_ROMAN = { titre: 20, sousTitre: 13, paragraphe: 11, espaceTitre: 65 };
+
+const TYPO_PAR_FORMAT = {
+  "149x210": TYPO_ROMAN,
+  "105x148": { titre: 18, sousTitre: 10, paragraphe: 9, espaceTitre: 20 }
+};
+
+function typoDuFormat(formatKey) {
+  return TYPO_PAR_FORMAT[formatKey] || TYPO_ROMAN;
+}
+
+function appliquerTypoFormat(formatKey) {
+  const t = typoDuFormat(formatKey);
+  const racine = document.documentElement.style;
+  racine.setProperty("--taille-titre", t.titre + "pt");
+  racine.setProperty("--taille-sous-titre", t.sousTitre + "pt");
+  racine.setProperty("--taille-paragraphe", t.paragraphe + "pt");
+
+  // Le bouton de remise à zéro annonce les tailles du format en cours.
+  const bouton = document.querySelector('button[onclick*="reinitialiserTailles"]');
+  if (bouton) {
+    bouton.title = "Remettre tout le livre aux tailles par défaut de ce format " +
+      "(titre " + t.titre + ", sous-titre " + t.sousTitre +
+      ", paragraphe " + t.paragraphe + ")";
+  }
+}
+
 function styleTexteCouv(data, cle) {
   if (!data) return "";
   let css = "";

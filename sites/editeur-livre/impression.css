@@ -93,7 +93,7 @@
      La moindre différence de taille fait déborder le texte, qui est alors
      coupé par overflow:hidden. */
   .texte-impression {
-    font-size: 11pt;
+    font-size: var(--taille-paragraphe, 11pt);
     line-height: 1.45;
     color: #1a1a1a;
     overflow: hidden;
@@ -109,7 +109,7 @@
   }
 
   .texte-impression h2 {
-    font-size: 20pt;
+    font-size: var(--taille-titre, 20pt);
     font-weight: bold;
     text-align: center;
     margin: 0 0 8px 0;
@@ -118,7 +118,7 @@
   }
 
   .texte-impression h3 {
-    font-size: 13pt;
+    font-size: var(--taille-sous-titre, 13pt);
     font-weight: bold;
     font-style: italic;
     text-align: center;

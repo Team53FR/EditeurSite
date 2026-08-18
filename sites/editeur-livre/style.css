@@ -355,7 +355,9 @@ button.danger {
 
 .texte-livre {
   font-family: "EB Garamond", Georgia, serif;
-  font-size: 11pt;   /* taille par défaut du texte des paragraphes */
+  /* Taille du texte courant : posée par le format du livre (voir
+     appliquerTypoFormat), avec celle du roman en secours. */
+  font-size: var(--taille-paragraphe, 11pt);
   line-height: 1.45;
   color: #2a2a2a;
   overflow: hidden;
@@ -773,7 +775,7 @@ button.danger {
 /* Styles de paragraphe dans les pages (#7) */
 
 .texte-livre h2 {
-  font-size: 20pt;   /* taille par défaut d'un titre de chapitre */
+  font-size: var(--taille-titre, 20pt);   /* titre de chapitre, selon le format */
   font-weight: bold;
   text-align: center;
   margin: 0 0 8px 0;
@@ -781,7 +783,7 @@ button.danger {
 }
 
 .texte-livre h3 {
-  font-size: 13pt;   /* taille par défaut d'un sous-titre */
+  font-size: var(--taille-sous-titre, 13pt);   /* sous-titre, selon le format */
   font-weight: bold;
   font-style: italic;
   text-align: center;
