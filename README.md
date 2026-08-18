@@ -438,6 +438,13 @@ ligne, avec l'unité `%` sélectionnée d'office ; la valeur est alors stockée
 telle quelle (« 25% »). Le `%` n'est jamais proposé pour un prix, ni ajoutable
 dans `unites.json` : ce n'est pas un facteur, c'est une autre nature de valeur.
 
+Ce pourcentage est **appliqué** au rendement total de l'escouade :
+`effectif = crédits × (1 + %/100)`. Le détail du calcul reste affiché sous le
+résultat (« 185.6 K/s + 50 % ») — sans quoi on ne saurait pas d'où sort le
+chiffre. Il ne majore que le **total**, jamais le sous-total d'une classe :
+il porte sur le revenu global, pas sur celui d'une section, qui indique donc
+seulement ce qu'elle apporte et ce qu'elle contribue en pourcentage.
+
 > À noter : la rareté d'un droïde **ne change pas** d'un palier à l'autre
 > (vérifié sur les 379 entrées du tracker communautaire : Mouse reste Common
 > partout). Seul le rendement varie — d'où l'indexation par palier et non par
