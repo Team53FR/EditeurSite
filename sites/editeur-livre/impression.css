@@ -77,12 +77,24 @@
 
   /* Mode livret : deux demi-pages côte à côte sur une même feuille */
   .feuille-impression {
+    position: relative;
     display: flex;
     box-sizing: border-box;
     overflow: hidden;
     page-break-after: always;
     break-after: page;
     background: white;
+  }
+
+  /* Ligne de coupe entre les deux pages d'une feuille. Pointillé fin : il
+     tombe dans la marge intérieure des deux pages, jamais dans le texte, et
+     disparaît avec le coup de massicot. */
+  .trait-milieu {
+    position: absolute;
+    top: 0;
+    width: 0;
+    border-left: 0.25pt dotted #888;
+    z-index: 5;
   }
 
   .feuille-impression:last-child {

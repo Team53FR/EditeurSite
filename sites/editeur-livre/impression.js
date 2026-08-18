@@ -27,10 +27,15 @@ const AIDE_IMPRESSION = {
   },
   doscolle: {
     titre: "Le dos collé, comment ça marche",
-    principe: "Une seule page par feuille, imprimée recto-verso, dans l'ordre de lecture. " +
-              "Les feuilles sont ensuite encollées sur la tranche, comme un vrai roman de poche.",
+    principe: "Les feuilles sont encollées sur la tranche, comme un vrai roman de poche. Deux façons " +
+              "de les imprimer : UNE PAGE par feuille, dans l'ordre de lecture, rien à découper ; ou DEUX " +
+              "PAGES par feuille, à couper au milieu — moitié moins de papier. Dans ce second cas les " +
+              "pages ne sont pas côte à côte dans l'ordre : la colonne de gauche porte la première moitié " +
+              "du livre, celle de droite la seconde, pour qu'après la coupe chaque tas reste continu et " +
+              "que l'un se pose sous l'autre.",
     etapes: [
       "Imprimez en recto-verso, dans l'ordre. Si votre imprimante ne le fait pas seule, choisissez « En deux fois ».",
+      "Deux pages par feuille : coupez toute la pile sur le trait du milieu, puis posez le tas de DROITE sous celui de GAUCHE. Ne mélangez pas les deux moitiés.",
       "Massicotez les feuilles sur les traits de coupe imprimés dans la marge : la page retrouve alors son format exact.",
       "Empilez les feuilles dans l'ordre, puis tapotez la pile sur une table pour aligner parfaitement le bord de reliure.",
       "Serrez la pile entre deux planchettes, en laissant dépasser 2 à 3 mm du bord à encoller.",
@@ -38,7 +43,8 @@ const AIDE_IMPRESSION = {
       "Imprimez la couverture avec « Couverture seule » : 4e de couverture, dos et 1re viennent sur une seule feuille, les traits de pli marquant la tranche.",
       "Collez la couverture par-dessus, puis marquez les deux plis du dos avec un plioir."
     ],
-    bon: ["Aucune limite de pages : c'est le procédé des vrais livres.", "Dos plat, le livre tient debout sur une étagère.", "Rendu le plus proche d'un ouvrage édité."],
+    bon: ["Aucune limite de pages : c'est le procédé des vrais livres.", "Dos plat, le livre tient debout sur une étagère.",
+          "Rendu le plus proche d'un ouvrage édité.", "Deux pages par feuille : deux fois moins de papier et d'encre."],
     limites: ["La couverture à plat est plus large qu'une A4 : il faut du A3, ou une impression chez un copiste.",
               "Demande de la colle, une presse improvisée et du temps de séchage.",
               "Le collage doit être régulier, sous peine de pages qui se détachent.",
@@ -46,7 +52,8 @@ const AIDE_IMPRESSION = {
     reglages: "Les pages et la couverture sont posées sur un format de papier réel, à leur taille exacte, " +
               "avec des traits de coupe dans la marge pour savoir où massicoter : " +
               "choisissez la même feuille dans la fenêtre d'impression, marges « aucune », échelle 100 % " +
-              "(surtout pas « ajuster à la page »), et recto-verso « retourner sur les bords longs »."
+              "(surtout pas « ajuster à la page »), et recto-verso « retourner sur les bords longs » — " +
+              "à deux pages par feuille, c'est ce réglage qui garde la moitié gauche à gauche au verso."
   },
   imprimeur: {
     titre: "Le fichier pour un imprimeur professionnel",
@@ -89,12 +96,16 @@ const MODES_IMPRESSION = [
   },
   {
     categorie: "Page à page (dos collé)", aideCle: "doscolle",
-    aide: "Une page par feuille, à relier ou à faire relier.",
+    aide: "À relier ou à faire relier. Une page par feuille, ou deux à couper au milieu.",
     choix: [
-      { libelle: "Recto-verso automatique", detail: "Votre imprimante retourne les feuilles toute seule.",
+      { libelle: "Une page par feuille", detail: "Recto-verso automatique. Rien à découper.",
         action: "exporterImpression", mode: "auto" },
-      { libelle: "En deux fois", detail: "Sans recto-verso : les rectos d'abord, puis les versos.",
+      { libelle: "Une page — en deux fois", detail: "Sans recto-verso : les rectos d'abord, puis les versos.",
         action: "exporterImpression", mode: "passes" },
+      { libelle: "Deux pages par feuille", detail: "Recto-verso automatique. À couper au milieu : moitié de papier.",
+        action: "exporterDeuxPages", mode: "auto" },
+      { libelle: "Deux pages — en deux fois", detail: "Sans recto-verso : les rectos d'abord, puis les versos.",
+        action: "exporterDeuxPages", mode: "passes" },
       { libelle: "Couverture seule", detail: "4e de couverture, dos et 1re sur une seule feuille, avec les plis.",
         action: "exporterCouvertureSeule", mode: "" }
     ]
@@ -751,6 +762,93 @@ function avecPaginationImprimeur(livre, travail) {
     appliquerFormatPage(livre.format || "149x210");
     repaginerTout();
   }
+}
+
+// ----- Deux pages par feuille, à couper au milieu -----
+//
+// Même reliure que « page à page », mais deux pages côte à côte : on coupe la
+// pile en deux d'un coup de massicot, on pose la moitié droite sous la moitié
+// gauche, et le livre est dans l'ordre.
+//
+// C'est ce qui rend l'imposition indispensable. Poser bêtement 1 et 2 côte à
+// côte donnerait, après la coupe, deux tas où les pages sautent de deux en
+// deux. La colonne de gauche porte donc la PREMIÈRE moitié du livre, celle de
+// droite la SECONDE : chaque tas reste continu, et l'un se pose sous l'autre.
+//
+// Le recto-verso doit retourner sur les GRANDS bords : c'est ce qui garde la
+// moitié gauche à gauche au verso. Sur les petits bords, le livre sortirait
+// mélangé.
+
+function exporterDeuxPages(modeRectoVerso) {
+  flushSpread();
+  repaginerTout();
+  const livre = livreActuel();
+  const f = FORMATS[livre.format || "149x210"] || FORMATS["149x210"];
+
+  let stylePage = document.getElementById("stylePageImpression");
+  if (!stylePage) {
+    stylePage = document.createElement("style");
+    stylePage.id = "stylePageImpression";
+    document.head.appendChild(stylePage);
+  }
+
+  const largFeuille = f.larg * 2;
+  const papier = papierMinimal(largFeuille, f.haut, 2);
+  if (papier) reglerPagePapier(stylePage, papier);
+  else stylePage.textContent = "@page { size: " + largFeuille + "mm " + f.haut + "mm; margin: 0; }";
+
+  let zone = document.getElementById("zoneImpression");
+  if (zone) zone.remove();
+  zone = document.createElement("div");
+  zone.id = "zoneImpression";
+  document.body.appendChild(zone);
+
+  const margeInt = f.margeH + DELTA_RELIURE_MM;
+  const margeExt = Math.max(6, f.margeH - DELTA_RELIURE_MM);
+  const promessesImages = [];
+
+  // La suite des faces, dans l'ordre de lecture : couverture, son verso
+  // blanc, le texte, puis la 4e au dos de la dernière feuille.
+  const suite = [];
+  suite.push({ type: "couverture" });
+  suite.push({ type: "blanche" });
+  (livre.pages || []).forEach((page, i) => suite.push({ type: "texte", page, numero: i + 1 }));
+  suite.push({ type: "blanche" });
+  suite.push({ type: "quatrieme" });
+  // Une feuille porte quatre faces : le compte doit tomber juste, sinon la
+  // coupe décale tout le second tas.
+  while (suite.length % 4 !== 0) suite.splice(suite.length - 2, 0, { type: "blanche" });
+
+  const moitie = suite.length / 2;
+
+  for (let k = 0; k < suite.length / 4; k++) {
+    const recto = creerFaceLivret(suite[2 * k], suite[moitie + 2 * k],
+                                  livre, f, margeInt, margeExt, promessesImages);
+    const verso = creerFaceLivret(suite[2 * k + 1], suite[moitie + 2 * k + 1],
+                                  livre, f, margeInt, margeExt, promessesImages);
+    [recto, verso].forEach((face) => {
+      ajouterTraitMilieu(face, f.larg, f.haut);
+      zone.appendChild(papier ? poserSurPapier(face, papier, largFeuille, f.haut) : face);
+    });
+  }
+
+  const message = document.getElementById("message");
+  if (message) message.textContent = "Préparation de l'impression...";
+
+  Promise.all(promessesImages).finally(() => {
+    if (message) message.textContent = "";
+    lancerImpression(modeRectoVerso);
+  });
+}
+
+// La ligne de coupe entre les deux pages. Elle tombe dans la marge intérieure
+// des deux pages, jamais dans le texte, et disparaît avec le coup de massicot.
+function ajouterTraitMilieu(face, largPageMm, hautMm) {
+  const trait = document.createElement("div");
+  trait.className = "trait-milieu";
+  trait.style.left = largPageMm + "mm";
+  trait.style.height = hautMm + "mm";
+  face.appendChild(trait);
 }
 
 // ----- Couverture seule (reliure maison) -----
