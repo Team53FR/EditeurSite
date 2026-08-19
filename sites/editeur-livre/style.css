@@ -411,7 +411,9 @@ button.danger {
   font-family: "EB Garamond", Georgia, serif;
   font-size: 13px;
   color: #999;
-  padding: 6px 0 10px;
+  /* Le bloc occupe toute la bande du pied (PIED_PAGE_PX) ; ce retrait pose le
+     numéro à la même hauteur qu'à l'impression, soit 6 mm du bord. */
+  padding: 24px 0 0;
 }
 
 /* ---- Animation de tournage de page (mode aperçu) ---- */

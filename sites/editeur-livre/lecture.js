@@ -68,7 +68,7 @@ function appliquerFormatPage(formatKey) {
   const hautPx = Math.round(f.haut * PX_PAR_MM);
   const margeVPx = Math.round(f.margeV * PX_PAR_MM);
   const margeHPx = Math.round(f.margeH * PX_PAR_MM);
-  const numPageH = 32;
+  const numPageH = 64;   // même bande qu'à l'édition et à l'impression
   const gap = 26;
 
   document.querySelectorAll(".page-livre").forEach(el => {

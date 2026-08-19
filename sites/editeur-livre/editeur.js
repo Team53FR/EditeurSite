@@ -30,7 +30,11 @@ const PX_PAR_MM = 96 / 25.4;
 // Variable et non constante : l'export « fichier pour l'imprimeur » la
 // remonte le temps de la génération, pour que le folio respecte le blanc
 // tournant de 7 mm exigé par les imprimeurs (voir impression.js).
-let PIED_PAGE_PX = 32;
+// Bande réservée au bas de la page : le numéro y tient, et le texte s'arrête
+// AVANT. À 32 px, la bande était plus courte que le folio lui-même : la
+// dernière ligne venait mourir dessus, à un demi-millimètre. 64 px laissent
+// le folio à 6 mm du bord et un blanc de 4 mm au-dessus de lui.
+let PIED_PAGE_PX = 64;
 
 // Le livre courant compose selon SON format.
 function typoDuLivre() {

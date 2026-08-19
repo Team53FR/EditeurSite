@@ -334,13 +334,13 @@ document.addEventListener("keydown", (e) => {
 const MM_EN_PX = 96 / 25.4; // conversion CSS : 1mm = 96/25.4 px
 const DELTA_RELIURE_MM = 4; // ajouté côté reliure, retiré côté extérieur
 // Zone réservée au numéro de page. DOIT correspondre au « numPageH » de
-// l'éditeur (32 px logiques), sinon la hauteur utile diffère de celle qui a
+// l'éditeur (64 px logiques), sinon la hauteur utile diffère de celle qui a
 // servi à découper les pages et le texte se retrouve coupé à l'impression.
 // On retire une petite tolérance (2 mm) pour absorber les écarts d'arrondi
 // mm/px entre le rendu écran et le rendu imprimé ; le numéro de page reste
 // à sa place (il est positionné à 6 mm du bas, indépendamment).
 const TOLERANCE_MM = 2;
-const PIED_PAGE_MM = 32 * 25.4 / 96 - TOLERANCE_MM; // ≈ 6,47 mm
+const PIED_PAGE_MM = 64 * 25.4 / 96 - TOLERANCE_MM; // ≈ 14,9 mm
 
 // ----- Poser le travail sur une VRAIE feuille -----
 //
@@ -811,18 +811,19 @@ const FILET_REPERE_PT     = 0.25;
 const MARGE_TECHNIQUE_MM = DECALAGE_REPERE_MM + LONGUEUR_REPERE_MM + 1; // 12 mm
 
 // Pied de page de l'export imprimeur, en pixels logiques (voir PIED_PAGE_PX
-// dans editeur.js). 48 px ≈ 12,7 mm : le folio tient à 7,5 mm du bord rogné
-// sans que la dernière ligne de texte vienne le chevaucher.
-const PIED_PRO_PX  = 56;
-const PIED_PRO_MM  = PIED_PRO_PX * 25.4 / 96;      // ≈ 14,8 mm
+// dans editeur.js). Le folio y descend plus bas — 8 mm du bord rogné au lieu
+// de 6 — pour respecter le blanc tournant : la bande doit donc être plus
+// haute que celle de l'export normal, sans quoi le texte la rejoindrait.
+const PIED_PRO_PX  = 72;
+const PIED_PRO_MM  = PIED_PRO_PX * 25.4 / 96;      // ≈ 19,1 mm
 const FOLIO_PRO_MM = 8;                            // > BLANC_TOURNANT_MM
 // Le texte rendu à l'impression occupe quelques pixels de plus que dans le
 // mesureur de pagination (justification et césure automatique, absentes du
 // mesureur). L'export normal absorbe déjà cet écart par une tolérance ; on
 // garde le même principe ici, en dimensionnant le pied pour que la tolérance
 // ne fasse jamais descendre le texte sur la bande du folio :
-//   bas du texte  = 210 - 20 - 177,2 = 12,8 mm du bord rogné
-//   haut du folio = 8 + 3,5          = 11,5 mm du bord rogné
+//   bas du texte  = 210 - 20 - 172,9 = 17,1 mm du bord rogné
+//   haut du folio = 8 + 4,7          = 12,7 mm du bord rogné
 const TOLERANCE_PRO_MM = 2;
 
 // Épaisseur d'une feuille : grammage × main / 1000 (en mm).
