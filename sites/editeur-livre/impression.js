@@ -30,6 +30,7 @@ const AIDE_IMPRESSION = {
   },
   doscolle: {
     titre: "Le dos collé, comment ça marche",
+    schema: true,
     principe: "Seul le texte sort ici : la couverture s'imprime à part, avec « Couverture seule ». " +
               "Les feuilles sont encollées sur la tranche, comme un vrai roman de poche. Deux façons " +
               "de les imprimer : UNE PAGE par feuille, dans l'ordre de lecture, rien à découper ; ou DEUX " +
@@ -132,6 +133,90 @@ const MODES_IMPRESSION = [
   }
 ];
 
+// Schéma « bords longs / bords courts ».
+//
+// La feuille du mode « deux pages » est en PAYSAGE : ses grands bords sont
+// donc le haut et le bas. Un retournement sur les grands bords fait pivoter
+// la feuille autour d'un axe horizontal, et la moitié gauche revient à
+// gauche ; sur les petits bords, l'axe est vertical et les deux moitiés
+// s'échangent. Un schéma dessiné sur une feuille portrait dirait l'inverse :
+// celui-ci reprend la feuille telle qu'elle sort de l'imprimante.
+function schemaBordsHtml() {
+  const feuille = (x, gauche, droite, etiquette, couleur, fond) =>
+    '<g>' +
+      '<rect x="' + x + '" y="24" width="118" height="84" rx="5" fill="' + fond +
+        '" stroke="' + couleur + '" stroke-width="2"/>' +
+      '<line x1="' + (x + 59) + '" y1="24" x2="' + (x + 59) + '" y2="108" ' +
+        'stroke="#b9b0a2" stroke-width="1.4" stroke-dasharray="4 3"/>' +
+      '<text x="' + (x + 30) + '" y="72" font-size="17" font-weight="700" ' +
+        'fill="' + couleur + '" text-anchor="middle">' + gauche + "</text>" +
+      '<text x="' + (x + 89) + '" y="72" font-size="17" font-weight="700" ' +
+        'fill="' + couleur + '" text-anchor="middle">' + droite + "</text>" +
+      '<text x="' + (x + 59) + '" y="123" font-size="10" font-weight="600" ' +
+        'fill="#6b6255" text-anchor="middle">' + etiquette + "</text>" +
+    "</g>";
+
+  const fleche = (x, couleur, id) =>
+    '<path d="M ' + x + ' 50 q 14 16 0 32" fill="none" stroke="' + couleur +
+      '" stroke-width="1.8" marker-end="url(#' + id + ')"/>';
+
+  // Variante « grands bords » : axe horizontal, marqué en haut et en bas.
+  const longs =
+    '<svg viewBox="0 0 300 140" class="mi-schema-svg" role="img" ' +
+      'aria-label="Retournement sur les grands bords : la moitié gauche reste à gauche">' +
+      '<defs><marker id="flLong" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto">' +
+        '<path d="M0,0 L7,3.5 L0,7 z" fill="#b5401e"/></marker></defs>' +
+      // les grands bords, épais : c'est autour d'eux que la feuille bascule
+      '<line x1="10" y1="20" x2="128" y2="20" stroke="#b5401e" stroke-width="3.5"/>' +
+      '<line x1="10" y1="112" x2="128" y2="112" stroke="#b5401e" stroke-width="3.5"/>' +
+      '<line x1="172" y1="20" x2="290" y2="20" stroke="#b5401e" stroke-width="3.5"/>' +
+      '<line x1="172" y1="112" x2="290" y2="112" stroke="#b5401e" stroke-width="3.5"/>' +
+      feuille(10, "A", "B", "RECTO", "#b5401e", "#ffffff") +
+      fleche(140, "#b5401e", "flLong") +
+      feuille(172, "A", "B", "VERSO", "#b5401e", "#fdf4ef") +
+    "</svg>";
+
+  // Variante « petits bords » : axe vertical, marqué à gauche et à droite.
+  const courts =
+    '<svg viewBox="0 0 300 140" class="mi-schema-svg" role="img" ' +
+      'aria-label="Retournement sur les petits bords : la moitié gauche passe à droite">' +
+      '<defs><marker id="flCourt" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto">' +
+        '<path d="M0,0 L7,3.5 L0,7 z" fill="#2e6f6b"/></marker></defs>' +
+      '<line x1="6" y1="24" x2="6" y2="108" stroke="#2e6f6b" stroke-width="3.5"/>' +
+      '<line x1="132" y1="24" x2="132" y2="108" stroke="#2e6f6b" stroke-width="3.5"/>' +
+      '<line x1="168" y1="24" x2="168" y2="108" stroke="#2e6f6b" stroke-width="3.5"/>' +
+      '<line x1="294" y1="24" x2="294" y2="108" stroke="#2e6f6b" stroke-width="3.5"/>' +
+      feuille(10, "A", "B", "RECTO", "#2e6f6b", "#ffffff") +
+      fleche(140, "#2e6f6b", "flCourt") +
+      feuille(172, "B", "A", "VERSO", "#2e6f6b", "#f1f7f6") +
+    "</svg>";
+
+  return '<div class="mi-detail-bloc mi-schema">' +
+    "<h5>Bords longs ou bords courts ?</h5>" +
+    "<p>La feuille sort en PAYSAGE : ses grands bords sont le haut et le bas, " +
+    "ses petits bords la gauche et la droite. <b>A</b> et <b>B</b> sont les deux " +
+    "moitiés que vous allez séparer d'un coup de massicot.</p>" +
+    '<div class="mi-schema-paire">' +
+      '<div class="mi-schema-carte">' +
+        '<span class="mi-schema-etiquette longs">Bords longs</span>' + longs +
+        "<p>La feuille bascule autour d'un axe horizontal, comme on tourne " +
+        "la page d'un calendrier mural. <b>La moitié gauche reste à gauche</b> : " +
+        "le dos de A tombe bien derrière A.</p>" +
+      "</div>" +
+      '<div class="mi-schema-carte">' +
+        '<span class="mi-schema-etiquette courts">Bords courts</span>' + courts +
+        "<p>La feuille pivote autour d'un axe vertical, comme on tourne la page " +
+        "d'un livre. <b>Les deux moitiés s'échangent</b> : le dos de A se retrouve " +
+        "à droite, et l'imposition doit en tenir compte.</p>" +
+      "</div>" +
+    "</div>" +
+    "<p class=\"mi-schema-astuce\">Le réglage se trouve dans les options recto-verso de " +
+    "votre imprimante. Vous n'avez qu'à prendre le bouton du même nom. En cas de doute, " +
+    "imprimez deux feuilles d'essai : si le dos d'une page appartient à une autre partie " +
+    "du livre, reprenez avec l'autre bouton.</p>" +
+  "</div>";
+}
+
 // Construit le mode d'emploi dépliable d'une catégorie.
 function construireAideHtml(aide, index) {
   if (!aide) return "";
@@ -145,6 +230,7 @@ function construireAideHtml(aide, index) {
     '<div class="mi-detail-bloc"><h5>Assemblage, pas à pas</h5><ol>' +
       aide.etapes.map(e => "<li>" + e + "</li>").join("") +
     "</ol></div>" +
+    (aide.schema ? schemaBordsHtml() : "") +
     '<div class="mi-detail-colonnes">' +
       liste("Ce que ça apporte", aide.bon, "vert") +
       liste("À savoir", aide.limites, "orange") +

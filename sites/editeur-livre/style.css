@@ -1940,3 +1940,31 @@ button.danger {
   border: 1px solid var(--bordure, #d8d8d8); border-radius: 6px;
   font: inherit; font-size: 0.88rem; line-height: 1.4;
 }
+
+/* ===== Schéma « bords longs / bords courts » (mode d'emploi du dos collé) ===== */
+.mi-schema { margin-top: 14px; }
+.mi-schema-paire {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 8px;
+}
+.mi-schema-carte {
+  flex: 1 1 240px;
+  min-width: 0;
+  border: 1px solid var(--bordure, #d8cfc0);
+  border-radius: 10px;
+  padding: 10px 12px 12px;
+  background: rgba(255, 255, 255, 0.55);
+}
+.mi-schema-carte p { margin: 6px 0 0; font-size: 12px; line-height: 1.45; }
+.mi-schema-svg { display: block; width: 100%; height: auto; }
+.mi-schema-etiquette {
+  display: inline-block;
+  font-size: 11px; font-weight: 700;
+  padding: 2px 9px; border-radius: 999px;
+  margin-bottom: 8px;
+}
+.mi-schema-etiquette.longs { background: #f4e0d6; color: #b5401e; }
+.mi-schema-etiquette.courts { background: #dcebe9; color: #2e6f6b; }
+.mi-schema-astuce { margin-top: 10px !important; font-style: italic; }
