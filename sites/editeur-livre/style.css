@@ -1495,7 +1495,12 @@ button.danger {
   background: rgba(43, 38, 34, .45);
   backdrop-filter: blur(3px);
   display: flex;
-  align-items: center;
+  /* Surtout pas « center » ici : une carte plus haute que l'écran déborde
+     alors des DEUX côtés, et le haut devient inatteignable — on ne peut pas
+     remonter au-dessus du point de départ du défilement. Le centrage est
+     confié à « margin: auto » sur la carte, qui absorbe la place libre quand
+     il y en a et ne rogne rien quand il n'y en a pas. */
+  align-items: flex-start;
   justify-content: center;
   padding: 24px;
   overflow-y: auto;
@@ -1503,6 +1508,7 @@ button.danger {
 
 .modal-impression-carte {
   position: relative;
+  margin: auto;
   width: 100%;
   max-width: 560px;
   background: var(--s-paper, #fffdf8);
@@ -1943,15 +1949,18 @@ button.danger {
 
 /* ===== Schéma « bords longs / bords courts » (mode d'emploi du dos collé) ===== */
 .mi-schema { margin-top: 14px; }
+/* Les deux cas côte à côte : on les compare d'un coup d'œil, et le mode
+   d'emploi ne s'allonge pas d'un écran de plus. */
 .mi-schema-paire {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 10px;
   margin-top: 8px;
 }
 .mi-schema-carte {
-  flex: 1 1 240px;
+  flex: 1 1 200px;
   min-width: 0;
+  box-sizing: border-box;
   border: 1px solid var(--bordure, #d8cfc0);
   border-radius: 10px;
   padding: 10px 12px 12px;
