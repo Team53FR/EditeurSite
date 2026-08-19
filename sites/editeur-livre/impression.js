@@ -122,6 +122,9 @@ const MODES_IMPRESSION = [
     ]
   },
   {
+    // Masqué pour l'instant : l'export existe toujours et reste appelable,
+    // seul le bouton disparaît du panneau. Retirer cette ligne le rétablit.
+    masque: true,
     categorie: "Fichier pour l'imprimeur", aideCle: "imprimeur",
     aide: "Deux PDF conformes à un cahier des charges d'imprimeur : fond perdu, repères de coupe, pages simples.",
     choix: [
@@ -260,7 +263,10 @@ function ouvrirPanneauImpression() {
     "Pour obtenir un PDF, sélectionnez « Enregistrer au format PDF » dans la fenêtre d'impression. " +
     '<a href="montage.html" target="_blank" rel="noopener">Guide complet du montage</a>.</p>';
 
+  // Les catégories masquées gardent leur place dans MODES_IMPRESSION : on
+  // conserve donc leur index d'origine, dont dépendent les boutons.
   MODES_IMPRESSION.forEach((cat, i) => {
+    if (cat.masque) return;
     html += '<div class="mi-categorie">' +
       '<div class="mi-titre-ligne">' +
         "<h4>" + cat.categorie + "</h4>" +
