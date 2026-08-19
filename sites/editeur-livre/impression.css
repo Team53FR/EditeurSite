@@ -86,9 +86,16 @@
     background: white;
   }
 
-  /* Ligne de coupe entre les deux pages d'une feuille. Pointillé fin : il
-     tombe dans la marge intérieure des deux pages, jamais dans le texte, et
-     disparaît avec le coup de massicot. */
+  /* Bande blanche entre les deux pages. C'est elle qui absorbe le décalage
+     recto-verso de l'imprimante : on coupe de part et d'autre, elle part, et
+     les deux pages gardent leur format exact. */
+  .gouttiere-impression {
+    flex-shrink: 0;
+    background: white;
+  }
+
+  /* Traits de coupe de la gouttière. Pointillé fin, posé dans la bande
+     blanche : il ne touche aucune page et disparaît avec la coupe. */
   .trait-milieu {
     position: absolute;
     top: 0;

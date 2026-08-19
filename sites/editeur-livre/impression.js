@@ -39,7 +39,9 @@ const AIDE_IMPRESSION = {
               "que l'un se pose sous l'autre.",
     etapes: [
       "Imprimez en recto-verso, dans l'ordre. Si votre imprimante ne le fait pas seule, choisissez « En deux fois ».",
-      "Deux pages par feuille : coupez toute la pile sur le trait du milieu, puis posez le tas de DROITE sous celui de GAUCHE. Ne mélangez pas les deux moitiés.",
+      "Deux pages par feuille : coupez sur les DEUX traits du milieu — la bande blanche qui les sépare part, et chaque page garde son format exact malgré le décalage recto-verso de l'imprimante.",
+      "Posez ensuite le tas de DROITE sous celui de GAUCHE. Ne mélangez pas les deux moitiés.",
+      "Si les deux faces d'une même page ne se correspondent pas, votre imprimante retourne sur les petits bords : reprenez avec le bouton « bords courts ».",
       "Massicotez les feuilles sur les traits de coupe imprimés dans la marge : la page retrouve alors son format exact.",
       "Empilez les feuilles dans l'ordre, puis tapotez la pile sur une table pour aligner parfaitement le bord de reliure.",
       "Serrez la pile entre deux planchettes, en laissant dépasser 2 à 3 mm du bord à encoller.",
@@ -108,8 +110,10 @@ const MODES_IMPRESSION = [
         action: "exporterImpression", mode: "auto" },
       { libelle: "Une page — en deux fois", detail: "Sans recto-verso : les rectos d'abord, puis les versos.",
         action: "exporterImpression", mode: "passes" },
-      { libelle: "Deux pages par feuille", detail: "Le texte seul, à couper au milieu : moitié de papier.",
+      { libelle: "Deux pages — bords longs", detail: "À couper au milieu : moitié de papier. Recto-verso retourné sur les GRANDS bords.",
         action: "exporterDeuxPages", mode: "auto" },
+      { libelle: "Deux pages — bords courts", detail: "Idem, si votre imprimante retourne sur les PETITS bords.",
+        action: "exporterDeuxPages", mode: "auto-court" },
       { libelle: "Deux pages — en deux fois", detail: "Sans recto-verso : les rectos d'abord, puis les versos.",
         action: "exporterDeuxPages", mode: "passes" },
       { libelle: "Couverture seule", detail: "4e de couverture, dos et 1re sur une seule feuille, avec les plis.",
@@ -769,23 +773,39 @@ function avecPaginationImprimeur(livre, travail) {
 // ----- Deux pages par feuille, à couper au milieu -----
 //
 // Même reliure que « page à page », mais deux pages côte à côte : on coupe la
-// pile en deux d'un coup de massicot, on pose la moitié droite sous la moitié
-// gauche, et le livre est dans l'ordre.
+// pile, on pose la moitié droite sous la moitié gauche, et le livre est dans
+// l'ordre.
 //
-// C'est ce qui rend l'imposition indispensable. Poser bêtement 1 et 2 côte à
-// côte donnerait, après la coupe, deux tas où les pages sautent de deux en
-// deux. La colonne de gauche porte donc la PREMIÈRE moitié du livre, celle de
-// droite la SECONDE : chaque tas reste continu, et l'un se pose sous l'autre.
+// C'est ce qui rend l'imposition indispensable. Poser 1 et 2 côte à côte
+// donnerait, après la coupe, deux tas où les pages sautent de deux en deux. La
+// colonne de gauche porte donc la PREMIÈRE moitié du livre, celle de droite la
+// SECONDE : chaque tas reste continu, et l'un se pose sous l'autre.
 //
-// Le recto-verso doit retourner sur les GRANDS bords : c'est ce qui garde la
-// moitié gauche à gauche au verso. Sur les petits bords, le livre sortirait
-// mélangé.
+// Deux difficultés viennent de l'imprimante, pas du calcul :
+//
+//  1. Le sens de retournement. Sur les grands bords, la moitié gauche reste à
+//     gauche au verso ; sur les petits bords, elle passe à droite et le livre
+//     sort mélangé. Aucun réglage du navigateur ne le dit — c'est donc
+//     l'auteur qui l'indique, et l'imposition s'y adapte.
+//
+//  2. Le registre recto-verso. Une imprimante familiale décale le verso d'un
+//     ou deux millimètres. Une coupe unique au milieu tomberait juste d'un
+//     côté et dans le texte de l'autre. On laisse donc une GOUTTIÈRE blanche
+//     entre les deux pages, avec un trait de chaque côté : on coupe deux fois,
+//     la bande centrale part, et chaque page garde son format exact quel que
+//     soit le décalage.
+const GOUTTIERE_MM = 6;
 
-function exporterDeuxPages(modeRectoVerso) {
+function exporterDeuxPages(mode) {
   flushSpread();
   repaginerTout();
   const livre = livreActuel();
   const f = FORMATS[livre.format || "149x210"] || FORMATS["149x210"];
+
+  // « auto » et « passes » disent comment imprimer ; « court » dit comment la
+  // feuille se retourne. Les deux se combinent (« passes-court »).
+  const passes = mode.indexOf("passes") !== -1;
+  const bordsCourts = mode.indexOf("court") !== -1;
 
   let stylePage = document.getElementById("stylePageImpression");
   if (!stylePage) {
@@ -794,8 +814,17 @@ function exporterDeuxPages(modeRectoVerso) {
     document.head.appendChild(stylePage);
   }
 
-  const largFeuille = f.larg * 2;
-  const papier = papierMinimal(largFeuille, f.haut, 2);
+  // La gouttière élargit la planche de quelques millimètres. Si ces
+  // millimètres obligent à passer au format de papier au-dessus — deux pages
+  // de roman font déjà 298 mm sur une A4 —, on y renonce : demander de l'A3
+  // pour six millimètres serait un remède pire que le mal.
+  const aire = (pa) => (pa ? pa.larg * pa.haut : Infinity);
+  const sansGouttiere = papierMinimal(2 * f.larg, f.haut, 2);
+  const avecGouttiere = papierMinimal(2 * f.larg + GOUTTIERE_MM, f.haut, 2);
+  const gouttiere = aire(avecGouttiere) <= aire(sansGouttiere) ? GOUTTIERE_MM : 0;
+  const papier = gouttiere ? avecGouttiere : sansGouttiere;
+  const largFeuille = 2 * f.larg + gouttiere;
+
   if (papier) reglerPagePapier(stylePage, papier);
   else stylePage.textContent = "@page { size: " + largFeuille + "mm " + f.haut + "mm; margin: 0; }";
 
@@ -807,7 +836,6 @@ function exporterDeuxPages(modeRectoVerso) {
 
   const margeInt = f.margeH + DELTA_RELIURE_MM;
   const margeExt = Math.max(6, f.margeH - DELTA_RELIURE_MM);
-  const promessesImages = [];
 
   // Les faces, dans l'ordre de lecture — le texte seul, les couvertures
   // s'imprimant à part.
@@ -820,31 +848,68 @@ function exporterDeuxPages(modeRectoVerso) {
   const moitie = suite.length / 2;
 
   for (let k = 0; k < suite.length / 4; k++) {
-    const recto = creerFaceLivret(suite[2 * k], suite[moitie + 2 * k], f, margeInt, margeExt);
-    const verso = creerFaceLivret(suite[2 * k + 1], suite[moitie + 2 * k + 1], f, margeInt, margeExt);
+    const recto = creerFaceDeuxPages(suite[2 * k], suite[moitie + 2 * k],
+                                     f, margeInt, margeExt, gouttiere);
+    // Sur les petits bords, la feuille se retourne autour de son axe vertical :
+    // ce qui était à gauche revient à droite. On échange donc les deux moitiés
+    // du verso pour que chaque bande garde ses deux faces.
+    const verso = bordsCourts
+      ? creerFaceDeuxPages(suite[moitie + 2 * k + 1], suite[2 * k + 1],
+                           f, margeInt, margeExt, gouttiere)
+      : creerFaceDeuxPages(suite[2 * k + 1], suite[moitie + 2 * k + 1],
+                           f, margeInt, margeExt, gouttiere);
+
     [recto, verso].forEach((face) => {
-      ajouterTraitMilieu(face, f.larg, f.haut);
       zone.appendChild(papier ? poserSurPapier(face, papier, largFeuille, f.haut) : face);
     });
   }
 
   const message = document.getElementById("message");
   if (message) message.textContent = "Préparation de l'impression...";
-
-  Promise.all(promessesImages).finally(() => {
+  setTimeout(() => {
     if (message) message.textContent = "";
-    lancerImpression(modeRectoVerso);
-  });
+    lancerImpression(passes ? "passes" : "auto");
+  }, 0);
 }
 
-// La ligne de coupe entre les deux pages. Elle tombe dans la marge intérieure
-// des deux pages, jamais dans le texte, et disparaît avec le coup de massicot.
-function ajouterTraitMilieu(face, largPageMm, hautMm) {
-  const trait = document.createElement("div");
-  trait.className = "trait-milieu";
-  trait.style.left = largPageMm + "mm";
-  trait.style.height = hautMm + "mm";
-  face.appendChild(trait);
+// Une face : deux pages séparées par la gouttière, avec ses traits de coupe.
+function creerFaceDeuxPages(demiGauche, demiDroite, f, margeInt, margeExt, gouttiere) {
+  const feuille = document.createElement("div");
+  feuille.className = "feuille-impression";
+  feuille.style.width = (2 * f.larg + gouttiere) + "mm";
+  feuille.style.height = f.haut + "mm";
+
+  feuille.appendChild(creerDemiPageLivret(demiGauche, f, margeInt, margeExt));
+
+  if (gouttiere > 0) {
+    const bande = document.createElement("div");
+    bande.className = "gouttiere-impression";
+    bande.style.width = gouttiere + "mm";
+    feuille.appendChild(bande);
+  }
+
+  feuille.appendChild(creerDemiPageLivret(demiDroite, f, margeInt, margeExt));
+
+  // Les deux traits, posés DANS la gouttière : ils ne touchent aucune page, et
+  // la bande qu'ils encadrent part avec la coupe.
+  if (gouttiere > 0) {
+    [f.larg + 0.4, f.larg + gouttiere - 0.4].forEach((x) => {
+      const trait = document.createElement("div");
+      trait.className = "trait-milieu";
+      trait.style.left = x + "mm";
+      trait.style.height = f.haut + "mm";
+      feuille.appendChild(trait);
+    });
+  } else {
+    // Pas la place pour une gouttière : un seul trait, sur la ligne de coupe.
+    const trait = document.createElement("div");
+    trait.className = "trait-milieu";
+    trait.style.left = f.larg + "mm";
+    trait.style.height = f.haut + "mm";
+    feuille.appendChild(trait);
+  }
+
+  return feuille;
 }
 
 // ----- Couverture seule (reliure maison) -----
