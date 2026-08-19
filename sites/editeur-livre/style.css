@@ -1974,6 +1974,19 @@ button.danger {
   padding: 2px 9px; border-radius: 999px;
   margin-bottom: 8px;
 }
+/* Légende du trait épais : le même filet, en petit, à côté de son sens. */
+.mi-schema-legende {
+  display: flex; align-items: center; gap: 6px;
+  margin-top: 6px !important;
+  font-weight: 600;
+}
+.mi-schema-trait {
+  flex-shrink: 0;
+  display: inline-block;
+  width: 22px; height: 3px; border-radius: 2px;
+}
+.mi-schema-trait.longs { background: #b5401e; }
+.mi-schema-trait.courts { background: #2e6f6b; }
 .mi-schema-etiquette.longs { background: #f4e0d6; color: #b5401e; }
 .mi-schema-etiquette.courts { background: #dcebe9; color: #2e6f6b; }
 .mi-schema-astuce { margin-top: 10px !important; font-style: italic; }

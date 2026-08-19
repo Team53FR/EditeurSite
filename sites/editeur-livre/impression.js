@@ -195,16 +195,22 @@ function schemaBordsHtml() {
     "<h5>Bords longs ou bords courts ?</h5>" +
     "<p>La feuille sort en PAYSAGE : ses grands bords sont le haut et le bas, " +
     "ses petits bords la gauche et la droite. <b>A</b> et <b>B</b> sont les deux " +
-    "moitiés que vous allez séparer d'un coup de massicot.</p>" +
+    "moitiés que vous allez séparer d'un coup de massicot. Le <b>trait épais</b> " +
+    "montre les bords autour desquels la feuille bascule — c'est là toute la " +
+    "différence entre les deux réglages.</p>" +
     '<div class="mi-schema-paire">' +
       '<div class="mi-schema-carte">' +
         '<span class="mi-schema-etiquette longs">Bords longs</span>' + longs +
+        '<p class="mi-schema-legende"><span class="mi-schema-trait longs"></span> ' +
+        "les grands bords : le haut et le bas</p>" +
         "<p>La feuille bascule autour d'un axe horizontal, comme on tourne " +
         "la page d'un calendrier mural. <b>La moitié gauche reste à gauche</b> : " +
         "le dos de A tombe bien derrière A.</p>" +
       "</div>" +
       '<div class="mi-schema-carte">' +
         '<span class="mi-schema-etiquette courts">Bords courts</span>' + courts +
+        '<p class="mi-schema-legende"><span class="mi-schema-trait courts"></span> ' +
+        "les petits bords : la gauche et la droite</p>" +
         "<p>La feuille pivote autour d'un axe vertical, comme on tourne la page " +
         "d'un livre. <b>Les deux moitiés s'échangent</b> : le dos de A se retrouve " +
         "à droite, et l'imposition doit en tenir compte.</p>" +
