@@ -358,6 +358,36 @@ function resumePurge(rapport) {
   return texte;
 }
 
+// Le pseudo et le rôle sont recopiés sur l'appareil à la connexion, pour ne
+// pas relire le fichier des comptes à chaque page. Cette copie ne bouge plus
+// ensuite : un pseudo changé depuis le portail — ou depuis un autre appareil —
+// laissait l'ancien s'afficher ici indéfiniment.
+//
+// On la remet donc d'aplomb au chargement de la bibliothèque, sur le compte
+// courant seulement. Best-effort : le fichier illisible ne doit pas empêcher
+// d'ouvrir ses livres.
+async function rafraichirIdentiteCentrale(token) {
+  const login = localStorage.getItem("gh_login");
+  if (!token || !login) return null;
+  try {
+    const { contenu } = await lireFichierJSON(CHEMIN_UTILISATEURS, token);
+    const moi = (Array.isArray(contenu) ? contenu : []).find((u) => u.login === login);
+    if (!moi) return null;
+
+    const nom = moi.nomAffichage ? String(moi.nomAffichage) : "";
+    const role = moi.role === "admin" ? "admin" : "user";
+    localStorage.setItem("gh_nom", nom);
+    localStorage.setItem("gh_role", role);
+    // La session centrale porte les mêmes valeurs : la laisser en arrière
+    // ferait réapparaître l'ancien pseudo au prochain passage par le portail.
+    localStorage.setItem("team53_nom", nom);
+    localStorage.setItem("team53_role", role);
+    return moi;
+  } catch (e) {
+    return null;
+  }
+}
+
 function mimeDepuisChemin(chemin) {
   const ext = (chemin.split(".").pop() || "").toLowerCase();
   if (ext === "png") return "image/png";

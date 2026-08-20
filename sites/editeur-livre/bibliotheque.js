@@ -30,6 +30,10 @@ async function chargerBibliotheque() {
 
   if (!bibliotheque.livres) bibliotheque.livres = [];
 
+  // Le pseudo affiché vient du fichier central, pas d'une copie locale figée
+  // à la dernière connexion.
+  await rafraichirIdentiteCentrale(token);
+
   try {
     const modifie = await migrerImagesEmbarquees(token);
     if (modifie) {
