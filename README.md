@@ -205,6 +205,23 @@ Deux précautions :
 L'identifiant de connexion, lui, ne se change pas : il sert de clé aux
 fichiers personnels de chaque site (`bibliotheques/<slug>.json`).
 
+### Supprimer un compte
+
+Supprimer un compte n'efface que sa ligne de `Web/utilisateurs.json` : ses
+fichiers restent en place, et recréer le même identifiant les retrouve — une
+suppression par erreur reste donc réparable.
+
+Une **seconde question** propose ensuite d'effacer aussi tout ce qu'il
+possédait : les trois `bibliotheques/<slug>.json`, ses dossiers d'images, et
+ses entrées dans `EditeurLivre/publies.json` — sans quoi ses livres publiés
+resteraient listés pour tout le monde. Elle n'est jamais cochée d'avance, et
+ce ménage-là ne se répare pas.
+
+Le compte part **avant** ses données : si la purge échoue en cours de route,
+on ne se retrouve pas avec des fichiers effacés et un compte toujours debout.
+Chaque fichier est traité pour lui-même, et ce qui résiste est nommé dans le
+message plutôt que d'interrompre le reste.
+
 ## Migration de Ma Bibliothèque (compte unique → comptes séparés)
 
 Ma Bibliothèque a été créée avec un seul compte partagé

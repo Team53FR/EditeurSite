@@ -274,12 +274,24 @@ async function supprimerUtilisateur(login) {
   const message = document.getElementById("message");
   const copie = utilisateurs.filter(u => u.login !== login);
 
+  // Le compte d'abord : si la purge échoue ensuite, on ne se retrouve pas
+  // avec des données effacées et un compte toujours debout.
   try {
     shaUtilisateurs = await ecrireFichierJSON("utilisateurs.json", copie, shaUtilisateurs, token, `Suppression de l'utilisateur ${login}`);
     utilisateurs = copie;
     if (modeEditionLogin === login) annulerEdition();
     else afficherUtilisateurs();
     message.textContent = "Compte supprimé.";
+
+    // Seconde question, posée après coup et jamais cochée d'avance : effacer
+    // ses données est irréversible et ne se répare pas en recréant le compte.
+    if (confirm(`Supprimer aussi TOUT ce que « ${login} » possédait ?\n\nSes livres, sa bibliothèque, ses images et sa progression Droid Fortnite ` +
+      `seront effacés du dépôt, et ses livres publiés retirés de la liste commune.\n\nSans cela, ces fichiers restent en place : recréer le même identifiant les retrouve.`)) {
+      message.textContent = "Suppression des données...";
+      const rapport = await supprimerDonneesUtilisateur(login, token);
+      message.textContent = "Compte supprimé. " + resumePurge(rapport);
+      return;
+    }
     setTimeout(() => { if (message.textContent === "Compte supprimé.") message.textContent = ""; }, 2500);
   } catch (erreur) {
     message.textContent = erreur.conflit

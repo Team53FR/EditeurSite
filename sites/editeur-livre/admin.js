@@ -274,7 +274,7 @@ async function supprimerUtilisateur(login) {
   if (login === moi) return; // garde-fou : pas d'auto-suppression
 
   if (!confirm(`Supprimer le compte « ${login} » ?\n\nIl perdra l'accès au portail ET à tous les sites, pas seulement à l'éditeur. ` +
-    `Ses données ne sont pas effacées : sa bibliothèque reste dans le dépôt.\n\nPour lui fermer le seul éditeur, utilisez « Retirer l'accès ».`)) return;
+    `Une seconde question proposera ensuite d'effacer aussi ses données.\n\nPour lui fermer le seul éditeur, utilisez « Retirer l'accès ».`)) return;
 
   const token = localStorage.getItem("gh_token");
   const message = document.getElementById("message");
@@ -288,6 +288,16 @@ async function supprimerUtilisateur(login) {
     if (modeEditionLogin === login) annulerEdition();
     else afficherUtilisateurs();
     message.textContent = "Compte supprimé.";
+
+    // Seconde question, posée après coup et jamais cochée d'avance : effacer
+    // ses données est irréversible et ne se répare pas en recréant le compte.
+    if (confirm(`Supprimer aussi TOUT ce que « ${login} » possédait ?\n\nSes livres, sa bibliothèque, ses images et sa progression Droid Fortnite ` +
+      `seront effacés du dépôt, et ses livres publiés retirés de la liste commune.\n\nSans cela, ces fichiers restent en place : recréer le même identifiant les retrouve.`)) {
+      message.textContent = "Suppression des données...";
+      const rapport = await supprimerDonneesUtilisateur(login, token);
+      message.textContent = "Compte supprimé. " + resumePurge(rapport);
+      return;
+    }
     setTimeout(() => { if (message.textContent === "Compte supprimé.") message.textContent = ""; }, 2500);
   } catch (erreur) {
     message.textContent = erreur.conflit

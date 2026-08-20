@@ -244,6 +244,121 @@ async function chargerSites(token) {
   return DEFAULT_SITES;
 }
 
+// Primitives sur le dépôt entier, utilisées par la purge. Le portail travaille
+// déjà en chemins absolus : ce ne sont que des noms communs aux deux copies.
+function lireFichierDepot(chemin, token) { return lireFichierJSONAbsolu(chemin.replace(/^\//, ""), token); }
+function ecrireFichierDepot(chemin, contenu, sha, token, message) {
+  return ecrireFichierJSONAbsolu(chemin.replace(/^\//, ""), contenu, sha, token, message);
+}
+async function supprimerFichierDepot(chemin, token, message) {
+  const propre = chemin.replace(/^\//, "");
+  const sha = await obtenirShaFichierAbsolu(propre, token);
+  if (!sha) return false;
+  await supprimerFichierAbsolu(propre, token, message);
+  return true;
+}
+async function listerDossierDepot(chemin, token) {
+  const reponse = await fetch(urlContenuAbsolu(chemin.replace(/^\//, "")), {
+    headers: { "Authorization": `Bearer ${token}`, "Accept": "application/vnd.github+json" }
+  });
+  if (reponse.status === 404) return [];
+  if (!reponse.ok) { const e = new Error("Dossier illisible."); e.status = reponse.status; throw e; }
+  const data = await reponse.json();
+  return Array.isArray(data) ? data : [];
+}
+
+// ===== Purge des données d'un compte =====
+//
+// Supprimer un compte n'efface rien de ce qu'il possédait : ses fichiers sont
+// rangés sous un nom dérivé de son login, et recréer le même identifiant les
+// retrouve. C'est voulu — une suppression par erreur reste réparable.
+//
+// Quand on veut vraiment tout effacer, cette fonction s'en charge : les trois
+// bibliothèques, les images de couverture, et les publications retirées de
+// l'index commun. Best-effort fichier par fichier : ce qui résiste est nommé
+// dans le compte rendu plutôt que d'interrompre le reste, sans quoi une image
+// verrouillée laisserait la moitié du ménage en plan sans le dire.
+//
+// (Même code côté portail et côté éditeur : les deux pages qui suppriment un
+// compte doivent effacer exactement la même chose.)
+
+// Le nom de dossier d'un compte. On réutilise la fonction de slug déjà
+// présente — celle du portail ou celle du site — plutôt que d'en écrire une
+// troisième : une règle qui changerait d'un côté ferait chercher la purge au
+// mauvais endroit, et elle effacerait alors les fichiers de personne.
+function slugPurge(login) {
+  if (typeof slugifierLoginPortail === "function") return slugifierLoginPortail(login);
+  if (typeof slugifierLogin === "function") return slugifierLogin(login);
+  return (login || "").toLowerCase().trim().replace(/[^a-z0-9_-]+/g, "_");
+}
+
+async function supprimerDonneesUtilisateur(login, token) {
+  const slug = slugPurge(login);
+  const rapport = { bibliotheques: 0, images: 0, publications: 0, echecs: [] };
+  if (!slug) return rapport;
+
+  const effacer = async (chemin, quoi) => {
+    try {
+      const supprime = await supprimerFichierDepot(chemin, token,
+        `Suppression des données de ${login}`);
+      if (supprime) rapport[quoi]++;
+    } catch (e) {
+      rapport.echecs.push(chemin);
+    }
+  };
+
+  // 1) Une bibliothèque par site — le fichier personnel de chacun.
+  await effacer(`/EditeurLivre/bibliotheques/${slug}.json`, "bibliotheques");
+  await effacer(`/MaBibliotheque/bibliotheques/${slug}.json`, "bibliotheques");
+  await effacer(`/DroidFortnite/bibliotheques/${slug}.json`, "bibliotheques");
+
+  // 2) Les images, rangées dans un dossier par compte : on liste avant, le
+  //    nombre de couvertures n'étant connu de personne.
+  for (const dossier of [`/EditeurLivre/images/${slug}`, `/MaBibliotheque/images/${slug}`]) {
+    let entrees = [];
+    try {
+      entrees = await listerDossierDepot(dossier, token);
+    } catch (e) {
+      rapport.echecs.push(dossier);
+      continue;
+    }
+    for (const entree of entrees) {
+      if (entree && entree.type === "file") await effacer("/" + entree.path, "images");
+    }
+  }
+
+  // 3) L'index des livres publiés est commun : ses entrées survivraient à la
+  //    suppression et resteraient lisibles par tout le monde.
+  try {
+    const { contenu, sha } = await lireFichierDepot("/EditeurLivre/publies.json", token);
+    const liste = Array.isArray(contenu) ? contenu : [];
+    const restantes = liste.filter((e) => e && e.proprietaire !== login);
+    rapport.publications = liste.length - restantes.length;
+    if (rapport.publications > 0) {
+      await ecrireFichierDepot("/EditeurLivre/publies.json", restantes, sha, token,
+        `Retrait des publications de ${login}`);
+    }
+  } catch (e) {
+    // 404 : personne n'a jamais rien publié — rien à retirer.
+    if (e.status !== 404) rapport.echecs.push("EditeurLivre/publies.json");
+  }
+
+  return rapport;
+}
+
+// Compte rendu lisible, pour la ligne de message du panneau.
+function resumePurge(rapport) {
+  const morceaux = [];
+  if (rapport.bibliotheques) morceaux.push(rapport.bibliotheques + " bibliothèque(s)");
+  if (rapport.images) morceaux.push(rapport.images + " image(s)");
+  if (rapport.publications) morceaux.push(rapport.publications + " publication(s)");
+  let texte = morceaux.length ? "Données supprimées : " + morceaux.join(", ") + "." : "Aucune donnée à supprimer.";
+  if (rapport.echecs.length) {
+    texte += " Non supprimé : " + rapport.echecs.join(", ") + ".";
+  }
+  return texte;
+}
+
 // ===== Connexion centrale =====
 // Les comptes centraux vivent dans Web/utilisateurs.json sur le dépôt BDD :
 //   [{ login, password, role: "admin"|"user", nomAffichage, acces: [siteId,...], derniereConnexion }]
