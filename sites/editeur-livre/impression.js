@@ -90,59 +90,18 @@ const AIDE_IMPRESSION = {
   }
 };
 
-const MODES_IMPRESSION = [
-  {
-    categorie: "Livret à agrafer", aideCle: "livret",
-    aide: "Le texte seul, deux pages par feuille. On plie la pile en deux et on agrafe au centre.",
-    choix: [
-      { libelle: "Recto-verso automatique", detail: "Votre imprimante retourne les feuilles toute seule.",
-        action: "exporterLivret", mode: "auto" },
-      { libelle: "En deux fois", detail: "Sans recto-verso : les rectos d'abord, puis les versos.",
-        action: "exporterLivret", mode: "passes" },
-      { libelle: "Couverture du livret", detail: "4e et 1re sur une feuille, à plier en deux et agrafer avec le cahier.",
-        action: "exporterCouvertureLivret", mode: "" }
-    ]
-  },
-  {
-    categorie: "Page à page (dos collé)", aideCle: "doscolle",
-    aide: "À relier ou à faire relier. Une page par feuille, ou deux à couper au milieu.",
-    choix: [
-      { libelle: "Une page par feuille", detail: "Le texte seul, recto-verso automatique. Rien à découper.",
-        action: "exporterImpression", mode: "auto" },
-      { libelle: "Une page — en deux fois", detail: "Sans recto-verso : les rectos d'abord, puis les versos.",
-        action: "exporterImpression", mode: "passes" },
-      { libelle: "Deux pages — bords longs", detail: "À couper au milieu : moitié de papier. Recto-verso retourné sur les GRANDS bords.",
-        action: "exporterDeuxPages", mode: "auto" },
-      { libelle: "Deux pages — bords courts", detail: "Idem, si votre imprimante retourne sur les PETITS bords.",
-        action: "exporterDeuxPages", mode: "auto-court" },
-      { libelle: "Deux pages — en deux fois", detail: "Sans recto-verso : les rectos d'abord, puis les versos.",
-        action: "exporterDeuxPages", mode: "passes" },
-      { libelle: "Couverture seule", detail: "4e de couverture, dos et 1re sur une seule feuille, avec les plis.",
-        action: "exporterCouvertureSeule", mode: "" }
-    ]
-  },
-  {
-    // Masqué pour l'instant : l'export existe toujours et reste appelable,
-    // seul le bouton disparaît du panneau. Retirer cette ligne le rétablit.
-    masque: true,
-    categorie: "Fichier pour l'imprimeur", aideCle: "imprimeur",
-    aide: "Deux PDF conformes à un cahier des charges d'imprimeur : fond perdu, repères de coupe, pages simples.",
-    choix: [
-      { libelle: "Intérieur", detail: "Les pages de texte seules, en pages simples numérotées.",
-        action: "exporterImprimeur", mode: "interieur" },
-      { libelle: "Couverture à plat", detail: "4e de couverture, dos et 1re réunis, avec repères de pli.",
-        action: "exporterImprimeur", mode: "couverture" }
-    ]
-  }
-];
+// Le panneau d'impression ne lit plus de table de boutons : il pose ses
+// questions dans l'ordre et traduit les réponses en appel d'export (voir
+// actionImpression()). Les modes d'emploi détaillés, eux, restent dans
+// AIDE_IMPRESSION ci-dessus.
 
-// Schéma « bords longs / bords courts ».
+// SchÃ©ma Â« bords longs / bords courts Â».
 //
-// La feuille du mode « deux pages » est en PAYSAGE : ses grands bords sont
+// La feuille du mode Â« deux pages Â» est en PAYSAGE : ses grands bords sont
 // donc le haut et le bas. Un retournement sur les grands bords fait pivoter
-// la feuille autour d'un axe horizontal, et la moitié gauche revient à
-// gauche ; sur les petits bords, l'axe est vertical et les deux moitiés
-// s'échangent. Un schéma dessiné sur une feuille portrait dirait l'inverse :
+// la feuille autour d'un axe horizontal, et la moitiÃ© gauche revient Ã 
+// gauche ; sur les petits bords, l'axe est vertical et les deux moitiÃ©s
+// s'Ã©changent. Un schÃ©ma dessinÃ© sur une feuille portrait dirait l'inverse :
 // celui-ci reprend la feuille telle qu'elle sort de l'imprimante.
 function schemaBordsHtml() {
   const feuille = (x, gauche, droite, etiquette, couleur, fond) =>
@@ -163,13 +122,13 @@ function schemaBordsHtml() {
     '<path d="M ' + x + ' 50 q 14 16 0 32" fill="none" stroke="' + couleur +
       '" stroke-width="1.8" marker-end="url(#' + id + ')"/>';
 
-  // Variante « grands bords » : axe horizontal, marqué en haut et en bas.
+  // Variante Â« grands bords Â» : axe horizontal, marquÃ© en haut et en bas.
   const longs =
     '<svg viewBox="0 0 300 140" class="mi-schema-svg" role="img" ' +
-      'aria-label="Retournement sur les grands bords : la moitié gauche reste à gauche">' +
+      'aria-label="Retournement sur les grands bords : la moitiÃ© gauche reste Ã  gauche">' +
       '<defs><marker id="flLong" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto">' +
         '<path d="M0,0 L7,3.5 L0,7 z" fill="#b5401e"/></marker></defs>' +
-      // les grands bords, épais : c'est autour d'eux que la feuille bascule
+      // les grands bords, Ã©pais : c'est autour d'eux que la feuille bascule
       '<line x1="10" y1="20" x2="128" y2="20" stroke="#b5401e" stroke-width="3.5"/>' +
       '<line x1="10" y1="112" x2="128" y2="112" stroke="#b5401e" stroke-width="3.5"/>' +
       '<line x1="172" y1="20" x2="290" y2="20" stroke="#b5401e" stroke-width="3.5"/>' +
@@ -179,10 +138,10 @@ function schemaBordsHtml() {
       feuille(172, "A", "B", "VERSO", "#b5401e", "#fdf4ef") +
     "</svg>";
 
-  // Variante « petits bords » : axe vertical, marqué à gauche et à droite.
+  // Variante Â« petits bords Â» : axe vertical, marquÃ© Ã  gauche et Ã  droite.
   const courts =
     '<svg viewBox="0 0 300 140" class="mi-schema-svg" role="img" ' +
-      'aria-label="Retournement sur les petits bords : la moitié gauche passe à droite">' +
+      'aria-label="Retournement sur les petits bords : la moitiÃ© gauche passe Ã  droite">' +
       '<defs><marker id="flCourt" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto">' +
         '<path d="M0,0 L7,3.5 L0,7 z" fill="#2e6f6b"/></marker></defs>' +
       '<line x1="6" y1="24" x2="6" y2="108" stroke="#2e6f6b" stroke-width="3.5"/>' +
@@ -198,42 +157,42 @@ function schemaBordsHtml() {
     "<h5>Bords longs ou bords courts ?</h5>" +
     "<p>La feuille sort en PAYSAGE : ses grands bords sont le haut et le bas, " +
     "ses petits bords la gauche et la droite. <b>A</b> et <b>B</b> sont les deux " +
-    "moitiés que vous allez séparer d'un coup de massicot. Le <b>trait épais</b> " +
-    "montre les bords autour desquels la feuille bascule — c'est là toute la " +
-    "différence entre les deux réglages.</p>" +
+    "moitiÃ©s que vous allez sÃ©parer d'un coup de massicot. Le <b>trait Ã©pais</b> " +
+    "montre les bords autour desquels la feuille bascule â€” c'est lÃ  toute la " +
+    "diffÃ©rence entre les deux rÃ©glages.</p>" +
     '<div class="mi-schema-paire">' +
       '<div class="mi-schema-carte">' +
         '<span class="mi-schema-etiquette longs">Bords longs</span>' + longs +
         '<p class="mi-schema-legende"><span class="mi-schema-trait longs"></span> ' +
         "les grands bords : le haut et le bas</p>" +
         "<p>La feuille bascule autour d'un axe horizontal, comme on tourne " +
-        "la page d'un calendrier mural. <b>La moitié gauche reste à gauche</b> : " +
-        "le dos de A tombe bien derrière A.</p>" +
+        "la page d'un calendrier mural. <b>La moitiÃ© gauche reste Ã  gauche</b> : " +
+        "le dos de A tombe bien derriÃ¨re A.</p>" +
       "</div>" +
       '<div class="mi-schema-carte">' +
         '<span class="mi-schema-etiquette courts">Bords courts</span>' + courts +
         '<p class="mi-schema-legende"><span class="mi-schema-trait courts"></span> ' +
         "les petits bords : la gauche et la droite</p>" +
         "<p>La feuille pivote autour d'un axe vertical, comme on tourne la page " +
-        "d'un livre. <b>Les deux moitiés s'échangent</b> : le dos de A se retrouve " +
-        "à droite, et l'imposition doit en tenir compte.</p>" +
+        "d'un livre. <b>Les deux moitiÃ©s s'Ã©changent</b> : le dos de A se retrouve " +
+        "Ã  droite, et l'imposition doit en tenir compte.</p>" +
       "</div>" +
     "</div>" +
-    "<p class=\"mi-schema-astuce\">Le réglage se trouve dans les options recto-verso de " +
-    "votre imprimante. Vous n'avez qu'à prendre le bouton du même nom. En cas de doute, " +
-    "imprimez deux feuilles d'essai : si le dos d'une page appartient à une autre partie " +
+    "<p class=\"mi-schema-astuce\">Le rÃ©glage se trouve dans les options recto-verso de " +
+    "votre imprimante. Vous n'avez qu'Ã  prendre le bouton du mÃªme nom. En cas de doute, " +
+    "imprimez deux feuilles d'essai : si le dos d'une page appartient Ã  une autre partie " +
     "du livre, reprenez avec l'autre bouton.</p>" +
   "</div>";
 }
 
 // Construit le mode d'emploi dépliable d'une catégorie.
-function construireAideHtml(aide, index) {
+function construireAideHtml(aide) {
   if (!aide) return "";
   const liste = (titre, items, classe) =>
     '<div class="mi-detail-bloc"><h5 class="' + (classe || "") + '">' + titre + "</h5><ul>" +
     items.map(x => "<li>" + x + "</li>").join("") + "</ul></div>";
 
-  return '<div class="mi-detail" data-aide="' + index + '">' +
+  return '<div class="mi-detail ouvert">' +
     "<h5>" + aide.titre + "</h5>" +
     "<p>" + aide.principe + "</p>" +
     '<div class="mi-detail-bloc"><h5>Assemblage, pas à pas</h5><ol>' +
@@ -248,67 +207,61 @@ function construireAideHtml(aide, index) {
   "</div>";
 }
 
+// =====================================================================
+//  Panneau d'impression, en deux temps
+//
+//  Il présentait huit boutons d'un coup, tous de la même taille, dont les
+//  libellés ne se distinguaient que par un détail (« bords longs », « en deux
+//  fois »). Impossible de savoir lequel prendre sans lire les huit.
+//
+//  On pose donc les questions dans l'ordre où elles se décident vraiment :
+//  d'abord LA RELIURE — le seul choix qui engage vraiment, et dont dépend tout
+//  le reste —, puis ce qu'on imprime et comment, sur un formulaire où chaque
+//  réponse s'explique. Un seul bouton pour lancer, et un résumé qui dit ce
+//  qu'on va obtenir avant de cliquer.
+// =====================================================================
+
+const RELIURES = {
+  livret: {
+    nom: "Livret à agrafer",
+    resume: "On plie la pile en deux et on agrafe au centre.",
+    detail: "Rapide, sans colle ni matériel. Idéal jusqu'à une quarantaine de pages.",
+    aideCle: "livret"
+  },
+  doscolle: {
+    nom: "Dos collé",
+    resume: "On encolle la tranche, comme un vrai roman de poche.",
+    detail: "Aucune limite de pages, dos plat qui tient debout sur une étagère.",
+    aideCle: "doscolle"
+  }
+};
+
+// L'état du formulaire, conservé tant que le panneau reste ouvert.
+let choixImpression = {
+  reliure: null,        // "livret" | "doscolle"
+  quoi: "texte",        // "texte" | "couverture"
+  disposition: "une",   // dos collé : "une" | "deux" pages par feuille
+  imprimante: "auto",   // "auto" | "passes"
+  retournement: "long"  // deux pages : "long" | "court"
+};
+
 function ouvrirPanneauImpression() {
   fermerPanneauImpression();
+  // On repart du cas courant : le texte du livre, une page par feuille. Ce
+  // qu'on imprime change à chaque fois, alors que le comportement de
+  // l'imprimante — recto-verso, sens de retournement — reste le même d'une
+  // séance à l'autre : ces deux réponses-là sont conservées.
+  choixImpression.reliure = null;
+  choixImpression.quoi = "texte";
+  choixImpression.disposition = "une";
 
   const fond = document.createElement("div");
   fond.id = "panneauImpression";
   fond.className = "modal-impression";
   fond.addEventListener("click", (e) => { if (e.target === fond) fermerPanneauImpression(); });
-
-  let html = '<div class="modal-impression-carte" role="dialog" aria-modal="true">' +
-    '<button class="mi-fermer" aria-label="Fermer">&#10005;</button>' +
-    "<h3>Imprimer votre livre</h3>" +
-    '<p class="mi-intro">Choisissez la reliure, puis le type de votre imprimante. ' +
-    "Pour obtenir un PDF, sélectionnez « Enregistrer au format PDF » dans la fenêtre d'impression. " +
-    '<a href="montage.html" target="_blank" rel="noopener">Guide complet du montage</a>.</p>';
-
-  // Les catégories masquées gardent leur place dans MODES_IMPRESSION : on
-  // conserve donc leur index d'origine, dont dépendent les boutons.
-  MODES_IMPRESSION.forEach((cat, i) => {
-    if (cat.masque) return;
-    html += '<div class="mi-categorie">' +
-      '<div class="mi-titre-ligne">' +
-        "<h4>" + cat.categorie + "</h4>" +
-        '<button class="mi-aide-btn" data-aide="' + i + '" title="Comment ça marche et comment assembler" ' +
-          'aria-label="Aide sur ' + cat.categorie + '">?</button>' +
-      "</div>" +
-      '<p class="mi-aide">' + cat.aide + "</p>" +
-      construireAideHtml(AIDE_IMPRESSION[cat.aideCle], i) +
-      '<div class="mi-choix">';
-    cat.choix.forEach((c, j) => {
-      html += '<button class="mi-bouton" data-cat="' + i + '" data-choix="' + j + '">' +
-        "<span>" + c.libelle + "</span>" +
-        '<small>' + c.detail + "</small>" +
-      "</button>";
-    });
-    html += "</div></div>";
-  });
-
-  html += "</div>";
-  fond.innerHTML = html;
   document.body.appendChild(fond);
 
-  fond.querySelector(".mi-fermer").onclick = fermerPanneauImpression;
-
-  // Boutons « ? » : déplient le mode d'emploi de leur catégorie
-  fond.querySelectorAll(".mi-aide-btn").forEach(btn => {
-    btn.onclick = () => {
-      const bloc = fond.querySelector('.mi-detail[data-aide="' + btn.dataset.aide + '"]');
-      if (!bloc) return;
-      const ouvert = bloc.classList.toggle("ouvert");
-      btn.classList.toggle("actif", ouvert);
-      btn.setAttribute("aria-expanded", ouvert ? "true" : "false");
-    };
-  });
-  fond.querySelectorAll(".mi-bouton").forEach(btn => {
-    btn.onclick = () => {
-      const c = MODES_IMPRESSION[+btn.dataset.cat].choix[+btn.dataset.choix];
-      fermerPanneauImpression();
-      // Laisser la fenêtre se fermer avant d'ouvrir celle du navigateur
-      setTimeout(() => { window[c.action](c.mode); }, 50);
-    };
-  });
+  dessinerPanneauImpression();
 }
 
 function fermerPanneauImpression() {
@@ -319,6 +272,213 @@ function fermerPanneauImpression() {
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") fermerPanneauImpression();
 });
+
+function dessinerPanneauImpression() {
+  const fond = document.getElementById("panneauImpression");
+  if (!fond) return;
+  fond.innerHTML = '<div class="modal-impression-carte mi-carte" role="dialog" aria-modal="true">' +
+    '<button class="mi-fermer" aria-label="Fermer">&#10005;</button>' +
+    (choixImpression.reliure ? etapeReglages() : etapeReliure()) +
+    "</div>";
+  fond.querySelector(".mi-fermer").onclick = fermerPanneauImpression;
+  if (choixImpression.reliure) brancherReglages(fond);
+  else brancherChoixReliure(fond);
+}
+
+// ----- Étape 1 : la reliure -----
+
+function etapeReliure() {
+  const carte = (cle, r) =>
+    '<button class="mi-reliure" data-reliure="' + cle + '">' +
+      illustrationReliure(cle) +
+      "<span class='mi-reliure-nom'>" + r.nom + "</span>" +
+      "<span class='mi-reliure-resume'>" + r.resume + "</span>" +
+      "<span class='mi-reliure-detail'>" + r.detail + "</span>" +
+    "</button>";
+
+  return "<h3>Imprimer votre livre</h3>" +
+    '<p class="mi-intro">Comment voulez-vous relier votre livre ? Le reste des ' +
+    "réglages en découle — vous n'aurez plus qu'à répondre à deux ou trois questions.</p>" +
+    '<div class="mi-reliures">' +
+      carte("livret", RELIURES.livret) +
+      carte("doscolle", RELIURES.doscolle) +
+    "</div>" +
+    '<p class="mi-pied-lien">Pas sûr ? <a href="montage.html" target="_blank" rel="noopener">' +
+    "Le guide du montage</a> compare les deux, photos à l'appui.</p>";
+}
+
+// Deux petits dessins valent mieux qu'un paragraphe : l'un montre le pli
+// agrafé, l'autre la pile encollée.
+function illustrationReliure(cle) {
+  if (cle === "livret") {
+    return '<svg class="mi-reliure-dessin" viewBox="0 0 80 56" aria-hidden="true">' +
+      '<path d="M40 8 L14 14 L14 46 L40 40 Z" fill="#fff" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>' +
+      '<path d="M40 8 L66 14 L66 46 L40 40 Z" fill="#faf6ec" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>' +
+      '<line x1="40" y1="8" x2="40" y2="40" stroke="currentColor" stroke-width="2"/>' +
+      '<rect x="37" y="14" width="6" height="3" rx="1" fill="currentColor"/>' +
+      '<rect x="37" y="30" width="6" height="3" rx="1" fill="currentColor"/>' +
+    "</svg>";
+  }
+  return '<svg class="mi-reliure-dessin" viewBox="0 0 80 56" aria-hidden="true">' +
+    '<rect x="18" y="10" width="44" height="36" rx="2" fill="#fff" stroke="currentColor" stroke-width="2"/>' +
+    '<line x1="26" y1="10" x2="26" y2="46" stroke="currentColor" stroke-width="2"/>' +
+    '<line x1="34" y1="14" x2="54" y2="14" stroke="currentColor" stroke-width="1.4" opacity=".5"/>' +
+    '<line x1="34" y1="22" x2="54" y2="22" stroke="currentColor" stroke-width="1.4" opacity=".5"/>' +
+    '<line x1="34" y1="30" x2="48" y2="30" stroke="currentColor" stroke-width="1.4" opacity=".5"/>' +
+    '<rect x="18" y="10" width="8" height="36" rx="2" fill="currentColor" opacity=".18"/>' +
+  "</svg>";
+}
+
+function brancherChoixReliure(fond) {
+  fond.querySelectorAll(".mi-reliure").forEach((b) => {
+    b.onclick = () => {
+      choixImpression.reliure = b.dataset.reliure;
+      // Un livret n'a qu'une disposition possible : deux pages pliées.
+      if (choixImpression.reliure === "livret") choixImpression.disposition = "une";
+      dessinerPanneauImpression();
+    };
+  });
+}
+
+// ----- Étape 2 : les réglages -----
+
+function etapeReglages() {
+  const c = choixImpression;
+  const r = RELIURES[c.reliure];
+  const texte = c.quoi === "texte";
+  const deux = texte && c.reliure === "doscolle" && c.disposition === "deux";
+
+  const groupe = (titre, aide, options, nomChamp) =>
+    '<div class="mi-groupe"><h4>' + titre + "</h4>" +
+    (aide ? '<p class="mi-groupe-aide">' + aide + "</p>" : "") +
+    '<div class="mi-options">' +
+      options.map((o) =>
+        '<label class="mi-option' + (o.valeur === c[nomChamp] ? " actif" : "") + '">' +
+          '<input type="radio" name="' + nomChamp + '" value="' + o.valeur + '"' +
+            (o.valeur === c[nomChamp] ? " checked" : "") + ">" +
+          "<span class='mi-option-nom'>" + o.nom + "</span>" +
+          "<span class='mi-option-detail'>" + o.detail + "</span>" +
+        "</label>").join("") +
+    "</div></div>";
+
+  let html = '<button class="mi-retour" type="button">← Changer de reliure</button>' +
+    "<h3>" + r.nom + "</h3>" +
+    '<p class="mi-intro">' + r.resume + "</p>";
+
+  html += groupe("Que voulez-vous imprimer ?", "", [
+    { valeur: "texte", nom: "Le texte du livre",
+      detail: "Toutes les pages, dans l'ordre voulu par la reliure." },
+    { valeur: "couverture", nom: "La couverture",
+      detail: c.reliure === "livret"
+        ? "4e et 1re sur une feuille, à plier autour du cahier."
+        : "4e, dos et 1re à plat, avec les traits de pli." }
+  ], "quoi");
+
+  if (texte && c.reliure === "doscolle") {
+    html += groupe("Combien de pages par feuille ?", "", [
+      { valeur: "une", nom: "Une page par feuille", detail: "Rien à découper. Le plus simple." },
+      { valeur: "deux", nom: "Deux pages par feuille",
+        detail: "Deux fois moins de papier, mais il faut couper la pile au milieu." }
+    ], "disposition");
+  }
+
+  if (texte) {
+    html += groupe("Votre imprimante fait-elle le recto-verso ?", "", [
+      { valeur: "auto", nom: "Oui, toute seule", detail: "Elle retourne les feuilles d'elle-même." },
+      { valeur: "passes", nom: "Non, en deux fois",
+        detail: "Les rectos d'abord ; on remet la pile dans le bac pour les versos." }
+    ], "imprimante");
+  }
+
+  if (deux) {
+    html += groupe("Comment retourne-t-elle les feuilles ?",
+      "Ce réglage se lit dans les options recto-verso de votre imprimante. " +
+      "Il décide de la place de chaque page une fois la pile coupée en deux.", [
+      { valeur: "long", nom: "Sur les grands bords", detail: "Le plus courant. La moitié gauche reste à gauche." },
+      { valeur: "court", nom: "Sur les petits bords", detail: "Les deux moitiés s'échangent au verso." }
+    ], "retournement");
+    html += '<details class="mi-details-schema"><summary>Voir la différence en image</summary>' +
+      schemaBordsHtml() + "</details>";
+  }
+
+  html += '<p class="mi-resume">' + resumeImpression() + "</p>";
+
+  html += '<details class="mi-details-guide"><summary>Comment assembler le livre ensuite ?</summary>' +
+    construireAideHtml(AIDE_IMPRESSION[r.aideCle]) + "</details>";
+
+  html += '<div class="mi-actions">' +
+    '<button class="mi-lancer" type="button">Imprimer</button>' +
+  "</div>";
+
+  return html;
+}
+
+// Ce qu'on va obtenir, en une phrase, avant de cliquer.
+function resumeImpression() {
+  const c = choixImpression;
+  if (c.quoi === "couverture") {
+    return c.reliure === "livret"
+      ? "Une seule feuille : 4e de couverture et 1re, à plier en deux autour du cahier."
+      : "Une seule feuille : 4e de couverture, dos et 1re, avec les traits de pli et de coupe.";
+  }
+  const morceaux = [];
+  if (c.reliure === "livret") {
+    morceaux.push("Deux pages par feuille, dans l'ordre du pliage");
+    morceaux.push("on plie toute la pile en deux et on agrafe sur le pli");
+  } else if (c.disposition === "deux") {
+    morceaux.push("Deux pages par feuille, séparées par une bande blanche");
+    morceaux.push("on coupe sur les deux traits, puis on pose le tas de droite sous celui de gauche");
+  } else {
+    morceaux.push("Une page par feuille, dans l'ordre de lecture");
+    morceaux.push("il n'y a rien à découper");
+  }
+  if (c.imprimante === "passes") {
+    morceaux.push("les rectos sortent d'abord, une fenêtre vous guidera pour les versos");
+  }
+  return morceaux.join(" ; ") + ".";
+}
+
+function brancherReglages(fond) {
+  fond.querySelector(".mi-retour").onclick = () => {
+    choixImpression.reliure = null;
+    dessinerPanneauImpression();
+  };
+
+  fond.querySelectorAll(".mi-option input").forEach((input) => {
+    input.onchange = () => {
+      choixImpression[input.name] = input.value;
+      dessinerPanneauImpression();   // les questions suivantes en dépendent
+    };
+  });
+
+  fond.querySelector(".mi-lancer").onclick = () => {
+    const action = actionImpression();
+    fermerPanneauImpression();
+    // Laisser la fenêtre se fermer avant d'ouvrir celle du navigateur.
+    setTimeout(() => { window[action.fonction](action.mode); }, 50);
+  };
+}
+
+// Traduit les réponses en appel d'export. Les fonctions d'export, elles, n'ont
+// pas changé : ce panneau ne fait que choisir la bonne.
+function actionImpression() {
+  const c = choixImpression;
+  if (c.quoi === "couverture") {
+    return c.reliure === "livret"
+      ? { fonction: "exporterCouvertureLivret", mode: "" }
+      : { fonction: "exporterCouvertureSeule", mode: "" };
+  }
+  if (c.reliure === "livret") {
+    return { fonction: "exporterLivret", mode: c.imprimante };
+  }
+  if (c.disposition === "deux") {
+    const mode = c.imprimante === "passes"
+      ? "passes"
+      : (c.retournement === "court" ? "auto-court" : "auto");
+    return { fonction: "exporterDeuxPages", mode };
+  }
+  return { fonction: "exporterImpression", mode: c.imprimante };
+}
 
 // ----- Export impression (PDF / imprimante au format réel) -----
 //

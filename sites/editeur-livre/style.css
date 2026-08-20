@@ -1992,3 +1992,116 @@ button.danger {
 .mi-schema-etiquette.longs { background: #f4e0d6; color: #b5401e; }
 .mi-schema-etiquette.courts { background: #dcebe9; color: #2e6f6b; }
 .mi-schema-astuce { margin-top: 10px !important; font-style: italic; }
+
+/* ===== Panneau d'impression, version guidée ===== */
+.mi-carte { max-width: 640px; }
+
+/* Étape 1 : deux grandes cartes, une par reliure. */
+.mi-reliures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+  margin: 18px 0 6px;
+}
+.mi-reliure {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 18px 18px 20px;
+  border: 1px solid var(--s-line, #e6ddc9);
+  border-radius: 14px;
+  background: var(--s-paper, #fffdf8);
+  color: var(--s-ink, #2b2622);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color .15s, box-shadow .15s, transform .15s;
+}
+.mi-reliure:hover {
+  border-color: var(--s-accent, #8a4b2a);
+  box-shadow: 0 6px 18px rgba(60, 42, 20, .12);
+  transform: translateY(-1px);
+}
+.mi-reliure-dessin {
+  width: 80px; height: 56px;
+  margin-bottom: 6px;
+  color: var(--s-accent, #8a4b2a);
+}
+.mi-reliure-nom { font-size: 17px; font-weight: 700; }
+.mi-reliure-resume { font-size: 13px; color: var(--s-ink-soft, #6f6455); }
+.mi-reliure-detail { font-size: 12px; color: var(--s-ink-soft, #6f6455); opacity: .85; margin-top: 4px; }
+
+.mi-pied-lien { font-size: 12.5px; color: var(--s-ink-soft, #6f6455); margin: 14px 0 0; }
+
+/* Étape 2 : un groupe de questions par décision. */
+.mi-retour {
+  background: none; border: none; padding: 0 0 8px;
+  color: var(--s-ink-soft, #6f6455); font-size: 13px; cursor: pointer;
+}
+.mi-retour:hover { color: var(--s-accent, #8a4b2a); }
+
+.mi-groupe { margin: 18px 0 0; }
+.mi-groupe h4 {
+  margin: 0 0 6px;
+  font-size: 14px;
+  color: var(--s-ink, #2b2622);
+}
+.mi-groupe-aide { margin: -2px 0 8px; font-size: 12.5px; color: var(--s-ink-soft, #6f6455); line-height: 1.45; }
+
+.mi-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 10px;
+}
+/* La case radio elle-même est masquée : c'est toute la carte qui se coche,
+   ce qui donne une cible bien plus large au doigt comme à la souris. */
+.mi-option {
+  position: relative;
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 12px 14px;
+  border: 1px solid var(--s-line, #e6ddc9);
+  border-radius: 10px;
+  background: var(--s-paper, #fffdf8);
+  cursor: pointer;
+}
+.mi-option input { position: absolute; opacity: 0; pointer-events: none; }
+.mi-option:hover { border-color: var(--s-accent, #8a4b2a); }
+.mi-option.actif {
+  border-color: var(--s-accent, #8a4b2a);
+  box-shadow: inset 0 0 0 1px var(--s-accent, #8a4b2a);
+  background: var(--s-paper-2, #fdf6ec);
+}
+.mi-option-nom { font-size: 13.5px; font-weight: 600; }
+.mi-option-detail { font-size: 12px; color: var(--s-ink-soft, #6f6455); line-height: 1.4; }
+
+/* Ce qu'on va obtenir, juste avant le bouton. */
+.mi-resume {
+  margin: 20px 0 0;
+  padding: 12px 14px;
+  border-left: 3px solid var(--s-accent, #8a4b2a);
+  background: var(--s-paper-2, #fdf6ec);
+  border-radius: 0 8px 8px 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--s-ink, #2b2622);
+}
+
+.mi-details-schema, .mi-details-guide { margin-top: 12px; }
+.mi-details-schema > summary, .mi-details-guide > summary {
+  cursor: pointer;
+  font-size: 12.5px;
+  color: var(--s-accent, #8a4b2a);
+  padding: 4px 0;
+}
+.mi-details-guide .mi-detail { margin-top: 8px; }
+
+.mi-actions { display: flex; justify-content: flex-end; margin-top: 18px; }
+.mi-lancer {
+  padding: 11px 26px;
+  border: none; border-radius: 10px;
+  background: var(--s-accent, #8a4b2a);
+  color: #fff;
+  font-size: 15px; font-weight: 600;
+  cursor: pointer;
+}
+.mi-lancer:hover { filter: brightness(1.06); }
