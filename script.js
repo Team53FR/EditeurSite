@@ -459,18 +459,15 @@ async function importerComptesExistants(token) {
 // ===== Migration structurelle de Ma Bibliothèque vers un compte par personne =====
 // Avant : MaBibliotheque/compte.json (un seul compte) + livres.json (une
 // seule collection partagée) + images/<id>.jpg (chemin plat).
-// Après : MaBibliotheque/users.json (comptes multiples) +
-// bibliotheques/<slug>.json (une collection par compte) +
-// images/<slug>/<id>.jpg — même pattern qu'editeur-livre. Ne supprime jamais
-// les anciens fichiers, qui restent en place par sécurité une fois la
-// migration faite.
+// Après : bibliotheques/<slug>.json (une collection par compte) +
+// images/<slug>/<id>.jpg — même pattern qu'editeur-livre — et le compte versé
+// dans Web/utilisateurs.json. Ne supprime jamais les anciens fichiers, qui
+// restent en place par sécurité une fois la migration faite.
 //
 // Idempotence : on vérifie l'existence de bibliotheques/<slug>.json pour LE
-// COMPTE DE compte.json précisément (pas juste "users.json existe") — sinon,
-// si un users.json de Ma Bibliothèque existe déjà avec un autre compte, ce
-// bouton se croirait "déjà fait" et laisserait la vraie collection historique
-// orpheline dans l'ancien livres.json. On fusionne donc dans users.json
-// plutôt que de l'écraser.
+// COMPTE DE compte.json précisément. Se fier à la présence d'un fichier de
+// comptes laisserait la vraie collection historique orpheline dans l'ancien
+// livres.json dès qu'un autre compte y aurait été ajouté.
 async function migrerMaBibliothequeVersMultiCompte(token) {
   let compte;
   try {
@@ -516,24 +513,28 @@ async function migrerMaBibliothequeVersMultiCompte(token) {
   await ecrireFichierJSONAbsolu(`MaBibliotheque/bibliotheques/${slug}.json`, livres, null, token,
     `Bibliothèque séparée pour ${compte.login}`);
 
-  // Fusion dans users.json (jamais d'écrasement : un autre compte a pu y être
-  // ajouté entre-temps). Ce fichier n'est plus lu pour se connecter — les
-  // comptes sont centralisés — mais il reste la trace de l'ancien état, que
-  // l'import des comptes reprendra.
-  let utilisateursMB = [];
-  let shaUsersMB = null;
+  // Le compte historique rejoint le fichier central, avec l'accès à ce site.
+  // Il allait autrefois dans MaBibliotheque/users.json ; y écrire aujourd'hui
+  // créerait un compte que plus personne ne lit.
+  let centraux = [];
+  let shaCentraux = null;
   try {
-    const r = await lireFichierJSONAbsolu("MaBibliotheque/users.json", token);
-    utilisateursMB = Array.isArray(r.contenu) ? r.contenu : [];
-    shaUsersMB = r.sha;
+    const r = await lireFichierJSON("utilisateurs.json", token);
+    centraux = Array.isArray(r.contenu) ? r.contenu : [];
+    shaCentraux = r.sha;
   } catch (e) {
     if (e.status !== 404) throw e;
   }
-  if (!utilisateursMB.some(u => u.login === compte.login)) {
-    utilisateursMB.push({ login: compte.login, password: compte.password, nomAffichage: "" });
+  let entree = centraux.find(u => u.login === compte.login);
+  if (!entree) {
+    entree = { login: compte.login, password: compte.password, role: "user",
+               nomAffichage: "", acces: [] };
+    centraux.push(entree);
   }
-  await ecrireFichierJSONAbsolu("MaBibliotheque/users.json", utilisateursMB, shaUsersMB, token,
-    "Passage de Ma Bibliothèque à des comptes séparés");
+  if (!Array.isArray(entree.acces)) entree.acces = [];
+  if (!entree.acces.includes("ma-bibliotheque")) entree.acces.push("ma-bibliotheque");
+  await ecrireFichierJSON("utilisateurs.json", centraux, shaCentraux, token,
+    `Passage de Ma Bibliothèque à des comptes séparés (${compte.login})`);
 
   return { migre: true, login: compte.login, livres: livres.length, imagesDeplacees };
 }

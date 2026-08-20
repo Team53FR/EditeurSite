@@ -243,10 +243,10 @@ async function obtenirUrlImage(chemin, token) {
 }
 
 // ===== Comptes (un par personne, chacun avec sa propre collection) =====
-// Les identifiants vivent dans MaBibliotheque/users.json sur le dépôt BDD :
-//   [{ "login": "...", "password": "...", "nomAffichage": "..." }]
-// (Anciennement un compte unique dans compte.json — voir migrerMaBibliothequeVersMultiCompte()
-// côté portail central pour la bascule vers ce fichier.)
+// Les identifiants vivent dans le fichier central Web/utilisateurs.json, avec
+// la liste des sites auxquels chaque compte a accès (voir aAccesAuSite).
+// (Ce site a connu un compte unique dans compte.json, puis un users.json qui
+// lui était propre — voir migrerMaBibliothequeVersMultiCompte() côté portail.)
 // Le token GitHub et l'identifiant sont mémorisés sur l'appareil (localStorage)
 // pour éviter de les retaper à chaque ouverture — usage personnel sur un
 // téléphone déjà protégé par son propre verrouillage. Contrepartie assumée :

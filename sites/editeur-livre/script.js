@@ -1,7 +1,8 @@
 // ===== A MODIFIER avec tes informations =====
 const PROPRIETAIRE = "Team53FR";
 const DEPOT_BDD = "BDD";
-// Dossier du dépôt qui contient toute la base (users.json, bibliotheques/, images/).
+// Dossier du dépôt qui contient les données de ce site (bibliotheques/,
+// images/, publies.json). Les comptes, eux, sont centralisés ailleurs.
 // Laisser "" pour revenir à la racine du dépôt.
 const DOSSIER_BDD = "EditeurLivre";
 
@@ -87,9 +88,9 @@ function seDeconnecter() {
 }
 
 // Construit l'URL de l'API GitHub pour un chemin RELATIF à la base.
-// Ex. "users.json" -> .../contents/EditeurLivre/users.json
+// Ex. "publies.json" -> .../contents/EditeurLivre/publies.json
 // Ainsi le reste du code continue de manipuler des chemins courts
-// ("users.json", "bibliotheques/x.json", "images/x/y.png").
+// ("publies.json", "bibliotheques/x.json", "images/x/y.png").
 function urlContenuBDD(chemin) {
   // Un chemin commençant par « / » part de la RACINE du dépôt et ignore le
   // dossier du site : c'est ainsi qu'on atteint le fichier central des

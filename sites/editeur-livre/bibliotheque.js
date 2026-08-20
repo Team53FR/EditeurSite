@@ -357,7 +357,7 @@ async function supprimerLivre(id) {
   }
 }
 
-// ----- Nom d'affichage (libre-service, stocké dans users.json) -----
+// ----- Nom d'affichage (libre-service, dans le fichier central) -----
 
 function modifierNom() {
   const edition = document.getElementById("editionNom");
@@ -392,17 +392,23 @@ async function enregistrerNom() {
   if (nouveau === ancien) { annulerNom(); return; }
 
   try {
-    // Le nom d'affichage est stocké dans users.json (champ nomAffichage du compte)
-    const { contenu: utilisateurs, sha } = await lireFichierJSON("users.json", token);
-    const u = Array.isArray(utilisateurs) ? utilisateurs.find(x => x.login === login) : null;
-    if (!u) { message.textContent = "Compte introuvable dans users.json."; return; }
+    // Le pseudo vit dans le fichier central des comptes : le changer ici le
+    // change pour le portail et pour tous les sites, comme le fait « Mon
+    // compte ». On relit juste avant d'écrire et on ne touche qu'à sa propre
+    // entrée, pour ne pas écraser ce qu'un administrateur aurait modifié.
+    const { contenu, sha } = await lireFichierJSON(CHEMIN_UTILISATEURS, token);
+    const utilisateurs = Array.isArray(contenu) ? contenu : [];
+    const u = utilisateurs.find(x => x.login === login);
+    if (!u) { message.textContent = "Compte introuvable dans les comptes du portail."; return; }
 
     if (nouveau) u.nomAffichage = nouveau;
     else delete u.nomAffichage; // un nom vide = revenir à l'identifiant
 
-    await ecrireFichierJSON("users.json", utilisateurs, sha, token, "Mise à jour du nom d'affichage");
+    await ecrireFichierJSON(CHEMIN_UTILISATEURS, utilisateurs, sha, token,
+      `Changement de pseudo de ${login}`);
 
     localStorage.setItem("gh_nom", nouveau);
+    localStorage.setItem("team53_nom", nouveau);
     annulerNom();
     remplirProfil();
     message.textContent = "Nom mis à jour.";

@@ -775,8 +775,8 @@ function adopterSessionCentrale() {
 adopterSessionCentrale();
 
 // ===== Connexion (comptes multiples) =====
-// Les identifiants vivent dans DroidFortnite/users.json sur le dépôt BDD :
-//   [{ "login": "...", "password": "...", "nomAffichage": "..." }]
+// Les identifiants vivent dans le fichier central Web/utilisateurs.json, avec
+// la liste des sites auxquels chaque compte a accès (voir aAccesAuSite).
 // Token + identité mémorisés sur l'appareil (localStorage), comme
 // ma-bibliotheque : usage personnel/familial sur un appareil déjà protégé.
 async function seConnecter() {
