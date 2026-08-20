@@ -303,6 +303,33 @@ a { color: var(--primaire); }
   .encart-app { flex-wrap: wrap; }
   .encart-app-texte { flex-basis: calc(100% - 4rem); }
   .encart-app .btn-primaire { flex: 1; }
+
+  /* Fiche de compte sur téléphone.
+     Sur une seule rangée, l'avatar, le nom, le badge de rôle et trois boutons
+     se disputaient 350 pixels : la date se coupait lettre par lettre et les
+     boutons sortaient de l'écran. On empile donc — identité en haut, accès
+     ensuite, actions en bas — et les boutons prennent toute la largeur, ce
+     qui leur donne enfin une cible atteignable au pouce. */
+  .user-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    gap: 0.5rem 0.8rem;
+    padding: 0.9rem;
+  }
+  .user-ava { grid-row: 1; grid-column: 1; }
+  .user-nom { grid-row: 1; grid-column: 2; }
+  .user-date { white-space: normal; }
+  /* Le rôle se range sous le nom, dans la même colonne : seul sur sa ligne,
+     il flottait entre l'identité et les boutons sans se rattacher à rien. */
+  .role-badge { grid-column: 2; justify-self: start; }
+  .user-actions {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+    gap: 0.4rem;
+  }
+  .user-actions .btn-mini { padding: 0.6rem 0.5rem; text-align: center; }
 }
 
 /* ===== Mon compte : statistiques ===== */
