@@ -2105,3 +2105,49 @@ button.danger {
   cursor: pointer;
 }
 .mi-lancer:hover { filter: brightness(1.06); }
+
+/* ===== Dialogue de la couverture ===== */
+.dc-apercu { display: flex; justify-content: center; margin: 16px 0 4px; }
+.dc-schema {
+  max-width: 100%;
+  height: auto;
+  color: var(--s-accent, #8a4b2a);
+}
+.dc-ligne {
+  display: flex; flex-wrap: wrap; gap: 12px;
+  align-items: flex-end;
+  margin-top: 6px;
+}
+.dc-ligne .tr-champ { flex: 1 1 200px; }
+.dc-ligne .tr-champ.tr-court { flex: 0 0 8.5rem; }
+.dc-ligne select, .dc-ligne input[type="number"] {
+  width: 100%; box-sizing: border-box;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--s-line, #e6ddc9); border-radius: 8px;
+  font: inherit; font-size: 0.9rem;
+  background: var(--s-paper, #fffdf8);
+}
+.dc-ligne .tr-champ > span { font-size: 12px; color: var(--s-ink-soft, #6f6455); margin-bottom: 3px; }
+.dc-ligne .tr-champ > strong { font-size: 15px; }
+.dc-ligne .tr-champ small { font-size: 12px; color: var(--s-ink-soft, #6f6455); }
+.dc-calcul { margin-top: 8px !important; }
+.mi-actions .ci-annuler {
+  margin-right: 10px;
+  padding: 11px 20px;
+  border: 1px solid var(--s-line, #e6ddc9); border-radius: 10px;
+  background: var(--s-paper, #fffdf8);
+  color: var(--s-ink, #2b2622);
+  font-size: 15px; cursor: pointer;
+}
+.mi-actions .ci-annuler:hover { border-color: var(--s-accent, #8a4b2a); }
+.mi-details-schema .tr-champ { display: inline-flex; flex-direction: column; margin: 6px 0; }
+/* Le contenu replié garde la taille d'une note, pas celle du texte courant :
+   déplié, il prenait plus de place que la question à laquelle il répond. */
+.mi-details-schema > p,
+.mi-details-guide > p {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--s-ink-soft, #6f6455);
+  margin: 6px 0;
+}
+.mi-details-schema > p b { color: var(--s-ink, #2b2622); }

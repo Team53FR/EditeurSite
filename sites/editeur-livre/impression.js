@@ -1202,73 +1202,104 @@ function exporterCouvertureLivret() {
   ouvrirDialogueCouvertureSeule(livre, f, (livre.pages || []).length, true);
 }
 
+// Papiers courants pour les PAGES INTÉRIEURES. C'est leur épaisseur qui fait
+// le dos, pas celle de la couverture : le dos entoure la pile des pages.
+//
+// La « main » (ou bouffant) dit combien un papier gonfle à grammage égal —
+// un mot d'imprimeur qui ne dit rien à personne. On la range donc dans les
+// réglages fins et on propose des papiers nommés, avec leur usage.
+const PAPIERS_INTERIEUR = [
+  { cle: "70",  nom: "Papier fin — 70 g",        grammage: 70,  main: 1.2 },
+  { cle: "80",  nom: "Papier ordinaire — 80 g",  grammage: 80,  main: 1.2 },
+  { cle: "90",  nom: "Un peu épais — 90 g",      grammage: 90,  main: 1.2 },
+  { cle: "100", nom: "Épais — 100 g",            grammage: 100, main: 1.2 },
+  { cle: "120", nom: "Très épais — 120 g",       grammage: 120, main: 1.2 }
+];
+const PAPIER_INTERIEUR_DEFAUT = "80";
+
+function papierInterieur(cle) {
+  return PAPIERS_INTERIEUR.find((p) => p.cle === cle) || PAPIERS_INTERIEUR[1];
+}
+
 function ouvrirDialogueCouvertureSeule(livre, f, nbPages, agrafe) {
   const ancien = document.getElementById("dialogueCouverture");
   if (ancien) ancien.remove();
 
-  const dos = agrafe ? 0 : epaisseurDosMm(nbPages, GRAMMAGE_DEFAUT, MAIN_DEFAUT);
-  const largSupport = (larg) => 2 * f.larg + larg + 2 * MARGE_TECHNIQUE_MM;
+  const papierPages = papierInterieur(PAPIER_INTERIEUR_DEFAUT);
+  const dosCalcule = agrafe ? 0 : epaisseurDosMm(nbPages, papierPages.grammage, papierPages.main);
+  const largSupport = (dosMm) => 2 * f.larg + dosMm + 2 * MARGE_TECHNIQUE_MM;
   const hautSupport = f.haut + 2 * MARGE_TECHNIQUE_MM;
 
-  let html = '<div class="modal-impression-carte ci-carte" role="dialog" aria-modal="true">' +
+  let html = '<div class="modal-impression-carte mi-carte" role="dialog" aria-modal="true">' +
     '<button class="mi-fermer" aria-label="Fermer">&#10005;</button>' +
-    "<h3>" + (agrafe ? "Couverture du livret" : "Imprimer la couverture") + "</h3>" +
+    "<h3>" + (agrafe ? "La couverture du livret" : "La couverture") + "</h3>" +
     '<p class="mi-intro">' + (agrafe
-      ? "Une seule feuille, ouverte à plat : 4e de couverture et 1re, à plier en deux " +
-        "et à agrafer avec le cahier. Le trait du milieu marque le pli, les quatre " +
-        "autres les coupes."
-      : "Une seule feuille, ouverte à plat : 4e de couverture, dos, 1re de couverture. " +
-        "Deux traits marquent les plis du dos, quatre autres les coupes.") + "</p>";
+      ? "Une seule feuille, ouverte à plat : la 4e de couverture et la 1re. " +
+        "On la plie en deux et on l'agrafe avec le cahier."
+      : "Une seule feuille, ouverte à plat : la 4e de couverture, le dos, la 1re. " +
+        "Des traits marquent où plier et où couper.") + "</p>";
 
-  html += '<div class="ci-resume">' +
-    "<div><span>Format du livre</span><strong>" + f.larg + " × " + f.haut + " mm</strong></div>" +
-    '<div><span>Planche à plat</span><strong class="dc-support">' +
-      largSupport(dos).toFixed(0) + " × " + hautSupport + " mm</strong></div>" +
-  "</div>";
+  // Le dessin dit en un coup d'œil ce qui va sortir de l'imprimante.
+  html += '<div class="dc-apercu">' + schemaPlancheHtml(f, dosCalcule, agrafe) + "</div>";
 
-  html += '<div class="ci-dos">' +
-    "<h4>Papier chargé dans l'imprimante</h4>" +
-    '<div class="ci-champs">' +
-      '<label>Feuille <select id="dcPapier">' +
-        PAPIERS.map((pa) => '<option value="' + pa.cle + '">' + pa.nom +
-          " (" + pa.larg + " × " + pa.haut + " mm)</option>").join("") +
-        '<option value="exact">Taille exacte de la planche (pour un PDF)</option>' +
-      "</select></label>" +
+  if (!agrafe) {
+    html += '<div class="mi-groupe"><h4>Quelle épaisseur fera le dos ?</h4>' +
+      '<p class="mi-groupe-aide">Le dos entoure la pile de vos pages : c\'est ' +
+      "l'épaisseur de <b>leur</b> papier qui compte, pas celle de la couverture. " +
+      "Choisissez le papier que vous mettrez dans le bac.</p>" +
+      '<div class="dc-ligne">' +
+        '<label class="tr-champ"><span>Papier de vos pages</span>' +
+          '<select id="dcPapierPages">' +
+            PAPIERS_INTERIEUR.map((pa) => '<option value="' + pa.cle + '"' +
+              (pa.cle === PAPIER_INTERIEUR_DEFAUT ? " selected" : "") + ">" + pa.nom + "</option>").join("") +
+          "</select></label>" +
+        '<label class="tr-champ tr-court"><span>Dos obtenu</span>' +
+          '<input type="number" id="dcDos" value="' + dosCalcule.toFixed(1) +
+          '" min="0" max="60" step="0.1"> <small>mm</small></label>' +
+      "</div>" +
+      '<p class="mi-groupe-aide dc-calcul"></p>' +
+      '<details class="mi-details-schema"><summary>Le dos ne tombe pas juste ?</summary>' +
+        "<p>Le calcul part d'un papier moyen ; le vôtre gonfle peut-être un peu plus " +
+        "ou un peu moins. La mesure vaut mieux que le calcul : <b>imprimez vos pages, " +
+        "tassez la pile sur une table, mesurez son épaisseur à la règle</b> et reportez-la " +
+        "dans « Dos obtenu ». La couverture elle-même ajoute une fraction de millimètre, " +
+        "absorbée par les plis.</p>" +
+        '<label class="tr-champ tr-court"><span>Main du papier</span>' +
+          '<input type="number" id="dcMain" value="' + papierPages.main +
+          '" min="0.8" max="2.5" step="0.05"></label>' +
+        "<p>La « main » dit de combien un papier gonfle à grammage égal. 1,2 correspond " +
+        "à un papier de bureau courant ; un papier bouffant de roman monte à 1,8.</p>" +
+      "</details>" +
+    "</div>";
+  } else {
+    html += '<p class="mi-groupe-aide">Un cahier agrafé n\'a pas de dos plat : la planche ' +
+      "vaut exactement deux pages, et le pli tombe en son milieu. Pour un dos collé, " +
+      "repassez par « La couverture » du dos collé.</p>" +
+      '<input type="hidden" id="dcDos" value="0">';
+  }
+
+  html += '<div class="mi-groupe"><h4>Sur quelle feuille imprimez-vous ?</h4>' +
+    '<div class="dc-ligne">' +
+      '<label class="tr-champ"><span>Papier chargé dans l\'imprimante</span>' +
+        '<select id="dcPapier">' +
+          PAPIERS.map((pa) => '<option value="' + pa.cle + '">' + pa.nom +
+            " — " + pa.larg + " × " + pa.haut + " mm</option>").join("") +
+          '<option value="exact">Taille exacte de la planche (pour un PDF)</option>' +
+        "</select></label>" +
+      '<div class="tr-champ"><span>Planche à plat</span>' +
+        '<strong class="dc-support">' + largSupport(dosCalcule).toFixed(0) +
+        " × " + hautSupport + " mm</strong></div>" +
     "</div>" +
-    '<p class="ci-note">La planche est centrée sur cette feuille, à sa taille réelle. ' +
-      "C'est ce qui garantit que la couverture tombe autour des pages : sans papier " +
-      "déclaré, le navigateur met le travail à l'échelle de la feuille et chaque " +
-      "export sort à une échelle différente.</p>" +
+    '<p class="mi-groupe-aide dc-papier"></p>' +
   "</div>";
 
-  html += '<div class="ci-dos">' +
-    "<h4>Épaisseur du dos</h4>" +
-    '<div class="ci-champs">' +
-      '<label>Grammage <input type="number" id="dcGrammage" value="' + GRAMMAGE_DEFAUT +
-        '" min="50" max="200" step="5"' + (agrafe ? " disabled" : "") + "> g/m²</label>" +
-      '<label>Main <input type="number" id="dcMain" value="' + MAIN_DEFAUT +
-        '" min="0.8" max="2.5" step="0.05"' + (agrafe ? " disabled" : "") + "></label>" +
-      '<label>Dos <input type="number" id="dcDos" value="' + dos.toFixed(1) +
-        '" min="0" max="60" step="0.1"' + (agrafe ? " disabled" : "") + "> mm</label>" +
-    "</div>" +
-    '<p class="ci-note">' + (agrafe
-      ? "Un cahier agrafé n'a pas de dos plat : la planche vaut exactement deux pages, " +
-        "et le pli tombe en son milieu. Pour un dos collé, passez par « Couverture " +
-        "seule » dans la catégorie du dos collé."
-      : "Calculé pour " + nbPages + " pages sur du papier ordinaire. " +
-        "Mesurez la tranche de votre pile une fois imprimée et reportez la valeur ici : " +
-        "c'est elle qui place les plis.") + "</p>" +
-  "</div>";
+  html += '<p class="mi-resume">Dans la fenêtre d\'impression : échelle <b>100 %</b> ' +
+    "(jamais « ajuster à la page »), marges « aucune », et décochez les en-têtes et " +
+    "pieds de page du navigateur. Sans quoi les plis ne tomberaient plus au bon endroit.</p>";
 
-  html += '<p class="ci-note dc-papier"></p>';
-
-  html += '<p class="ci-reglages"><strong>Dans la fenêtre d&rsquo;impression :</strong> échelle 100 % ' +
-    "(jamais « ajuster à la page »), marges « aucune », et décochez les en-têtes et pieds de page " +
-    "du navigateur. Sans quoi les plis ne tomberaient plus au bon endroit.</p>";
-
-  html += '<div class="ci-actions">' +
-    '<button class="ci-annuler">Annuler</button>' +
-    '<button class="ci-generer">Imprimer la couverture</button>' +
+  html += '<div class="mi-actions">' +
+    '<button class="ci-annuler" type="button">Annuler</button>' +
+    '<button class="mi-lancer" type="button">Imprimer la couverture</button>' +
   "</div></div>";
 
   const fond = document.createElement("div");
@@ -1279,59 +1310,108 @@ function ouvrirDialogueCouvertureSeule(livre, f, nbPages, agrafe) {
   document.body.appendChild(fond);
 
   const champDos = fond.querySelector("#dcDos");
-
-  // La feuille à plat dépasse presque toujours l'A4 : mieux vaut le dire ici
-  // que devant une couverture tronquée.
   const selPapier = fond.querySelector("#dcPapier");
+  const selPages = fond.querySelector("#dcPapierPages");
+  const champMain = fond.querySelector("#dcMain");
 
-  const majSupport = () => {
-    const d = parseFloat(champDos.value);
-    const dosMm = (isFinite(d) && d >= 0) ? d : dos;
+  const dosSaisi = () => {
+    const v = parseFloat(champDos.value);
+    return isFinite(v) && v >= 0 ? v : dosCalcule;
+  };
+
+  // Le dessin, la taille de planche et la remarque sur le papier suivent
+  // chaque frappe : on voit tout de suite l'effet de ce qu'on change.
+  const rafraichir = () => {
+    const dosMm = dosSaisi();
     const l = largSupport(dosMm);
+
+    fond.querySelector(".dc-apercu").innerHTML = schemaPlancheHtml(f, dosMm, agrafe);
     fond.querySelector(".dc-support").textContent = l.toFixed(0) + " × " + hautSupport + " mm";
+
+    const calcul = fond.querySelector(".dc-calcul");
+    if (calcul && selPages) {
+      const pa = papierInterieur(selPages.value);
+      const m = parseFloat(champMain && champMain.value) || pa.main;
+      calcul.textContent = "Calculé pour " + nbPages + " pages, soit " +
+        Math.ceil(nbPages / 2) + " feuilles de " + pa.grammage + " g/m² : " +
+        epaisseurDosMm(nbPages, pa.grammage, m).toFixed(1).replace(".", ",") + " mm.";
+    }
 
     const papier = papierParCle(selPapier.value);
     const note = fond.querySelector(".dc-papier");
     if (!papier) {
       note.textContent = "Taille exacte : à réserver au PDF. Sur une imprimante, le pilote " +
-        "ramènera la planche au format du papier chargé, et la couverture ne fera plus la " +
-        "bonne taille.";
+        "ramènerait la planche au format du papier chargé, et la couverture ne ferait plus " +
+        "la bonne taille.";
       note.classList.add("dc-alerte");
     } else if (papier.larg < l || papier.haut < hautSupport) {
-      note.textContent = "La planche (" + l.toFixed(0) + " × " + hautSupport +
-        " mm) ne tient pas sur cette feuille : elle sera rognée. Prenez du " +
-        (papierMinimal(l, hautSupport) || { nom: "plus grand" }).nom + ".";
+      const mieux = papierMinimal(l, hautSupport);
+      note.textContent = "La planche ne tient pas sur cette feuille : elle serait rognée. " +
+        "Prenez du " + (mieux ? mieux.nom : "plus grand") + ".";
       note.classList.add("dc-alerte");
     } else {
       note.textContent = "La planche tient sur cette feuille, à sa taille réelle.";
       note.classList.remove("dc-alerte");
     }
   };
-  selPapier.onchange = majSupport;
 
-  const recalculer = () => {
-    const g = parseFloat(fond.querySelector("#dcGrammage").value) || GRAMMAGE_DEFAUT;
-    const m = parseFloat(fond.querySelector("#dcMain").value) || MAIN_DEFAUT;
-    champDos.value = epaisseurDosMm(nbPages, g, m).toFixed(1);
-    majSupport();
+  // Changer de papier recalcule le dos ; le modifier à la main fige la valeur.
+  const recalculerDos = () => {
+    const pa = papierInterieur(selPages.value);
+    const m = parseFloat(champMain && champMain.value) || pa.main;
+    champDos.value = epaisseurDosMm(nbPages, pa.grammage, m).toFixed(1);
+    rafraichir();
   };
-  fond.querySelector("#dcGrammage").oninput = recalculer;
-  fond.querySelector("#dcMain").oninput = recalculer;
-  champDos.oninput = majSupport;
-  const parDefaut = papierMinimal(largSupport(dos), hautSupport);
+  if (selPages) selPages.onchange = recalculerDos;
+  if (champMain) champMain.oninput = recalculerDos;
+  champDos.oninput = rafraichir;
+  selPapier.onchange = rafraichir;
+
+  const parDefaut = papierMinimal(largSupport(dosCalcule), hautSupport);
   if (parDefaut) selPapier.value = parDefaut.cle;
-  majSupport();
+  rafraichir();
 
   fond.querySelector(".mi-fermer").onclick = () => fond.remove();
   fond.querySelector(".ci-annuler").onclick = () => fond.remove();
-  fond.querySelector(".ci-generer").onclick = () => {
-    const saisi = parseFloat(champDos.value);
-    const dosMm = (isFinite(saisi) && saisi >= 0) ? saisi : dos;
+  fond.querySelector(".mi-lancer").onclick = () => {
+    const dosMm = dosSaisi();
+    const papier = papierParCle(selPapier.value);
     fond.remove();
     // Aucune page intérieure à fournir : la planche de couverture n'en utilise pas.
-    const papier = papierParCle(selPapier.value);
     setTimeout(() => genererFichierImprimeur("couverture", dosMm, livre, f, [], papier), 50);
   };
+}
+
+// La planche vue de dessus : 4e de couverture, dos, 1re — avec le dos à
+// l'échelle, pour qu'on voie tout de suite s'il est plausible.
+function schemaPlancheHtml(f, dosMm, agrafe) {
+  const H = 108;                      // hauteur du dessin, en px
+  const echelle = H / f.haut;
+  const largPan = f.larg * echelle;
+  const largDos = Math.max(agrafe ? 1 : 2, dosMm * echelle);
+  const total = 2 * largPan + largDos;
+
+  const panneau = (x, etiquette) =>
+    '<rect x="' + x.toFixed(1) + '" y="6" width="' + largPan.toFixed(1) + '" height="' + H +
+      '" rx="2" fill="#fffdf8" stroke="currentColor" stroke-width="1.4"/>' +
+    '<text x="' + (x + largPan / 2).toFixed(1) + '" y="' + (H / 2 + 10) +
+      '" font-size="10" text-anchor="middle" fill="currentColor" opacity=".75">' + etiquette + "</text>";
+
+  // Taille intrinsèque donnée en pixels : sans elle, le SVG s'étire à la
+  // largeur du dialogue et grossit ses libellés jusqu'à l'absurde.
+  const largeurPx = total + 4;
+  const hauteurPx = H + 30;
+  return '<svg width="' + largeurPx.toFixed(0) + '" height="' + hauteurPx +
+    '" viewBox="0 0 ' + largeurPx.toFixed(1) + ' ' + hauteurPx + '" class="dc-schema" role="img" ' +
+    'aria-label="La planche de couverture, à plat">' +
+    panneau(2, "4e de couv.") +
+    '<rect x="' + (2 + largPan).toFixed(1) + '" y="6" width="' + largDos.toFixed(1) +
+      '" height="' + H + '" fill="currentColor" opacity=".16" stroke="currentColor" stroke-width="1.4"/>' +
+    panneau(2 + largPan + largDos, "1re de couv.") +
+    '<text x="' + (2 + largPan + largDos / 2).toFixed(1) + '" y="' + (H + 22) +
+      '" font-size="9" text-anchor="middle" fill="currentColor">' +
+      (agrafe ? "le pli" : "dos " + dosMm.toFixed(1).replace(".", ",") + " mm") + "</text>" +
+  "</svg>";
 }
 
 // ----- Panneau de contrôle avant génération -----
