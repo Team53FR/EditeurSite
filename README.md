@@ -205,6 +205,19 @@ Deux précautions :
 L'identifiant de connexion, lui, ne se change pas : il sert de clé aux
 fichiers personnels de chaque site (`bibliotheques/<slug>.json`).
 
+### Fichiers de plus de 1 Mo
+
+L'API Contents cesse de renvoyer le contenu au-delà de 1 Mo — un livre de
+quelques centaines de pages y arrive. La lecture bascule alors sur l'**API des
+blobs** (`git/blobs/<sha>` en `Accept: application/vnd.github.raw`), qui est
+authentifiée et tient jusqu'à 100 Mo. L'URL de téléchargement directe ne sert
+plus que de dernier recours : sur un dépôt privé, son jeton temporaire se fait
+refuser dès qu'il expire, et c'était la cause du message « trop volumineux et
+sa version brute n'a pas pu être récupérée ».
+
+Les métadonnées (dont le `sha`) viennent toujours du premier appel : la
+réécriture du fichier n'est pas affectée.
+
 ### Supprimer un compte
 
 Supprimer un compte n'efface que sa ligne de `Web/utilisateurs.json` : ses

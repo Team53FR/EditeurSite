@@ -127,14 +127,27 @@ async function lireFichierJSON(nomFichier, token) {
     } catch (e) {
       throw new Error(`Le contenu de "${nomFichier}" n'a pas pu être décodé (encodage invalide).`);
     }
-  } else if (data.download_url) {
-    // Fichier trop volumineux pour l'API Contents classique (> 1 Mo) :
-    // on récupère le contenu brut via son URL directe, qui n'a pas cette limite.
-    const reponseBrute = await fetch(data.download_url);
-    if (!reponseBrute.ok) {
+  } else if (data.sha) {
+    // Fichier trop volumineux pour l'API Contents (plus de 1 Mo) : son contenu
+    // n'accompagne plus les métadonnées. On le lit alors par l'API des blobs,
+    // en demandant le format brut — authentifiée, elle marche sur un dépôt
+    // privé, là où l'URL de téléchargement directe se fait refuser.
+    const reponseBlob = await fetch(
+      `https://api.github.com/repos/${PROPRIETAIRE}/${DEPOT_BDD}/git/blobs/${data.sha}`,
+      { headers: { "Authorization": `Bearer ${token}`, "Accept": "application/vnd.github.raw" } });
+
+    if (reponseBlob.ok) {
+      contenuDecode = await reponseBlob.text();
+    } else if (data.download_url) {
+      // Dernier recours : l'URL directe, qui porte son propre jeton temporaire.
+      const reponseBrute = await fetch(data.download_url);
+      if (!reponseBrute.ok) {
+        throw new Error(`Le fichier "${nomFichier}" est trop volumineux et sa version brute n'a pas pu être récupérée.`);
+      }
+      contenuDecode = await reponseBrute.text();
+    } else {
       throw new Error(`Le fichier "${nomFichier}" est trop volumineux et sa version brute n'a pas pu être récupérée.`);
     }
-    contenuDecode = await reponseBrute.text();
   } else {
     throw new Error(`Le fichier "${nomFichier}" est trop volumineux pour être lu (aucune URL brute disponible).`);
   }
