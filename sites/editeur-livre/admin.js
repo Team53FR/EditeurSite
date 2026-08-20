@@ -5,11 +5,11 @@
 // fichier central, en préservant les champs qu'elle n'affiche pas (accès aux
 // autres sites, dates de connexion…).
 //
-// « Retirer » ne supprime pas le compte : il lui retire l'accès à CE site.
-// Depuis que le fichier est commun, une suppression franche effacerait aussi
-// la bibliothèque, les droïdes et le portail de la personne — une page qui
-// s'appelle « utilisateurs de l'éditeur » n'a pas à pouvoir faire ça. La
-// suppression complète d'un compte reste au portail central.
+// Deux gestes, volontairement distincts depuis que le fichier est commun :
+// « Retirer l'accès » ferme le seul éditeur, « Supprimer » efface le compte
+// du portail et de tous les sites. Le second demande une confirmation qui
+// nomme ce qu'on perd — sur un fichier partagé, les deux ne peuvent pas
+// porter le même bouton.
 
 let tousLesComptes = [];   // le fichier central en entier
 let utilisateurs = [];     // ceux qui ont accès à l'éditeur
@@ -60,6 +60,13 @@ async function chargerUtilisateurs() {
   afficherUtilisateurs();
 }
 
+function desactiver(bouton, raison) {
+  bouton.disabled = true;
+  bouton.title = raison;
+  bouton.style.opacity = ".5";
+  bouton.style.cursor = "not-allowed";
+}
+
 function afficherUtilisateurs() {
   const liste = document.getElementById("listeUtilisateurs");
   const moi = localStorage.getItem("gh_login");
@@ -101,14 +108,27 @@ function afficherUtilisateurs() {
     bEdit.onclick = () => editerUtilisateur(u.login);
     actions.appendChild(bEdit);
 
+    // Deux gestes bien distincts, parce que le fichier des comptes est commun
+    // à tout le portail : lui fermer l'éditeur, ou effacer son compte partout.
+    const bAcces = document.createElement("button");
+    bAcces.className = "btn-mini";
+    bAcces.textContent = "Retirer l'accès";
+    if (estMoi) {
+      desactiver(bAcces, "Vous ne pouvez pas vous retirer l'accès");
+    } else if (role === "admin") {
+      // Un administrateur entre partout par son rôle : lui retirer cet accès
+      // ne changerait rien, et le bouton mentirait.
+      desactiver(bAcces, "Un administrateur a accès à tous les sites. Changez son rôle, ou supprimez son compte.");
+    } else {
+      bAcces.onclick = () => retirerAcces(u.login);
+    }
+    actions.appendChild(bAcces);
+
     const bDel = document.createElement("button");
     bDel.className = "btn-mini danger";
     bDel.textContent = "Supprimer";
     if (estMoi) {
-      bDel.disabled = true;
-      bDel.title = "Vous ne pouvez pas supprimer votre propre compte";
-      bDel.style.opacity = ".5";
-      bDel.style.cursor = "not-allowed";
+      desactiver(bDel, "Vous ne pouvez pas supprimer votre propre compte");
     } else {
       bDel.onclick = () => supprimerUtilisateur(u.login);
     }
@@ -211,7 +231,7 @@ async function enregistrerUtilisateur() {
   }
 }
 
-async function supprimerUtilisateur(login) {
+async function retirerAcces(login) {
   const moi = localStorage.getItem("gh_login");
   if (login === moi) return; // garde-fou : pas d'auto-retrait
 
@@ -241,6 +261,37 @@ async function supprimerUtilisateur(login) {
   } catch (erreur) {
     message.textContent = erreur.conflit
       ? "La liste des utilisateurs a été modifiée ailleurs. Rechargez la page avant de réessayer."
+      : erreur.message;
+  }
+}
+
+// Suppression franche du compte, dans le fichier central : la personne perd
+// le portail et tous les sites, pas seulement l'éditeur. Ses données restent
+// (bibliothèque, livres, droïdes) : rien n'est effacé du dépôt, seul le
+// compte disparaît.
+async function supprimerUtilisateur(login) {
+  const moi = localStorage.getItem("gh_login");
+  if (login === moi) return; // garde-fou : pas d'auto-suppression
+
+  if (!confirm(`Supprimer le compte « ${login} » ?\n\nIl perdra l'accès au portail ET à tous les sites, pas seulement à l'éditeur. ` +
+    `Ses données ne sont pas effacées : sa bibliothèque reste dans le dépôt.\n\nPour lui fermer le seul éditeur, utilisez « Retirer l'accès ».`)) return;
+
+  const token = localStorage.getItem("gh_token");
+  const message = document.getElementById("message");
+  const copie = tousLesComptes.filter(u => u.login !== login);
+
+  try {
+    shaUsers = await ecrireFichierJSON(CHEMIN_UTILISATEURS, copie, shaUsers, token,
+      `Suppression du compte ${login}`);
+    tousLesComptes = copie;
+    utilisateurs = copie.filter(aAccesAuSite);
+    if (modeEditionLogin === login) annulerEdition();
+    else afficherUtilisateurs();
+    message.textContent = "Compte supprimé.";
+    setTimeout(() => { if (message.textContent === "Compte supprimé.") message.textContent = ""; }, 2500);
+  } catch (erreur) {
+    message.textContent = erreur.conflit
+      ? "La liste des comptes a été modifiée ailleurs. Rechargez la page avant de réessayer."
       : erreur.message;
   }
 }
