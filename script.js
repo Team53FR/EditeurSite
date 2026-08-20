@@ -452,6 +452,33 @@ function ouvrirSessionCentrale(utilisateur, token) {
 // centralisation : les sites lisent maintenant Web/utilisateurs.json
 // directement, il n'y a plus de copie à tenir à jour.
 
+// Remet la session d'aplomb à partir du fichier des comptes.
+//
+// Le rôle, le pseudo et la liste des accès sont recopiés sur l'appareil à la
+// connexion, pour ne pas relire les comptes à chaque page. Mais cette copie ne
+// bougeait plus ensuite : un accès accordé par un administrateur n'apparaissait
+// qu'à la connexion suivante, et l'intéressé ne comprenait pas pourquoi son
+// nouveau site restait invisible.
+//
+// Renvoie « false » si le compte a disparu du fichier — la session ne vaut
+// alors plus rien. Une lecture qui échoue, elle, laisse la copie en place :
+// mieux vaut un tableau de bord un peu daté que pas de tableau de bord.
+async function rafraichirSessionCentrale(token) {
+  const login = localStorage.getItem("team53_login");
+  if (!token || !login) return true;
+  let utilisateurs;
+  try {
+    const { contenu } = await lireFichierJSON("utilisateurs.json", token);
+    utilisateurs = Array.isArray(contenu) ? contenu : [];
+  } catch (e) {
+    return true;
+  }
+  const moi = utilisateurs.find((u) => u.login === login);
+  if (!moi) return false;
+  ouvrirSessionCentrale(moi, token);
+  return true;
+}
+
 function seDeconnecter() {
   localStorage.removeItem("team53_token");
   localStorage.removeItem("team53_login");

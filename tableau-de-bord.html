@@ -57,6 +57,16 @@
       const token = exigerConnexionCentrale();
       if (!token) return;
 
+      // Les accès, le rôle et le pseudo sont relus à chaque ouverture : sans
+      // cela, un accès accordé à l'instant n'apparaîtrait qu'à la prochaine
+      // connexion, et le nouveau site resterait invisible sans explication.
+      const valide = await rafraichirSessionCentrale(token);
+      if (!valide) {
+        // Le compte n'existe plus : la session ne vaut plus rien.
+        seDeconnecter();
+        return;
+      }
+
       const nom = localStorage.getItem("team53_nom");
       if (nom) document.querySelector(".app-header h1").innerHTML =
         '<span id="entete-pastille">🔐</span> Bonjour, ' + echapper(nom);

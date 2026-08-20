@@ -152,6 +152,14 @@ portail préremplit directement les clés de stockage que le site cible lit
 déjà lui-même (selon `relais`), puis navigue vers `pageArrivee`. Le site ne
 voit pas la différence entre un relais et sa propre page de connexion.
 
+**Fraîcheur de la session** : le rôle, le pseudo et la liste des accès sont
+recopiés sur l'appareil à la connexion, pour ne pas relire les comptes à chaque
+page. Le tableau de bord les **relit à chaque ouverture**
+(`rafraichirSessionCentrale()`), sans quoi un accès accordé à l'instant
+n'apparaîtrait qu'à la connexion suivante. Un compte disparu du fichier ferme
+la session ; une lecture qui échoue laisse la copie en place, plutôt que de
+priver quelqu'un de son tableau de bord pour une coupure réseau.
+
 **Adoption de la session centrale** : le relais ne joue que si l'on passe par
 le tableau de bord. Chaque site appelle donc aussi `adopterSessionCentrale()`
 au chargement (en tête de son `script.js`) : si sa propre session manque mais
