@@ -4,6 +4,42 @@
 const PROPRIETAIRE = "Team53FR";
 const DEPOT_BDD = "BDD";
 const DOSSIER_BDD = "MaBibliotheque";
+
+// ===== Comptes centralisés =====
+//
+// Les comptes ne vivent plus dans le users.json de chaque site, mais dans un
+// seul fichier — Web/utilisateurs.json — qui porte aussi la liste des sites
+// auxquels chacun a accès. Un mot de passe changé l'est donc partout à la
+// fois, et deux fichiers ne peuvent plus diverger en silence.
+const CHEMIN_UTILISATEURS = "/Web/utilisateurs.json";
+// Identifiants des sites du portail, dans l'ordre du tableau de bord. Sert à
+// écrire une liste d'accès complète pour un compte qui n'en avait pas.
+const SITES_CONNUS = ["editeur-livre", "ma-bibliotheque", "droid-fortnite"];
+const ID_SITE = "ma-bibliotheque";
+
+// Un compte peut-il entrer ici ? Un administrateur du portail, oui, toujours.
+// Sinon il faut que ce site figure dans ses accès. Une entrée sans champ
+// « acces » date d'avant la centralisation : on la laisse passer plutôt que
+// d'enfermer quelqu'un dehors, la liste étant ensuite gérée par le portail.
+function aAccesAuSite(utilisateur) {
+  if (!utilisateur) return false;
+  if (utilisateur.role === "admin") return true;
+  if (!Array.isArray(utilisateur.acces)) return true;
+  return utilisateur.acces.includes(ID_SITE);
+}
+
+// Date de connexion : la globale, plus celle propre à ce site. Les deux
+// coexistent — le portail montre la dernière visite tous sites confondus,
+// chaque site la sienne — et l'ancien champ « derniereConnexion » des
+// fichiers de site retrouve ainsi sa place.
+function noterConnexion(utilisateur) {
+  const maintenant = new Date().toISOString();
+  utilisateur.derniereConnexion = maintenant;
+  if (!utilisateur.connexions || typeof utilisateur.connexions !== "object") {
+    utilisateur.connexions = {};
+  }
+  utilisateur.connexions[ID_SITE] = maintenant;
+}
 // Optionnel : clé Google Books gratuite (sans elle, le scan de code-barres
 // fonctionne quand même via Open Library et la BnF, mais Google Books limite
 // alors les requêtes anonymes à un quota global PARTAGÉ par tous les sites
@@ -22,9 +58,14 @@ const CLE_GOOGLE_BOOKS = "";
 // Construit l'URL de l'API GitHub pour un chemin RELATIF au dossier de la base.
 // Ex. "livres.json" -> .../contents/MaBibliotheque/livres.json
 function urlContenuBDD(chemin) {
-  const base = (DOSSIER_BDD || "").replace(/^\/+|\/+$/g, "");
+  // Un chemin commençant par « / » part de la RACINE du dépôt et ignore le
+  // dossier du site : c'est ainsi qu'on atteint le fichier central des
+  // comptes, qui n'appartient à aucun site en particulier.
+  const depuisRacine = chemin.charAt(0) === "/";
+  const base = depuisRacine ? "" : (DOSSIER_BDD || "").replace(/^\/+|\/+$/g, "");
   const prefixe = base ? base + "/" : "";
-  return `https://api.github.com/repos/${PROPRIETAIRE}/${DEPOT_BDD}/contents/${prefixe}${chemin}`;
+  const suite = depuisRacine ? chemin.slice(1) : chemin;
+  return `https://api.github.com/repos/${PROPRIETAIRE}/${DEPOT_BDD}/contents/${prefixe}${suite}`;
 }
 
 async function lireFichierJSON(nomFichier, token) {
@@ -225,20 +266,32 @@ async function seConnecter() {
   message.textContent = "Vérification en cours...";
 
   try {
-    const { contenu } = await lireFichierJSON("users.json", token);
+    const { contenu, sha } = await lireFichierJSON(CHEMIN_UTILISATEURS, token);
     const utilisateurs = Array.isArray(contenu) ? contenu : [];
     const utilisateur = utilisateurs.find(u => u.login === login && u.password === password);
 
-    if (utilisateur) {
-      localStorage.setItem("mb_token", token);
-      localStorage.setItem("mb_login", utilisateur.login);
-      window.location.href = "collection.html";
-    } else {
+    if (!utilisateur) {
       message.textContent = "Identifiants incorrects.";
+      return;
     }
+    if (!aAccesAuSite(utilisateur)) {
+      message.textContent = "Ce compte n'a pas accès à ce site. Demandez l'accès à un administrateur depuis le portail central.";
+      return;
+    }
+
+    localStorage.setItem("mb_token", token);
+    localStorage.setItem("mb_login", utilisateur.login);
+
+    try {
+      noterConnexion(utilisateur);
+      await ecrireFichierJSON(CHEMIN_UTILISATEURS, utilisateurs, sha, token,
+        `Dernière connexion de ${login} sur ${ID_SITE}`);
+    } catch (e) { /* la connexion se poursuit */ }
+
+    window.location.href = "collection.html";
   } catch (erreur) {
     if (erreur.status === 404) {
-      message.textContent = "Aucun compte configuré : crée MaBibliotheque/users.json dans le dépôt BDD.";
+      message.textContent = "Aucun compte configuré : demandez à un administrateur de créer le vôtre depuis le portail central.";
     } else {
       message.textContent = erreur.message;
     }

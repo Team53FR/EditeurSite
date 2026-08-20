@@ -87,9 +87,9 @@
     </div>
 
     <div class="bloc-carte">
-      <h2>Import des comptes existants</h2>
-      <p class="sous-titre">Fusionne les comptes d'Éditeur de livre et de Ma Bibliothèque dans les comptes centraux. Peut être relancé sans créer de doublon.</p>
-      <button class="btn btn-secondaire" onclick="lancerImport()">Importer les comptes existants</button>
+      <h2>Import des comptes des sites</h2>
+      <p class="sous-titre">Verse les anciens <code>users.json</code> d'Éditeur de livre, de Ma Bibliothèque et de Droid Fortnite dans ce fichier central, qui est désormais le seul que les sites consultent pour se connecter. Reprend les accès, les pseudos et les dates de connexion. Peut être relancé sans créer de doublon : un compte central déjà présent n'est jamais écrasé, seulement complété.</p>
+      <button class="btn btn-secondaire" onclick="lancerImport()">Importer les comptes des sites</button>
       <p id="messageImport" class="message"></p>
     </div>
 

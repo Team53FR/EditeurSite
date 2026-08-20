@@ -210,13 +210,6 @@ function annulerEdition() {
   afficherUtilisateurs();
 }
 
-// Upsert silencieux dans EditeurLivre/users.json pour qu'un compte auquel on
-// vient de donner accès à editeur-livre puisse aussi s'y connecter en direct
-// (ce site vérifie que gh_login correspond à une entrée réelle de son propre
-// users.json — voir README.md). N'écrit jamais dans les fichiers du site sauf
-// pour ce seul besoin de synchronisation.
-
-
 async function enregistrerUtilisateur() {
   const message = document.getElementById("message");
   const moi = localStorage.getItem("team53_login");
@@ -259,20 +252,9 @@ async function enregistrerUtilisateur() {
     shaUtilisateurs = await ecrireFichierJSON("utilisateurs.json", copie, shaUtilisateurs, token, commit);
     utilisateurs = copie;
 
-    // Best-effort : ne doit jamais bloquer l'enregistrement du compte central.
-    if (acces.includes("editeur-livre")) {
-      try { await synchroniserEditeurLivre(login, password, nomAffichage, token); }
-      catch (e) { /* ignoré : la synchro pourra être retentée en réenregistrant */ }
-    }
-    if (acces.includes("ma-bibliotheque")) {
-      try { await synchroniserMaBibliotheque(login, password, nomAffichage, token); }
-      catch (e) { /* ignoré : la synchro pourra être retentée en réenregistrant */ }
-    }
-    if (acces.includes("droid-fortnite")) {
-      try { await synchroniserDroidFortnite(login, password, nomAffichage, token); }
-      catch (e) { /* ignoré : la synchro pourra être retentée en réenregistrant */ }
-    }
-
+    // Rien à recopier ailleurs : les sites lisent ce fichier-ci. C'est tout
+    // l'intérêt de la centralisation — un mot de passe changé l'est partout,
+    // et deux fichiers ne peuvent plus diverger en silence.
     annulerEdition();
     message.textContent = "Enregistré avec succès.";
     setTimeout(() => { if (message.textContent === "Enregistré avec succès.") message.textContent = ""; }, 2500);
@@ -287,7 +269,7 @@ async function supprimerUtilisateur(login) {
   const moi = localStorage.getItem("team53_login");
   if (login === moi) return; // garde-fou : pas d'auto-suppression
 
-  if (!confirm(`Supprimer le compte « ${login} » ? Cette action est irréversible.\n\n(Ses comptes propres à chaque site, s'ils existent, ne sont pas supprimés.)`)) return;
+  if (!confirm(`Supprimer le compte « ${login} » ? Cette action est irréversible.\n\nIl perd l'accès à tous les sites du portail. Ses données (bibliothèque, livres, droïdes) ne sont pas supprimées.`)) return;
 
   const message = document.getElementById("message");
   const copie = utilisateurs.filter(u => u.login !== login);

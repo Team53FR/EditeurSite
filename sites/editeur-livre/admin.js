@@ -1,7 +1,18 @@
 // Gestion des utilisateurs (réservée aux administrateurs).
-// Les comptes sont stockés dans users.json du dépôt BDD : [{ login, password, role }].
+//
+// Les comptes sont centralisés dans Web/utilisateurs.json : cette page ne
+// montre donc que ceux qui ont accès à l'éditeur, et n'écrit que dans le
+// fichier central, en préservant les champs qu'elle n'affiche pas (accès aux
+// autres sites, dates de connexion…).
+//
+// « Retirer » ne supprime pas le compte : il lui retire l'accès à CE site.
+// Depuis que le fichier est commun, une suppression franche effacerait aussi
+// la bibliothèque, les droïdes et le portail de la personne — une page qui
+// s'appelle « utilisateurs de l'éditeur » n'a pas à pouvoir faire ça. La
+// suppression complète d'un compte reste au portail central.
 
-let utilisateurs = [];
+let tousLesComptes = [];   // le fichier central en entier
+let utilisateurs = [];     // ceux qui ont accès à l'éditeur
 let shaUsers = null;
 let modeEditionLogin = null; // login en cours de modification, ou null (mode ajout)
 
@@ -29,8 +40,9 @@ async function chargerUtilisateurs() {
   if (!token || !login) { window.location.replace("connexion.html"); return; }
 
   try {
-    const { contenu, sha } = await lireFichierJSON("users.json", token);
-    utilisateurs = Array.isArray(contenu) ? contenu : [];
+    const { contenu, sha } = await lireFichierJSON(CHEMIN_UTILISATEURS, token);
+    tousLesComptes = Array.isArray(contenu) ? contenu : [];
+    utilisateurs = tousLesComptes.filter(aAccesAuSite);
     shaUsers = sha;
   } catch (erreur) {
     message.textContent = erreur.message;
@@ -38,7 +50,7 @@ async function chargerUtilisateurs() {
   }
 
   // Contrôle basé sur les données réelles : l'utilisateur courant doit être admin
-  const moi = utilisateurs.find(u => u.login === login);
+  const moi = tousLesComptes.find(u => u.login === login);
   if (!moi || moi.role !== "admin") {
     alert("Accès réservé aux administrateurs.");
     window.location.href = "bibliotheque.html";
@@ -132,7 +144,7 @@ function annulerEdition() {
   document.getElementById("champPassword").value = "";
   document.getElementById("champRole").value = "user";
   document.getElementById("formTitre").textContent = "Ajouter un utilisateur";
-  document.getElementById("formNote").textContent = "Le mot de passe est stocké tel quel dans users.json.";
+  document.getElementById("formNote").textContent = "Le compte est créé dans le fichier central du portail, avec accès à l'éditeur.";
   document.getElementById("btnEnregistrer").textContent = "Ajouter";
   document.getElementById("btnAnnuler").style.display = "none";
   document.getElementById("message").textContent = "";
@@ -153,7 +165,9 @@ async function enregistrerUtilisateur() {
     return;
   }
 
-  const copie = JSON.parse(JSON.stringify(utilisateurs));
+  // On travaille sur le fichier central AU COMPLET : les comptes des autres
+  // sites doivent se retrouver intacts dans ce qu'on réécrit.
+  const copie = JSON.parse(JSON.stringify(tousLesComptes));
 
   if (modeEditionLogin) {
     const u = copie.find(x => x.login === modeEditionLogin);
@@ -165,17 +179,28 @@ async function enregistrerUtilisateur() {
     u.password = password;
     u.role = role;
   } else {
-    if (copie.some(x => x.login === login)) {
-      message.textContent = `L'identifiant « ${login} » existe déjà.`;
-      return;
+    const existant = copie.find(x => x.login === login);
+    if (existant) {
+      // Le compte existe ailleurs dans le portail : on lui ouvre l'éditeur
+      // plutôt que de refuser un identifiant qui n'est pas un doublon.
+      if (!Array.isArray(existant.acces)) existant.acces = [];
+      if (existant.acces.includes(ID_SITE)) {
+        message.textContent = `L'identifiant « ${login} » existe déjà.`;
+        return;
+      }
+      existant.acces.push(ID_SITE);
+      existant.password = password;
+      existant.role = role;
+    } else {
+      copie.push({ login, password, role, nomAffichage: "", acces: [ID_SITE] });
     }
-    copie.push({ login, password, role });
   }
 
   const commit = modeEditionLogin ? `Modification de l'utilisateur ${modeEditionLogin}` : `Ajout de l'utilisateur ${login}`;
   try {
-    shaUsers = await ecrireFichierJSON("users.json", copie, shaUsers, token, commit);
-    utilisateurs = copie;
+    shaUsers = await ecrireFichierJSON(CHEMIN_UTILISATEURS, copie, shaUsers, token, commit);
+    tousLesComptes = copie;
+    utilisateurs = copie.filter(aAccesAuSite);
     annulerEdition();
     message.textContent = "Enregistré avec succès.";
     setTimeout(() => { if (message.textContent === "Enregistré avec succès.") message.textContent = ""; }, 2500);
@@ -188,21 +213,31 @@ async function enregistrerUtilisateur() {
 
 async function supprimerUtilisateur(login) {
   const moi = localStorage.getItem("gh_login");
-  if (login === moi) return; // garde-fou : pas d'auto-suppression
+  if (login === moi) return; // garde-fou : pas d'auto-retrait
 
-  if (!confirm(`Supprimer l'utilisateur « ${login} » ? Cette action est irréversible.\n\n(Sa bibliothèque n'est pas supprimée.)`)) return;
+  if (!confirm(`Retirer à « ${login} » l'accès à l'éditeur de livre ?\n\n` +
+    "Son compte, sa bibliothèque et ses accès aux autres sites sont conservés. " +
+    "La suppression complète d'un compte se fait depuis le portail central.")) return;
 
   const token = localStorage.getItem("gh_token");
   const message = document.getElementById("message");
-  const copie = utilisateurs.filter(u => u.login !== login);
+  const copie = JSON.parse(JSON.stringify(tousLesComptes));
+  const u = copie.find(x => x.login === login);
+  if (!u) { message.textContent = "Utilisateur introuvable."; return; }
+  // Une entrée sans liste d'accès date d'avant la centralisation : elle vaut
+  // « accès à tout ». Pour lui en retirer un, il faut d'abord l'écrire.
+  if (!Array.isArray(u.acces)) u.acces = SITES_CONNUS.slice();
+  u.acces = u.acces.filter(id => id !== ID_SITE);
 
   try {
-    shaUsers = await ecrireFichierJSON("users.json", copie, shaUsers, token, `Suppression de l'utilisateur ${login}`);
-    utilisateurs = copie;
+    shaUsers = await ecrireFichierJSON(CHEMIN_UTILISATEURS, copie, shaUsers, token,
+      `Retrait de l'accès ${ID_SITE} pour ${login}`);
+    tousLesComptes = copie;
+    utilisateurs = copie.filter(aAccesAuSite);
     if (modeEditionLogin === login) annulerEdition();
     else afficherUtilisateurs();
-    message.textContent = "Utilisateur supprimé.";
-    setTimeout(() => { if (message.textContent === "Utilisateur supprimé.") message.textContent = ""; }, 2500);
+    message.textContent = "Accès retiré.";
+    setTimeout(() => { if (message.textContent === "Accès retiré.") message.textContent = ""; }, 2500);
   } catch (erreur) {
     message.textContent = erreur.conflit
       ? "La liste des utilisateurs a été modifiée ailleurs. Rechargez la page avant de réessayer."

@@ -318,102 +318,9 @@ function ouvrirSessionCentrale(utilisateur, token) {
   localStorage.setItem("team53_acces", JSON.stringify(Array.isArray(utilisateur.acces) ? utilisateur.acces : []));
 }
 
-// ===== Synchronisation d'un compte vers les sites =====
-// Chaque site garde son propre fichier de comptes : un changement de mot de
-// passe ou de pseudo doit y être reporté, sinon le compte central et le site
-// divergent silencieusement. Utilisé par le panneau admin comme par la page
-// « Mon compte ».
-
-async function synchroniserEditeurLivre(loginCentral, passwordCentral, nomAffichage, token) {
-  let liste = [];
-  let sha = null;
-  try {
-    const r = await lireFichierJSONAbsolu("EditeurLivre/users.json", token);
-    liste = Array.isArray(r.contenu) ? r.contenu : [];
-    sha = r.sha;
-  } catch (e) {
-    if (e.status !== 404) throw e;
-  }
-
-  const existant = liste.find(u => u.login === loginCentral);
-  if (existant) {
-    existant.password = passwordCentral;
-    if (nomAffichage) existant.nomAffichage = nomAffichage;
-  } else {
-    liste.push({ login: loginCentral, password: passwordCentral, role: "user", nomAffichage: nomAffichage || "" });
-  }
-
-  await ecrireFichierJSONAbsolu("EditeurLivre/users.json", liste, sha, token,
-    `Synchronisation du compte ${loginCentral} depuis le portail central`);
-}
-
-// Même principe que synchroniserEditeurLivre(), pour Ma Bibliothèque (qui est
-// maintenant, elle aussi, un site à comptes séparés — voir
-// migrerMaBibliothequeVersMultiCompte()). Pas de champ "role" ici : ce site
-// n'a pas de notion d'administrateur propre.
-async function synchroniserMaBibliotheque(loginCentral, passwordCentral, nomAffichage, token) {
-  let liste = [];
-  let sha = null;
-  try {
-    const r = await lireFichierJSONAbsolu("MaBibliotheque/users.json", token);
-    liste = Array.isArray(r.contenu) ? r.contenu : [];
-    sha = r.sha;
-  } catch (e) {
-    if (e.status !== 404) throw e;
-  }
-
-  const existant = liste.find(u => u.login === loginCentral);
-  if (existant) {
-    existant.password = passwordCentral;
-    if (nomAffichage) existant.nomAffichage = nomAffichage;
-  } else {
-    liste.push({ login: loginCentral, password: passwordCentral, nomAffichage: nomAffichage || "" });
-  }
-
-  await ecrireFichierJSONAbsolu("MaBibliotheque/users.json", liste, sha, token,
-    `Synchronisation du compte ${loginCentral} depuis le portail central`);
-}
-
-// Même principe, pour Droid Fortnite (également à comptes séparés dès sa
-// création). Pas de champ "role" ici non plus.
-async function synchroniserDroidFortnite(loginCentral, passwordCentral, nomAffichage, token) {
-  let liste = [];
-  let sha = null;
-  try {
-    const r = await lireFichierJSONAbsolu("DroidFortnite/users.json", token);
-    liste = Array.isArray(r.contenu) ? r.contenu : [];
-    sha = r.sha;
-  } catch (e) {
-    if (e.status !== 404) throw e;
-  }
-
-  const existant = liste.find(u => u.login === loginCentral);
-  if (existant) {
-    existant.password = passwordCentral;
-    if (nomAffichage) existant.nomAffichage = nomAffichage;
-  } else {
-    liste.push({ login: loginCentral, password: passwordCentral, nomAffichage: nomAffichage || "" });
-  }
-
-  await ecrireFichierJSONAbsolu("DroidFortnite/users.json", liste, sha, token,
-    `Synchronisation du compte ${loginCentral} depuis le portail central`);
-}
-
-// Reporte le compte sur les trois sites. Best-effort site par site : qu'un
-// fichier soit indisponible ne doit pas empêcher les autres d'être à jour.
-async function synchroniserTousLesSites(login, password, nomAffichage, token) {
-  const taches = [
-    ["editeur-livre", synchroniserEditeurLivre],
-    ["ma-bibliotheque", synchroniserMaBibliotheque],
-    ["droid-fortnite", synchroniserDroidFortnite]
-  ];
-  const echecs = [];
-  for (const [nom, fn] of taches) {
-    try { await fn(login, password, nomAffichage, token); }
-    catch (e) { echecs.push(nom); }
-  }
-  return echecs;
-}
+// La synchronisation d'un compte vers chaque site a disparu avec la
+// centralisation : les sites lisent maintenant Web/utilisateurs.json
+// directement, il n'y a plus de copie à tenir à jour.
 
 function seDeconnecter() {
   localStorage.removeItem("team53_token");
@@ -472,13 +379,14 @@ function relayerVersSite(site) {
 }
 
 // ===== Migration des comptes existants =====
-// Fusionne EditeurLivre/users.json et MaBibliotheque/users.json dans
-// Web/utilisateurs.json. Ré-exécutable sans jamais créer de doublon ni
-// écraser un compte central déjà présent : les comptes déjà migrés ne sont
-// que complétés (union des accès), jamais recréés.
-// Note : MaBibliotheque/users.json n'existe que si
-// migrerMaBibliothequeVersMultiCompte() a déjà tourné (voir plus bas) —
-// avant ça, ce site n'a qu'un compte.json unique, non repris ici.
+// Verse les users.json des trois sites dans Web/utilisateurs.json, désormais
+// seul fichier de comptes : chaque site y lit ses identifiants et n'a plus le
+// sien. Ré-exécutable sans jamais créer de doublon ni écraser un compte
+// central déjà présent — les comptes déjà repris ne sont que complétés (union
+// des accès, dates de connexion, pseudo manquant).
+//
+// Les fichiers de site ne sont pas supprimés : ils cessent simplement d'être
+// lus. On peut les effacer du dépôt une fois la bascule vérifiée.
 async function importerComptesExistants(token) {
   let utilisateurs = [];
   let sha = null;
@@ -494,43 +402,56 @@ async function importerComptesExistants(token) {
   const index = new Map(utilisateurs.map(u => [normaliser(u.login), u]));
   let ajoutes = 0, accesAjoutes = 0;
 
-  function fusionner(login, password, nomAffichage, siteId) {
-    const cle = normaliser(login);
+  function fusionner(u, siteId) {
+    const cle = normaliser(u && u.login);
     if (!cle) return;
     let central = index.get(cle);
     if (!central) {
-      central = { login, password, role: "user", nomAffichage: nomAffichage || "", acces: [] };
+      central = { login: u.login, password: u.password, role: "user",
+                  nomAffichage: u.nomAffichage || "", acces: [] };
       index.set(cle, central);
       utilisateurs.push(central);
       ajoutes++;
     }
+    // Un compte central déjà là fait foi : son mot de passe et son rôle ne
+    // sont pas écrasés par ceux d'un fichier de site, qui peuvent dater.
+    if (!central.nomAffichage && u.nomAffichage) central.nomAffichage = u.nomAffichage;
+    if (u.role === "admin" && central.role !== "admin") central.role = "admin";
+
     if (!Array.isArray(central.acces)) central.acces = [];
     if (!central.acces.includes(siteId)) {
       central.acces.push(siteId);
       accesAjoutes++;
     }
+
+    // La date de dernière connexion au site rejoint le fichier central, où
+    // chaque site a désormais la sienne.
+    if (u.derniereConnexion) {
+      if (!central.connexions || typeof central.connexions !== "object") central.connexions = {};
+      const connue = central.connexions[siteId];
+      if (!connue || connue < u.derniereConnexion) central.connexions[siteId] = u.derniereConnexion;
+      if (!central.derniereConnexion || central.derniereConnexion < u.derniereConnexion) {
+        central.derniereConnexion = u.derniereConnexion;
+      }
+    }
   }
 
-  try {
-    const { contenu } = await lireFichierJSONAbsolu("EditeurLivre/users.json", token);
-    (Array.isArray(contenu) ? contenu : []).forEach(u =>
-      fusionner(u.login, u.password, u.nomAffichage, "editeur-livre"));
-  } catch (e) {
-    if (e.status !== 404) throw e;
+  async function reprendre(chemin, siteId) {
+    try {
+      const { contenu } = await lireFichierJSONAbsolu(chemin, token);
+      (Array.isArray(contenu) ? contenu : []).forEach((u) => fusionner(u, siteId));
+    } catch (e) {
+      // 404 : ce site n'a jamais eu de fichier de comptes — rien à reprendre.
+      if (e.status !== 404) throw e;
+    }
   }
 
-  try {
-    const { contenu } = await lireFichierJSONAbsolu("MaBibliotheque/users.json", token);
-    (Array.isArray(contenu) ? contenu : []).forEach(u =>
-      fusionner(u.login, u.password, u.nomAffichage, "ma-bibliotheque"));
-  } catch (e) {
-    // 404 : soit rien n'a encore été migré (voir migrerMaBibliothequeVersMultiCompte),
-    // soit le site n'a pas encore de compte du tout — dans les deux cas, rien à fusionner.
-    if (e.status !== 404) throw e;
-  }
+  await reprendre("EditeurLivre/users.json", "editeur-livre");
+  await reprendre("MaBibliotheque/users.json", "ma-bibliotheque");
+  await reprendre("DroidFortnite/users.json", "droid-fortnite");
 
   await ecrireFichierJSON("utilisateurs.json", utilisateurs, sha, token,
-    "Import des comptes existants (editeur-livre, ma-bibliotheque)");
+    "Import des comptes des sites dans le fichier central");
 
   return { ajoutes, accesAjoutes, total: utilisateurs.length };
 }
@@ -546,11 +467,10 @@ async function importerComptesExistants(token) {
 //
 // Idempotence : on vérifie l'existence de bibliotheques/<slug>.json pour LE
 // COMPTE DE compte.json précisément (pas juste "users.json existe") — sinon,
-// si un admin donne accès à Ma Bibliothèque à un second compte central AVANT
-// d'avoir cliqué ce bouton, synchroniserMaBibliotheque() aura déjà créé
-// users.json avec ce second compte, et ce bouton se croirait "déjà fait" en
-// laissant la vraie collection historique orpheline dans l'ancien
-// livres.json. On fusionne donc dans users.json plutôt que de l'écraser.
+// si un users.json de Ma Bibliothèque existe déjà avec un autre compte, ce
+// bouton se croirait "déjà fait" et laisserait la vraie collection historique
+// orpheline dans l'ancien livres.json. On fusionne donc dans users.json
+// plutôt que de l'écraser.
 async function migrerMaBibliothequeVersMultiCompte(token) {
   let compte;
   try {
@@ -597,7 +517,9 @@ async function migrerMaBibliothequeVersMultiCompte(token) {
     `Bibliothèque séparée pour ${compte.login}`);
 
   // Fusion dans users.json (jamais d'écrasement : un autre compte a pu y être
-  // ajouté entre-temps par synchroniserMaBibliotheque()).
+  // ajouté entre-temps). Ce fichier n'est plus lu pour se connecter — les
+  // comptes sont centralisés — mais il reste la trace de l'ancien état, que
+  // l'import des comptes reprendra.
   let utilisateursMB = [];
   let shaUsersMB = null;
   try {

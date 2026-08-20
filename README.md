@@ -78,10 +78,16 @@ mélanger ses données avec celles d'un autre site :
 
 | Site              | Dossier dans `Team53FR/BDD` | Fichiers                                  |
 |-------------------|------------------------------|--------------------------------------------|
-| editeur-livre      | `EditeurLivre/`             | `users.json`, `bibliotheques/<login>.json`, `images/<login>/…` |
-| ma-bibliotheque    | `MaBibliotheque/`           | `users.json`, `bibliotheques/<login>.json`, `images/<login>/…` |
-| droid-fortnite     | `DroidFortnite/`            | `users.json`, `catalogue.json`, `renaissance.json`, `paliers.json`, `unites.json`, `raretes.json` (partagés), `bibliotheques/<login>.json` (personnel) |
-| portail central    | `Web/`                      | `utilisateurs.json`, `sites.json`         |
+| editeur-livre      | `EditeurLivre/`             | `bibliotheques/<login>.json`, `images/<login>/…`, `publies.json` |
+| ma-bibliotheque    | `MaBibliotheque/`           | `bibliotheques/<login>.json`, `images/<login>/…` |
+| droid-fortnite     | `DroidFortnite/`            | `catalogue.json`, `renaissance.json`, `paliers.json`, `unites.json`, `raretes.json` (partagés), `bibliotheques/<login>.json` (personnel) |
+| portail central    | `Web/`                      | `utilisateurs.json` (**tous les comptes**), `sites.json` |
+
+Les comptes ne figurent plus dans le dossier des sites : ils sont **tous** dans
+`Web/utilisateurs.json`, seul fichier consulté pour se connecter, où que l'on
+entre. Les anciens `users.json` de chaque site ne sont plus lus ; le bouton
+« Importer les comptes des sites » du panneau admin les y verse une fois pour
+toutes, après quoi on peut les effacer du dépôt.
 
 Les trois sites suivent donc le **même modèle par compte** pour leurs données
 personnelles : chaque personne a sa propre bibliothèque (et, pour
@@ -95,13 +101,9 @@ seule la progression personnelle (`bibliotheques/<login>.json` : droïdes
 possédés + palier, renaissances atteintes) est propre à chaque compte. Voir
 « Droid Fortnite » ci-dessous.
 
-Pour qu'un site fonctionne, son fichier de comptes doit exister dans son
-dossier BDD. Pour **ma-bibliotheque**, créer `MaBibliotheque/users.json`
-dans `Team53FR/BDD` :
-
-```json
-[{ "login": "ton_identifiant", "password": "ton_mot_de_passe", "nomAffichage": "" }]
-```
+Pour qu'un site fonctionne, il suffit qu'un compte de `Web/utilisateurs.json`
+porte son identifiant dans sa liste `acces` — ce que fait le panneau admin du
+portail. Aucun fichier à créer dans le dossier du site.
 
 (Historique : avant la migration multi-compte, ma-bibliotheque n'avait qu'un
 `compte.json` unique et une collection `livres.json` partagée par tout le
@@ -123,8 +125,16 @@ Les comptes centraux vivent dans `Web/utilisateurs.json` :
 
 ```json
 [{ "login": "...", "password": "...", "role": "admin", "nomAffichage": "...",
-   "acces": ["editeur-livre", "ma-bibliotheque"], "derniereConnexion": "..." }]
+   "acces": ["editeur-livre", "ma-bibliotheque"], "derniereConnexion": "...",
+   "connexions": { "editeur-livre": "...", "droid-fortnite": "..." } }]
 ```
+
+`acces` décide de ce qu'on voit sur le tableau de bord **et** de ce à quoi on
+peut se connecter en direct : chaque site vérifie que son identifiant y figure
+(`aAccesAuSite()` dans son `script.js`). Une entrée sans champ `acces` date
+d'avant la centralisation et vaut « accès à tout », plutôt que d'enfermer
+quelqu'un dehors. `connexions` garde une date par site, en plus de la date
+globale `derniereConnexion`.
 
 Le registre des sites affichables vit dans `Web/sites.json` (repli automatique
 sur une constante `DEFAULT_SITES` dans `script.js` tant que ce fichier
@@ -158,28 +168,22 @@ aucun effet.
 **Premier lancement** : `Web/utilisateurs.json` n'existe pas encore, donc
 `seConnecter()` du portail traite un 404 comme une première installation et
 crée automatiquement un compte administrateur fondateur à partir de ce qui
-vient d'être saisi. Ensuite, le bouton « Importer les comptes existants » du
-panneau admin fusionne les comptes déjà présents dans
-`EditeurLivre/users.json` et `MaBibliotheque/users.json` (sans jamais créer
-de doublon, relançable autant de fois que nécessaire).
+vient d'être saisi. Ensuite, le bouton « Importer les comptes des sites » du
+panneau admin verse les anciens `users.json` des trois sites dans le fichier
+central — accès, pseudos et dates de connexion compris, sans jamais créer de
+doublon ni écraser un compte central existant, relançable autant de fois que
+nécessaire.
 
-**Sites « identité-dépendants »** : les deux sites vérifient que le login
-relayé correspond à une entrée réelle de leur propre fichier de comptes
-(`EditeurLivre/users.json` / `MaBibliotheque/users.json`), puisque chacun a
-sa bibliothèque propre. Pour rester cohérent sans jamais modifier le code de
-ces sites, le panneau admin central fait un *upsert* silencieux dans le
-fichier de comptes du site concerné (`synchroniserEditeurLivre()` /
-`synchroniserMaBibliotheque()` dans `admin.js` racine, même logique dupliquée
-pour chaque site) chaque fois qu'un compte central se voit accorder l'accès à
-ce site. Un futur site purement « token », sans notion d'identité, s'ajoute
-en pure donnée (`Web/sites.json`) ; un futur site « identité » demandera une
-petite synchro dédiée du même genre.
+**Un seul fichier de comptes** : les sites n'ont plus le leur. Chacun lit
+`Web/utilisateurs.json` (chemin absolu obtenu en préfixant par `/`, ce qui
+court-circuite son `DOSSIER_BDD`), vérifie le mot de passe puis l'accès. Un
+mot de passe changé depuis « Mon compte » vaut donc immédiatement partout : il
+n'y a plus de copie à synchroniser, ni de risque que deux fichiers divergent.
 
 Révoquer un accès dans le panneau admin retire la carte du tableau de bord
-mais **ne bloque pas** une connexion directe sur le site concerné (son propre
-mot de passe existe toujours dans son propre fichier BDD) — cohérent avec le
-fait qu'aucun site de ce dépôt n'a d'autorisation côté serveur, puisqu'il n'y
-a pas de serveur.
+**et** ferme la connexion directe au site : il n'y a plus de mot de passe
+ailleurs pour contourner. La vérification reste côté client, puisqu'il n'y a
+pas de serveur — mais elle porte enfin sur une seule vérité.
 
 ## Mon compte
 
@@ -194,12 +198,9 @@ Deux précautions :
 - L'écriture **relit `Web/utilisateurs.json` juste avant d'écrire** et ne
   modifie que sa propre entrée, pour ne pas écraser ce qu'un administrateur
   aurait changé sur d'autres comptes entre-temps.
-- Un changement de mot de passe ou de pseudo est **reporté sur les trois
-  sites** (`synchroniserTousLesSites()` dans `script.js`, déplacé là depuis
-  `admin.js` pour être partagé). Sans ce report, l'ancien mot de passe
-  continuerait de fonctionner sur les sites et le nouveau y serait refusé.
-  Le report est best-effort : un site indisponible est nommé dans le message
-  plutôt que de faire échouer l'ensemble.
+- Un changement de mot de passe ou de pseudo vaut **immédiatement partout** :
+  les sites lisent ce fichier. La synchronisation vers chaque site, qui
+  existait tant que les comptes étaient dupliqués, a disparu avec elle.
 
 L'identifiant de connexion, lui, ne se change pas : il sert de clé aux
 fichiers personnels de chaque site (`bibliotheques/<slug>.json`).

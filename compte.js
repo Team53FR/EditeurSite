@@ -60,18 +60,15 @@ async function enregistrerPseudo() {
   bouton.disabled = true;
   message.textContent = "Enregistrement...";
   try {
-    const entree = await enregistrerMonEntree(
+    await enregistrerMonEntree(
       (u) => { u.nomAffichage = pseudo; },
       `Changement de pseudo de ${monLogin}`);
 
-    // Le pseudo s'affiche aussi sur les sites : on le leur reporte.
-    const echecs = await synchroniserTousLesSites(monLogin, entree.password, pseudo, token);
+    // Rien à reporter : les sites lisent ce même fichier.
     localStorage.setItem("team53_nom", pseudo);
 
     message.className = "message ok";
-    message.textContent = echecs.length
-      ? "Pseudo enregistré. Non reporté sur : " + echecs.join(", ") + "."
-      : "Pseudo enregistré.";
+    message.textContent = "Pseudo enregistré, sur le portail comme sur les sites.";
   } catch (e) {
     message.textContent = e.message;
   } finally {
@@ -103,15 +100,9 @@ async function changerMotDePasse() {
       (u) => { u.password = motDePasse; },
       `Changement de mot de passe de ${monLogin}`);
 
-    // Chaque site garde sa propre copie : sans ce report, l'ancien mot de
-    // passe continuerait d'y fonctionner et le nouveau y serait refusé.
-    const echecs = await synchroniserTousLesSites(monLogin, motDePasse, moi.nomAffichage || "", token);
-
     ancien.value = nouveau.value = confirmation.value = "";
     message.className = "message ok";
-    message.textContent = echecs.length
-      ? "Mot de passe changé. Non reporté sur : " + echecs.join(", ") + " — réessaie plus tard."
-      : "Mot de passe changé, sur le portail et sur tous les sites.";
+    message.textContent = "Mot de passe changé, sur le portail comme sur tous les sites.";
   } catch (e) {
     message.textContent = e.message;
   } finally {
