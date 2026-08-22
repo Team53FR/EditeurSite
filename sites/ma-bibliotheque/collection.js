@@ -148,7 +148,7 @@ function afficherLivres() {
   const estSerie = ongletActif === "serie";
 
   if (filtres.length === 0) {
-    grille.style.display = "none";
+    grille.classList.add("masquee");
     grille.innerHTML = "";
     etatVide.style.display = "block";
     document.getElementById("etatVideTitre").textContent = delOnglet.length === 0
@@ -161,7 +161,10 @@ function afficherLivres() {
   }
 
   etatVide.style.display = "none";
-  grille.style.display = "grid";
+  // Masquer par une classe et non par un style en ligne : « display:grid »
+  // en dur écrasait le « flex » de la vue Liste, qui se retrouvait affichée
+  // en deux colonnes comme la grille.
+  grille.classList.remove("masquee");
   grille.innerHTML = filtres.map((item) => (item.type === "serie" ? carteSerieHTML(item) : carteLivreHTML(item))).join("");
 
   configurerChargementParesseuxImages(filtres);

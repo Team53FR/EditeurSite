@@ -1,37 +1,50 @@
 /* ===== Ma Bibliothèque — mobile-first ===== */
 
+/* Papier chaud le jour, encre chaude la nuit, et le vert de reliure que le
+   portail donne déjà à ce site : on le retrouve ici sur les progressions et
+   les éléments actifs. La couverture des livres est la seule vraie couleur de
+   la page — tout le reste se tient en retrait pour ne pas lui faire
+   concurrence. */
 :root {
   color-scheme: light dark;
-  --fond: #f4f5f9;
-  --carte: #ffffff;
-  --texte: #1c1d24;
-  --texte-att: #6b6d7a;
-  --bordure: #e3e4ec;
-  --primaire: #4f46e5;
-  --primaire-fonce: #4038c4;
-  --primaire-clair: #ecebfd;
-  --accent: #d97706;
-  --danger: #dc2626;
-  --danger-fonce: #b91c1c;
-  --succes: #16a34a;
-  --ombre: 0 4px 16px rgba(30, 30, 60, 0.08);
-  --rayon: 16px;
+  --fond: #f4efe4;
+  --carte: #fffdf8;
+  --creux: #ece5d6;
+  --texte: #241d15;
+  --texte-att: #6d6152;
+  --bordure: #d9cdb8;
+  --primaire: #3f6b4a;
+  --primaire-fonce: #325740;
+  --primaire-clair: rgba(63, 107, 74, 0.12);
+  --accent: #b4552c;
+  --danger: #a8392a;
+  --danger-fonce: #8a2c20;
+  --succes: #3f6b4a;
+  --grain: 0.04;
+  --ombre: 0 2px 10px rgba(60, 42, 20, 0.10);
+  --serif: "EB Garamond", Georgia, serif;
+  --rayon: 12px;
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-top: env(safe-area-inset-top, 0px);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --fond: #131319;
-    --carte: #1d1e26;
-    --texte: #f1f1f5;
-    --texte-att: #9a9ca8;
-    --bordure: #2c2d38;
-    --primaire: #7c74f1;
-    --primaire-fonce: #948cf5;
-    --primaire-clair: #26243f;
-    --accent: #f0a94a;
-    --ombre: 0 4px 20px rgba(0, 0, 0, 0.35);
+    --fond: #14110c;
+    --carte: #1c1811;
+    --creux: #201b13;
+    --texte: #f2ebdd;
+    --texte-att: #a2967f;
+    --bordure: #322b20;
+    --primaire: #6ea37c;
+    --primaire-fonce: #86bb93;
+    --primaire-clair: rgba(110, 163, 124, 0.16);
+    --accent: #d87a4e;
+    --danger: #c9614f;
+    --danger-fonce: #d97a68;
+    --succes: #6ea37c;
+    --grain: 0.05;
+    --ombre: 0 4px 18px rgba(0, 0, 0, 0.4);
   }
 }
 
@@ -44,6 +57,16 @@ body {
   color: var(--texte);
   -webkit-tap-highlight-color: transparent;
 }
+/* Un grain très léger : sans lui les aplats sonnent « écran ». */
+body::before {
+  content: "";
+  position: fixed; inset: 0; z-index: 0;
+  pointer-events: none;
+  opacity: var(--grain);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+body > * { position: relative; z-index: 1; }
+
 img { max-width: 100%; display: block; }
 button { font: inherit; }
 input, select { font: inherit; }
@@ -142,67 +165,94 @@ a { color: var(--primaire); }
 /* ===== Application : en-tête ===== */
 .app-header {
   position: sticky; top: 0; z-index: 20;
-  background: var(--carte);
+  background: var(--fond);
   border-bottom: 1px solid var(--bordure);
-  padding: calc(0.9rem + var(--safe-top)) 1rem 0.9rem;
+  padding: calc(0.9rem + var(--safe-top)) 1.1rem 0.9rem;
 }
 .app-header-ligne {
   display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
   margin-bottom: 0.75rem;
 }
-.app-header h1 { font-size: 1.15rem; margin: 0; display: flex; align-items: center; gap: 0.5rem; }
+.app-header h1 {
+  margin: 0;
+  font-family: var(--serif);
+  font-weight: 600;
+  font-size: 1.5rem;
+  letter-spacing: 0.01em;
+}
 .app-header .icone-deconnexion {
   background: transparent; border: none; color: var(--texte-att); cursor: pointer;
   padding: 0.5rem; border-radius: 10px; display: flex;
 }
 .app-header .icone-deconnexion:hover { background: var(--fond); color: var(--danger); }
 
-.onglets-type { display: flex; gap: 0.4rem; margin-bottom: 0.75rem; }
+/* Livres / Séries : deux mots et un trait sous celui qui est actif. Deux
+   pilules pleine largeur en tête de page criaient plus fort que les
+   couvertures, qui sont pourtant le sujet. */
+.barre-outils-biblio {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+.onglets-type { display: flex; gap: 1.2rem; }
 .onglet-type {
-  flex: 1;
-  padding: 0.55rem 0.6rem;
-  border-radius: 10px;
-  border: 1px solid var(--bordure);
-  background: var(--fond);
+  position: relative;
+  padding: 0.2rem 0 0.5rem;
+  border: none;
+  background: none;
   color: var(--texte-att);
-  font-weight: 600;
-  font-size: 0.88rem;
+  font-family: var(--serif);
+  font-size: 1.1rem;
   cursor: pointer;
 }
-.onglet-type.actif { background: var(--primaire); border-color: var(--primaire); color: #fff; }
+.onglet-type::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 2px;
+  background: var(--primaire);
+  transform: scaleX(0);
+  transition: transform 0.18s ease;
+}
+.onglet-type:hover { color: var(--texte); }
+.onglet-type.actif { color: var(--texte); font-weight: 600; }
+.onglet-type.actif::after { transform: scaleX(1); }
 
 .recherche { position: relative; }
 .recherche input {
   width: 100%;
-  padding: 0.7rem 0.9rem 0.7rem 2.4rem;
-  border-radius: 12px;
+  padding: 0.65rem 0.9rem 0.65rem 2.4rem;
+  border-radius: 999px;
   border: 1px solid var(--bordure);
-  background: var(--fond);
+  background: var(--creux);
   color: var(--texte);
 }
+.recherche input:focus { outline: 2px solid var(--primaire); outline-offset: 1px; border-color: transparent; }
 .recherche svg { position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); color: var(--texte-att); }
 
 /* ===== Bascule du mode d'affichage ===== */
+/* Le choix de la vue est un réglage, pas une décision : trois petites icônes
+   au bout de la ligne suffisent, là où trois barres pleine largeur donnaient
+   à ce détail l'importance d'un menu principal. */
 .groupe-vues {
   display: flex;
-  gap: 0.4rem;
-  margin-top: 0.6rem;
+  gap: 0.15rem;
+  flex-shrink: 0;
+  padding-bottom: 0.35rem;
 }
 .bouton-vue {
-  flex: 1;
   display: flex; align-items: center; justify-content: center;
-  padding: 0.5rem;
-  border-radius: 10px;
-  border: 1px solid var(--bordure);
-  background: var(--fond);
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  border: none;
+  background: none;
   color: var(--texte-att);
   cursor: pointer;
 }
-.bouton-vue.actif {
-  background: var(--primaire);
-  border-color: var(--primaire);
-  color: #fff;
-}
+.bouton-vue:hover { color: var(--texte); background: var(--creux); }
+.bouton-vue.actif { color: var(--primaire); background: var(--primaire-clair); }
 
 /* ===== Contenu ===== */
 .contenu {
@@ -237,11 +287,17 @@ a { color: var(--primaire); }
 .grille-livres.vue-liste {
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
+  gap: 0;
 }
-.vue-liste .carte-livre { flex-direction: row; align-items: center; }
-.vue-liste .couv-livre { width: 52px; flex-shrink: 0; }
-.vue-liste .info-livre { flex: 1; min-width: 0; padding: 0.5rem 0.8rem; }
+.vue-liste .carte-livre {
+  flex-direction: row; align-items: center;
+  gap: 0.9rem;
+  padding: 0.55rem 0.2rem;
+  border-bottom: 1px solid var(--bordure);
+}
+.vue-liste .carte-livre:hover { transform: none; background: var(--creux); }
+.vue-liste .couv-livre { width: 46px; flex-shrink: 0; }
+.vue-liste .info-livre { flex: 1; min-width: 0; padding: 0; }
 .vue-liste .info-livre h3 { font-size: 0.88rem; -webkit-line-clamp: 1; }
 .vue-liste .progression { margin-top: 0.35rem; }
 
@@ -254,38 +310,51 @@ a { color: var(--primaire); }
 @media (min-width: 640px) { .grille-livres.vue-miniature { grid-template-columns: repeat(5, 1fr); } }
 @media (min-width: 760px) { .grille-livres.vue-miniature { grid-template-columns: repeat(6, 1fr); } }
 @media (min-width: 980px) { .grille-livres.vue-miniature { grid-template-columns: repeat(8, 1fr); } }
+
+/* Après les trois vues, pour l'emporter sur leur « display » : à égalité de
+   spécificité, c'est la dernière règle qui gagne. */
+.grille-livres.masquee { display: none; }
 .vue-miniature .info-livre { padding: 0.35rem 0.4rem 0.45rem; }
 .vue-miniature .info-livre h3 { font-size: 0.72rem; -webkit-line-clamp: 1; }
 .vue-miniature .info-livre .auteur { display: none; }
 .vue-miniature .progression small { display: none; }
 
+/* La couverture est le sujet : on retire le cadre et le fond de carte qui la
+   mettaient en boîte, et c'est elle qui porte l'ombre — comme un livre posé.
+   Le texte vient dessous, sans chrome. */
 .carte-livre {
-  background: var(--carte);
-  border-radius: var(--rayon);
-  border: 1px solid var(--bordure);
-  overflow: hidden;
+  background: none;
+  border: none;
+  border-radius: 0;
   cursor: pointer;
   text-align: left;
   padding: 0;
   display: flex;
   flex-direction: column;
-  transition: transform 0.1s ease, box-shadow 0.15s ease;
+  transition: transform 0.12s ease;
 }
+.carte-livre:hover { transform: translateY(-3px); }
 .carte-livre:active { transform: scale(0.97); }
 .couv-livre {
   aspect-ratio: 2 / 3;
-  background: var(--primaire-clair);
+  background: var(--creux);
   display: flex; align-items: center; justify-content: center;
   color: var(--primaire);
   overflow: hidden;
   position: relative;
+  border-radius: 4px;
+  box-shadow: var(--ombre);
+  transition: box-shadow 0.15s ease;
 }
+.carte-livre:hover .couv-livre { box-shadow: 0 10px 24px rgba(60, 42, 20, 0.28); }
 .couv-livre img { width: 100%; height: 100%; object-fit: cover; }
-.info-livre { padding: 0.65rem 0.7rem 0.8rem; }
+.info-livre { padding: 0.6rem 0.15rem 0.2rem; }
 .info-livre h3 {
-  margin: 0 0 0.15rem;
-  font-size: 0.92rem;
-  line-height: 1.25;
+  margin: 0 0 0.1rem;
+  font-family: var(--serif);
+  font-weight: 600;
+  font-size: 1.02rem;
+  line-height: 1.2;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -302,9 +371,9 @@ a { color: var(--primaire); }
   display: flex; align-items: center; gap: 0.4rem;
 }
 .barre-progression {
-  flex: 1; height: 5px; border-radius: 3px; background: var(--bordure); overflow: hidden;
+  flex: 1; height: 3px; border-radius: 2px; background: var(--bordure); overflow: hidden;
 }
-.barre-progression > span { display: block; height: 100%; background: var(--primaire); border-radius: 3px; }
+.barre-progression > span { display: block; height: 100%; background: var(--primaire); border-radius: 2px; }
 .progression small { font-size: 0.72rem; color: var(--texte-att); white-space: nowrap; }
 .badge-complet .barre-progression > span { background: var(--succes); }
 
@@ -318,7 +387,7 @@ a { color: var(--primaire); }
   background: var(--primaire);
   color: #fff;
   border: none;
-  box-shadow: 0 6px 18px rgba(79, 70, 229, 0.45);
+  box-shadow: 0 6px 18px rgba(40, 70, 48, 0.45);
   display: flex; align-items: center; justify-content: center;
   cursor: pointer;
   z-index: 30;
@@ -587,3 +656,8 @@ a { color: var(--primaire); }
 }
 .toast.visible { transform: translateX(-50%) translateY(0); }
 .toast.erreur { background: var(--danger-fonce); }
+
+/* Les titres du site sont en Garamond, comme les livres qu'il répertorie et
+   comme le portail dont il dépend. */
+h1, h2, .titre-serif { font-family: var(--serif); font-weight: 600; }
+.etat-vide h2 { font-family: var(--serif); }
