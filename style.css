@@ -790,3 +790,91 @@ a { color: var(--primaire); }
 }
 .page-tdb .stat-groupe h3 { color: var(--tdb-encre-douce); }
 .page-tdb .stat-ligne strong { font-family: "EB Garamond", Georgia, serif; }
+
+/* ===== Gestion des comptes : en-tête de section et fiches détachées ===== */
+.cp-entete {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.2rem;
+}
+.cp-entete > div { min-width: 0; }
+.cp-entete .sous-titre { margin-bottom: 0; }
+.cp-ajouter { flex-shrink: 0; padding: 0.7rem 1.1rem; }
+
+/* Chaque compte devient une fiche à part entière : filets partagés et lignes
+   collées, on ne savait plus où finissait l'un et où commençait l'autre. */
+.page-tdb .user-liste { gap: 0.9rem; }
+.page-tdb .user-row {
+  border: 1px solid var(--tdb-filet);
+  border-radius: 14px;
+  background: var(--tdb-relief);
+  padding: 1.1rem 1.2rem;
+}
+.page-tdb .user-liste .user-row:first-child { border-top: 1px solid var(--tdb-filet); }
+.page-tdb .user-row.en-edition {
+  border-color: var(--primaire);
+  box-shadow: inset 3px 0 0 var(--primaire);
+  padding-left: 1.2rem;
+}
+
+/* ===== Fenêtre modale du portail ===== */
+.fenetre {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  background: rgba(20, 17, 12, 0.55);
+  backdrop-filter: blur(3px);
+  display: flex;
+  /* Jamais « center » : une carte plus haute que l'écran déborderait des deux
+     côtés et son haut deviendrait inatteignable. Le centrage vient du
+     « margin: auto » de la carte. */
+  align-items: flex-start;
+  justify-content: center;
+  padding: 1.5rem;
+  overflow-y: auto;
+}
+.fenetre-carte {
+  position: relative;
+  margin: auto;
+  width: 100%;
+  max-width: 30rem;
+  background: var(--tdb-fond);
+  border: 1px solid var(--tdb-filet);
+  border-radius: 16px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.4);
+  padding: 1.6rem 1.6rem 1.4rem;
+}
+.fenetre-carte h2 {
+  font-family: "EB Garamond", Georgia, serif;
+  font-weight: 600;
+  font-size: 1.4rem;
+  margin: 0 0 0.3rem;
+}
+.fenetre-fermer {
+  position: absolute;
+  top: 0.8rem; right: 0.8rem;
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  border: none; border-radius: 9px;
+  background: none;
+  color: var(--tdb-encre-douce);
+  cursor: pointer;
+}
+.fenetre-fermer:hover { background: var(--tdb-fond-creux); color: var(--tdb-encre); }
+.fenetre-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  margin-top: 1.2rem;
+}
+.fenetre-carte .champ { margin-bottom: 0.9rem; }
+.fenetre-carte .case-acces-sites { margin-bottom: 0; }
+
+@media (max-width: 520px) {
+  .fenetre { padding: 0.8rem; }
+  .fenetre-actions { flex-direction: column-reverse; }
+  .fenetre-actions .btn { width: 100%; }
+}

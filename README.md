@@ -85,9 +85,9 @@ mélanger ses données avec celles d'un autre site :
 
 Les comptes ne figurent plus dans le dossier des sites : ils sont **tous** dans
 `Web/utilisateurs.json`, seul fichier consulté pour se connecter, où que l'on
-entre. Les anciens `users.json` de chaque site ne sont plus lus ; le bouton
-« Importer les comptes des sites » du panneau admin les y verse une fois pour
-toutes, après quoi on peut les effacer du dépôt.
+entre. Les anciens `users.json` de chaque site ont été versés dans ce fichier
+puis supprimés du dépôt ; l'outil d'import qui servait à cette bascule a été
+retiré du panneau, sa tâche accomplie.
 
 Les trois sites suivent donc le **même modèle par compte** pour leurs données
 personnelles : chaque personne a sa propre bibliothèque (et, pour
@@ -107,7 +107,7 @@ portail. Aucun fichier à créer dans le dossier du site.
 
 (Historique : avant la migration multi-compte, ma-bibliotheque n'avait qu'un
 `compte.json` unique et une collection `livres.json` partagée par tout le
-monde — voir « Migration de Ma Bibliothèque » ci-dessous si ces fichiers
+monde — voir « Migrations retirées » ci-dessous si ces fichiers
 existent encore dans ton dépôt.)
 
 À l'ajout d'un nouveau site suivant ce modèle : choisir un nouveau nom de
@@ -176,11 +176,7 @@ aucun effet.
 **Premier lancement** : `Web/utilisateurs.json` n'existe pas encore, donc
 `seConnecter()` du portail traite un 404 comme une première installation et
 crée automatiquement un compte administrateur fondateur à partir de ce qui
-vient d'être saisi. Ensuite, le bouton « Importer les comptes des sites » du
-panneau admin verse les anciens `users.json` des trois sites dans le fichier
-central — accès, pseudos et dates de connexion compris, sans jamais créer de
-doublon ni écraser un compte central existant, relançable autant de fois que
-nécessaire.
+vient d'être saisi. Les comptes suivants se créent depuis le panneau admin.
 
 **Un seul fichier de comptes** : les sites n'ont plus le leur. Chacun lit
 `Web/utilisateurs.json` (chemin absolu obtenu en préfixant par `/`, ce qui
@@ -243,27 +239,14 @@ on ne se retrouve pas avec des fichiers effacés et un compte toujours debout.
 Chaque fichier est traité pour lui-même, et ce qui résiste est nommé dans le
 message plutôt que d'interrompre le reste.
 
-## Migration de Ma Bibliothèque (compte unique → comptes séparés)
+## Migrations retirées
 
-Ma Bibliothèque a été créée avec un seul compte partagé
-(`MaBibliotheque/compte.json` + une collection unique `livres.json`). Le
-bouton « Migrer Ma Bibliothèque vers des comptes séparés » du panneau admin
-(`migrerMaBibliothequeVersMultiCompte()` dans `script.js` racine) fait passer
-ce site au même modèle par compte qu'editeur-livre :
-
-1. Lit l'ancien `compte.json`, en déduit le login et son « slug ».
-2. Recopie chaque image de couverture référencée dans `livres.json` vers
-   `images/<slug>/…` (l'API Contents de GitHub n'a pas de copie serveur : il
-   faut télécharger puis ré-uploader chaque fichier).
-3. Écrit la collection dans `bibliotheques/<slug>.json` et crée/complète
-   `MaBibliotheque/users.json`.
-
-Ne supprime **jamais** `compte.json`/`livres.json`/les anciennes images — ils
-restent en place, orphelins mais inoffensifs, à supprimer à la main une fois
-vérifié que tout fonctionne. Sans danger à relancer : la vérification se fait
-sur l'existence de `bibliotheques/<slug>.json` pour ce compte précis (pas
-juste "`users.json` existe"), pour rester correct même si un second compte a
-été créé côté portail avant que ce bouton n'ait été cliqué.
+Deux outils à usage unique ont vécu dans le panneau admin, puis en ont été
+retirés une fois leur travail fait : l'**import des `users.json`** des sites
+vers le fichier central, et le passage de **Ma Bibliothèque** d'un compte
+unique partagé à un compte par personne. Un bouton qui ne peut plus rien
+faire n'est qu'un piège de plus dans une page d'administration ; leur code
+reste dans l'historique Git si un dépôt neuf en avait besoin.
 
 ## Transfert de données entre comptes
 

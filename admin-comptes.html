@@ -43,62 +43,20 @@
 
   <main class="contenu">
 
-    <div class="bloc-carte">
-      <h2>Comptes</h2>
-      <p class="sous-titre">Chaque compte accède aux sites cochés depuis le tableau de bord.</p>
+    <section class="bloc-carte">
+      <div class="cp-entete">
+        <div>
+          <h2>Comptes</h2>
+          <p class="sous-titre">Chaque compte accède aux sites cochés depuis le tableau de bord.</p>
+        </div>
+        <button class="btn btn-primaire cp-ajouter" onclick="ouvrirFenetreCompte(null)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Ajouter un compte
+        </button>
+      </div>
       <ul class="user-liste" id="listeUtilisateurs"></ul>
-    </div>
-
-    <div class="bloc-carte">
-      <h2 id="formTitre">Ajouter un utilisateur</h2>
-      <p class="sous-titre" id="formNote">Le mot de passe est stocké tel quel dans Web/utilisateurs.json.</p>
-
-      <div class="champ">
-        <label for="champLogin">Identifiant</label>
-        <input type="text" id="champLogin" placeholder="identifiant" autocomplete="off">
-      </div>
-      <div class="champ">
-        <label for="champPassword">Mot de passe</label>
-        <input type="text" id="champPassword" placeholder="mot de passe" autocomplete="off">
-      </div>
-      <div class="champ">
-        <label for="champNom">Nom affiché (optionnel)</label>
-        <input type="text" id="champNom" placeholder="ex. Robin" autocomplete="off">
-      </div>
-      <div class="champ">
-        <label for="champRole">Rôle central</label>
-        <select id="champRole">
-          <option value="user">Utilisateur</option>
-          <option value="admin">Administrateur (gère les comptes)</option>
-        </select>
-      </div>
-
-      <div class="champ">
-        <label>Accès aux sites</label>
-        <div class="case-acces-sites" id="casesAcces"></div>
-      </div>
-
-      <div style="display:flex; gap:0.7rem;">
-        <button class="btn btn-primaire" id="btnEnregistrer" onclick="enregistrerUtilisateur()">Ajouter</button>
-        <button class="btn btn-fantome" id="btnAnnuler" style="display:none" onclick="annulerEdition()">Annuler</button>
-      </div>
-
       <p id="message" class="message"></p>
-    </div>
-
-    <div class="bloc-carte">
-      <h2>Migration de Ma Bibliothèque</h2>
-      <p class="sous-titre">Une seule fois : fait passer Ma Bibliothèque d'une collection unique partagée à une collection séparée par compte (comme Éditeur de livre). Sans danger à relancer — ne fait rien si déjà fait, et ne supprime jamais les anciens fichiers.</p>
-      <button class="btn btn-secondaire" onclick="lancerMigrationMaBibliotheque()">Migrer Ma Bibliothèque vers des comptes séparés</button>
-      <p id="messageMigrationMB" class="message"></p>
-    </div>
-
-    <div class="bloc-carte">
-      <h2>Import des comptes des sites</h2>
-      <p class="sous-titre">Verse les anciens <code>users.json</code> d'Éditeur de livre, de Ma Bibliothèque et de Droid Fortnite dans ce fichier central, qui est désormais le seul que les sites consultent pour se connecter. Reprend les accès, les pseudos et les dates de connexion. Peut être relancé sans créer de doublon : un compte central déjà présent n'est jamais écrasé, seulement complété.</p>
-      <button class="btn btn-secondaire" onclick="lancerImport()">Importer les comptes des sites</button>
-      <p id="messageImport" class="message"></p>
-    </div>
+    </section>
 
   </main>
 

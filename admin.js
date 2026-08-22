@@ -48,7 +48,10 @@ async function chargerDonnees() {
 }
 
 function construireCasesAcces(accesActuels) {
+  // Les cases ne vivent que dans la fenêtre : au chargement de la page, elles
+  // n'existent pas encore.
   const zone = document.getElementById("casesAcces");
+  if (!zone) return;
   zone.innerHTML = "";
   sitesDisponibles.forEach(site => {
     const label = document.createElement("label");
@@ -173,45 +176,102 @@ function construireFormulaireTransfert(loginSource) {
   return li;
 }
 
-function editerUtilisateur(login) {
-  const u = utilisateurs.find(x => x.login === login);
-  if (!u) return;
+// ===== La fiche d'un compte, en fenêtre =====
+//
+// Le formulaire vivait en bas de page, sous la liste : pour modifier
+// quelqu'un il fallait descendre, et l'on ne voyait plus de qui il
+// s'agissait. Ajouter et modifier passent donc par une fenêtre, qui se
+// referme sur la liste — et qui porte le nom du compte concerné.
 
+function ouvrirFenetreCompte(login) {
+  fermerFenetreCompte();
   modeEditionLogin = login;
-  document.getElementById("champLogin").value = u.login;
-  document.getElementById("champLogin").disabled = true; // le login est la clé : non modifiable
-  document.getElementById("champPassword").value = u.password || "";
-  document.getElementById("champNom").value = u.nomAffichage || "";
-  document.getElementById("champRole").value = u.role === "admin" ? "admin" : "user";
-  construireCasesAcces(Array.isArray(u.acces) ? u.acces : []);
-  document.getElementById("formTitre").textContent = "Modifier « " + u.login + " »";
-  document.getElementById("formNote").textContent = "L'identifiant ne peut pas être changé.";
-  document.getElementById("btnEnregistrer").textContent = "Enregistrer les modifications";
-  document.getElementById("btnAnnuler").style.display = "";
-  document.getElementById("message").textContent = "";
 
+  const u = login ? utilisateurs.find((x) => x.login === login) : null;
+  if (login && !u) return;
+  const acces = u && Array.isArray(u.acces) ? u.acces : [];
+
+  const fond = document.createElement("div");
+  fond.id = "fenetreCompte";
+  fond.className = "fenetre";
+  fond.addEventListener("click", (e) => { if (e.target === fond) fermerFenetreCompte(); });
+
+  fond.innerHTML =
+    '<div class="fenetre-carte" role="dialog" aria-modal="true" aria-label="' +
+      (u ? "Modifier un compte" : "Ajouter un compte") + '">' +
+      '<button class="fenetre-fermer" aria-label="Fermer">&#10005;</button>' +
+      "<h2>" + (u ? "Modifier « " + echapper(u.login) + " »" : "Ajouter un compte") + "</h2>" +
+      '<p class="sous-titre">' + (u
+        ? "L'identifiant ne peut pas être changé : il sert de clé aux fichiers personnels de chaque site."
+        : "Le compte sera créé dans le fichier central du portail, avec les accès cochés.") + "</p>" +
+
+      '<div class="champ">' +
+        '<label for="champLogin">Identifiant</label>' +
+        '<input type="text" id="champLogin" placeholder="identifiant" autocomplete="off"' +
+          (u ? ' value="' + echapper(u.login) + '" disabled' : "") + ">" +
+      "</div>" +
+      '<div class="champ">' +
+        '<label for="champPassword">Mot de passe</label>' +
+        '<input type="text" id="champPassword" placeholder="mot de passe" autocomplete="off" value="' +
+          (u ? echapper(u.password || "") : "") + '">' +
+      "</div>" +
+      '<div class="champ">' +
+        '<label for="champNom">Pseudo (optionnel)</label>' +
+        '<input type="text" id="champNom" placeholder="ex. Robin" autocomplete="off" value="' +
+          (u ? echapper(u.nomAffichage || "") : "") + '">' +
+      "</div>" +
+      '<div class="champ">' +
+        '<label for="champRole">Rôle</label>' +
+        '<select id="champRole">' +
+          '<option value="user">Utilisateur</option>' +
+          '<option value="admin">Administrateur (gère les comptes)</option>' +
+        "</select>" +
+      "</div>" +
+      '<div class="champ">' +
+        "<label>Accès aux sites</label>" +
+        '<div class="case-acces-sites" id="casesAcces"></div>' +
+      "</div>" +
+
+      '<p id="messageFenetre" class="message"></p>' +
+      '<div class="fenetre-actions">' +
+        '<button class="btn btn-fantome" id="btnAnnuler">Annuler</button>' +
+        '<button class="btn btn-primaire" id="btnEnregistrer">' +
+          (u ? "Enregistrer" : "Créer le compte") + "</button>" +
+      "</div>" +
+    "</div>";
+
+  document.body.appendChild(fond);
+
+  if (u) document.getElementById("champRole").value = u.role === "admin" ? "admin" : "user";
+  construireCasesAcces(acces);
+
+  fond.querySelector(".fenetre-fermer").onclick = fermerFenetreCompte;
+  fond.querySelector("#btnAnnuler").onclick = fermerFenetreCompte;
+  fond.querySelector("#btnEnregistrer").onclick = enregistrerUtilisateur;
+
+  document.getElementById(u ? "champPassword" : "champLogin").focus();
   afficherUtilisateurs();
-  document.getElementById("champPassword").focus();
 }
 
-function annulerEdition() {
+function fermerFenetreCompte() {
+  const f = document.getElementById("fenetreCompte");
+  if (f) f.remove();
   modeEditionLogin = null;
-  document.getElementById("champLogin").value = "";
-  document.getElementById("champLogin").disabled = false;
-  document.getElementById("champPassword").value = "";
-  document.getElementById("champNom").value = "";
-  document.getElementById("champRole").value = "user";
-  construireCasesAcces([]);
-  document.getElementById("formTitre").textContent = "Ajouter un utilisateur";
-  document.getElementById("formNote").textContent = "Le mot de passe est stocké tel quel dans Web/utilisateurs.json.";
-  document.getElementById("btnEnregistrer").textContent = "Ajouter";
-  document.getElementById("btnAnnuler").style.display = "none";
-  document.getElementById("message").textContent = "";
   afficherUtilisateurs();
+}
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") fermerFenetreCompte();
+});
+
+// L'ancien bouton « Modifier » de chaque ligne ouvre la même fenêtre.
+function editerUtilisateur(login) {
+  ouvrirFenetreCompte(login);
 }
 
 async function enregistrerUtilisateur() {
-  const message = document.getElementById("message");
+  // Les messages restent dans la fenêtre : sous la liste, on ne les voyait pas.
+  const message = document.getElementById("messageFenetre") || document.getElementById("message");
   const moi = localStorage.getItem("team53_login");
 
   const login = document.getElementById("champLogin").value.trim();
@@ -255,9 +315,14 @@ async function enregistrerUtilisateur() {
     // Rien à recopier ailleurs : les sites lisent ce fichier-ci. C'est tout
     // l'intérêt de la centralisation — un mot de passe changé l'est partout,
     // et deux fichiers ne peuvent plus diverger en silence.
-    annulerEdition();
-    message.textContent = "Enregistré avec succès.";
-    setTimeout(() => { if (message.textContent === "Enregistré avec succès.") message.textContent = ""; }, 2500);
+    fermerFenetreCompte();
+    const messageListe = document.getElementById("message");
+    if (messageListe) {
+      messageListe.textContent = "Enregistré avec succès.";
+      setTimeout(() => {
+        if (messageListe.textContent === "Enregistré avec succès.") messageListe.textContent = "";
+      }, 2500);
+    }
   } catch (erreur) {
     message.textContent = erreur.conflit
       ? "La liste des comptes a été modifiée ailleurs. Rechargez la page avant de réessayer."
@@ -279,7 +344,8 @@ async function supprimerUtilisateur(login) {
   try {
     shaUtilisateurs = await ecrireFichierJSON("utilisateurs.json", copie, shaUtilisateurs, token, `Suppression de l'utilisateur ${login}`);
     utilisateurs = copie;
-    if (modeEditionLogin === login) annulerEdition();
+    // Si sa fiche était ouverte, elle n'a plus d'objet.
+    if (modeEditionLogin === login) fermerFenetreCompte();
     else afficherUtilisateurs();
     message.textContent = "Compte supprimé.";
 
@@ -431,41 +497,6 @@ async function confirmerTransfert(loginSource) {
   } catch (erreur) {
     message.className = "message";
     message.textContent = "Erreur pendant le transfert : " + erreur.message;
-  }
-}
-
-async function lancerMigrationMaBibliotheque() {
-  const message = document.getElementById("messageMigrationMB");
-  message.className = "message";
-  message.textContent = "Migration en cours (peut prendre un moment si beaucoup de couvertures)...";
-  try {
-    const resultat = await migrerMaBibliothequeVersMultiCompte(token);
-    message.className = "message ok";
-    if (resultat.dejaMigre) {
-      message.textContent = "Déjà migré : rien à refaire.";
-    } else if (resultat.rienAMigrer) {
-      message.textContent = "Aucun compte Ma Bibliothèque trouvé (MaBibliotheque/compte.json absent) : rien à migrer.";
-    } else {
-      message.textContent = `Migration terminée pour « ${resultat.login} » : ${resultat.livres} livre(s)/série(s), ${resultat.imagesDeplacees} image(s) déplacée(s) vers un dossier séparé.`;
-    }
-  } catch (erreur) {
-    message.className = "message";
-    message.textContent = erreur.message;
-  }
-}
-
-async function lancerImport() {
-  const message = document.getElementById("messageImport");
-  message.className = "message";
-  message.textContent = "Import en cours...";
-  try {
-    const resultat = await importerComptesExistants(token);
-    message.className = "message ok";
-    message.textContent = `Import terminé : ${resultat.ajoutes} compte(s) créé(s), ${resultat.accesAjoutes} accès ajouté(s) (total ${resultat.total} compte(s)).`;
-    await chargerDonnees();
-  } catch (erreur) {
-    message.className = "message";
-    message.textContent = erreur.message;
   }
 }
 
