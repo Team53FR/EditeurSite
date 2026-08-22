@@ -268,19 +268,24 @@ a { color: var(--primaire); }
 .etat-vide .pastille-lg { opacity: 0.5; }
 .etat-vide h2 { color: var(--texte); font-size: 1.1rem; margin: 0.5rem 0 0.4rem; }
 
+/* « minmax(0, 1fr) » et non « 1fr » : une piste « 1fr » vaut en réalité
+   minmax(AUTO, 1fr), et refuse donc de descendre sous la largeur minimale de
+   son contenu. Une couverture plus large que les autres élargissait sa
+   colonne — et le livre entier paraissait deux fois plus gros que ses
+   voisins. Le zéro autorise la piste à se serrer, l'image suit. */
 .grille-livres {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.9rem;
 }
 @media (min-width: 520px) {
-  .grille-livres { grid-template-columns: repeat(3, 1fr); }
+  .grille-livres { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 @media (min-width: 760px) {
-  .grille-livres { grid-template-columns: repeat(4, 1fr); }
+  .grille-livres { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 @media (min-width: 980px) {
-  .grille-livres { grid-template-columns: repeat(5, 1fr); }
+  .grille-livres { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 }
 
 /* Vue Liste : une ligne par livre, couverture à gauche */
@@ -303,13 +308,13 @@ a { color: var(--primaire); }
 
 /* Vue Miniature : grille dense, juste la couverture + le titre */
 .grille-livres.vue-miniature {
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.5rem;
 }
-@media (min-width: 480px) { .grille-livres.vue-miniature { grid-template-columns: repeat(4, 1fr); } }
-@media (min-width: 640px) { .grille-livres.vue-miniature { grid-template-columns: repeat(5, 1fr); } }
-@media (min-width: 760px) { .grille-livres.vue-miniature { grid-template-columns: repeat(6, 1fr); } }
-@media (min-width: 980px) { .grille-livres.vue-miniature { grid-template-columns: repeat(8, 1fr); } }
+@media (min-width: 480px) { .grille-livres.vue-miniature { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (min-width: 640px) { .grille-livres.vue-miniature { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+@media (min-width: 760px) { .grille-livres.vue-miniature { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+@media (min-width: 980px) { .grille-livres.vue-miniature { grid-template-columns: repeat(8, minmax(0, 1fr)); } }
 
 /* Après les trois vues, pour l'emporter sur leur « display » : à égalité de
    spécificité, c'est la dernière règle qui gagne. */
@@ -347,9 +352,17 @@ a { color: var(--primaire); }
   transition: box-shadow 0.15s ease;
 }
 .carte-livre:hover .couv-livre { box-shadow: 0 10px 24px rgba(60, 42, 20, 0.28); }
-.couv-livre img { width: 100%; height: 100%; object-fit: cover; }
-.info-livre { padding: 0.6rem 0.15rem 0.2rem; }
+.couv-livre img { width: 100%; height: 100%; min-width: 0; object-fit: cover; }
+/* Une carte ne doit jamais réclamer plus que sa colonne : sans « min-width: 0 »,
+   un titre d'un seul tenant (un mot long, un titre sans espace) impose sa
+   largeur à la piste, et le livre paraît deux fois plus gros que ses voisins,
+   qui se serrent d'autant. */
+.carte-livre { min-width: 0; }
+.info-livre { min-width: 0; padding: 0.6rem 0.15rem 0.2rem; }
 .info-livre h3 {
+  /* Le mot long ne pousse plus la carte : il se coupe donc en bout de ligne,
+     faute de quoi il serait silencieusement rogné. */
+  overflow-wrap: anywhere;
   margin: 0 0 0.1rem;
   font-family: var(--serif);
   font-weight: 600;
