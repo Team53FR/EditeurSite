@@ -303,13 +303,13 @@ a { color: var(--primaire); }
   .encart-app { flex-wrap: wrap; }
   .encart-app-texte { flex-basis: calc(100% - 4rem); }
   .encart-app .btn-primaire { flex: 1; }
+}
 
-  /* Fiche de compte sur téléphone.
-     Sur une seule rangée, l'avatar, le nom, le badge de rôle et trois boutons
-     se disputaient 350 pixels : la date se coupait lettre par lettre et les
-     boutons sortaient de l'écran. On empile donc — identité en haut, accès
-     ensuite, actions en bas — et les boutons prennent toute la largeur, ce
-     qui leur donne enfin une cible atteignable au pouce. */
+/* Fiche de compte : trois boutons, un badge, un avatar et une date ne tiennent
+   pas sur une rangée avant 780 px — le texte s'y coupait en escalier. En
+   dessous, on empile : identité en haut, rôle sous le nom, accès, puis les
+   actions en grille sur toute la largeur. */
+@media (max-width: 780px) {
   .user-row {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr);
@@ -642,3 +642,151 @@ a { color: var(--primaire); }
   color: var(--tdb-encre);
 }
 .tdb-vide p { margin: 0; font-size: 0.9rem; }
+
+/* ===== Le cabinet, appliqué aux pages de comptes =====
+   Plutôt que de réécrire chaque composant, la classe de page redéfinit les
+   variables dont ils se servent déjà : cartes, champs, boutons et listes
+   prennent la palette du portail sans qu'on touche à leur balisage. Seuls
+   les titres et quelques bordures méritent un mot de plus. */
+.page-tdb {
+  --fond: var(--tdb-fond);
+  --carte: var(--tdb-relief);
+  --texte: var(--tdb-encre);
+  --texte-att: var(--tdb-encre-douce);
+  --bordure: var(--tdb-filet);
+  --primaire: #b4552c;
+  --primaire-fonce: #8f3f1d;
+  --primaire-clair: rgba(180, 85, 44, 0.12);
+  --ombre: none;
+  --rayon: 14px;
+}
+@media (prefers-color-scheme: dark) {
+  .page-tdb {
+    --primaire: #d87a4e;
+    --primaire-fonce: #e79668;
+    --primaire-clair: rgba(216, 122, 78, 0.16);
+  }
+}
+
+/* Le lien de retour tient lieu de marque sur les pages secondaires. */
+.tdb-retour {
+  display: inline-flex; align-items: center; gap: 0.55rem;
+  text-decoration: none;
+  color: var(--tdb-encre-douce);
+  font-family: "EB Garamond", Georgia, serif;
+  font-size: 1.05rem;
+}
+.tdb-retour span { letter-spacing: 0.02em; }
+.tdb-retour:hover { color: var(--tdb-encre); }
+
+/* Le titre de page est plus mesuré que celui du tableau de bord : c'est une
+   page de travail, pas un seuil. */
+.page-tdb .tdb-hero { padding-bottom: 0.6rem; }
+.page-tdb .tdb-titre { font-size: clamp(1.8rem, 4.5vw, 2.5rem); }
+
+.page-tdb .contenu {
+  max-width: 62rem;
+  padding: 0.4rem 1.5rem calc(3.5rem + var(--safe-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 1.4rem;
+}
+
+/* Les blocs deviennent des sections séparées par un filet : moins de boîtes
+   empilées, plus de page. */
+.page-tdb .bloc-carte {
+  background: none;
+  border: none;
+  border-top: 1px solid var(--tdb-filet);
+  border-radius: 0;
+  box-shadow: none;
+  padding: 1.5rem 0 0;
+  margin: 0;
+}
+.page-tdb .bloc-carte:first-child { border-top: none; padding-top: 0.4rem; }
+.page-tdb .bloc-carte h2 {
+  font-family: "EB Garamond", Georgia, serif;
+  font-weight: 600;
+  font-size: 1.35rem;
+  margin: 0 0 0.3rem;
+}
+.page-tdb .sous-titre { font-size: 0.87rem; line-height: 1.55; color: var(--tdb-encre-douce); }
+
+.page-tdb .champ label,
+.page-tdb .label-couv { font-size: 0.78rem; letter-spacing: 0.04em; color: var(--tdb-encre-douce); }
+.page-tdb input, .page-tdb select, .page-tdb textarea {
+  background: var(--tdb-fond-creux);
+  border: 1px solid var(--tdb-filet);
+  border-radius: 10px;
+  color: var(--tdb-encre);
+}
+.page-tdb input:focus, .page-tdb select:focus, .page-tdb textarea:focus {
+  outline: 2px solid var(--primaire);
+  outline-offset: 1px;
+  border-color: transparent;
+}
+
+.page-tdb .btn-primaire {
+  background: var(--primaire);
+  border-color: var(--primaire);
+  color: #fffdf8;
+}
+.page-tdb .btn-primaire:hover { background: var(--primaire-fonce); border-color: var(--primaire-fonce); }
+.page-tdb .btn-secondaire, .page-tdb .btn-fantome {
+  background: var(--tdb-relief);
+  border: 1px solid var(--tdb-filet);
+  color: var(--tdb-encre);
+}
+.page-tdb .btn-secondaire:hover, .page-tdb .btn-fantome:hover { border-color: var(--tdb-encre-douce); }
+
+/* La fiche d'un compte reprend le trait du sommaire : filet plutôt que carte,
+   et l'initiale en serif comme une lettrine. */
+.page-tdb .user-row {
+  background: none;
+  border: none;
+  border-top: 1px solid var(--tdb-filet);
+  border-radius: 0;
+  box-shadow: none;
+  padding: 1.1rem 0.2rem;
+}
+.page-tdb .user-liste { gap: 0; }
+.page-tdb .user-liste .user-row:first-child { border-top: none; }
+.page-tdb .user-row.en-edition {
+  box-shadow: none;
+  border-left: 3px solid var(--primaire);
+  padding-left: 0.9rem;
+}
+.page-tdb .user-ava {
+  background: var(--tdb-fond-creux);
+  border: 1px solid var(--tdb-filet);
+  color: var(--primaire);
+  font-family: "EB Garamond", Georgia, serif;
+  font-size: 1.05rem;
+}
+.page-tdb .user-nom > div:first-child {
+  font-family: "EB Garamond", Georgia, serif;
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+.page-tdb .chip-site, .page-tdb .role-badge { background: var(--tdb-fond-creux); }
+.page-tdb .role-badge.admin {
+  background: var(--primaire-clair);
+  color: var(--primaire);
+  border-color: var(--primaire);
+}
+.page-tdb .btn-mini {
+  background: var(--tdb-relief);
+  border-color: var(--tdb-filet);
+}
+.page-tdb .btn-mini:hover { border-color: var(--primaire); color: var(--primaire); }
+
+.page-tdb .case-acces {
+  background: var(--tdb-fond-creux);
+  border-color: var(--tdb-filet);
+}
+.page-tdb .stat-ligne {
+  background: var(--tdb-fond-creux);
+  border-color: var(--tdb-filet);
+}
+.page-tdb .stat-groupe h3 { color: var(--tdb-encre-douce); }
+.page-tdb .stat-ligne strong { font-family: "EB Garamond", Georgia, serif; }

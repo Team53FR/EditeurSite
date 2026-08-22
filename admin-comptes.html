@@ -3,8 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#4f46e5">
+<meta name="theme-color" content="#f4efe4">
+<meta name="theme-color" content="#14110c" media="(prefers-color-scheme: dark)">
 <title>Gestion des comptes — Team53FR</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icone-192.png">
@@ -19,22 +23,25 @@
 
 <link rel="icon" href="icone-192.png">
 </head>
-<body>
-  <header class="app-header">
-    <div class="app-header-ligne">
-      <h1>🔐 Gestion des comptes</h1>
-      <div class="actions-entete">
-        <a href="tableau-de-bord.html" class="icone-bouton" title="Retour au tableau de bord">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
-        </a>
-        <button class="icone-bouton deconnexion" title="Se déconnecter" onclick="seDeconnecter()">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-        </button>
-      </div>
+<body class="page-tdb">
+  <div class="tdb-barre">
+    <a class="tdb-retour" href="tableau-de-bord.html" title="Retour au tableau de bord">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+      <span>Team53FR</span>
+    </a>
+    <div class="tdb-outils">
+      <button class="deconnexion" title="Se déconnecter" aria-label="Se déconnecter" onclick="seDeconnecter()">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </button>
     </div>
+  </div>
+
+  <header class="tdb-hero">
+    <h1 class="tdb-titre">Les comptes</h1>
+    <p class="tdb-sous">Qui entre où, et avec quel rôle. Les comptes sont communs à tous les sites du portail.</p>
   </header>
 
-  <div class="contenu">
+  <main class="contenu">
 
     <div class="bloc-carte">
       <h2>Comptes</h2>
@@ -93,7 +100,7 @@
       <p id="messageImport" class="message"></p>
     </div>
 
-  </div>
+  </main>
 
   <script src="script.js"></script>
   <script src="admin.js"></script>
