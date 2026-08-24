@@ -1,3 +1,12 @@
+// ----- Ces actions passent par le reseau : on le dit, et on empeche d'y toucher -----
+// Voir attente.js. Les actions de FOND (sauvegarde differee, chargement d'une
+// vignette, migration silencieuse) n'y figurent surtout pas : les voiler
+// bloquerait la page pour un travail que l'on a justement choisi de rendre
+// invisible.
+envelopperAttente({
+  chargerLecture: "Ouverture du livre…",
+});
+
 // ===== Lecteur de livre publié (lecture seule) =====
 // Reprend l'expérience du « mode aperçu » de l'éditeur (double-page + tournage
 // de page), mais en lecture seule et de façon autonome. Utilise directement

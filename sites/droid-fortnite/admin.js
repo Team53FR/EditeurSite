@@ -1,3 +1,18 @@
+// ----- Ces actions passent par le reseau : on le dit, et on empeche d'y toucher -----
+// Voir attente.js. Les actions de FOND (sauvegarde differee, chargement d'une
+// vignette, migration silencieuse) n'y figurent surtout pas : les voiler
+// bloquerait la page pour un travail que l'on a justement choisi de rendre
+// invisible.
+envelopperAttente({
+  chargerDonnees: "Chargement des données…",
+  enregistrerDroideAdmin: ["Enregistrement du droïde…", "Si vous avez choisi une icône, elle part aussi."],
+  supprimerDroide: "Suppression du droïde…",
+  sauvegarderPaliers: "Enregistrement des paliers…",
+  sauvegarderUnites: "Enregistrement des unités…",
+  sauvegarderRaretes: "Enregistrement des raretés…",
+  sauvegarderRenaissanceAdmin: "Enregistrement des renaissances…",
+});
+
 // Panneau de gestion Droid Fortnite (réservé aux admins du portail central —
 // voir exigerAdminDroidFortnite() dans script.js).
 

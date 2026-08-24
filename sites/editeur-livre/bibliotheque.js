@@ -1,3 +1,15 @@
+// ----- Ces actions passent par le reseau : on le dit, et on empeche d'y toucher -----
+// Voir attente.js. Les actions de FOND (sauvegarde differee, chargement d'une
+// vignette, migration silencieuse) n'y figurent surtout pas : les voiler
+// bloquerait la page pour un travail que l'on a justement choisi de rendre
+// invisible.
+envelopperAttente({
+  chargerBibliotheque: "Ouverture de la bibliothèque…",
+  creerLivre: "Création du livre…",
+  supprimerLivre: "Suppression du livre…",
+  enregistrerNom: "Enregistrement du pseudo…",
+});
+
 let bibliotheque = null;
 let shaBiblio = null;
 let nomFichierBiblio = null;

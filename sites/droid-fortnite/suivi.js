@@ -1,3 +1,12 @@
+// ----- Ces actions passent par le reseau : on le dit, et on empeche d'y toucher -----
+// Voir attente.js. Les actions de FOND (sauvegarde differee, chargement d'une
+// vignette, migration silencieuse) n'y figurent surtout pas : les voiler
+// bloquerait la page pour un travail que l'on a justement choisi de rendre
+// invisible.
+envelopperAttente({
+  chargerTout: "Chargement du suivi…",
+});
+
 // ===== Droid Fortnite — logique de la page de suivi =====
 const token = exigerConnexion(); // redirige vers connexion.html si absent
 
@@ -861,6 +870,3 @@ function basculerAtteint(idRenaissance) {
   afficherRenaissance({ recadrer: true });
   marquerProgressionModifiee();
 }
-
-
-

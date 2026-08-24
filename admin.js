@@ -1,3 +1,15 @@
+// ----- Ces actions passent par le reseau : on le dit, et on empeche d'y toucher -----
+// Voir attente.js. Les actions de FOND (sauvegarde differee, chargement d'une
+// vignette, migration silencieuse) n'y figurent surtout pas : les voiler
+// bloquerait la page pour un travail que l'on a justement choisi de rendre
+// invisible.
+envelopperAttente({
+  chargerDonnees: "Chargement des comptes…",
+  enregistrerUtilisateur: "Enregistrement du compte…",
+  supprimerUtilisateur: ["Suppression du compte…", "Selon le choix, ses données sont aussi effacées : cela peut prendre un moment."],
+  confirmerTransfert: "Transfert en cours…",
+});
+
 // Panneau d'administration central (réservé aux comptes team53_role === "admin").
 // Comptes stockés dans Web/utilisateurs.json :
 //   [{ login, password, role: "admin"|"user", nomAffichage, acces: [siteId,...], derniereConnexion }]

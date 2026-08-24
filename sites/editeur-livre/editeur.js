@@ -1,3 +1,15 @@
+// ----- Ces actions passent par le reseau : on le dit, et on empeche d'y toucher -----
+// Voir attente.js. Les actions de FOND (sauvegarde differee, chargement d'une
+// vignette, migration silencieuse) n'y figurent surtout pas : les voiler
+// bloquerait la page pour un travail que l'on a justement choisi de rendre
+// invisible.
+envelopperAttente({
+  chargerLivre: ["Ouverture du livre…", "Le texte et la mise en pages sont récupérés."],
+  sauvegarder: ["Enregistrement du livre…", "Ne fermez pas la page : l'écriture est en cours."],
+  gererConflitSauvegarde: ["Résolution d'un conflit…", "Le livre a été modifié ailleurs : les deux versions sont comparées."],
+  basculerPublication: ["Publication…", "La liste des livres publiés est mise à jour."],
+});
+
 let bibliotheque = null;
 let shaBiblio = null;
 let nomFichierBiblio = null;
@@ -1227,6 +1239,9 @@ function chargerImageFond(event) {
     const extension = extraireExtensionDataUrl(dataUrl);
     const chemin = `${obtenirPrefixeImagesUtilisateur()}/${livre.id}_${modeCourant}.${extension}`;
 
+    // Le travail se fait dans la réponse du lecteur de fichier, pas dans
+    // chargerImageFond : le voile se pose donc ici, et pas autour de l'appel.
+    ouvrirAttente("Envoi de l'image…", "Une image de couverture peut peser lourd : le transfert prend quelques secondes.");
     messageCouv.textContent = "Envoi de l'image en cours...";
     try {
       await uploaderImageBase64(chemin, dataUrl, token, `Image de couverture — ${livre.titre || livre.id}`);
@@ -1248,6 +1263,8 @@ function chargerImageFond(event) {
       planifierBrouillon();
     } catch (erreur) {
       messageCouv.textContent = erreur.message;
+    } finally {
+      fermerAttente();
     }
   };
   reader.readAsDataURL(fichier);

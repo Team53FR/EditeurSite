@@ -1,3 +1,23 @@
+// ----- Ces actions passent par le reseau : on le dit, et on empeche d'y toucher -----
+// Voir attente.js. Les actions de FOND (sauvegarde differee, chargement d'une
+// vignette, migration silencieuse) n'y figurent surtout pas : les voiler
+// bloquerait la page pour un travail que l'on a justement choisi de rendre
+// invisible.
+envelopperAttente({
+  chargerCollection: "Ouverture de la collection…",
+  enregistrerLivre: ["Enregistrement…", "Si vous avez choisi une couverture, elle part aussi : comptez quelques secondes."],
+  supprimerLivreCourant: "Suppression…",
+  enregistrerSerie: ["Enregistrement…", "Si vous avez choisi une affiche, elle part aussi : comptez quelques secondes."],
+  supprimerSerieCourante: "Suppression…",
+  lancerRechercheTitre: ["Recherche du livre…", "Google Books, la BnF et OpenLibrary sont interrogés."],
+  lancerRechercheSerie: "Recherche de la série…",
+  choisirResultatRecherche: "Récupération de la fiche…",
+  choisirResultatRechercheSerie: "Récupération de la fiche…",
+  ajouterSerieComplete: "Ajout de la série…",
+  traiterCodeScanne: "Lecture du code-barres…",
+  traiterPhotoCodeBarre: "Lecture du code-barres…",
+});
+
 // ===== Ma Bibliothèque — logique de la collection =====
 const token = exigerConnexion(); // redirige vers connexion.html si absent
 

@@ -1,3 +1,15 @@
+// ----- Ces actions passent par le reseau : on le dit, et on empeche d'y toucher -----
+// Voir attente.js. Les actions de FOND (sauvegarde differee, chargement d'une
+// vignette, migration silencieuse) n'y figurent surtout pas : les voiler
+// bloquerait la page pour un travail que l'on a justement choisi de rendre
+// invisible.
+envelopperAttente({
+  chargerCompte: "Chargement de votre compte…",
+  enregistrerPseudo: "Enregistrement du pseudo…",
+  changerMotDePasse: "Changement du mot de passe…",
+  afficherStats: "Lecture de vos statistiques…",
+});
+
 // Page « Mon compte » : chacun modifie son pseudo et son mot de passe, et
 // consulte ses propres statistiques. Aucun droit d'administrateur requis —
 // on ne touche qu'à sa propre entrée de Web/utilisateurs.json.

@@ -678,9 +678,12 @@ function exporterImpression(modeRectoVerso) {
 
   const message = document.getElementById("message");
   if (message) message.textContent = "Préparation de l'impression...";
+  ouvrirAttente("Préparation de l'impression…",
+    "Les pages et leurs images sont assemblées ; la fenêtre d'impression s'ouvrira toute seule.");
 
   Promise.all(promessesImages).finally(() => {
     if (message) message.textContent = "";
+    fermerAttente();
     lancerImpression(modeRectoVerso);
   });
 }
@@ -746,9 +749,12 @@ function exporterLivret(modeRectoVerso) {
 
   const message = document.getElementById("message");
   if (message) message.textContent = "Préparation de l'impression...";
+  ouvrirAttente("Préparation de l'impression…",
+    "Les pages et leurs images sont assemblées ; la fenêtre d'impression s'ouvrira toute seule.");
 
   Promise.all(promessesImages).finally(() => {
     if (message) message.textContent = "";
+    fermerAttente();
     lancerImpression(modeRectoVerso);
   });
 }
@@ -1125,8 +1131,11 @@ function exporterDeuxPages(mode) {
 
   const message = document.getElementById("message");
   if (message) message.textContent = "Préparation de l'impression...";
+  ouvrirAttente("Préparation de l'impression…",
+    "Les pages et leurs images sont assemblées ; la fenêtre d'impression s'ouvrira toute seule.");
   setTimeout(() => {
     if (message) message.textContent = "";
+    fermerAttente();
     lancerImpression(passes ? "passes" : "auto");
   }, 0);
 }
@@ -1571,6 +1580,8 @@ function ouvrirControleImprimeur(cible, livre, f, pagesEcran, pagesPro) {
 function genererFichierImprimeur(cible, dosMm, livre, f, pagesPro, papier) {
   const message = document.getElementById("message");
   if (message) message.textContent = "Préparation du fichier imprimeur...";
+  ouvrirAttente("Préparation du fichier…",
+    "La planche et ses images sont assemblées ; la fenêtre d'impression s'ouvrira toute seule.");
 
   const promessesImages = [];
 
@@ -1624,6 +1635,7 @@ function genererFichierImprimeur(cible, dosMm, livre, f, pagesPro, papier) {
 
   Promise.all(promessesImages).finally(() => {
     if (message) message.textContent = "";
+    fermerAttente();
     definirPasseLivret(null);
     window.print();
   });
@@ -2187,6 +2199,9 @@ function envoyerImageTranche(event, livre, tranche, surFin, note) {
     const extension = extraireExtensionDataUrl(dataUrl);
     const chemin = obtenirPrefixeImagesUtilisateur() + "/" + livre.id + "_tranche." + extension;
 
+    // Comme pour la couverture : le travail a lieu dans la réponse du lecteur
+    // de fichier, c'est donc ici que le voile se pose.
+    ouvrirAttente("Envoi de l'image…", "Le transfert d'une image prend quelques secondes.");
     if (note) note.textContent = "Envoi de l'image en cours…";
     try {
       await uploaderImageBase64(chemin, dataUrl, token,
@@ -2202,6 +2217,8 @@ function envoyerImageTranche(event, livre, tranche, surFin, note) {
       surFin();
     } catch (erreur) {
       if (note) note.textContent = erreur.message;
+    } finally {
+      fermerAttente();
     }
   };
   lecteur.readAsDataURL(fichier);
