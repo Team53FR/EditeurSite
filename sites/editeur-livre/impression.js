@@ -1711,18 +1711,23 @@ function genererFichierImprimeur(cible, dosMm, livre, f, pagesPro, papier) {
     }
 
     if (cible === "couverture") {
-      const largSupport = 2 * f.larg + dosMm + 2 * MARGE_TECHNIQUE_MM;
+      const largTrim = 2 * f.larg + dosMm;          // la couverture finie
+      const largSupport = largTrim + 2 * MARGE_TECHNIQUE_MM;
       const hautSupport = f.haut + 2 * MARGE_TECHNIQUE_MM;
-      const planche = creerCouverturePlat(livre, f, dosMm, promessesImages);
       // Sur une imprimante, la planche est centrée sur une feuille réelle pour
       // sortir à sa taille exacte. Pour l'imprimeur, c'est le support lui-même
       // qui doit faire cette taille : pas d'enveloppe.
       if (papier) {
+        const planche = creerCouverturePlat(livre, f, dosMm, promessesImages, false);
         reglerPagePapier(stylePage, papier);
-        // La planche porte déjà ses propres repères de coupe et de pli : ce
-        // sont ses bords rognés qui comptent, pas ceux du support.
-        zone.appendChild(poserSurPapier(planche, papier, largSupport, hautSupport));
+        // On cerne le format ROGNÉ, pas le support : le support n'est qu'un
+        // porte-repères, et l'encadrer donnait deux rectangles concentriques
+        // sur la feuille — dont un qu'il ne fallait surtout pas suivre.
+        const feuilleP = poserSurPapier(planche, papier, largTrim, f.haut);
+        ajouterLegendeCouverture(feuilleP, papier, largSupport, hautSupport, dosMm);
+        zone.appendChild(feuilleP);
       } else {
+        const planche = creerCouverturePlat(livre, f, dosMm, promessesImages, true);
         stylePage.textContent = "@page { size: " + largSupport + "mm " + hautSupport + "mm; margin: 0; }";
         zone.appendChild(planche);
       }
@@ -1803,14 +1808,23 @@ function ajouterReperesCoupe(feuille, largTrim, hautTrim) {
 }
 
 // Repères de pli : verticaux, de part et d'autre du dos.
-function ajouterReperesPli(feuille, hautTrim, positionsMm) {
+//
+// `pointille` les distingue des traits de coupe. Chez un imprimeur, la
+// convention du métier suffit ; chez soi, deux hairlines identiques à cinq
+// millimètres l'une de l'autre — l'une à scier, l'autre à plier — ne se
+// distinguent pas, et l'on coupe la couverture en trois.
+//
+// Ils restent DEHORS du format rogné : un pointillé qui traverserait le dos
+// resterait imprimé sur le livre fini. La contrepartie est que la coupe les
+// emporte, d'où la consigne de marquer les plis avant de couper.
+function ajouterReperesPli(feuille, hautTrim, positionsMm, pointille) {
   const M = MARGE_TECHNIQUE_MM;
   const d = DECALAGE_REPERE_MM;
   const L = LONGUEUR_REPERE_MM;
   positionsMm.forEach((x) => {
     [M - d - L, M + hautTrim + d].forEach((y) => {
       const t = document.createElement("div");
-      t.className = "repere-pro repere-v repere-pli-pro";
+      t.className = "repere-pro repere-v repere-pli-pro" + (pointille ? " repere-pli-tirets" : "");
       t.style.left = (M + x) + "mm";
       t.style.top = y + "mm";
       t.style.width = "0mm";
@@ -2335,7 +2349,11 @@ function envoyerImageTranche(event, livre, tranche, surFin, note) {
 }
 
 // Couverture ouverte à plat : 4e de couverture | dos | 1re de couverture.
-function creerCouverturePlat(livre, f, dosMm, promessesImages) {
+// `pourImprimeur` : la planche part telle quelle chez un professionnel, avec
+// les repères d'angle qu'attend son massicot. Chez soi, on coupe à la règle :
+// ce sont alors les lignes pleines posées par poserSurPapier qui cernent la
+// couverture, et la planche se contente d'indiquer ses plis.
+function creerCouverturePlat(livre, f, dosMm, promessesImages, pourImprimeur) {
   const largTrim = 2 * f.larg + dosMm;
   const feuille = creerFeuillePro(largTrim, f.haut);
   const zone = creerZoneRognePro(largTrim, f.haut);
@@ -2361,9 +2379,32 @@ function creerCouverturePlat(livre, f, dosMm, promessesImages) {
   zone.appendChild(creerPanneauCouverture(livre, "couverture", f, promessesImages));
 
   feuille.appendChild(zone);
-  ajouterReperesCoupe(feuille, largTrim, f.haut);
-  ajouterReperesPli(feuille, f.haut, [f.larg, f.larg + dosMm]);
+  if (pourImprimeur) ajouterReperesCoupe(feuille, largTrim, f.haut);
+  ajouterReperesPli(feuille, f.haut, [f.larg, f.larg + dosMm], !pourImprimeur);
   return feuille;
+}
+
+// La légende, posée sur le BLANC DE LA FEUILLE, sous la planche — et non dans
+// la marge technique, où elle passerait au travers des repères de pli.
+// Elle ne survit pas non plus à la coupe, et c'est très bien : elle n'a plus
+// rien à dire une fois la couverture détourée.
+//
+// Sans elle, la feuille porte deux sortes de repères qui se ressemblent, et
+// rien ne dit lequel est un trait de scie et lequel est un pli.
+function ajouterLegendeCouverture(feuilleP, papier, largSupport, hautSupport, dosMm) {
+  const margeBasse = (papier.haut - hautSupport) / 2;
+  if (margeBasse < 6) return;   // pas la place d'écrire quoi que ce soit
+
+  const p = document.createElement("div");
+  p.className = "legende-couv-pro";
+  p.style.left = ((papier.larg - largSupport) / 2) + "mm";
+  p.style.top = (papier.haut - margeBasse + 2) + "mm";
+  p.style.width = largSupport + "mm";
+  p.innerHTML =
+    "<b>Trait plein</b> : couper — les quatre lignes font le tour de la couverture. &nbsp;·&nbsp; " +
+    "<b>Pointillé</b> : plier" + (dosMm > 0 ? ", les deux bords du dos" : ", le pli central") +
+    ". &nbsp;·&nbsp; Marquez les plis au crayon <b>avant</b> de couper : leurs repères sont hors de la couverture, la coupe les emporte.";
+  feuilleP.appendChild(p);
 }
 
 // Un panneau de couverture au format rogné, réutilisant le rendu existant.

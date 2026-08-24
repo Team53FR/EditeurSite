@@ -278,6 +278,23 @@
   .repere-h { border-top: 0.25pt solid #000; }
   .repere-v { border-left: 0.25pt solid #000; }
 
+  /* Impression maison : le pli doit se voir d'un coup d'oeil comme AUTRE
+     CHOSE qu'une coupe. Plus epais et en tirets — deux hairlines identiques
+     a cinq millimetres l'une de l'autre se confondent, et l'on scie la
+     couverture au lieu de la plier. */
+  .repere-pli-tirets { border-left: 0.7pt dashed #000; }
+
+  /* La legende, dans la marge technique : elle part avec la coupe. */
+  .legende-couv-pro {
+    position: absolute;
+    box-sizing: border-box;
+    text-align: center;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 2.6mm;
+    line-height: 1.35;
+    color: #000;
+  }
+
   /* Couverture ouverte à plat : 4e | dos | 1re */
   .couv-plat {
     display: flex;
