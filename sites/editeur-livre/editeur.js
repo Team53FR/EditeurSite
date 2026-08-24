@@ -3004,7 +3004,23 @@ function reecrireCasse(h2, nouveauTexte) {
   }
 }
 
-function corrigerCasseTitres() {
+// ===== Renommer les chapitres =====
+//
+// Renommer un chapitre se faisait dans le texte, page par page : il fallait
+// retrouver le titre dans la mise en pages, cliquer dedans, corriger, puis
+// recommencer trente-quatre fois. Le sommaire connaît pourtant déjà tous les
+// titres — autant les présenter ensemble et les laisser corriger à la file.
+//
+// Un titre porte parfois des italiques ou des petites capitales : on ne
+// remplace donc pas son contenu, on réécrit ses nœuds de texte (voir
+// reecrireCasse), qui préserve le balisage tant que la longueur concorde.
+//
+// La correction de casse d'autrefois n'a pas disparu : elle est devenue un
+// bouton de ce dialogue, qui REMPLIT les champs au lieu d'appliquer d'office.
+// L'éditeur propose toujours, l'auteur décide toujours — mais dans la même
+// fenêtre que le reste.
+
+function ouvrirRenommageChapitres() {
   if (modeApercu || modeCouverture) return;
   flushSpread();
 
@@ -3014,80 +3030,161 @@ function corrigerCasseTitres() {
     .filter((h) => (h.textContent || "").trim());
 
   if (!titres.length) {
-    alert("Aucun titre de chapitre à corriger.");
+    alert("Aucun chapitre à renommer : ce livre n'a pas encore de titre.");
     return;
   }
 
-  const noms = nomsPropresDuLivre();
-  const propositions = titres.map((h) => {
-    const avant = h.textContent;
-    return { h2: h, avant, apres: titreEnCasseFrancaise(avant, noms) };
-  });
+  // Le numéro de page vient du sommaire. Si les deux comptes divergent — un
+  // titre coupé entre deux pages, par exemple — on préfère n'afficher aucun
+  // numéro plutôt qu'un numéro faux.
+  const duSommaire = listerChapitres();
+  const pages = duSommaire.length === titres.length ? duSommaire : null;
 
-  const changes = propositions.filter((p) => p.avant !== p.apres);
-  if (!changes.length) {
-    alert("Rien à corriger : aucun titre ne porte de majuscule superflue après le tiret.");
-    return;
-  }
+  const lignes = titres.map((h, i) => ({
+    h2: h,
+    avant: h.textContent,
+    page: pages ? pages[i].page + 1 : null
+  }));
 
-  ouvrirDialogueCasse(changes, conteneur);
+  ouvrirDialogueRenommage(lignes, conteneur);
 }
 
-function ouvrirDialogueCasse(changes, conteneur) {
-  const ancien = document.getElementById("dialogueCasse");
+function ouvrirDialogueRenommage(lignes, conteneur) {
+  const ancien = document.getElementById("dialogueRenommage");
   if (ancien) ancien.remove();
 
   let html = '<div class="modal-impression-carte ci-carte" role="dialog" aria-modal="true">' +
     '<button class="mi-fermer" aria-label="Fermer">&#10005;</button>' +
-    "<h3>Majuscules des titres</h3>" +
-    '<p class="mi-intro">Les majuscules superflues après le tiret sont retirées. ' +
-    "Les noms propres sont reconnus parce qu'ils apparaissent en majuscule au milieu " +
-    "d'une phrase du livre ; ceux qui n'y figurent nulle part passent en minuscule. " +
-    "Corrigez librement les propositions avant d'appliquer.</p>" +
-    '<div class="dcasse-liste">';
+    "<h3>Renommer les chapitres</h3>" +
+    '<p class="mi-intro">Tous les titres du livre, dans l&rsquo;ordre. Corrigez ceux ' +
+    "que vous voulez et laissez les autres tels quels : seuls les titres modifiés " +
+    "seront réécrits. <b>Entrée</b> passe au suivant, <b>Ctrl+Entrée</b> enregistre.</p>" +
+    '<div class="renom-outils">' +
+      '<button type="button" class="renom-casse" ' +
+        'title="Proposer la casse française : les majuscules superflues après le tiret sont retirées, les noms propres du livre conservés">' +
+        "Aa Casse française</button>" +
+      '<button type="button" class="renom-annuler-tout" title="Remettre tous les titres tels qu&rsquo;ils sont dans le livre">Tout remettre</button>' +
+      '<span class="renom-compte"></span>' +
+    "</div>" +
+    '<div class="renom-liste">';
 
-  changes.forEach((c, i) => {
-    html += '<div class="dcasse-ligne">' +
-      '<label class="dcasse-case"><input type="checkbox" data-i="' + i + '" checked> Appliquer</label>' +
-      '<div class="dcasse-avant">' + echapperTitre(c.avant) + "</div>" +
-      '<input type="text" class="dcasse-apres" data-i="' + i + '" value="' + echapperTitre(c.apres) + '">' +
+  lignes.forEach((l, i) => {
+    html += '<div class="renom-ligne" data-i="' + i + '">' +
+      '<span class="renom-page">' + (l.page ? "p." + l.page : "&mdash;") + "</span>" +
+      '<input type="text" class="renom-champ" data-i="' + i + '" value="' + echapperTitre(l.avant) + '">' +
+      '<p class="renom-avant"></p>' +
     "</div>";
   });
 
   html += "</div>" +
     '<div class="ci-actions">' +
       '<button class="ci-annuler">Annuler</button>' +
-      '<button class="ci-generer">Appliquer aux ' + changes.length + " titres</button>" +
+      '<button class="ci-generer" disabled>Aucun changement</button>' +
     "</div></div>";
 
   const fond = document.createElement("div");
-  fond.id = "dialogueCasse";
+  fond.id = "dialogueRenommage";
   fond.className = "modal-impression";
   fond.innerHTML = html;
-  fond.addEventListener("click", (e) => { if (e.target === fond) fond.remove(); });
   document.body.appendChild(fond);
 
-  fond.querySelector(".mi-fermer").onclick = () => fond.remove();
-  fond.querySelector(".ci-annuler").onclick = () => fond.remove();
-  fond.querySelector(".ci-generer").onclick = () => {
+  const champs = [...fond.querySelectorAll(".renom-champ")];
+  const bouton = fond.querySelector(".ci-generer");
+
+  // Ce qui a changé, et ce que cela va coûter : le bouton ne ment jamais sur
+  // le nombre de titres qu'il va réécrire.
+  const modifies = () => champs.filter((c, i) => c.value !== lignes[i].avant && c.value.trim());
+
+  const rafraichir = () => {
+    champs.forEach((c, i) => {
+      const change = c.value !== lignes[i].avant;
+      const ligne = c.closest(".renom-ligne");
+      ligne.classList.toggle("modifiee", change && !!c.value.trim());
+      ligne.classList.toggle("vide", !c.value.trim());
+      // L'ancien titre ne s'affiche que s'il diffère : sinon il ne dirait
+      // rien que le champ ne dise déjà, et la liste doublerait de hauteur.
+      const avant = ligne.querySelector(".renom-avant");
+      avant.textContent = change ? lignes[i].avant : "";
+      avant.style.display = change ? "" : "none";
+    });
+    const n = modifies().length;
+    const vides = champs.filter((c) => !c.value.trim()).length;
+    bouton.disabled = n === 0;
+    bouton.textContent = n === 0 ? "Aucun changement"
+      : "Renommer " + n + " chapitre" + (n > 1 ? "s" : "");
+    fond.querySelector(".renom-compte").textContent = vides
+      ? vides + " titre" + (vides > 1 ? "s vides seront ignorés." : " vide sera ignoré.")
+      : "";
+  };
+
+  champs.forEach((c, i) => {
+    c.addEventListener("input", rafraichir);
+    c.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); appliquer(); return; }
+      if (e.key === "Enter") {
+        e.preventDefault();
+        const suivant = champs[i + 1];
+        if (suivant) { suivant.focus(); suivant.select(); }
+        else appliquer();
+      }
+    });
+  });
+
+  fond.querySelector(".renom-casse").onclick = () => {
+    const noms = nomsPropresDuLivre();
+    champs.forEach((c) => { c.value = titreEnCasseFrancaise(c.value, noms); });
+    rafraichir();
+  };
+  fond.querySelector(".renom-annuler-tout").onclick = () => {
+    champs.forEach((c, i) => { c.value = lignes[i].avant; });
+    rafraichir();
+  };
+
+  const fermer = () => {
+    if (modifies().length &&
+        !confirm("Fermer sans renommer ?\n\nLes titres saisis seront perdus.")) return;
+    document.removeEventListener("keydown", surEchap, true);
+    fond.remove();
+  };
+  const surEchap = (e) => {
+    if (e.key === "Escape" && document.getElementById("dialogueRenommage")) {
+      e.preventDefault(); e.stopPropagation(); fermer();
+    }
+  };
+  document.addEventListener("keydown", surEchap, true);
+
+  fond.addEventListener("click", (e) => { if (e.target === fond) fermer(); });
+  fond.querySelector(".mi-fermer").onclick = fermer;
+  fond.querySelector(".ci-annuler").onclick = fermer;
+
+  function appliquer() {
     let n = 0;
-    fond.querySelectorAll(".dcasse-apres").forEach((champ) => {
-      const i = +champ.dataset.i;
-      const case_ = fond.querySelector('.dcasse-case input[data-i="' + i + '"]');
-      if (!case_.checked) return;
-      const valeur = champ.value;
-      if (!valeur.trim() || valeur === changes[i].avant) return;
-      reecrireCasse(changes[i].h2, valeur);
+    champs.forEach((c, i) => {
+      const valeur = c.value;
+      // Un champ vidé n'efface pas le chapitre : il serait bien trop facile de
+      // perdre un titre d'un coup de touche. On le laisse tel quel.
+      if (!valeur.trim() || valeur === lignes[i].avant) return;
+      reecrireCasse(lignes[i].h2, valeur);
       n++;
     });
+    document.removeEventListener("keydown", surEchap, true);
     fond.remove();
-    if (n) appliquerContenuComplet(conteneur.innerHTML, n);
-  };
+    if (n) {
+      appliquerContenuComplet(conteneur.innerHTML, n,
+        n + " chapitre" + (n > 1 ? "s renommés" : " renommé") + ".");
+    }
+  }
+  bouton.onclick = appliquer;
+
+  rafraichir();
+  if (champs[0]) { champs[0].focus(); champs[0].select(); }
 }
 
 // Repose le livre entier après une retouche globale, comme le fait la
 // suppression d'un chapitre : on réécrit le texte continu, puis on repagine.
-function appliquerContenuComplet(html, nbTitres) {
+// `texteMessage` : ce qui s'affiche en bas quand l'appelant sait mieux dire
+// ce qu'il vient de faire (« 12 chapitres renommés » plutôt que « corrigés »).
+function appliquerContenuComplet(html, nbTitres, texteMessage) {
   const livre = livreActuel();
   livre.spreads = [html || ""];
   indexSpread = 0;
@@ -3104,9 +3201,13 @@ function appliquerContenuComplet(html, nbTitres) {
 
   const message = document.getElementById("message");
   if (message) {
-    message.textContent = nbTitres + " titre" + (nbTitres > 1 ? "s corrigés" : " corrigé") + ".";
+    const texte = texteMessage ||
+      (nbTitres + " titre" + (nbTitres > 1 ? "s corrigés" : " corrigé") + ".");
+    message.textContent = texte;
+    // On n'efface que SON message : entre-temps, une sauvegarde ou une erreur
+    // a pu écrire ici, et la faire disparaître serait pire que la laisser.
     setTimeout(() => {
-      if (message.textContent.indexOf("corrig") !== -1) message.textContent = "";
+      if (message.textContent === texte) message.textContent = "";
     }, 3000);
   }
 }

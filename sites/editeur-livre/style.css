@@ -1825,31 +1825,87 @@ button.danger {
 }
 
 
-/* ===== Dialogue « Majuscules des titres » ===== */
-.dcasse-liste {
-  display: flex; flex-direction: column; gap: 0.55rem;
-  max-height: 45vh; overflow-y: auto;
-  margin: 0.9rem 0;
+/* ===== Dialogue « Renommer les chapitres » =====
+   Une liste longue — trente, quarante titres — qu'on parcourt au clavier.
+   Elle doit donc rester dense, et ne signaler que ce qui a bougé : une ligne
+   intacte n'a aucune raison d'attirer l'oeil. */
+.renom-outils {
+  display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
+  margin: 0 0 0.7rem;
 }
-.dcasse-ligne {
+.renom-outils button {
+  padding: 0.38rem 0.7rem;
+  border: 1px solid var(--s-line, #e6ddc9); border-radius: 8px;
+  background: var(--s-cream, #f6efe0); color: var(--s-ink, #2b2622);
+  font-size: 0.8rem; cursor: pointer;
+}
+.renom-outils button:hover { border-color: var(--s-accent, #8a4b38); color: var(--s-accent, #8a4b38); }
+.renom-compte { font-size: 0.76rem; color: #b45309; }
+
+/* Tant que rien n'a bougé, le bouton d'application le montre : il garde sa
+   couleur d'accent mais s'efface, au lieu d'inviter à un clic sans effet. */
+.ci-actions .ci-generer:disabled,
+.ci-actions .ci-generer:disabled:hover {
+  opacity: 0.45;
+  cursor: default;
+  background: var(--s-accent, #8a4b38);
+  border-color: var(--s-accent, #8a4b38);
+}
+
+.renom-liste {
+  display: flex; flex-direction: column; gap: 0.3rem;
+  max-height: 52vh; overflow-y: auto;
+  margin: 0 0 1rem;
+  /* Le rentré compense la barre de défilement : sans lui, les champs sautent
+     de quelques pixels selon que la liste défile ou non. */
+  padding-right: 0.3rem;
+}
+.renom-ligne {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 0.25rem 0.7rem;
-  padding: 0.6rem 0.7rem;
-  border: 1px solid var(--bordure, #d8d8d8); border-radius: 8px;
+  grid-template-columns: 3.2rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0.15rem 0.6rem;
+  padding: 0.35rem 0.45rem;
+  border: 1px solid transparent; border-radius: 8px;
 }
-.dcasse-case { grid-row: 1 / span 2; align-self: center; font-size: 0.8rem; white-space: nowrap; }
-/* Le titre d'origine, barré : on voit d'un coup d'oeil ce qui change. */
-.dcasse-avant { font-size: 0.8rem; opacity: 0.6; text-decoration: line-through; }
-.dcasse-apres {
+.renom-ligne.modifiee {
+  border-color: var(--s-accent, #8a4b38);
+  background: rgba(138, 75, 56, .05);
+}
+.renom-ligne.vide { border-color: #d9a441; background: rgba(217, 164, 65, .08); }
+.renom-page {
+  font-size: 0.74rem; color: var(--s-ink-soft, #6f6455);
+  font-variant-numeric: tabular-nums; text-align: right;
+}
+.renom-champ {
   width: 100%; min-width: 0;
+  /* Sans cela le champ vaut 100 % PLUS ses marges intérieures et sa bordure :
+     il déborde de sa colonne, et la liste se dote d'une barre horizontale. */
+  box-sizing: border-box;
   padding: 0.4rem 0.55rem;
-  border: 1px solid var(--bordure, #d8d8d8); border-radius: 6px;
-  font-size: 0.92rem;
+  border: 1px solid var(--s-line, #e6ddc9); border-radius: 6px;
+  background: var(--s-paper, #fffdf8); color: var(--s-ink, #2b2622);
+  font-family: var(--s-serif, Georgia, serif);
+  font-size: 0.95rem;
+}
+.renom-champ:focus {
+  outline: none;
+  border-color: var(--s-accent, #8a4b38);
+  box-shadow: 0 0 0 3px rgba(138, 75, 56, .14);
+}
+/* Le titre d'origine, barré, sous le champ : on voit ce qu'on remplace, et
+   il ne prend de la place que sur les lignes effectivement modifiées. */
+.renom-avant {
+  grid-column: 2;
+  margin: 0;
+  font-size: 0.74rem; color: var(--s-ink-soft, #6f6455);
+  text-decoration: line-through;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 @media (max-width: 560px) {
-  .dcasse-ligne { grid-template-columns: minmax(0, 1fr); }
-  .dcasse-case { grid-row: auto; }
+  .renom-ligne { grid-template-columns: minmax(0, 1fr); }
+  .renom-page { text-align: left; }
+  .renom-avant { grid-column: 1; }
 }
 
 /* Avertissement du dialogue « Imprimer la couverture » */
