@@ -243,6 +243,18 @@
   #zoneImpression.passe-recto > *:nth-child(even) { display: none; }
   #zoneImpression.passe-verso > *:nth-child(odd)  { display: none; }
 
+  /* Compensation du registre recto-verso.
+     Aucune imprimante familiale ne repose la feuille exactement au même
+     endroit pour son second passage : le verso sort décalé d'un ou deux
+     millimètres, toujours du même côté et toujours de la même quantité.
+     C'est mesurable, donc corrigeable — on décale le dessin du verso de
+     l'écart annoncé, en sens inverse, et l'impression retombe juste.
+     Les faces paires sont les versos (voir les règles ci-dessus). */
+  #zoneImpression > *:nth-child(even) {
+    position: relative;
+    left: var(--decalage-verso, 0mm);
+  }
+
 
   /* ----- Fichier pour l'imprimeur -----
      Feuille = format rogné + 12 mm de marge technique (5 mm de fond perdu,

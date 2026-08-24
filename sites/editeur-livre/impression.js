@@ -396,6 +396,26 @@ function etapeReglages() {
     ], "imprimante");
   }
 
+  if (texte) {
+    const d = decalageVersoMm();
+    html += '<details class="mi-details-schema"' + (d ? " open" : "") + ">" +
+      "<summary>Le verso ne tombe pas juste en face du recto ?" +
+      (d ? " <b>(" + String(d).replace(".", ",") + " mm corrigés)</b>" : "") + "</summary>" +
+      "<p>Aucune imprimante familiale ne repose la feuille exactement au même " +
+      "endroit pour son second passage : le verso sort décalé d'un ou deux " +
+      "millimètres. Ce décalage n'a rien d'aléatoire — c'est une propriété de " +
+      "votre machine —, alors il se mesure une fois et se corrige pour toujours.</p>" +
+      "<p><b>Pour le mesurer :</b> imprimez deux pages en recto-verso, tenez la " +
+      "feuille devant une lampe et regardez les lignes de coupe du recto et du " +
+      "verso se superposer. L'écart entre les deux, c'est la valeur à saisir.</p>" +
+      '<label class="tr-champ tr-court"><span>Le verso sort décalé vers la droite de</span>' +
+        '<input type="number" id="miDecalage" value="' + d + '" min="-' + DECALAGE_MAX_MM +
+        '" max="' + DECALAGE_MAX_MM + '" step="0.5"> <small>mm</small></label>' +
+      "<p>Une valeur négative pour un décalage vers la gauche. Le réglage est " +
+      "retenu d'une fois sur l'autre : il appartient à l'imprimante, pas au livre.</p>" +
+    "</details>";
+  }
+
   if (deux) {
     html += groupe("Comment vos feuilles se retournent-elles ?",
       "C'est la seule chose que ce panneau ne peut pas deviner, et elle décide " +
@@ -476,6 +496,15 @@ function brancherReglages(fond) {
   // chercher, et l'on répond à la question sans avoir tout à refaire.
   const essai = fond.querySelector(".mi-feuille-essai");
   if (essai) essai.onclick = () => imprimerFeuilleEssai();
+
+  // Le décalage se range à part, dans localStorage : pas de redessin du
+  // panneau, qui ferait perdre le focus à chaque frappe.
+  const champDecalage = fond.querySelector("#miDecalage");
+  if (champDecalage) {
+    champDecalage.onchange = () => {
+      champDecalage.value = definirDecalageVerso(champDecalage.value);
+    };
+  }
 
   fond.querySelector(".mi-lancer").onclick = () => {
     const action = actionImpression();
@@ -641,6 +670,39 @@ function ajouterTraitsDecoupe(feuille, largMm, hautMm, papier) {
   });
 }
 
+// ----- Registre recto-verso -----
+//
+// Une imprimante familiale ne repose pas la feuille exactement au même
+// endroit pour son second passage : le verso sort décalé d'un ou deux
+// millimètres. Le décalage n'a rien d'aléatoire — c'est une propriété de la
+// machine, toujours du même côté et de la même quantité —, donc il se mesure
+// une fois et se corrige pour toujours.
+//
+// On garde la valeur à part de choixImpression : elle appartient à
+// l'imprimante, pas au livre, et doit survivre à la fermeture de l'onglet.
+const CLE_DECALAGE = "gh_decalage_verso";
+const DECALAGE_MAX_MM = 5;
+
+function decalageVersoMm() {
+  const v = parseFloat(localStorage.getItem(CLE_DECALAGE));
+  if (!isFinite(v)) return 0;
+  return Math.max(-DECALAGE_MAX_MM, Math.min(DECALAGE_MAX_MM, v));
+}
+
+function definirDecalageVerso(mm) {
+  const v = parseFloat(mm);
+  if (!isFinite(v)) { localStorage.removeItem(CLE_DECALAGE); return 0; }
+  const borne = Math.max(-DECALAGE_MAX_MM, Math.min(DECALAGE_MAX_MM, v));
+  localStorage.setItem(CLE_DECALAGE, String(borne));
+  return borne;
+}
+
+// Le verso est dessiné à CONTRE-SENS du décalage constaté : si la machine le
+// pose 1 mm trop à droite, on le dessine 1 mm plus à gauche.
+function appliquerDecalageVerso(zone) {
+  zone.style.setProperty("--decalage-verso", (-decalageVersoMm()) + "mm");
+}
+
 function reglerPagePapier(stylePage, papier) {
   stylePage.textContent = "@page { size: " + papier.larg + "mm " + papier.haut + "mm; margin: 0; }";
 }
@@ -669,6 +731,7 @@ function exporterImpression(modeRectoVerso) {
   if (zone) zone.remove();
   zone = document.createElement("div");
   zone.id = "zoneImpression";
+  appliquerDecalageVerso(zone);
   document.body.appendChild(zone);
 
   // Chaque page part sur sa feuille : le recto-verso en deux passes compte
@@ -739,6 +802,7 @@ function exporterLivret(modeRectoVerso) {
   if (zone) zone.remove();
   zone = document.createElement("div");
   zone.id = "zoneImpression";
+  appliquerDecalageVerso(zone);
   document.body.appendChild(zone);
 
   // Une face de feuille par enfant direct : l'impression en deux passes
@@ -1133,6 +1197,7 @@ function exporterDeuxPages(mode) {
   if (zone) zone.remove();
   zone = document.createElement("div");
   zone.id = "zoneImpression";
+  appliquerDecalageVerso(zone);
   document.body.appendChild(zone);
 
   const margeInt = f.margeH + DELTA_RELIURE_MM;
@@ -1216,6 +1281,7 @@ function imprimerFeuilleEssai() {
   if (zone) zone.remove();
   zone = document.createElement("div");
   zone.id = "zoneImpression";
+  appliquerDecalageVerso(zone);
   document.body.appendChild(zone);
 
   const marque = (m, l) => ({ type: "essai", marque: m, legende: l });
