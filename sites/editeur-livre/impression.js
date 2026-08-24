@@ -40,9 +40,10 @@ const AIDE_IMPRESSION = {
               "que l'un se pose sous l'autre.",
     etapes: [
       "Imprimez en recto-verso, dans l'ordre. Si votre imprimante ne le fait pas seule, choisissez « En deux fois ».",
-      "Deux pages par feuille : coupez sur les DEUX traits du milieu — la bande blanche qui les sépare part, et chaque page garde son format exact malgré le décalage recto-verso de l'imprimante.",
+      "Deux pages par feuille : coupez la feuille en son milieu. Quand le papier le permet — un poche sur A4, un grand roman sur A3 —, une bande blanche de 6 mm sépare les deux pages : c'est votre marge d'erreur, elle absorbe le décalage recto-verso de l'imprimante et l'on coupe n'importe où dedans. Un roman sur A4 fait 298 mm de large à lui seul : les deux pages s'y touchent, et la coupe demande alors d'être soignée.",
+      "Repères : avec « L'autre sens », des traits fins marquent l'endroit exact où couper. Avec « Comme le livret », la feuille sort nue — à vous de viser le milieu.",
       "Posez ensuite le tas de DROITE sous celui de GAUCHE. Ne mélangez pas les deux moitiés.",
-      "Si les deux faces d'une même page ne se correspondent pas, votre imprimante retourne sur les petits bords : reprenez avec le bouton « bords courts ».",
+      "Si les deux faces d'une même page ne se correspondent pas, c'est le sens de retournement qui est en cause : reprenez avec l'autre réponse à « Comment vos feuilles se retournent-elles ? ». La feuille d'essai tranche la question en une feuille.",
       "Massicotez les feuilles sur les traits de coupe imprimés dans la marge : la page retrouve alors son format exact.",
       "Empilez les feuilles dans l'ordre, puis tapotez la pile sur une table pour aligner parfaitement le bord de reliure.",
       "Serrez la pile entre deux planchettes, en laissant dépasser 2 à 3 mm du bord à encoller.",
@@ -442,8 +443,12 @@ function resumeImpression() {
     morceaux.push("Deux pages par feuille, dans l'ordre du pliage");
     morceaux.push("on plie toute la pile en deux et on agrafe sur le pli");
   } else if (c.disposition === "deux") {
-    morceaux.push("Deux pages par feuille, séparées par une bande blanche");
-    morceaux.push("on coupe sur les deux traits, puis on pose le tas de droite sous celui de gauche");
+    // « Séparées par une bande blanche » n'était vrai que sur les formats où
+    // la gouttière tient : un roman fait déjà 298 mm de large sur une A4.
+    morceaux.push("Deux pages par feuille");
+    morceaux.push(c.retournement === "court"
+      ? "la feuille sort sans repère, on la coupe en son milieu, puis on pose le tas de droite sous celui de gauche"
+      : "on coupe sur les traits du milieu, puis on pose le tas de droite sous celui de gauche");
   } else {
     morceaux.push("Une page par feuille, dans l'ordre de lecture");
     morceaux.push("il n'y a rien à découper");
@@ -1154,17 +1159,21 @@ function exporterDeuxPages(mode) {
 
   const moitie = suite.length / 2;
 
+  // « Comme le livret » sort sans repères imprimés, à la demande : la
+  // gouttière reste, mais la feuille est nue. L'autre sens les garde.
+  const sansTraits = bordsCourts;
+
   for (let k = 0; k < suite.length / 4; k++) {
     const recto = creerFaceDeuxPages(suite[2 * k], suite[moitie + 2 * k],
-                                     f, margeInt, margeExt, gouttiere);
+                                     f, margeInt, margeExt, gouttiere, sansTraits);
     // Sur les petits bords, la feuille se retourne autour de son axe vertical :
     // ce qui était à gauche revient à droite. On échange donc les deux moitiés
     // du verso pour que chaque bande garde ses deux faces.
     const verso = bordsCourts
       ? creerFaceDeuxPages(suite[moitie + 2 * k + 1], suite[2 * k + 1],
-                           f, margeInt, margeExt, gouttiere)
+                           f, margeInt, margeExt, gouttiere, sansTraits)
       : creerFaceDeuxPages(suite[2 * k + 1], suite[moitie + 2 * k + 1],
-                           f, margeInt, margeExt, gouttiere);
+                           f, margeInt, margeExt, gouttiere, sansTraits);
 
     [recto, verso].forEach((face) => {
       zone.appendChild(papier ? poserSurPapier(face, papier, largFeuille, f.haut) : face);
@@ -1225,14 +1234,16 @@ function imprimerFeuilleEssai() {
 
   // Recto : deux repères. Verso : les deux réponses possibles, chacune du
   // côté qui la désigne.
+  // Sans repères de coupe : cet essai ne demande aucune précision, on coupe
+  // la feuille à peu près en deux et l'on retourne la moitié qui porte le A.
   const recto = creerFaceDeuxPages(
-    marque("A", "Coupez la feuille en deux, puis regardez le DOS de cette moitié-ci."),
+    marque("A", "Coupez la feuille en deux, à peu près au milieu, puis regardez le DOS de cette moitié-ci."),
     marque("B", "Celle-ci ne sert qu'à faire la paire."),
-    f, f.margeH, f.margeH, gouttiere);
+    f, f.margeH, f.margeH, gouttiere, true);
   const verso = creerFaceDeuxPages(
     reponse("L'autre sens", "Si c'est ceci que vous lisez au dos du A, choisissez « L'autre sens »."),
     reponse("Comme le livret", "Si c'est ceci que vous lisez au dos du A, choisissez « Comme le livret »."),
-    f, f.margeH, f.margeH, gouttiere);
+    f, f.margeH, f.margeH, gouttiere, true);
 
   [recto, verso].forEach((face) => {
     zone.appendChild(papier ? poserSurPapier(face, papier, largFeuille, f.haut) : face);
@@ -1244,7 +1255,12 @@ function imprimerFeuilleEssai() {
 }
 
 // Une face : deux pages séparées par la gouttière, avec ses traits de coupe.
-function creerFaceDeuxPages(demiGauche, demiDroite, f, margeInt, margeExt, gouttiere) {
+//
+// `sansTraits` laisse la gouttière mais retire les repères imprimés. La bande
+// blanche continue de faire son office — elle absorbe le décalage recto-verso
+// de l'imprimante, et l'on coupe n'importe où dedans — mais rien n'est tracé
+// sur la feuille.
+function creerFaceDeuxPages(demiGauche, demiDroite, f, margeInt, margeExt, gouttiere, sansTraits) {
   const feuille = document.createElement("div");
   feuille.className = "feuille-impression";
   feuille.style.width = (2 * f.larg + gouttiere) + "mm";
@@ -1263,6 +1279,8 @@ function creerFaceDeuxPages(demiGauche, demiDroite, f, margeInt, margeExt, goutt
 
   // Les deux traits, posés DANS la gouttière : ils ne touchent aucune page, et
   // la bande qu'ils encadrent part avec la coupe.
+  if (sansTraits) return feuille;
+
   if (gouttiere > 0) {
     [f.larg + 0.4, f.larg + gouttiere - 0.4].forEach((x) => {
       const trait = document.createElement("div");
