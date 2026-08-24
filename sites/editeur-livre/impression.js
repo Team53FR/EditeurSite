@@ -44,7 +44,7 @@ const AIDE_IMPRESSION = {
       "Repères : avec « L'autre sens », des traits fins marquent l'endroit exact où couper. Avec « Comme le livret », la feuille sort nue — à vous de viser le milieu.",
       "Posez ensuite le tas de DROITE sous celui de GAUCHE. Ne mélangez pas les deux moitiés.",
       "Si les deux faces d'une même page ne se correspondent pas, c'est le sens de retournement qui est en cause : reprenez avec l'autre réponse à « Comment vos feuilles se retournent-elles ? ». La feuille d'essai tranche la question en une feuille.",
-      "Coupez les feuilles sur les lignes qui font le tour de la zone imprimée : la page retrouve alors son format exact. La coupe emporte la ligne avec elle, il n'en reste rien.",
+      "Coupez les feuilles en suivant les repères qui entourent la zone imprimée. Ils s'arrêtent avant la page et reprennent de l'autre côté : posez la règle sur deux repères opposés, elle enjambe la page, et vous coupez le long. Rien n'étant imprimé à l'intérieur du format fini, aucun trait ne peut rester sur la page — même si la coupe dévie d'un millimètre.",
       "Empilez les feuilles dans l'ordre, puis tapotez la pile sur une table pour aligner parfaitement le bord de reliure.",
       "Serrez la pile entre deux planchettes, en laissant dépasser 2 à 3 mm du bord à encoller.",
       "Encollez la tranche (colle vinylique blanche, ou colle thermofusible), en croisant les passages. Laissez sécher sous presse au moins une heure.",
@@ -639,25 +639,31 @@ function poserSurPapier(element, papier, largMm, hautMm) {
   return feuille;
 }
 
-// Lignes de coupe tout autour de la zone imprimée : quatre traits qui
-// traversent la feuille de part en part, chacun posé exactement sur un bord
-// du livre.
+// Lignes de coupe tout autour de la zone imprimée — mais INTERROMPUES au
+// droit de la page.
 //
-// C'étaient des repères d'angle, à la manière des imprimeurs — quatre petites
-// équerres dans les coins, et le massicot fait le reste. Sans massicot, il
-// faut relier les repères à la règle avant de couper : autant tracer la ligne
-// tout de suite. Elle se pose PILE sur le bord du livre, donc la coupe
-// l'emporte avec elle : rien n'en reste sur la page finie.
+// Trois états successifs, et la raison de chacun :
 //
-// Un trait n'est tracé que si son bord tombe dans la feuille, et pas à
-// l'extrême bord : une page aussi large que son papier — le poche en livret —
-// n'a aucun blanc de ce côté, rien à y couper, et l'imprimante n'y déposerait
-// de toute façon pas d'encre.
-const BORD_MINI_MM = 1;   // distance minimale au bord de la feuille
+//  1. Des repères d'angle, à la manière des imprimeurs. Un massicot se cale
+//     dessus ; à la règle, il faut d'abord relier les repères à l'œil.
+//  2. Des lignes pleines traversant la feuille, posées PILE sur le bord du
+//     livre. On pose la règle dessus et l'on coupe d'un trait — mais je
+//     tenais que « la coupe emporte la ligne ». C'est vrai au massicot, faux
+//     à la main : une coupe à trois dixièmes près laisse la moitié du trait
+//     sur la page, et cela se voit.
+//  3. Les mêmes lignes, mais qui s'arrêtent avant la page et reprennent de
+//     l'autre côté. La règle se pose toujours sur deux repères opposés — elle
+//     enjambe la page —, et plus rien n'est imprimé à l'intérieur du format
+//     fini : quelle que soit la précision de la coupe, il ne peut rien rester.
+//
+// L'écart laissé de chaque côté du bord absorbe l'erreur de coupe : tant
+// qu'on ne s'écarte pas de plus de ça, l'encre part avec la chute.
+const BORD_MINI_MM = 1;    // blanc conservé au bord de la feuille
+const ECART_TRAIT_MM = 1.5; // blanc conservé entre la page et le trait
 
 function ajouterTraitsDecoupe(feuille, largMm, hautMm, papier) {
-  const margeX = (papier.larg - largMm) / 2;
-  const margeY = (papier.haut - hautMm) / 2;
+  const x0 = (papier.larg - largMm) / 2, x1 = x0 + largMm;
+  const y0 = (papier.haut - hautMm) / 2, y1 = y0 + hautMm;
 
   const trait = (classe, gauche, haut, largeur, hauteur) => {
     const t = document.createElement("div");
@@ -671,14 +677,29 @@ function ajouterTraitsDecoupe(feuille, largMm, hautMm, papier) {
 
   const tientDans = (v, taille) => v >= BORD_MINI_MM && v <= taille - BORD_MINI_MM;
 
-  // Les deux verticales : bords gauche et droit du livre, sur toute la hauteur.
-  [margeX, margeX + largMm].forEach((x) => {
-    if (tientDans(x, papier.larg)) trait("trait-v", x, 0, 0, papier.haut);
+  // Longueur utile de chaque marge, une fois retirés l'écart à la page et le
+  // blanc du bord. En dessous de 2 mm le trait ne se verrait plus : on
+  // s'abstient plutôt que de poser une poussière d'encre.
+  const brin = {
+    haut:   y0 - ECART_TRAIT_MM - BORD_MINI_MM,
+    bas:    papier.haut - y1 - ECART_TRAIT_MM - BORD_MINI_MM,
+    gauche: x0 - ECART_TRAIT_MM - BORD_MINI_MM,
+    droite: papier.larg - x1 - ECART_TRAIT_MM - BORD_MINI_MM
+  };
+
+  // Verticales : les bords gauche et droit du livre, prolongés dans les
+  // marges du haut et du bas.
+  [x0, x1].forEach((x) => {
+    if (!tientDans(x, papier.larg)) return;
+    if (brin.haut >= 2) trait("trait-v", x, BORD_MINI_MM, 0, brin.haut);
+    if (brin.bas >= 2) trait("trait-v", x, y1 + ECART_TRAIT_MM, 0, brin.bas);
   });
 
-  // Les deux horizontales : bords haut et bas, sur toute la largeur.
-  [margeY, margeY + hautMm].forEach((y) => {
-    if (tientDans(y, papier.haut)) trait("trait-h", 0, y, papier.larg, 0);
+  // Horizontales : les bords haut et bas, prolongés à gauche et à droite.
+  [y0, y1].forEach((y) => {
+    if (!tientDans(y, papier.haut)) return;
+    if (brin.gauche >= 2) trait("trait-h", BORD_MINI_MM, y, brin.gauche, 0);
+    if (brin.droite >= 2) trait("trait-h", x1 + ECART_TRAIT_MM, y, brin.droite, 0);
   });
 }
 
@@ -2487,7 +2508,7 @@ function ajouterLegendeCouverture(feuilleP, papier, largSupport, hautSupport, do
   p.style.top = (papier.haut - margeBasse + 2) + "mm";
   p.style.width = largSupport + "mm";
   p.innerHTML =
-    "<b>Trait plein</b> : couper — les quatre lignes font le tour de la couverture. &nbsp;·&nbsp; " +
+    "<b>Trait plein</b> : couper — posez la règle sur deux repères opposés, elle enjambe la couverture. &nbsp;·&nbsp; " +
     "<b>Pointillé</b> : plier" + (dosMm > 0 ? ", les deux bords du dos" : ", le pli central") +
     ". &nbsp;·&nbsp; Marquez les plis au crayon <b>avant</b> de couper : leurs repères sont hors de la couverture, la coupe les emporte.";
   feuilleP.appendChild(p);
