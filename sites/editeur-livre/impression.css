@@ -39,6 +39,33 @@
     break-after: auto;
   }
 
+  /* Feuille d'essai : une marque qui se lit à bout de bras, sa légende
+     dessous. Rien d'autre ne doit occuper la demi-feuille. */
+  .page-essai {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10mm;
+    padding: 12mm;
+    text-align: center;
+  }
+  .essai-marque {
+    font-size: 26mm;
+    line-height: 1.05;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+  .essai-reponse .essai-marque {
+    font-size: 11mm;
+    line-height: 1.2;
+  }
+  .essai-legende {
+    font-size: 4.2mm;
+    line-height: 1.5;
+    max-width: 90%;
+  }
+
   /* Feuille de papier réelle : le travail y est centré à sa taille exacte.
      Sans cela, le navigateur met le format déclaré à l'échelle du papier
      chargé — et deux exports de tailles différentes ressortent à deux
@@ -283,6 +310,9 @@
 
   /* Le panneau d'aide ne doit jamais s'imprimer */
   .panneau-versos { display: none !important; }
+  /* La feuille d'essai s'imprime SANS fermer le panneau de réglages : sans
+     cette règle, le panneau lui-même partirait à l'imprimante. */
+  .modal-impression { display: none !important; }
 }
 
 /* ----- Panneau « Étape 2 : les versos » (impression en deux passes) ----- */

@@ -2142,6 +2142,24 @@ button.danger {
   color: var(--s-ink, #2b2622);
 }
 
+/* Le bouton de la feuille d'essai : une proposition, pas l'action principale
+   du panneau — d'où le trait plutôt que l'aplat. */
+.mi-essai { margin: 0 0 12px; }
+.mi-feuille-essai {
+  padding: 7px 14px;
+  border: 1px dashed var(--s-accent, #8a4b38);
+  border-radius: 9px;
+  background: none;
+  color: var(--s-accent, #8a4b38);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.mi-feuille-essai:hover {
+  background: var(--s-accent, #8a4b38);
+  border-style: solid;
+  color: #fff;
+}
+
 .mi-details-schema, .mi-details-guide { margin-top: 12px; }
 .mi-details-schema > summary, .mi-details-guide > summary {
   cursor: pointer;

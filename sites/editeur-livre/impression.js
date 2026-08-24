@@ -242,7 +242,12 @@ let choixImpression = {
   quoi: "texte",        // "texte" | "couverture"
   disposition: "une",   // dos collé : "une" | "deux" pages par feuille
   imprimante: "auto",   // "auto" | "passes"
-  retournement: "long"  // deux pages : "long" | "court"
+  // « court » par défaut, et non « long » : c'est l'hypothèse que fait déjà,
+  // sans le dire, l'imposition du livret — une feuille pliée met forcément le
+  // dos de sa moitié droite à gauche du verso. Le livret marchant sur la
+  // plupart des imprimantes, partir de la même hypothèse pour la coupe donne
+  // le bon ordre du premier coup, au lieu de sortir un livre mélangé.
+  retournement: "court" // deux pages : "long" | "court"
 };
 
 function ouvrirPanneauImpression() {
@@ -391,12 +396,23 @@ function etapeReglages() {
   }
 
   if (deux) {
-    html += groupe("Comment retourne-t-elle les feuilles ?",
-      "Ce réglage se lit dans les options recto-verso de votre imprimante. " +
-      "Il décide de la place de chaque page une fois la pile coupée en deux.", [
-      { valeur: "long", nom: "Sur les grands bords", detail: "Le plus courant. La moitié gauche reste à gauche." },
-      { valeur: "court", nom: "Sur les petits bords", detail: "Les deux moitiés s'échangent au verso." }
+    html += groupe("Comment vos feuilles se retournent-elles ?",
+      "C'est la seule chose que ce panneau ne peut pas deviner, et elle décide " +
+      "de l'ordre des pages une fois la pile coupée. Le plus sûr n'est pas de " +
+      "chercher le réglage dans le pilote : <b>si le mode livret vous donne un " +
+      "cahier dans le bon ordre, gardez « comme le livret »</b> — les deux " +
+      "reliures dépendent exactement du même comportement.", [
+      { valeur: "court", nom: "Comme le livret",
+        detail: "Les deux moitiés s'échangent au verso (retournement sur les petits bords). " +
+                "À garder si vos livrets sortent bien." },
+      { valeur: "long", nom: "L'autre sens",
+        detail: "La moitié gauche reste à gauche (retournement sur les grands bords)." }
     ], "retournement");
+    html += '<p class="mi-groupe-aide">Dans le doute, imprimez d\'abord la ' +
+      '<b>feuille d\'essai</b> : une seule feuille qui vous dit lequel des deux ' +
+      "choisir, sans y laisser tout un livre.</p>" +
+      '<div class="mi-essai"><button class="mi-feuille-essai" type="button">' +
+      "Imprimer la feuille d'essai</button></div>";
     html += '<details class="mi-details-schema"><summary>Voir la différence en image</summary>' +
       schemaBordsHtml() + "</details>";
   }
@@ -451,6 +467,11 @@ function brancherReglages(fond) {
     };
   });
 
+  // La feuille d'essai ne ferme pas le panneau : on la lance, on va la
+  // chercher, et l'on répond à la question sans avoir tout à refaire.
+  const essai = fond.querySelector(".mi-feuille-essai");
+  if (essai) essai.onclick = () => imprimerFeuilleEssai();
+
   fond.querySelector(".mi-lancer").onclick = () => {
     const action = actionImpression();
     fermerPanneauImpression();
@@ -472,9 +493,14 @@ function actionImpression() {
     return { fonction: "exporterLivret", mode: c.imprimante };
   }
   if (c.disposition === "deux") {
-    const mode = c.imprimante === "passes"
-      ? "passes"
-      : (c.retournement === "court" ? "auto-court" : "auto");
+    // Le sens de retournement compte AUSSI en deux passes : c'est alors la
+    // main qui retourne la pile, mais la question posée est la même — quelle
+    // moitié du verso se retrouve derrière quelle moitié du recto. Le laisser
+    // tomber ici, comme on le faisait, imposait en silence « grands bords » à
+    // qui avait répondu « petits bords », et le livre sortait mélangé
+    // (1, 8, 3, 10, 5, 12, 7, 2… au lieu de 1, 2, 3, 4…).
+    const mode = (c.imprimante === "passes" ? "passes" : "auto") +
+                 (c.retournement === "court" ? "-court" : "");
     return { fonction: "exporterDeuxPages", mode };
   }
   return { fonction: "exporterImpression", mode: c.imprimante };
@@ -829,7 +855,23 @@ function creerFaceLivret(demiGauche, demiDroite, f, margeInt, margeExt) {
 // couvertures ne passent plus par ici — elles ont leur propre export.
 function creerDemiPageLivret(demi, f, margeInt, margeExt) {
   if (!demi || demi.type === "blanche") return creerPageBlancheImpression(f);
+  if (demi.type === "essai") return creerDemiEssai(demi, f);
   return creerPageTexteImpression(demi.page, demi.numero, f, margeInt, margeExt);
+}
+
+// Une demi-feuille d'essai : une grande marque et, dessous, ce qu'elle veut
+// dire. Rien d'autre — elle doit se lire à bout de bras.
+function creerDemiEssai(demi, f) {
+  const div = document.createElement("div");
+  // Une lettre seule se lit en très grand ; une réponse de trois mots, non —
+  // à la même taille elle passerait à la ligne et remplirait la demi-feuille.
+  div.className = "page-impression page-essai" + (demi.reponse ? " essai-reponse" : "");
+  div.style.width = f.larg + "mm";
+  div.style.height = f.haut + "mm";
+  div.innerHTML =
+    '<div class="essai-marque">' + demi.marque + "</div>" +
+    '<div class="essai-legende">' + demi.legende + "</div>";
+  return div;
 }
 
 function creerPageBlancheImpression(f) {
@@ -1138,6 +1180,67 @@ function exporterDeuxPages(mode) {
     fermerAttente();
     lancerImpression(passes ? "passes" : "auto");
   }, 0);
+}
+
+// ----- La feuille d'essai -----
+//
+// Le sens de retournement est la seule inconnue de cette reliure, et personne
+// ne peut y répondre de tête : le pilote ne le dit pas toujours, et en deux
+// passes c'est la main qui décide. Le découvrir en imprimant tout un livre
+// coûte cent feuilles ; le découvrir sur UNE feuille ne coûte rien.
+//
+// Le principe évite toute ambiguïté de manipulation. On ne demande pas de
+// « retourner la feuille » — selon qu'on la tourne autour d'un bord ou de
+// l'autre, on ne voit pas la même chose. On demande de la COUPER, ce qui est
+// de toute façon le geste de cette reliure : une moitié porte le A, et son
+// dos porte, écrit en toutes lettres, le réglage à choisir.
+function imprimerFeuilleEssai() {
+  const livre = livreActuel();
+  const f = FORMATS[livre.format || "149x210"] || FORMATS["149x210"];
+
+  const aire = (pa) => (pa ? pa.larg * pa.haut : Infinity);
+  const sansGouttiere = papierMinimal(2 * f.larg, f.haut, 2);
+  const avecGouttiere = papierMinimal(2 * f.larg + GOUTTIERE_MM, f.haut, 2);
+  const gouttiere = aire(avecGouttiere) <= aire(sansGouttiere) ? GOUTTIERE_MM : 0;
+  const papier = gouttiere ? avecGouttiere : sansGouttiere;
+  const largFeuille = 2 * f.larg + gouttiere;
+
+  let stylePage = document.getElementById("stylePageImpression");
+  if (!stylePage) {
+    stylePage = document.createElement("style");
+    stylePage.id = "stylePageImpression";
+    document.head.appendChild(stylePage);
+  }
+  if (papier) reglerPagePapier(stylePage, papier);
+  else stylePage.textContent = "@page { size: " + largFeuille + "mm " + f.haut + "mm; margin: 0; }";
+
+  let zone = document.getElementById("zoneImpression");
+  if (zone) zone.remove();
+  zone = document.createElement("div");
+  zone.id = "zoneImpression";
+  document.body.appendChild(zone);
+
+  const marque = (m, l) => ({ type: "essai", marque: m, legende: l });
+  const reponse = (m, l) => ({ type: "essai", marque: m, legende: l, reponse: true });
+
+  // Recto : deux repères. Verso : les deux réponses possibles, chacune du
+  // côté qui la désigne.
+  const recto = creerFaceDeuxPages(
+    marque("A", "Coupez la feuille en deux, puis regardez le DOS de cette moitié-ci."),
+    marque("B", "Celle-ci ne sert qu'à faire la paire."),
+    f, f.margeH, f.margeH, gouttiere);
+  const verso = creerFaceDeuxPages(
+    reponse("L'autre sens", "Si c'est ceci que vous lisez au dos du A, choisissez « L'autre sens »."),
+    reponse("Comme le livret", "Si c'est ceci que vous lisez au dos du A, choisissez « Comme le livret »."),
+    f, f.margeH, f.margeH, gouttiere);
+
+  [recto, verso].forEach((face) => {
+    zone.appendChild(papier ? poserSurPapier(face, papier, largFeuille, f.haut) : face);
+  });
+
+  // L'essai doit emprunter le MÊME chemin que l'impression réelle : en deux
+  // passes, c'est justement la remise de la pile dans le bac qu'on teste.
+  lancerImpression(choixImpression.imprimante === "passes" ? "passes" : "auto");
 }
 
 // Une face : deux pages séparées par la gouttière, avec ses traits de coupe.
