@@ -64,7 +64,11 @@ function appliquerFormatPage(formatKey) {
     el.style.flexShrink = "0";
   });
 
-  document.querySelectorAll(".texte-livre").forEach(el => {
+  // Le manuscrit (manuscrit.js) emprunte la typographie de « .texte-livre »
+  // mais pas sa géométrie : sa feuille est large et sans fin, c'est sa raison
+  // d'être. Sans cette exception, la taille d'une page lui serait imposée ici
+  // en style en ligne, et le chapitre s'y trouverait à nouveau enfermé.
+  document.querySelectorAll(".texte-livre:not(.ms-texte)").forEach(el => {
     el.style.width  = (largPx - margeHPx * 2) + "px";
     el.style.height = (hautPx - margeVPx - numPageH) + "px";
   });
@@ -2794,6 +2798,15 @@ function afficherSommaire() {
     num.className = "num-chapitre";
     num.textContent = "p." + (ch.page + 1);
     li.appendChild(num);
+
+    // Ouvrir le chapitre d'un seul tenant, sans pages à gérer (manuscrit.js).
+    const editer = document.createElement("button");
+    editer.className = "editer-chapitre";
+    editer.textContent = "✎";
+    editer.title = "Écrire ce chapitre d'un seul tenant, sans pagination";
+    editer.setAttribute("aria-label", "Écrire le chapitre " + ch.titre);
+    editer.onclick = (e) => { e.stopPropagation(); ouvrirManuscrit(i); };
+    li.appendChild(editer);
 
     const suppr = document.createElement("button");
     suppr.className = "supprimer-chapitre";

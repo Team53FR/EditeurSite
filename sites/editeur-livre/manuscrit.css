@@ -1,0 +1,170 @@
+/* =====================================================================
+   Le manuscrit — un chapitre sur une feuille sans fin
+   =====================================================================
+   Volontairement sobre : ici on écrit. Un fond crème, une feuille claire
+   posée dessus, une barre d'outils qui reste en haut, et rien d'autre.
+   La feuille est plus large qu'une page du livre — c'est le prix à payer
+   pour n'avoir aucune coupure — mais les tailles de caractères, elles,
+   restent celles du livre : le texte se lit avec le bon rythme.
+   ===================================================================== */
+
+.manuscrit {
+  position: fixed;
+  inset: 0;
+  z-index: 1400;
+  display: flex;
+  flex-direction: column;
+  background: var(--s-cream, #f6efe0);
+}
+
+/* Rien ne doit flotter par-dessus la feuille : le bouton de retour au portail
+   se pose en z-index 9999 et en style EN LIGNE — d'où le « !important ». */
+body.manuscrit-ouvert { overflow: hidden; }
+body.manuscrit-ouvert .bouton-retour-portail { display: none !important; }
+
+/* ----- Barre du haut ----- */
+.ms-barre {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 10px 16px;
+  background: var(--s-paper, #fffdf8);
+  border-bottom: 1px solid var(--s-line, #e6ddc9);
+  box-shadow: 0 1px 6px rgba(60, 42, 20, .06);
+}
+
+.ms-titre {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+.ms-etiquette {
+  font-size: 10.5px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--s-ink-soft, #6f6455);
+  flex-shrink: 0;
+}
+.ms-titre strong {
+  font-family: var(--s-serif, Georgia, serif);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--s-ink, #2b2622);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ms-outils { display: flex; align-items: center; gap: 3px; }
+.ms-outils button {
+  min-width: 30px;
+  height: 30px;
+  padding: 0 7px;
+  border: 1px solid var(--s-line, #e6ddc9);
+  border-radius: 8px;
+  background: var(--s-paper, #fffdf8);
+  color: var(--s-ink, #2b2622);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+.ms-outils button:hover {
+  border-color: var(--s-accent, #8a4b38);
+  color: var(--s-accent, #8a4b38);
+}
+.ms-separateur {
+  width: 1px;
+  height: 18px;
+  margin: 0 4px;
+  background: var(--s-line, #e6ddc9);
+}
+
+.ms-actions { display: flex; align-items: center; gap: 10px; }
+.ms-mots {
+  font-size: 12px;
+  color: var(--s-ink-soft, #6f6455);
+  font-variant-numeric: tabular-nums;
+}
+
+.ms-aide {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 8px 16px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--s-ink-soft, #6f6455);
+  background: var(--s-paper, #fffdf8);
+  border-bottom: 1px solid var(--s-line, #e6ddc9);
+}
+
+/* ----- La feuille ----- */
+.ms-feuille {
+  flex: 1;
+  overflow-y: auto;
+  padding: 28px 16px 60px;
+}
+
+.ms-texte {
+  max-width: 760px;
+  margin: 0 auto;
+  /* La hauteur est libre : c'est tout l'intérêt de cette vue. On annule donc
+     ce que « .texte-livre » impose pour la pagination — hauteur fixe et
+     débordement caché — sans quoi le chapitre serait tronqué. */
+  width: auto;
+  height: auto !important;
+  min-height: 60vh;
+  overflow: visible;
+  padding: 54px 62px 64px;
+  box-sizing: border-box;
+  background: #fff;
+  border: 1px solid var(--s-line, #e6ddc9);
+  border-radius: 3px;
+  box-shadow: 0 1px 3px rgba(60, 42, 20, .08), 0 12px 34px rgba(60, 42, 20, .10);
+  outline: none;
+}
+
+/* Sans page à ouvrir, le grand blanc au-dessus des titres n'a plus d'objet :
+   il ne ferait qu'éloigner le titre du haut de la feuille. */
+.ms-texte h2 { padding-top: 0; margin-top: 0; }
+.ms-texte h2 + p { margin-top: 4px; }
+
+/* Un peu plus d'air entre les paragraphes qu'en page : ici on relit et on
+   retouche, la densité du livre imprimé n'a pas lieu d'être. */
+.ms-texte p { margin: 0 0 10px 0; }
+
+@media (max-width: 720px) {
+  .ms-aide { display: none; }
+  .ms-feuille { padding: 12px 8px 40px; }
+  .ms-texte { padding: 26px 22px 34px; }
+  .ms-titre { flex-basis: 100%; }
+}
+
+/* ----- Le bouton qui ouvre le manuscrit, dans le sommaire ----- */
+.editer-chapitre {
+  background: none;
+  border: none;
+  color: #c4b8a0;
+  font-size: 12px;
+  line-height: 1;
+  padding: 4px 5px;
+  margin: 0 0 0 2px;
+  border-radius: 6px;
+  cursor: pointer;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity .12s ease, background .12s ease, color .12s ease;
+}
+
+.sommaire li:hover .editer-chapitre,
+.sommaire li.actif .editer-chapitre {
+  opacity: 1;
+}
+
+.editer-chapitre:hover {
+  background: var(--s-accent, #8a4b38);
+  color: #fff;
+}
