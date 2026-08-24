@@ -44,7 +44,7 @@ const AIDE_IMPRESSION = {
       "Repères : avec « L'autre sens », des traits fins marquent l'endroit exact où couper. Avec « Comme le livret », la feuille sort nue — à vous de viser le milieu.",
       "Posez ensuite le tas de DROITE sous celui de GAUCHE. Ne mélangez pas les deux moitiés.",
       "Si les deux faces d'une même page ne se correspondent pas, c'est le sens de retournement qui est en cause : reprenez avec l'autre réponse à « Comment vos feuilles se retournent-elles ? ». La feuille d'essai tranche la question en une feuille.",
-      "Massicotez les feuilles sur les traits de coupe imprimés dans la marge : la page retrouve alors son format exact.",
+      "Coupez les feuilles sur les lignes qui font le tour de la zone imprimée : la page retrouve alors son format exact. La coupe emporte la ligne avec elle, il n'en reste rien.",
       "Empilez les feuilles dans l'ordre, puis tapotez la pile sur une table pour aligner parfaitement le bord de reliure.",
       "Serrez la pile entre deux planchettes, en laissant dépasser 2 à 3 mm du bord à encoller.",
       "Encollez la tranche (colle vinylique blanche, ou colle thermofusible), en croisant les passages. Laissez sécher sous presse au moins une heure.",
@@ -58,7 +58,7 @@ const AIDE_IMPRESSION = {
               "Le collage doit être régulier, sous peine de pages qui se détachent.",
               "Une marge intérieure est réservée à la reliure : ne réduisez pas les marges."],
     reglages: "Les pages et la couverture sont posées sur un format de papier réel, à leur taille exacte, " +
-              "avec des traits de coupe dans la marge pour savoir où massicoter : " +
+              "entourés des lignes de coupe qui disent où passer la lame : " +
               "choisissez la même feuille dans la fenêtre d'impression, marges « aucune », échelle 100 % " +
               "(surtout pas « ajuster à la page »), et recto-verso « retourner sur les bords longs » — " +
               "à deux pages par feuille, c'est ce réglage qui garde la moitié gauche à gauche au verso."
@@ -560,10 +560,10 @@ function papierParCle(cle) {
 // feuille égale, celui qui laisse le plus de blanc sur son côté le plus juste.
 //
 // L'orientation compte : une imposition de poche (210 × 148 mm) entre dans une
-// A4 portrait, mais bord à bord en largeur — impossible d'y poser un repère de
+// A4 portrait, mais bord à bord en largeur — impossible d'y tracer la ligne de
 // coupe. La même A4 en paysage lui laisse 43 mm de chaque côté et 31 en haut
-// et en bas, donc de vrais traits aux quatre angles. Même feuille, même
-// imprimante, juste tournée.
+// et en bas, donc les quatre lignes au complet. Même feuille, même imprimante,
+// juste tournée.
 //
 // La tolérance sert au livret de roman : deux pages font 298 mm pour une A4
 // paysage de 297. Refuser ce millimètre l'enverrait sur de l'A3 alors qu'il
@@ -598,29 +598,25 @@ function poserSurPapier(element, papier, largMm, hautMm) {
   return feuille;
 }
 
-// Traits de coupe aux quatre angles de la zone imprimée. Ils se posent dans
-// la marge, jamais sur la page — un trait qui la traverse se retrouverait sur
-// le livre fini. Chaque côté n'est tracé que si sa marge en laisse la place ;
-// une marge étroite raccourcit le trait plutôt que de le supprimer.
-const ECART_TRAIT_MM = 2;      // blanc laissé entre la page et le trait
-const LONGUEUR_TRAIT_MM = 5;   // longueur visée
+// Lignes de coupe tout autour de la zone imprimée : quatre traits qui
+// traversent la feuille de part en part, chacun posé exactement sur un bord
+// du livre.
+//
+// C'étaient des repères d'angle, à la manière des imprimeurs — quatre petites
+// équerres dans les coins, et le massicot fait le reste. Sans massicot, il
+// faut relier les repères à la règle avant de couper : autant tracer la ligne
+// tout de suite. Elle se pose PILE sur le bord du livre, donc la coupe
+// l'emporte avec elle : rien n'en reste sur la page finie.
+//
+// Un trait n'est tracé que si son bord tombe dans la feuille, et pas à
+// l'extrême bord : une page aussi large que son papier — le poche en livret —
+// n'a aucun blanc de ce côté, rien à y couper, et l'imprimante n'y déposerait
+// de toute façon pas d'encre.
+const BORD_MINI_MM = 1;   // distance minimale au bord de la feuille
 
 function ajouterTraitsDecoupe(feuille, largMm, hautMm, papier) {
   const margeX = (papier.larg - largMm) / 2;
   const margeY = (papier.haut - hautMm) / 2;
-
-  // Longueur réellement traçable de chaque côté, écart compris.
-  const longX = Math.min(LONGUEUR_TRAIT_MM, margeX - ECART_TRAIT_MM);
-  const longY = Math.min(LONGUEUR_TRAIT_MM, margeY - ECART_TRAIT_MM);
-  if (longX < 1 && longY < 1) return;   // la page occupe toute la feuille
-
-  // Un bord sans marge — le livret de poche est aussi large que sa feuille —
-  // placerait le repère à l'extrême bord, là où aucune imprimante ne dépose
-  // d'encre. On le rentre alors de quelques millimètres : il ne désigne plus
-  // le bord de la page, seulement la hauteur (ou la largeur) où couper.
-  const RENTRE_MM = 4;
-  const cadrerX = (x) => Math.min(Math.max(x, RENTRE_MM), papier.larg - RENTRE_MM);
-  const cadrerY = (y) => Math.min(Math.max(y, RENTRE_MM), papier.haut - RENTRE_MM);
 
   const trait = (classe, gauche, haut, largeur, hauteur) => {
     const t = document.createElement("div");
@@ -632,24 +628,17 @@ function ajouterTraitsDecoupe(feuille, largMm, hautMm, papier) {
     feuille.appendChild(t);
   };
 
-  const x0 = margeX, x1 = margeX + largMm;
-  const y0 = margeY, y1 = margeY + hautMm;
+  const tientDans = (v, taille) => v >= BORD_MINI_MM && v <= taille - BORD_MINI_MM;
 
-  // Traits horizontaux : ils prolongent les bords haut et bas, à gauche et à
-  // droite de la page.
-  if (longX >= 1) {
-    [cadrerY(y0), cadrerY(y1)].forEach((y) => {
-      trait("trait-h", x0 - ECART_TRAIT_MM - longX, y, longX, 0);
-      trait("trait-h", x1 + ECART_TRAIT_MM, y, longX, 0);
-    });
-  }
-  // Traits verticaux : idem pour les bords gauche et droit.
-  if (longY >= 1) {
-    [cadrerX(x0), cadrerX(x1)].forEach((x) => {
-      trait("trait-v", x, y0 - ECART_TRAIT_MM - longY, 0, longY);
-      trait("trait-v", x, y1 + ECART_TRAIT_MM, 0, longY);
-    });
-  }
+  // Les deux verticales : bords gauche et droit du livre, sur toute la hauteur.
+  [margeX, margeX + largMm].forEach((x) => {
+    if (tientDans(x, papier.larg)) trait("trait-v", x, 0, 0, papier.haut);
+  });
+
+  // Les deux horizontales : bords haut et bas, sur toute la largeur.
+  [margeY, margeY + hautMm].forEach((y) => {
+    if (tientDans(y, papier.haut)) trait("trait-h", 0, y, papier.larg, 0);
+  });
 }
 
 function reglerPagePapier(stylePage, papier) {
@@ -740,7 +729,7 @@ function exporterLivret(modeRectoVerso) {
   // Une imposition de poche fait 210 × 148 mm : posée sur une A4, elle laisse
   // 74 mm de blanc en haut et en bas, qu'il faudra massicoter. Comme les
   // autres exports, elle se pose donc sur un papier réel, à sa taille exacte,
-  // avec ses traits de coupe dans la marge.
+  // entourée de ses lignes de coupe.
   const largFeuille = f.larg * 2;
   const papier = papierMinimal(largFeuille, f.haut, 2);
   if (papier) reglerPagePapier(stylePage, papier);
