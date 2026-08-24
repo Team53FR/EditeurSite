@@ -397,22 +397,35 @@ function etapeReglages() {
   }
 
   if (texte) {
-    const d = decalageVersoMm();
-    html += '<details class="mi-details-schema"' + (d ? " open" : "") + ">" +
+    const dx = decalageVersoMm("x");
+    const dy = decalageVersoMm("y");
+    const mm = (v) => String(v).replace(".", ",") + " mm";
+    const corriges = [];
+    if (dx) corriges.push(mm(dx) + " en largeur");
+    if (dy) corriges.push(mm(dy) + " en hauteur");
+
+    const champ = (id, axe, valeur, libelle, sens) =>
+      '<label class="tr-champ tr-court"><span>' + libelle + "</span>" +
+        '<input type="number" id="' + id + '" data-axe="' + axe + '" value="' + valeur +
+        '" min="-' + DECALAGE_MAX_MM + '" max="' + DECALAGE_MAX_MM +
+        '" step="0.5"> <small>mm</small></label>' +
+      '<p class="mi-groupe-aide">Une valeur négative pour un décalage vers ' + sens + ".</p>";
+
+    html += '<details class="mi-details-schema"' + (corriges.length ? " open" : "") + ">" +
       "<summary>Le verso ne tombe pas juste en face du recto ?" +
-      (d ? " <b>(" + String(d).replace(".", ",") + " mm corrigés)</b>" : "") + "</summary>" +
+      (corriges.length ? " <b>(" + corriges.join(", ") + " corrigés)</b>" : "") + "</summary>" +
       "<p>Aucune imprimante familiale ne repose la feuille exactement au même " +
       "endroit pour son second passage : le verso sort décalé d'un ou deux " +
       "millimètres. Ce décalage n'a rien d'aléatoire — c'est une propriété de " +
       "votre machine —, alors il se mesure une fois et se corrige pour toujours.</p>" +
       "<p><b>Pour le mesurer :</b> imprimez deux pages en recto-verso, tenez la " +
       "feuille devant une lampe et regardez les lignes de coupe du recto et du " +
-      "verso se superposer. L'écart entre les deux, c'est la valeur à saisir.</p>" +
-      '<label class="tr-champ tr-court"><span>Le verso sort décalé vers la droite de</span>' +
-        '<input type="number" id="miDecalage" value="' + d + '" min="-' + DECALAGE_MAX_MM +
-        '" max="' + DECALAGE_MAX_MM + '" step="0.5"> <small>mm</small></label>' +
-      "<p>Une valeur négative pour un décalage vers la gauche. Le réglage est " +
-      "retenu d'une fois sur l'autre : il appartient à l'imprimante, pas au livre.</p>" +
+      "verso se superposer. L'écart entre les deux, c'est la valeur à saisir — " +
+      "en largeur et en hauteur, les deux sont indépendants.</p>" +
+      champ("miDecalage", "x", dx, "Le verso sort décalé vers la droite de", "la gauche") +
+      champ("miDecalageY", "y", dy, "…et vers le bas de", "le haut") +
+      "<p>Les deux réglages sont retenus d'une fois sur l'autre : ils " +
+      "appartiennent à l'imprimante, pas au livre.</p>" +
     "</details>";
   }
 
@@ -497,14 +510,13 @@ function brancherReglages(fond) {
   const essai = fond.querySelector(".mi-feuille-essai");
   if (essai) essai.onclick = () => imprimerFeuilleEssai();
 
-  // Le décalage se range à part, dans localStorage : pas de redessin du
+  // Les décalages se rangent à part, dans localStorage : pas de redessin du
   // panneau, qui ferait perdre le focus à chaque frappe.
-  const champDecalage = fond.querySelector("#miDecalage");
-  if (champDecalage) {
-    champDecalage.onchange = () => {
-      champDecalage.value = definirDecalageVerso(champDecalage.value);
+  fond.querySelectorAll("input[data-axe]").forEach((champ) => {
+    champ.onchange = () => {
+      champ.value = definirDecalageVerso(champ.dataset.axe, champ.value);
     };
-  }
+  });
 
   fond.querySelector(".mi-lancer").onclick = () => {
     const action = actionImpression();
@@ -680,27 +692,35 @@ function ajouterTraitsDecoupe(feuille, largMm, hautMm, papier) {
 //
 // On garde la valeur à part de choixImpression : elle appartient à
 // l'imprimante, pas au livre, et doit survivre à la fermeture de l'onglet.
-const CLE_DECALAGE = "gh_decalage_verso";
+//
+// Deux axes, deux réglages : le chemin papier décale le verso latéralement
+// (le guide du bac) ET dans le sens de l'avance (le moment où les galets
+// reprennent la feuille). Rien n'oblige les deux à aller de pair, et corriger
+// l'un en laissant l'autre ne donne qu'un demi-résultat.
+const CLES_DECALAGE = { x: "gh_decalage_verso", y: "gh_decalage_verso_y" };
 const DECALAGE_MAX_MM = 5;
 
-function decalageVersoMm() {
-  const v = parseFloat(localStorage.getItem(CLE_DECALAGE));
+function decalageVersoMm(axe) {
+  const v = parseFloat(localStorage.getItem(CLES_DECALAGE[axe] || CLES_DECALAGE.x));
   if (!isFinite(v)) return 0;
   return Math.max(-DECALAGE_MAX_MM, Math.min(DECALAGE_MAX_MM, v));
 }
 
-function definirDecalageVerso(mm) {
+function definirDecalageVerso(axe, mm) {
+  const cle = CLES_DECALAGE[axe] || CLES_DECALAGE.x;
   const v = parseFloat(mm);
-  if (!isFinite(v)) { localStorage.removeItem(CLE_DECALAGE); return 0; }
+  if (!isFinite(v)) { localStorage.removeItem(cle); return 0; }
   const borne = Math.max(-DECALAGE_MAX_MM, Math.min(DECALAGE_MAX_MM, v));
-  localStorage.setItem(CLE_DECALAGE, String(borne));
+  localStorage.setItem(cle, String(borne));
   return borne;
 }
 
 // Le verso est dessiné à CONTRE-SENS du décalage constaté : si la machine le
-// pose 1 mm trop à droite, on le dessine 1 mm plus à gauche.
+// pose 1 mm trop à droite et 2 mm trop bas, on le dessine 1 mm plus à gauche
+// et 2 mm plus haut.
 function appliquerDecalageVerso(zone) {
-  zone.style.setProperty("--decalage-verso", (-decalageVersoMm()) + "mm");
+  zone.style.setProperty("--decalage-verso", (-decalageVersoMm("x")) + "mm");
+  zone.style.setProperty("--decalage-verso-y", (-decalageVersoMm("y")) + "mm");
 }
 
 function reglerPagePapier(stylePage, papier) {

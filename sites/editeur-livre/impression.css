@@ -253,6 +253,7 @@
   #zoneImpression > *:nth-child(even) {
     position: relative;
     left: var(--decalage-verso, 0mm);
+    top: var(--decalage-verso-y, 0mm);
   }
 
 
