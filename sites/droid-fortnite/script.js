@@ -1157,6 +1157,23 @@ const FUSIONS_INITIALES = [
     ingredients: [ { nom: "R2", quantite: 2 }, { nom: "B2 Super", quantite: 1 } ] }
 ];
 
+// Rang d'une rareté : sa position dans la liste des raretés (du plus faible au
+// plus fort). Une rareté inconnue passe en dernier. Partagé (tri du catalogue).
+function rangRarete(nom) {
+  const i = raretes.findIndex((r) => r.nom === nom);
+  return i === -1 ? raretes.length : i;
+}
+
+// Tri STABLE du catalogue par rareté (faible -> fort). Aucune clé secondaire
+// (surtout pas le nom) : l'ordre du jeu, saisi à la main, est ainsi conservé au
+// sein d'une même rareté — c'est ce que le tri « par rareté puis par nom »
+// cassait. Un droïde ajouté rejoint donc son groupe de rareté au lieu de tomber
+// en fin de liste.
+function trierCatalogueParRarete(liste) {
+  return (Array.isArray(liste) ? liste.slice() : [])
+    .sort((a, b) => rangRarete(a.rarete) - rangRarete(b.rarete));
+}
+
 // Retrouve un droïde du catalogue par son NOM (les ingrédients référencent les
 // droïdes par nom, comme le champ « elements » des renaissances).
 function droideParNom(nom) {

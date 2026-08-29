@@ -87,6 +87,8 @@ async function chargerTout() {
     return;
   }
 
+  // Même ordre que le panneau admin : rangé par rareté (faible -> fort).
+  catalogue = trierCatalogueParRarete(catalogue);
   construireOngletsPalier();
   document.getElementById("chargement").style.display = "none";
   document.getElementById("zoneDroidex").style.display = "";

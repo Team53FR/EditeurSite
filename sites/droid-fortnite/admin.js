@@ -132,6 +132,9 @@ async function chargerDonnees() {
     message.textContent = e.message;
     return;
   }
+  // Rangé par rareté dès le chargement : corrige d'emblée un catalogue où des
+  // droïdes auraient été ajoutés en fin de liste (avant ce tri à l'ajout).
+  catalogue = trierCatalogueParRarete(catalogue);
   remplirSelectRaretes(document.getElementById("champRarete"), raretes[0] && raretes[0].nom);
   remplirSelectRaretes(document.getElementById("champNouvelleFusionRarete"), raretes[0] && raretes[0].nom);
   afficherDroides();
@@ -371,9 +374,13 @@ async function enregistrerDroideAdmin() {
     if (Object.keys(prix).length) entree.prix = prix;
     if (Object.keys(rendements).length) entree.rendements = rendements;
 
-    const copie = modeEditionId
+    const copieBrute = modeEditionId
       ? catalogue.map((x) => x.id === modeEditionId ? entree : x)
       : catalogue.concat([entree]);
+    // Ranger par rareté (faible -> fort) : un droïde ajouté rejoint son groupe
+    // au lieu de tomber en fin de liste. Tri STABLE, sans clé secondaire, donc
+    // l'ordre du jeu est conservé à l'intérieur d'une même rareté.
+    const copie = trierCatalogueParRarete(copieBrute);
 
     shaCatalogue = await sauvegarderAvecFusion("catalogue.json", copie, shaCatalogue, token,
       modeEditionId ? `Modification du droïde ${nom}` : `Ajout du droïde ${nom}`);
