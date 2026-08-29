@@ -145,27 +145,10 @@
     <div id="zoneFusion" style="display:none">
       <div class="bloc-carte">
         <h2>Recettes de fusion</h2>
-        <p class="sous-titre">Chaque recette combine des droïdes (avec quantités) pour obtenir un droïde spécial. On clique une case pour choisir un droïde puis sa quantité. Le résultat (nom, type, rareté) se règle en haut de chaque ligne. Les modifications s'enregistrent dès qu'un champ est quitté.</p>
+        <p class="sous-titre">Le résultat d'une fusion est un droïde du catalogue : on le choisit directement (ajoute-le d'abord dans l'onglet Droïdes s'il n'y est pas). On clique ensuite une case pour choisir un droïde ingrédient puis sa quantité. Les modifications s'enregistrent aussitôt.</p>
         <div id="listeFusionAdmin"></div>
 
-        <div class="champ" style="margin-top:1.2rem">
-          <label for="champNouvelleFusionNom">Nom du droïde résultat</label>
-          <input type="text" id="champNouvelleFusionNom" placeholder="ex. WHL-EX">
-        </div>
-        <div class="champ">
-          <label for="champNouvelleFusionClasse">Type</label>
-          <select id="champNouvelleFusionClasse">
-            <option value="Ouvrier">🔧 Ouvrier</option>
-            <option value="Astromec">📡 Astromec</option>
-            <option value="Combat">⚔️ Combat</option>
-          </select>
-        </div>
-        <div class="champ">
-          <label for="champNouvelleFusionRarete">Rareté</label>
-          <select id="champNouvelleFusionRarete"></select>
-        </div>
-        <p class="aide-champ" style="margin:0 0 1rem">Les droïdes requis se choisissent ensuite, dans les emplacements de la recette.</p>
-        <button class="btn btn-primaire" onclick="ajouterFusionAdmin()">Ajouter la recette</button>
+        <button class="btn btn-primaire" style="margin-top:1.2rem" onclick="nouvelleFusionAdmin()">➕ Nouvelle recette</button>
         <p id="messageFusionAdmin" class="message"></p>
       </div>
     </div>

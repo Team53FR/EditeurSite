@@ -1174,11 +1174,29 @@ function trierCatalogueParRarete(liste) {
     .sort((a, b) => rangRarete(a.rarete) - rangRarete(b.rarete));
 }
 
-// Retrouve un droïde du catalogue par son NOM (les ingrédients référencent les
-// droïdes par nom, comme le champ « elements » des renaissances).
+// Retrouve un droïde du catalogue par son NOM (les ingrédients ET le résultat
+// d'une fusion référencent les droïdes par nom, comme le champ « elements » des
+// renaissances).
 function droideParNom(nom) {
   const cible = String(nom || "").trim().toLowerCase();
   return catalogue.find((d) => d.nom.toLowerCase() === cible) || null;
+}
+
+// ----- Résultat d'une fusion : un droïde DU CATALOGUE -----
+// La recette référence le résultat par son nom (champ « resultat »). On tolère
+// l'ancienne forme, où le résultat était décrit à part dans la recette
+// (nom/classe/rarete) : ces champs servent alors de repli si le droïde n'est
+// pas (encore) dans le catalogue.
+function nomResultatFusion(f) {
+  return (f && (f.resultat || f.nom)) || "";
+}
+function droideResultatFusion(f) {
+  return droideParNom(nomResultatFusion(f));
+}
+function rareteResultatFusion(f) {
+  const d = droideResultatFusion(f);
+  if (d) return d.rarete;
+  return (f && f.rarete) || "";
 }
 
 function normaliserIngredients(ingredients) {

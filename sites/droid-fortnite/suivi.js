@@ -894,7 +894,7 @@ function afficherFusion() {
   const ordre = raretes.map((r) => r.nom);
   const groupes = new Map();
   recettes.forEach((f) => {
-    const cle = f.rarete || "—";
+    const cle = rareteResultatFusion(f) || "—";
     if (!groupes.has(cle)) groupes.set(cle, []);
     groupes.get(cle).push(f);
   });
@@ -923,10 +923,25 @@ function construireRecetteFusion(f) {
   const recette = document.createElement("div");
   recette.className = "recette-fusion";
 
-  // Le résultat porte les champs d'un droïde : on réutilise la carte du Droidex.
+  // Le résultat est un droïde du catalogue : on affiche sa vraie carte (avec
+  // son image, sa rareté…). S'il n'y est pas encore, on retombe sur les champs
+  // de la recette (ancienne forme), ou un simple repli texte.
   const resultat = document.createElement("div");
   resultat.className = "recette-resultat";
-  resultat.appendChild(construireCarteDroide(f, { possede: true, palier: paliers[0] && paliers[0].nom }));
+  const droideResultat = droideResultatFusion(f);
+  if (droideResultat) {
+    resultat.appendChild(construireCarteDroide(droideResultat, { possede: true, palier: paliers[0] && paliers[0].nom }));
+  } else if (f.classe || f.rarete) {
+    resultat.appendChild(construireCarteDroide(
+      { id: f.id, nom: nomResultatFusion(f), classe: f.classe || "Ouvrier", rarete: f.rarete || "" },
+      { possede: true, palier: paliers[0] && paliers[0].nom }));
+  } else {
+    const inconnu = document.createElement("div");
+    inconnu.className = "element-inconnu";
+    inconnu.textContent = nomResultatFusion(f) || "?";
+    inconnu.title = "Ce résultat ne correspond à aucun droïde du catalogue";
+    resultat.appendChild(inconnu);
+  }
   recette.appendChild(resultat);
 
   const egale = document.createElement("div");
