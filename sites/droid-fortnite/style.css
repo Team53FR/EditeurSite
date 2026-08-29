@@ -1080,3 +1080,86 @@ a { color: var(--primaire); }
   .case-droide { min-height: 3.8rem; padding: 0.45rem 0.25rem; }
   .case-nom { font-size: 0.72rem; }
 }
+
+/* ===== Onglet Fusion ===== */
+.section-fusion { margin-bottom: 1.5rem; }
+.titre-fusion {
+  display: flex; align-items: center; gap: 0.5rem;
+  margin: 0 0 0.7rem; font-size: 0.95rem;
+}
+.titre-fusion .badge-rarete { font-size: 0.8rem; padding: 0.22rem 0.6rem; }
+.titre-fusion-suffixe { color: var(--texte-att); font-weight: 600; letter-spacing: 0.02em; }
+
+.grille-recettes { display: flex; flex-direction: column; gap: 0.7rem; }
+
+.recette-fusion {
+  display: flex; align-items: center; gap: 0.7rem;
+  padding: 0.7rem;
+  border: 1px solid var(--bordure); border-radius: 14px;
+  background: var(--carte);
+}
+.recette-resultat { flex-shrink: 0; width: 92px; }
+.recette-egale {
+  flex-shrink: 0;
+  font-size: 1.5rem; font-weight: 700;
+  color: var(--texte-att); font-family: var(--police-titre);
+}
+.recette-ingredients {
+  display: flex; flex-wrap: wrap; gap: 0.6rem; flex: 1; min-width: 0;
+}
+.ingredient-fusion { position: relative; width: 78px; }
+/* La case à cocher de la carte n'a rien à dire ici (référence, pas possession). */
+.recette-fusion .dx-case { display: none; }
+
+.badge-quantite {
+  position: absolute; top: -7px; left: -7px; z-index: 5;
+  min-width: 22px; height: 22px; padding: 0 5px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 11px;
+  background: var(--primaire); color: var(--sur-primaire);
+  font-size: 0.72rem; font-weight: 700; line-height: 1;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .4);
+}
+
+@media (max-width: 520px) {
+  .recette-fusion { flex-direction: column; align-items: stretch; }
+  .recette-resultat { width: 100%; max-width: 130px; margin: 0 auto; }
+  .recette-egale { text-align: center; }
+  .recette-ingredients { justify-content: center; }
+}
+
+/* ----- Fusion : édition admin (calquée sur les lignes de renaissance) ----- */
+.ligne-fusion {
+  border: 1px solid var(--bordure);
+  border-radius: 14px;
+  background: var(--fond);
+  padding: 0.85rem 0.9rem 0.9rem;
+  margin-bottom: 1rem;
+}
+.entete-fusion {
+  display: grid;
+  grid-template-columns: minmax(6rem, 1fr) auto auto 2rem;
+  gap: 0.45rem;
+  align-items: center;
+  padding-bottom: 0.7rem;
+  margin-bottom: 0.75rem;
+  border-bottom: 1px dashed var(--bordure);
+}
+.entete-fusion .f-nom {
+  width: 100%; min-width: 0;
+  padding: 0.45rem 0.55rem;
+  border-radius: 8px; border: 1px solid var(--bordure);
+  background: var(--carte); color: var(--texte);
+  font-size: 0.85rem; font-weight: 600;
+}
+.entete-fusion .f-nom:focus { outline: 2px solid var(--primaire); outline-offset: 1px; }
+.entete-fusion select {
+  padding: 0.4rem 0.4rem;
+  border-radius: 8px; border: 1px solid var(--bordure);
+  background: var(--carte); color: var(--texte);
+  font-size: 0.8rem;
+}
+@media (max-width: 520px) {
+  .entete-fusion { grid-template-columns: 1fr 1fr 2rem; }
+  .entete-fusion .f-nom { grid-column: 1 / -1; }
+}

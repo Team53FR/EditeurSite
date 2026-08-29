@@ -33,6 +33,7 @@
       <button type="button" class="onglet-type" data-type="ajout" onclick="ouvrirOngletAjout()">➕ Ajouter</button>
       <button type="button" class="onglet-type" data-type="paliers" onclick="changerOngletAdmin('paliers')">🎚️ Paliers</button>
       <button type="button" class="onglet-type" data-type="renaissance" onclick="changerOngletAdmin('renaissance')">🚀 Renaissance</button>
+      <button type="button" class="onglet-type" data-type="fusion" onclick="changerOngletAdmin('fusion')">🧬 Fusion</button>
       <button type="button" class="onglet-type" data-type="unites" onclick="changerOngletAdmin('unites')">📏 Unités</button>
       <button type="button" class="onglet-type" data-type="raretes" onclick="changerOngletAdmin('raretes')">🎨 Raretés</button>
     </div>
@@ -141,6 +142,34 @@
       </div>
     </div>
 
+    <div id="zoneFusion" style="display:none">
+      <div class="bloc-carte">
+        <h2>Recettes de fusion</h2>
+        <p class="sous-titre">Chaque recette combine des droïdes (avec quantités) pour obtenir un droïde spécial. On clique une case pour choisir un droïde puis sa quantité. Le résultat (nom, type, rareté) se règle en haut de chaque ligne. Les modifications s'enregistrent dès qu'un champ est quitté.</p>
+        <div id="listeFusionAdmin"></div>
+
+        <div class="champ" style="margin-top:1.2rem">
+          <label for="champNouvelleFusionNom">Nom du droïde résultat</label>
+          <input type="text" id="champNouvelleFusionNom" placeholder="ex. WHL-EX">
+        </div>
+        <div class="champ">
+          <label for="champNouvelleFusionClasse">Type</label>
+          <select id="champNouvelleFusionClasse">
+            <option value="Ouvrier">🔧 Ouvrier</option>
+            <option value="Astromec">📡 Astromec</option>
+            <option value="Combat">⚔️ Combat</option>
+          </select>
+        </div>
+        <div class="champ">
+          <label for="champNouvelleFusionRarete">Rareté</label>
+          <select id="champNouvelleFusionRarete"></select>
+        </div>
+        <p class="aide-champ" style="margin:0 0 1rem">Les droïdes requis se choisissent ensuite, dans les emplacements de la recette.</p>
+        <button class="btn btn-primaire" onclick="ajouterFusionAdmin()">Ajouter la recette</button>
+        <p id="messageFusionAdmin" class="message"></p>
+      </div>
+    </div>
+
     <div id="zoneUnites" style="display:none">
       <div class="bloc-carte">
         <h2>Unités de grandeur</h2>
@@ -194,6 +223,23 @@
           <input type="text" id="rechercheDroideRenaissance" placeholder="Rechercher un droïde..." oninput="afficherEtapeDroide()">
         </div>
         <div class="liste-choix" id="listeChoixDroideRenaissance"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Choix d'un ingrédient de fusion : le droïde, puis sa quantité -->
+  <div class="voile" id="voileDroideFusion" onclick="if(event.target===this)fermerChoixDroideFusion()">
+    <div class="feuille">
+      <div class="feuille-entete">
+        <h2 id="titreChoixDroideFusion">Choisir un droïde</h2>
+        <button type="button" onclick="fermerChoixDroideFusion()">✕</button>
+      </div>
+      <div class="feuille-corps">
+        <div class="recherche" id="rechercheFusionEnveloppe">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" id="rechercheDroideFusion" placeholder="Rechercher un droïde..." oninput="afficherEtapeDroideFusion()">
+        </div>
+        <div class="liste-choix" id="listeChoixDroideFusion"></div>
       </div>
     </div>
   </div>

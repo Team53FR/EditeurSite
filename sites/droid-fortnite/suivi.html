@@ -32,6 +32,7 @@
       <button type="button" class="onglet-type actif" data-type="droidex" onclick="changerOnglet('droidex')">🤖 Droidex</button>
       <button type="button" class="onglet-type" data-type="rendement" onclick="changerOnglet('rendement')">⚡ Rendement</button>
       <button type="button" class="onglet-type" data-type="renaissance" onclick="changerOnglet('renaissance')">🚀 Renaissance</button>
+      <button type="button" class="onglet-type" data-type="fusion" onclick="changerOnglet('fusion')">🧬 Fusion</button>
     </div>
 
     <div id="zoneDroidexFiltres">
@@ -87,6 +88,16 @@
         <span><i class="element-utilite reserve">💰</i> vendable, mais posé dans ton rendement</span>
       </p>
       <div class="liste-renaissance" id="listeRenaissance"></div>
+    </div>
+
+    <div id="zoneFusion" style="display:none">
+      <p class="note-source">Combine trois droïdes pour obtenir un droïde spécial. Voici les recettes connues, regroupées par rareté du résultat.</p>
+      <div id="listeFusion"></div>
+      <div class="etat-vide" id="videFusion" style="display:none">
+        <div class="pastille-lg">🧬</div>
+        <h2>Aucune recette de fusion</h2>
+        <p>Un administrateur peut en ajouter depuis le panneau de gestion.</p>
+      </div>
     </div>
   </main>
 

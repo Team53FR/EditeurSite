@@ -12,6 +12,7 @@ const token = exigerConnexion(); // redirige vers connexion.html si absent
 
 let catalogue = [];
 let renaissance = [];
+let fusions = [];
 let paliers = PALIERS_INITIAUX; // remplacé par le contenu réel de paliers.json au chargement
 // droidesPossedes : tableau de clés "<idDroide>::<palier>" — chaque droïde
 // peut être possédé indépendamment à CHAQUE palier (Défaut, Or, Diamant...),
@@ -39,7 +40,9 @@ function changerOnglet(type) {
   document.getElementById("zoneDroidex").style.display = type === "droidex" ? "" : "none";
   document.getElementById("zoneRendement").style.display = type === "rendement" ? "" : "none";
   document.getElementById("zoneRenaissance").style.display = type === "renaissance" ? "" : "none";
+  document.getElementById("zoneFusion").style.display = type === "fusion" ? "" : "none";
   if (type === "rendement") afficherRendement();
+  if (type === "fusion") afficherFusion();
   // Le recadrage attend l'ouverture de l'onglet : tant qu'il est masqué, ses
   // paliers n'ont pas de position à l'écran.
   if (type === "renaissance") recadrerSurPalierCourant();
@@ -55,9 +58,10 @@ if (token) {
 
 async function chargerTout() {
   try {
-    const [rCatalogue, rRenaissance, rPaliers, rUnites, rRaretes] = await Promise.all([
+    const [rCatalogue, rRenaissance, rFusions, rPaliers, rUnites, rRaretes] = await Promise.all([
       chargerOuAmorcer("catalogue.json", CATALOGUE_INITIAL, token, "Amorçage du catalogue de droïdes"),
       chargerOuAmorcer("renaissance.json", RENAISSANCE_INITIALE, token, "Amorçage des paliers de renaissance"),
+      chargerOuAmorcer("fusions.json", FUSIONS_INITIALES, token, "Amorçage des recettes de fusion"),
       chargerOuAmorcer("paliers.json", PALIERS_INITIAUX, token, "Amorçage de la liste des paliers"),
       chargerOuAmorcer("unites.json", UNITES_INITIALES, token, "Amorçage des unités de grandeur"),
       chargerOuAmorcer("raretes.json", RARETES_INITIALES, token, "Amorçage des couleurs de rareté"),
@@ -65,6 +69,7 @@ async function chargerTout() {
     ]);
     catalogue = Array.isArray(rCatalogue.contenu) ? rCatalogue.contenu : [];
     renaissance = Array.isArray(rRenaissance.contenu) ? rRenaissance.contenu : [];
+    fusions = Array.isArray(rFusions.contenu) ? rFusions.contenu : [];
     const paliersCharges = normaliserPaliers(rPaliers.contenu);
     paliers = paliersCharges.length ? paliersCharges : PALIERS_INITIAUX;
     palierActif = paliers[0].nom;
@@ -869,4 +874,95 @@ function basculerAtteint(idRenaissance) {
   }
   afficherRenaissance({ recadrer: true });
   marquerProgressionModifiee();
+}
+
+// ===== Onglet Fusion =====
+// Lecture seule : on montre les recettes (résultat + ingrédients), groupées
+// par rareté du résultat. C'est de la référence, pas de la progression.
+function afficherFusion() {
+  const liste = document.getElementById("listeFusion");
+  const vide = document.getElementById("videFusion");
+  liste.innerHTML = "";
+  const recettes = Array.isArray(fusions) ? fusions : [];
+  vide.style.display = recettes.length ? "none" : "";
+  if (!recettes.length) return;
+
+  // Groupées par rareté, dans l'ordre des raretés (faible -> fort). Une rareté
+  // absente du fichier des raretés est reléguée en fin, sous son propre nom.
+  const ordre = raretes.map((r) => r.nom);
+  const groupes = new Map();
+  recettes.forEach((f) => {
+    const cle = f.rarete || "—";
+    if (!groupes.has(cle)) groupes.set(cle, []);
+    groupes.get(cle).push(f);
+  });
+  const clesTriees = [...groupes.keys()].sort((a, b) => {
+    const ia = ordre.indexOf(a), ib = ordre.indexOf(b);
+    return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+  });
+
+  clesTriees.forEach((rarete) => {
+    const section = document.createElement("section");
+    section.className = "section-fusion";
+    section.innerHTML =
+      '<h3 class="titre-fusion">' +
+        '<span class="badge-rarete ' + classeRareteCss(rarete) + '">' + echapperHTML(rarete) + "</span>" +
+        ' <span class="titre-fusion-suffixe">— fusions</span>' +
+      "</h3>";
+    const zone = document.createElement("div");
+    zone.className = "grille-recettes";
+    groupes.get(rarete).forEach((f) => zone.appendChild(construireRecetteFusion(f)));
+    section.appendChild(zone);
+    liste.appendChild(section);
+  });
+}
+
+function construireRecetteFusion(f) {
+  const recette = document.createElement("div");
+  recette.className = "recette-fusion";
+
+  // Le résultat porte les champs d'un droïde : on réutilise la carte du Droidex.
+  const resultat = document.createElement("div");
+  resultat.className = "recette-resultat";
+  resultat.appendChild(construireCarteDroide(f, { possede: true, palier: paliers[0] && paliers[0].nom }));
+  recette.appendChild(resultat);
+
+  const egale = document.createElement("div");
+  egale.className = "recette-egale";
+  egale.setAttribute("aria-label", "obtenu avec");
+  egale.textContent = "=";
+  recette.appendChild(egale);
+
+  const ingredients = document.createElement("div");
+  ingredients.className = "recette-ingredients";
+  const liste = normaliserIngredients(f.ingredients);
+  if (!liste.length) {
+    ingredients.innerHTML = '<p class="renaissance-elements">Aucun ingrédient indiqué.</p>';
+  } else {
+    liste.forEach((ing) => ingredients.appendChild(construireIngredientFusion(ing)));
+  }
+  recette.appendChild(ingredients);
+  return recette;
+}
+
+function construireIngredientFusion(ing) {
+  const enveloppe = document.createElement("div");
+  enveloppe.className = "ingredient-fusion";
+  const droide = droideParNom(ing.nom);
+  if (droide) {
+    enveloppe.appendChild(construireCarteDroide(droide, { possede: true, palier: paliers[0] && paliers[0].nom }));
+  } else {
+    const inconnu = document.createElement("div");
+    inconnu.className = "element-inconnu";
+    inconnu.textContent = ing.nom;
+    inconnu.title = "Ce nom ne correspond à aucun droïde du catalogue";
+    enveloppe.appendChild(inconnu);
+  }
+  if (ing.quantite > 1) {
+    const q = document.createElement("span");
+    q.className = "badge-quantite";
+    q.textContent = "×" + ing.quantite;
+    enveloppe.appendChild(q);
+  }
+  return enveloppe;
 }

@@ -11,6 +11,7 @@ envelopperAttente({
   sauvegarderUnites: "Enregistrement des unités…",
   sauvegarderRaretes: "Enregistrement des raretés…",
   sauvegarderRenaissanceAdmin: "Enregistrement des renaissances…",
+  sauvegarderFusionAdmin: "Enregistrement des fusions…",
 });
 
 // Panneau de gestion Droid Fortnite (réservé aux admins du portail central —
@@ -26,6 +27,8 @@ let shaUnites = null;
 let shaRaretes = null;
 let renaissance = [];
 let shaRenaissance = null;
+let fusions = [];
+let shaFusions = null;
 let superEdite = 0;   // super renaissance dont on edite les droides
 let modeEditionId = null; // id du droïde en cours de modification, ou null (mode ajout)
 const cacheImages = new Map(); // chemin GitHub -> URL locale (blob:)
@@ -82,6 +85,8 @@ function changerOngletAdmin(type) {
   document.getElementById("zonePaliers").style.display = type === "paliers" ? "" : "none";
   document.getElementById("zoneRenaissance").style.display = type === "renaissance" ? "" : "none";
   if (type === "renaissance") preparerAjoutRenaissance();
+  document.getElementById("zoneFusion").style.display = type === "fusion" ? "" : "none";
+  if (type === "fusion") afficherFusionAdmin();
   document.getElementById("zoneUnites").style.display = type === "unites" ? "" : "none";
   document.getElementById("zoneRaretes").style.display = type === "raretes" ? "" : "none";
 }
@@ -100,12 +105,13 @@ if (token) {
 async function chargerDonnees() {
   const message = document.getElementById("messageDroideAdmin");
   try {
-    const [rCatalogue, rPaliers, rUnites, rRaretes, rRenaissance] = await Promise.all([
+    const [rCatalogue, rPaliers, rUnites, rRaretes, rRenaissance, rFusions] = await Promise.all([
       chargerOuAmorcer("catalogue.json", CATALOGUE_INITIAL, token, "Amorçage du catalogue de droïdes"),
       chargerOuAmorcer("paliers.json", PALIERS_INITIAUX, token, "Amorçage de la liste des paliers"),
       chargerOuAmorcer("unites.json", UNITES_INITIALES, token, "Amorçage des unités de grandeur"),
       chargerOuAmorcer("raretes.json", RARETES_INITIALES, token, "Amorçage des couleurs de rareté"),
-      chargerOuAmorcer("renaissance.json", RENAISSANCE_INITIALE, token, "Amorçage des paliers de renaissance")
+      chargerOuAmorcer("renaissance.json", RENAISSANCE_INITIALE, token, "Amorçage des paliers de renaissance"),
+      chargerOuAmorcer("fusions.json", FUSIONS_INITIALES, token, "Amorçage des recettes de fusion")
     ]);
     catalogue = Array.isArray(rCatalogue.contenu) ? rCatalogue.contenu : [];
     shaCatalogue = rCatalogue.sha;
@@ -120,17 +126,21 @@ async function chargerDonnees() {
     appliquerCouleursRaretes();
     renaissance = Array.isArray(rRenaissance.contenu) ? rRenaissance.contenu : [];
     shaRenaissance = rRenaissance.sha;
+    fusions = Array.isArray(rFusions.contenu) ? rFusions.contenu : [];
+    shaFusions = rFusions.sha;
   } catch (e) {
     message.textContent = e.message;
     return;
   }
   remplirSelectRaretes(document.getElementById("champRarete"), raretes[0] && raretes[0].nom);
+  remplirSelectRaretes(document.getElementById("champNouvelleFusionRarete"), raretes[0] && raretes[0].nom);
   afficherDroides();
   afficherPaliers();
   afficherUnites();
   afficherRaretes();
   document.getElementById("champUniteCredits").innerHTML = optionsUnite("", false);
   afficherRenaissanceAdmin();
+  afficherFusionAdmin();
 }
 
 // ===== Droïdes =====
@@ -1081,4 +1091,261 @@ function preparerAjoutRenaissance() {
   if (champ && !champ.value) {
     champ.value = renaissance.reduce((max, r) => Math.max(max, r.niveau), 0) + 1;
   }
+}
+
+// ===== Fusions =====
+// Partagées (fusions.json), même schéma que les renaissances : des
+// emplacements où l'on choisit un droïde, mais ici avec une QUANTITÉ plutôt
+// qu'un palier. Le résultat (nom, type, rareté) est un droïde spécial qui
+// n'existe pas dans le catalogue : ses champs vivent dans la recette elle-même.
+
+const EMPLACEMENTS_FUSION = 3;
+
+// Emplacement (droïde + quantité) en cours de remplissage.
+let slotFusionEnCours = null;
+
+function ingredientsDe(recette) {
+  const liste = normaliserIngredients(recette && recette.ingredients).map((i) => ({
+    nom: i.nom, quantite: i.quantite, droide: droideParNom(i.nom)
+  }));
+  while (liste.length < EMPLACEMENTS_FUSION) liste.push(null);
+  return liste;
+}
+
+function serialiserIngredients(elements) {
+  return elements.filter(Boolean).map((e) => ({
+    nom: e.nom, quantite: Math.max(1, Math.round(e.quantite) || 1)
+  }));
+}
+
+function construireEmplacementsIngredients(recette, surChangement) {
+  const zone = document.createElement("div");
+  zone.className = "emplacements-droides";
+  let elements = ingredientsDe(recette);
+
+  const enregistrer = () => surChangement(serialiserIngredients(elements));
+
+  const rendre = () => {
+    zone.innerHTML = "";
+    elements.forEach((e, index) => {
+      const case_ = document.createElement("button");
+      case_.type = "button";
+      case_.className = "case-droide" + (e ? (e.droide ? " remplie" : " remplie inconnue") : " vide");
+
+      if (!e) {
+        case_.innerHTML = '<span class="case-plus">+</span>';
+        case_.title = "Choisir un droïde";
+      } else {
+        case_.innerHTML =
+          '<span class="case-nom">' + echapper(e.droide ? e.droide.nom : e.nom) + "</span>" +
+          '<span class="case-palier">×' + e.quantite + (e.droide ? "" : " · à corriger") + "</span>";
+        case_.title = e.droide
+          ? "Modifier " + e.droide.nom + " (×" + e.quantite + ")"
+          : "Ce nom ne correspond à aucun droïde du catalogue";
+      }
+
+      case_.onclick = () => ouvrirChoixDroideFusion(elements, index, () => { rendre(); enregistrer(); });
+
+      if (e) {
+        const vider = document.createElement("span");
+        vider.className = "case-vider";
+        vider.textContent = "✕";
+        vider.title = "Vider l'emplacement";
+        vider.onclick = (ev) => {
+          ev.stopPropagation();
+          elements.splice(index, 1);
+          while (elements.length < EMPLACEMENTS_FUSION) elements.push(null);
+          rendre();
+          enregistrer();
+        };
+        case_.appendChild(vider);
+      }
+      zone.appendChild(case_);
+    });
+  };
+
+  rendre();
+  return zone;
+}
+
+// ----- Feuille de choix : le droïde, puis sa quantité -----
+
+function ouvrirChoixDroideFusion(elements, index, surChoix) {
+  slotFusionEnCours = { elements, index, surChoix, droide: null };
+  document.getElementById("rechercheDroideFusion").value = "";
+  afficherEtapeDroideFusion();
+  document.getElementById("voileDroideFusion").classList.add("ouvert");
+}
+
+function fermerChoixDroideFusion() {
+  document.getElementById("voileDroideFusion").classList.remove("ouvert");
+  slotFusionEnCours = null;
+}
+
+function afficherEtapeDroideFusion() {
+  if (!slotFusionEnCours) return;
+  slotFusionEnCours.droide = null;
+  document.getElementById("titreChoixDroideFusion").textContent = "Choisir un droïde";
+  document.getElementById("rechercheFusionEnveloppe").style.display = "";
+
+  const recherche = (document.getElementById("rechercheDroideFusion").value || "").trim().toLowerCase();
+  const liste = document.getElementById("listeChoixDroideFusion");
+  liste.innerHTML = "";
+
+  catalogue
+    .filter((d) => !recherche || d.nom.toLowerCase().includes(recherche))
+    .forEach((d) => {
+      const item = document.createElement("button");
+      item.type = "button";
+      item.className = "choix-droide";
+      item.innerHTML =
+        '<span class="choix-nom">' + echapper(d.nom) + "<small>" + echapper(d.classe) + "</small></span>" +
+        '<span class="badge-rarete ' + classeRareteCss(d.rarete) + '">' + echapper(d.rarete) + "</span>";
+      item.onclick = () => afficherEtapeQuantiteFusion(d);
+      liste.appendChild(item);
+    });
+
+  if (!liste.children.length) {
+    liste.innerHTML = '<p class="sous-titre">Aucun droïde ne correspond.</p>';
+  }
+}
+
+function afficherEtapeQuantiteFusion(droide) {
+  if (!slotFusionEnCours) return;
+  slotFusionEnCours.droide = droide;
+  document.getElementById("titreChoixDroideFusion").textContent = droide.nom + " — quelle quantité ?";
+  document.getElementById("rechercheFusionEnveloppe").style.display = "none";
+
+  const liste = document.getElementById("listeChoixDroideFusion");
+  liste.innerHTML = "";
+
+  const retour = document.createElement("button");
+  retour.type = "button";
+  retour.className = "choix-droide retour-choix";
+  retour.innerHTML = '<span class="choix-nom">← Changer de droïde</span>';
+  retour.onclick = () => afficherEtapeDroideFusion();
+  liste.appendChild(retour);
+
+  [1, 2, 3].forEach((q) => {
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = "choix-droide";
+    item.innerHTML = '<span class="choix-nom">×' + q +
+      " <small>" + (q === 1 ? "un exemplaire" : q + " exemplaires") + "</small></span>";
+    item.onclick = () => {
+      const { elements, index, surChoix } = slotFusionEnCours;
+      // Remplir au bon rang pour ne pas laisser de trou (comme la renaissance).
+      const premierVide = elements.findIndex((e) => !e);
+      const rang = elements[index] ? index
+        : (premierVide === -1 ? index : Math.min(index, premierVide));
+      elements[rang] = { nom: droide.nom, quantite: q, droide };
+      fermerChoixDroideFusion();
+      surChoix();
+    };
+    liste.appendChild(item);
+  });
+}
+
+function afficherFusionAdmin() {
+  const zone = document.getElementById("listeFusionAdmin");
+  if (!zone) return;
+  zone.innerHTML = "";
+
+  if (!fusions.length) {
+    zone.innerHTML = '<p class="sous-titre">Aucune recette pour le moment.</p>';
+    return;
+  }
+
+  // Groupées par rareté (ordre des raretés), puis par nom — comme la page de suivi.
+  const ordre = raretes.map((r) => r.nom);
+  const tri = fusions.slice().sort((a, b) => {
+    const da = ordre.indexOf(a.rarete), db = ordre.indexOf(b.rarete);
+    const na = da === -1 ? 999 : da, nb = db === -1 ? 999 : db;
+    if (na !== nb) return na - nb;
+    return String(a.nom || "").localeCompare(String(b.nom || ""));
+  });
+
+  tri.forEach((f) => {
+    const ligne = document.createElement("div");
+    ligne.className = "ligne-fusion";
+    ligne.innerHTML =
+      '<div class="entete-fusion">' +
+        '<input type="text" class="f-nom" value="' + echapper(f.nom) + '" placeholder="Nom du résultat" aria-label="Nom du résultat">' +
+        '<select class="f-classe" aria-label="Type">' +
+          ["Ouvrier", "Astromec", "Combat"].map((c) =>
+            '<option value="' + c + '"' + (f.classe === c ? " selected" : "") + ">" +
+            iconeClasse(c) + " " + c + "</option>").join("") +
+        "</select>" +
+        '<select class="f-rarete" aria-label="Rareté"></select>' +
+        '<button type="button" class="btn-mini danger" title="Supprimer cette recette">✕</button>' +
+      "</div>" +
+      '<div class="cellule-droides"></div>';
+
+    remplirSelectRaretes(ligne.querySelector(".f-rarete"), f.rarete);
+
+    let ingredientsCourants = normaliserIngredients(f.ingredients);
+    const enregistrer = () => {
+      const entree = {
+        id: f.id,
+        nom: ligne.querySelector(".f-nom").value.trim(),
+        classe: ligne.querySelector(".f-classe").value,
+        rarete: ligne.querySelector(".f-rarete").value,
+        ingredients: ingredientsCourants
+      };
+      if (f.image) entree.image = f.image;
+      const copie = fusions.map((x) => (x.id === f.id ? entree : x));
+      sauvegarderFusionAdmin(copie, "Modification de la fusion " + (entree.nom || f.id));
+    };
+    ligne.querySelectorAll(".f-nom, .f-classe, .f-rarete")
+      .forEach((c) => c.addEventListener("change", enregistrer));
+
+    ligne.querySelector(".cellule-droides").appendChild(
+      construireEmplacementsIngredients(f, (ing) => { ingredientsCourants = ing; enregistrer(); }));
+
+    ligne.querySelector(".btn-mini.danger").onclick = () => supprimerFusionAdmin(f.id, f.nom);
+    zone.appendChild(ligne);
+  });
+}
+
+async function sauvegarderFusionAdmin(nouvelle, messageCommit) {
+  const message = document.getElementById("messageFusionAdmin");
+  message.className = "message";
+  message.textContent = "Enregistrement...";
+  try {
+    shaFusions = await sauvegarderAvecFusion("fusions.json", nouvelle, shaFusions, token, messageCommit);
+    fusions = nouvelle;
+    afficherFusionAdmin();
+    message.className = "message ok";
+    message.textContent = "Enregistré.";
+  } catch (e) {
+    message.textContent = e.message;
+  }
+}
+
+function ajouterFusionAdmin() {
+  const champNom = document.getElementById("champNouvelleFusionNom");
+  const champClasse = document.getElementById("champNouvelleFusionClasse");
+  const champRarete = document.getElementById("champNouvelleFusionRarete");
+  const message = document.getElementById("messageFusionAdmin");
+  message.className = "message";
+
+  const nom = champNom.value.trim();
+  if (!nom) { message.textContent = "Le nom du droïde résultat est obligatoire."; return; }
+
+  // Créée sans ingrédients : ils se choisissent ensuite dans les emplacements.
+  const nouvelle = {
+    id: genererId("fus"),
+    nom,
+    classe: champClasse.value,
+    rarete: champRarete.value,
+    ingredients: []
+  };
+  champNom.value = "";
+  sauvegarderFusionAdmin(fusions.concat([nouvelle]), "Ajout de la fusion " + nom);
+}
+
+function supprimerFusionAdmin(id, nom) {
+  if (!confirm("Supprimer la recette de fusion « " + (nom || "") + " » ?")) return;
+  sauvegarderFusionAdmin(fusions.filter((f) => f.id !== id),
+    "Suppression de la fusion " + (nom || id));
 }

@@ -1125,3 +1125,56 @@ function normaliserPaliers(bruts) {
     return { nom: p.nom, couleur: couleurs.length > 1 ? couleurs : (couleurs[0] || null) };
   });
 }
+
+// ===== Fusions =====
+//
+// Une recette de fusion combine trois droïdes (avec quantités) pour obtenir
+// un droïde SPÉCIAL — un résultat qui n'existe pas dans le catalogue normal.
+// La recette porte donc elle-même les champs d'un droïde (nom, classe,
+// rareté, image facultative), ce qui permet de réutiliser la carte du Droidex
+// pour l'afficher, plus la liste de ses ingrédients.
+//
+//   { id, nom: "WHL-EX", classe: "Ouvrier", rarete: "Rare",
+//     ingredients: [ { nom: "Mouse", quantite: 2 }, { nom: "ARG", quantite: 1 } ] }
+//
+// Partagé (DroidFortnite/fusions.json), éditable depuis admin.html comme le
+// reste. Données de départ tirées de l'exemple fourni — à compléter/corriger
+// librement, ce ne sont qu'un point de départ.
+const FUSIONS_INITIALES = [
+  { id: "fus-whl-ex",   nom: "WHL-EX",   classe: "Ouvrier",  rarete: "Rare",
+    ingredients: [ { nom: "Mouse", quantite: 2 }, { nom: "ARG", quantite: 1 } ] },
+  { id: "fus-zro-tec",  nom: "ZRO-TEC",  classe: "Astromec", rarete: "Rare",
+    ingredients: [ { nom: "ID10", quantite: 2 }, { nom: "2BB", quantite: 1 } ] },
+  { id: "fus-btl-r",    nom: "BTL-R",    classe: "Combat",   rarete: "Rare",
+    ingredients: [ { nom: "B1 Battle", quantite: 1 }, { nom: "R9", quantite: 1 }, { nom: "BDX Explorer", quantite: 1 } ] },
+  { id: "fus-n-ul",     nom: "N-UL",     classe: "Ouvrier",  rarete: "Épique",
+    ingredients: [ { nom: "B1 Heavy", quantite: 1 }, { nom: "Gunrunner", quantite: 1 }, { nom: "BB", quantite: 1 } ] },
+  { id: "fus-scrp-r",   nom: "SCRP-R",   classe: "Astromec", rarete: "Épique",
+    ingredients: [ { nom: "Gonk", quantite: 1 }, { nom: "Groundmech", quantite: 1 }, { nom: "R6", quantite: 1 } ] },
+  { id: "fus-arm-core", nom: "ARM-CORE", classe: "Combat",   rarete: "Épique",
+    ingredients: [ { nom: "ARG", quantite: 2 }, { nom: "B2 Heavy", quantite: 1 } ] },
+  { id: "fus-opt-ar",   nom: "OPT-AR",   classe: "Combat",   rarete: "Épique",
+    ingredients: [ { nom: "R2", quantite: 2 }, { nom: "B2 Super", quantite: 1 } ] }
+];
+
+// Retrouve un droïde du catalogue par son NOM (les ingrédients référencent les
+// droïdes par nom, comme le champ « elements » des renaissances).
+function droideParNom(nom) {
+  const cible = String(nom || "").trim().toLowerCase();
+  return catalogue.find((d) => d.nom.toLowerCase() === cible) || null;
+}
+
+function normaliserIngredients(ingredients) {
+  return (Array.isArray(ingredients) ? ingredients : [])
+    .map((i) => ({
+      nom: String(i && i.nom || "").trim(),
+      quantite: Math.max(1, Math.round(Number(i && i.quantite) || 1))
+    }))
+    .filter((i) => i.nom);
+}
+
+// Nombre total de droïdes consommés (somme des quantités) — le jeu en demande
+// trois, on l'affiche pour repérer une recette incomplète d'un coup d'œil.
+function totalDroidesFusion(f) {
+  return normaliserIngredients(f && f.ingredients).reduce((n, i) => n + i.quantite, 0);
+}
