@@ -1271,11 +1271,40 @@ function afficherEtapeQuantiteFusion(droide) {
 
 // Le résultat d'une recette : un droïde du catalogue, présenté comme une case
 // cliquable qu'on remplace d'un clic (ouvre la feuille de choix, sans quantité).
+// Cas particulier : un résultat « hors catalogue » propose un bouton pour le
+// créer directement dans le catalogue.
 function construireSlotResultat(f, surChangement) {
-  const slot = document.createElement("button");
-  slot.type = "button";
   const droide = droideResultatFusion(f);
   const nom = nomResultatFusion(f);
+
+  // Résultat nommé mais absent du catalogue : case + bouton de création.
+  if (nom && !droide) {
+    const wrap = document.createElement("div");
+    wrap.className = "resultat-horscatalogue";
+
+    const slot = document.createElement("button");
+    slot.type = "button";
+    slot.className = "case-droide resultat-fusion remplie inconnue";
+    slot.innerHTML =
+      '<span class="case-nom">' + echapper(nom) + "</span>" +
+      '<span class="case-palier">hors catalogue</span>';
+    slot.title = "Relier à un droïde existant du catalogue";
+    slot.onclick = () => ouvrirChoixResultatFusion((d) => surChangement(d));
+    wrap.appendChild(slot);
+
+    const creer = document.createElement("button");
+    creer.type = "button";
+    creer.className = "btn-mini btn-creer-catalogue";
+    creer.textContent = "＋ Créer dans le catalogue";
+    creer.title = "Créer « " + nom + " » comme droïde du catalogue (à compléter ensuite)";
+    creer.onclick = () => creerDroideDepuisFusion(f);
+    wrap.appendChild(creer);
+    return wrap;
+  }
+
+  // Résultat résolu, ou pas encore choisi : une case qui ouvre le choix.
+  const slot = document.createElement("button");
+  slot.type = "button";
   slot.className = "case-droide resultat-fusion" + (droide ? " remplie" : " vide");
   if (droide) {
     appliquerContourPalier(slot, (raretes.find((r) => r.nom === droide.rarete) || {}).fond);
@@ -1283,18 +1312,42 @@ function construireSlotResultat(f, surChangement) {
       '<span class="case-nom">' + echapper(droide.nom) + "</span>" +
       '<span class="badge-rarete ' + classeRareteCss(droide.rarete) + '">' + echapper(droide.rarete) + "</span>";
     slot.title = "Changer le droïde résultat (" + droide.nom + ")";
-  } else if (nom) {
-    slot.className = "case-droide resultat-fusion remplie inconnue";
-    slot.innerHTML =
-      '<span class="case-nom">' + echapper(nom) + "</span>" +
-      '<span class="case-palier">hors catalogue — cliquer pour relier</span>';
-    slot.title = "« " + nom + " » n'est pas dans le catalogue. Ajoute-le dans l'onglet Droïdes, puis relie-le ici.";
   } else {
     slot.innerHTML = '<span class="case-plus">+</span><span class="case-nom">Choisir le résultat</span>';
     slot.title = "Choisir le droïde résultat";
   }
-  slot.onclick = () => ouvrirChoixResultatFusion((droide) => surChangement(droide));
+  slot.onclick = () => ouvrirChoixResultatFusion((d) => surChangement(d));
   return slot;
+}
+
+// Crée le droïde résultat dans le catalogue à partir des champs de la recette
+// (nom, et type/rareté si la recette les portait — sinon des valeurs par
+// défaut à compléter ensuite dans l'onglet Droïdes).
+async function creerDroideDepuisFusion(f) {
+  const nom = nomResultatFusion(f);
+  if (!nom) return;
+  const message = document.getElementById("messageFusionAdmin");
+  message.className = "message";
+
+  if (droideParNom(nom)) { afficherFusionAdmin(); return; } // déjà créé entre-temps
+
+  const classe = ["Ouvrier", "Astromec", "Combat"].includes(f.classe) ? f.classe : "Ouvrier";
+  const rarete = raretes.some((r) => r.nom === f.rarete) ? f.rarete : (raretes[0] && raretes[0].nom);
+  const entree = { id: genererId("d"), nom, classe, rarete };
+
+  message.textContent = "Création du droïde " + nom + "...";
+  try {
+    const copie = trierCatalogueParRarete(catalogue.concat([entree]));
+    shaCatalogue = await sauvegarderAvecFusion("catalogue.json", copie, shaCatalogue, token,
+      "Ajout du droïde " + nom + " (résultat de fusion)");
+    catalogue = copie;
+    afficherDroides();
+    afficherFusionAdmin(); // la case résultat se résout désormais vers le droïde
+    message.className = "message ok";
+    message.textContent = "Droïde « " + nom + " » créé — complète son rendement, son prix et son image dans l'onglet Droïdes.";
+  } catch (e) {
+    message.textContent = e.message;
+  }
 }
 
 function afficherFusionAdmin() {

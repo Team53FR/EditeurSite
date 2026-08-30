@@ -1158,3 +1158,13 @@ a { color: var(--primaire); }
 .resultat-fusion .case-nom { font-size: 0.9rem; }
 .resultat-fusion .badge-rarete { margin-left: auto; flex-shrink: 0; }
 .resultat-fusion.vide { border-style: dashed; }
+
+/* Résultat hors catalogue : la case + un bouton pour le créer d'un clic. */
+.resultat-horscatalogue { display: flex; flex-direction: column; gap: 0.4rem; min-width: 0; }
+.resultat-horscatalogue .resultat-fusion { width: 100%; }
+.btn-creer-catalogue {
+  align-self: flex-start;
+  background: var(--primaire);
+  color: var(--sur-primaire);
+  border-color: var(--primaire);
+}
