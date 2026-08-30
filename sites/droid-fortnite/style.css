@@ -1054,6 +1054,45 @@ a { color: var(--primaire); }
 /* Rendement par seconde, à côté du total horaire */
 .total-seconde { color: var(--texte-att); font-size: 0.85em; }
 
+/* ===== Onglet Analyse : classements en barres ===== */
+.bloc-graph {
+  border: 1px solid var(--bordure); border-radius: 14px;
+  background: var(--carte);
+  padding: 0.9rem 1rem 1.1rem;
+  margin-bottom: 1rem;
+}
+.titre-graph { margin: 0 0 0.2rem; font-size: 1rem; font-family: var(--police-titre); }
+.sous-graph { margin: 0 0 0.9rem; font-size: 0.8rem; color: var(--texte-att); }
+
+.graph-barres { display: flex; flex-direction: column; gap: 0.4rem; }
+.barre-rangee {
+  display: grid;
+  grid-template-columns: 1.4rem minmax(6rem, 10rem) 1fr auto;
+  align-items: center; gap: 0.5rem;
+}
+.barre-rang { color: var(--texte-att); font-size: 0.8rem; font-weight: 700; text-align: right; }
+.barre-nom {
+  font-size: 0.82rem; font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.barre-rangee.possede .barre-nom { color: var(--primaire); }
+.barre-check { color: var(--succes); }
+.barre-piste {
+  height: 12px; border-radius: 6px;
+  background: rgba(148, 163, 184, .15);
+  overflow: hidden;
+}
+.barre-remplissage { display: block; height: 100%; border-radius: 6px; transition: width .3s; }
+.barre-valeur {
+  font-size: 0.78rem; font-weight: 700; white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.case-analyse { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.85rem; }
+@media (max-width: 520px) {
+  .barre-rangee { grid-template-columns: 1.2rem minmax(4rem, 6rem) 1fr auto; gap: 0.35rem; }
+  .barre-nom, .barre-valeur { font-size: 0.72rem; }
+}
+
 /* Multiplicateur de revenu appliqué au total, mis en avant. */
 .total-mult {
   display: inline-flex; align-items: center;

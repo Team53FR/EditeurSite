@@ -1036,3 +1036,104 @@ function construireIngredientFusion(ing) {
   }
   return enveloppe;
 }
+
+// ===== Onglet Analyse : aide à l'achat =====
+// Deux classements, au palier choisi : le meilleur rapport rendement/prix
+// (retour par crédit dépensé, donc le meilleur achat) et le rendement brut le
+// plus élevé. Les valeurs viennent de prix.json / rendements du catalogue.
+let palierAnalyse = null;
+
+// Valeur STOCKÉE -> nombre en crédits, ou null si absente / non numérique / en
+// pourcentage (les Iconiques rapportent un % : hors classement par crédits).
+function valeurNumerique(v) {
+  if (v === null || v === undefined || v === "") return null;
+  const s = String(v).trim();
+  if (s.indexOf("%") !== -1) return null;
+  const n = parseFloat(s.replace(",", "."));
+  return isFinite(n) ? n : null;
+}
+
+// Durée de rentabilisation (prix / rendement, en secondes) en texte lisible.
+function formaterDuree(sec) {
+  if (!isFinite(sec) || sec <= 0) return "—";
+  if (sec < 60) return Math.round(sec) + " s";
+  if (sec < 3600) return Math.round(sec / 60) + " min";
+  if (sec < 86400) return (Math.round(sec / 3600 * 10) / 10) + " h";
+  return (Math.round(sec / 86400 * 10) / 10) + " j";
+}
+
+function construireOngletsPalierAnalyse() {
+  const zone = document.getElementById("ongletsPalierAnalyse");
+  if (!zone) return;
+  if (!palierAnalyse || !paliers.some((p) => p.nom === palierAnalyse)) {
+    palierAnalyse = paliers[0] && paliers[0].nom;
+  }
+  zone.innerHTML = "";
+  paliers.forEach((p) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "onglet-palier" + (p.nom === palierAnalyse ? " actif" : "");
+    b.textContent = p.nom;
+    b.addEventListener("click", () => { palierAnalyse = p.nom; afficherAnalyse(); });
+    zone.appendChild(b);
+  });
+}
+
+function afficherAnalyse() {
+  construireOngletsPalierAnalyse();
+
+  const classe = document.getElementById("filtreClasseAnalyse").value;
+  const sansFusion = document.getElementById("analyseSansFusion").checked;
+
+  const lignes = [];
+  catalogue.forEach((d) => {
+    if (classe && d.classe !== classe) return;
+    if (sansFusion && estDroideFusion(d.nom)) return;
+    if (!estDisponibleAuPalier(d, palierAnalyse)) return;
+    const prix = valeurNumerique(valeurPalier(d.prix, palierAnalyse));
+    const rdt = valeurNumerique(valeurPalier(d.rendements, palierAnalyse));
+    if (prix === null || rdt === null || prix <= 0 || rdt <= 0) return;
+    lignes.push({
+      droide: d, prix, rdt,
+      ratio: rdt / prix,       // rendement par crédit dépensé
+      payback: prix / rdt,     // secondes pour se rembourser
+      possede: perso.droidesPossedes.includes(clePossession(d.id, palierAnalyse))
+    });
+  });
+
+  const parRatio = lignes.slice().sort((a, b) => b.ratio - a.ratio).slice(0, 15);
+  const parRdt = lignes.slice().sort((a, b) => b.rdt - a.rdt).slice(0, 15);
+
+  rendreBarres("graphRatio", parRatio, (l) => l.ratio,
+    (l) => "rentable en " + formaterDuree(l.payback));
+  rendreBarres("graphRendement", parRdt, (l) => l.rdt,
+    (l) => formaterCredits(arrondirCredits(l.rdt)) + "/s");
+}
+
+function rendreBarres(idZone, lignes, valeurFn, labelFn) {
+  const zone = document.getElementById(idZone);
+  if (!zone) return;
+  zone.innerHTML = "";
+  if (!lignes.length) {
+    zone.innerHTML = '<p class="sous-titre">Aucune donnée à ce palier — renseigne les prix et rendements des droïdes dans l’admin.</p>';
+    return;
+  }
+  const max = Math.max.apply(null, lignes.map(valeurFn)) || 1;
+  lignes.forEach((l, i) => {
+    const pct = Math.max(4, (valeurFn(l) / max) * 100);
+    const rar = raretes.find((r) => r.nom === l.droide.rarete);
+    const couleur = (rar && rar.texte) || "var(--primaire)";
+    const rangee = document.createElement("div");
+    rangee.className = "barre-rangee" + (l.possede ? " possede" : "");
+    rangee.innerHTML =
+      '<span class="barre-rang">' + (i + 1) + "</span>" +
+      '<span class="barre-nom">' + echapperHTML(l.droide.nom) +
+        (l.possede ? ' <span class="barre-check" title="Possédé">✓</span>' : "") +
+        (estDroideFusion(l.droide.nom) ? ' <span title="Droïde de fusion">\u{1F9EC}</span>' : "") +
+      "</span>" +
+      '<span class="barre-piste"><span class="barre-remplissage" style="width:' + pct +
+        "%;background:" + couleur + '"></span></span>' +
+      '<span class="barre-valeur">' + echapperHTML(labelFn(l)) + "</span>";
+    zone.appendChild(rangee);
+  });
+}
