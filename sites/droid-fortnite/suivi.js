@@ -90,6 +90,7 @@ async function chargerTout() {
 
   // Même ordre que le panneau admin : rangé par rareté (faible -> fort).
   catalogue = trierCatalogueParRarete(catalogue);
+  majFiltresActifs();  // reflète l'état par défaut des filtres (fusions masquées)
   construireOngletsPalier();
   document.getElementById("chargement").style.display = "none";
   document.getElementById("zoneDroidex").style.display = "";
@@ -258,7 +259,8 @@ function combinaisonsDroidex() {
 
 // ----- Filtres compacts (icônes toggle) -----
 // Chaque filtre est mono-choix : recliquer l'icône active la désactive (= tous).
-let filtresDroidex = { classe: "", rarete: "", possede: "", fusion: "" };
+// Exception : la fusion est MASQUÉE par défaut ; le bouton 🧬 (actif) l'affiche.
+let filtresDroidex = { classe: "", rarete: "", possede: "", fusion: "masquer" };
 
 function basculerFiltre(type, valeur) {
   filtresDroidex[type] = (filtresDroidex[type] === valeur) ? "" : valeur;
@@ -274,8 +276,14 @@ function majFiltresActifs() {
   marquer("#filtreClasseChips .chip-icone", "classe", "classe");
   marquer("#filtreRareteChips .chip-icone", "rarete", "rarete");
   marquer("#filtrePossedeChips .chip-icone", "possede", "possede");
+  // Fusion : le bouton est ACTIF quand il AFFICHE les fusions (masquées par défaut).
   const fus = document.querySelector(".chip-fusion");
-  if (fus) fus.classList.toggle("actif", filtresDroidex.fusion === "masquer");
+  if (fus) {
+    const affiche = filtresDroidex.fusion !== "masquer";
+    fus.classList.toggle("actif", affiche);
+    fus.title = affiche ? "Masquer les droïdes de fusion" : "Afficher les droïdes de fusion";
+    fus.setAttribute("aria-pressed", affiche ? "true" : "false");
+  }
 }
 
 // Une pastille par rareté, teintée de sa couleur, avec son initiale.
