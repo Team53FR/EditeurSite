@@ -33,6 +33,7 @@
       <button type="button" class="onglet-type" data-type="rendement" onclick="changerOnglet('rendement')">⚡ Rendement</button>
       <button type="button" class="onglet-type" data-type="renaissance" onclick="changerOnglet('renaissance')">🚀 Renaissance</button>
       <button type="button" class="onglet-type" data-type="fusion" onclick="changerOnglet('fusion')">🧬 Fusion</button>
+      <button type="button" class="onglet-type" data-type="analyse" onclick="changerOnglet('analyse')">📊 Analyse</button>
     </div>
 
     <div id="zoneDroidexFiltres">
@@ -80,6 +81,14 @@
 
     <div id="zoneRendement" style="display:none">
       <p class="note-source">Place tes droïdes dans les emplacements de ton escouade pour connaître le rendement total. Ajoute des emplacements à mesure que tu en débloques dans le jeu.</p>
+      <div class="ligne-multiplicateur">
+        <label for="champMultiplicateur">Multiplicateur de revenu</label>
+        <div class="champ-multiplicateur">
+          <span class="signe-mult">×</span>
+          <input type="text" id="champMultiplicateur" inputmode="decimal" value="1" oninput="changerMultiplicateur()" aria-label="Multiplicateur de revenu">
+        </div>
+        <span class="aide-mult">Boost global du jeu, appliqué au rendement total.</span>
+      </div>
       <div class="compteur-global" id="compteurRendement"></div>
       <div id="sectionsRendement"></div>
     </div>
@@ -102,6 +111,35 @@
         <div class="pastille-lg">🧬</div>
         <h2>Aucune recette de fusion</h2>
         <p>Un administrateur peut en ajouter depuis le panneau de gestion.</p>
+      </div>
+    </div>
+
+    <div id="zoneAnalyse" style="display:none">
+      <p class="note-source">Compare les droïdes pour choisir tes achats. Le rapport rendement/prix montre le meilleur retour par crédit dépensé ; le rendement brut, la puissance absolue. Les valeurs viennent des prix et rendements saisis dans l'admin, au palier choisi. Les Iconiques (bonus en %) ne figurent pas dans ces classements par crédits.</p>
+      <div class="onglets-palier" id="ongletsPalierAnalyse" role="tablist"></div>
+      <div class="filtres">
+        <select id="filtreClasseAnalyse" onchange="afficherAnalyse()">
+          <option value="">Toutes les classes</option>
+          <option value="Ouvrier">🔧 Ouvrier</option>
+          <option value="Astromec">📡 Astromec</option>
+          <option value="Combat">⚔️ Combat</option>
+        </select>
+        <label class="ligne-case case-analyse">
+          <input type="checkbox" id="analyseSansFusion" onchange="afficherAnalyse()">
+          🧬 Cacher les fusions
+        </label>
+      </div>
+
+      <div class="bloc-graph">
+        <h3 class="titre-graph">💹 Meilleur rapport rendement / prix</h3>
+        <p class="sous-graph">Barre plus longue = plus de rendement par crédit dépensé (meilleur achat). L'étiquette indique en combien de temps le droïde se rembourse.</p>
+        <div class="graph-barres" id="graphRatio"></div>
+      </div>
+
+      <div class="bloc-graph">
+        <h3 class="titre-graph">⚡ Meilleur rendement brut (par seconde)</h3>
+        <p class="sous-graph">Les droïdes qui rapportent le plus par seconde, quel que soit leur prix.</p>
+        <div class="graph-barres" id="graphRendement"></div>
       </div>
     </div>
   </main>

@@ -41,8 +41,10 @@ function changerOnglet(type) {
   document.getElementById("zoneRendement").style.display = type === "rendement" ? "" : "none";
   document.getElementById("zoneRenaissance").style.display = type === "renaissance" ? "" : "none";
   document.getElementById("zoneFusion").style.display = type === "fusion" ? "" : "none";
+  document.getElementById("zoneAnalyse").style.display = type === "analyse" ? "" : "none";
   if (type === "rendement") afficherRendement();
   if (type === "fusion") afficherFusion();
+  if (type === "analyse") afficherAnalyse();
   // Le recadrage attend l'ouverture de l'onglet : tant qu'il est masqué, ses
   // paliers n'ont pas de position à l'écran.
   if (type === "renaissance") recadrerSurPalierCourant();
@@ -412,13 +414,45 @@ function texteParHeure(creditsParSeconde) {
   return formaterCredits(arrondirCredits(creditsParSeconde * SECONDES_PAR_HEURE)) + "/h";
 }
 
-// Total global : le pourcentage des Iconiques est APPLIQUÉ, et le détail du
-// calcul reste affiché — sans quoi on ne saurait pas d'où sort le chiffre.
-function texteTotal(t) {
+// ----- Multiplicateur de revenu -----
+// Un boost global du jeu (ex. ×60,5) qui s'applique au rendement TOTAL. Il est
+// personnel (stocké dans perso.rendement.multiplicateur, sauvegardé comme le
+// reste de la progression) et n'affecte que le total affiché, pas les cartes.
+function multiplicateurRendement() {
+  const r = escouade();
+  const m = Number(r.multiplicateur);
+  return (isFinite(m) && m > 0) ? m : 1;
+}
+
+function formaterMultiplicateur(m) {
+  // 60.5 -> « 60,5 », 60 -> « 60 » (pas de décimale inutile).
+  return (Math.round(m * 100) / 100).toString().replace(".", ",");
+}
+
+function changerMultiplicateur() {
+  const champ = document.getElementById("champMultiplicateur");
+  if (!champ) return;
+  const r = escouade();
+  const brut = String(champ.value || "").trim().replace(",", ".").replace(/[^\d.]/g, "");
+  const m = parseFloat(brut);
+  r.multiplicateur = (isFinite(m) && m > 0) ? m : 1;
+  majTotalRendement();               // le total seul se met à jour (pas les cartes)
+  marquerProgressionModifiee();
+}
+
+// Total global : le pourcentage des Iconiques est APPLIQUÉ, puis le
+// multiplicateur de revenu. Le détail du calcul reste affiché — sans quoi on
+// ne saurait pas d'où sort le chiffre.
+function texteTotal(t, mult) {
+  mult = (typeof mult === "number" && isFinite(mult) && mult > 0) ? mult : 1;
+  const effectifFinal = t.effectif * mult;
   const morceaux = [];
-  morceaux.push("<b>" + texteParHeure(t.effectif) + "</b>");
+  morceaux.push("<b>" + texteParHeure(effectifFinal) + "</b>");
   morceaux.push('<span class="total-seconde">' +
-    formaterCredits(arrondirCredits(t.effectif)) + "/s</span>");
+    formaterCredits(arrondirCredits(effectifFinal)) + "/s</span>");
+  if (mult !== 1) {
+    morceaux.push('<span class="total-mult">×' + formaterMultiplicateur(mult) + "</span>");
+  }
   if (t.pourcentage) {
     morceaux.push('<span class="total-detail">' + formaterCredits(arrondirCredits(t.credits)) +
       "/s + " + (Math.round(t.pourcentage * 100) / 100) + " %</span>");
@@ -498,13 +532,28 @@ function afficherRendement() {
     zone.appendChild(section);
   });
 
+  // Reporter la valeur enregistrée dans le champ (sans écraser une saisie en cours).
+  const champM = document.getElementById("champMultiplicateur");
+  if (champM && document.activeElement !== champM) {
+    champM.value = formaterMultiplicateur(multiplicateurRendement());
+  }
+
+  majTotalRendement();
+}
+
+// Met à jour le seul encart « Rendement total » (utilisé aussi quand on change
+// le multiplicateur, pour ne pas reconstruire toutes les cartes à chaque frappe).
+function majTotalRendement() {
+  const r = escouade();
   const global = totalEscouade(
     CLASSES_ESCOUADE.flatMap((c) => r.places[c]).filter(Boolean)
   );
   const nbPlaces = CLASSES_ESCOUADE.reduce((n, c) => n + r.places[c].filter(Boolean).length, 0);
   const nbSlots = CLASSES_ESCOUADE.reduce((n, c) => n + r.slots[c], 0);
-  document.getElementById("compteurRendement").innerHTML =
-    "Rendement total : " + texteTotal(global) +
+  const el = document.getElementById("compteurRendement");
+  if (!el) return;
+  el.innerHTML =
+    "Rendement total : " + texteTotal(global, multiplicateurRendement()) +
     '<span class="compteur-detail">' + nbPlaces + " / " + nbSlots + " emplacements occupés</span>";
 }
 

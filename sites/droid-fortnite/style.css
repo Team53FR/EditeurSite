@@ -1054,6 +1054,37 @@ a { color: var(--primaire); }
 /* Rendement par seconde, à côté du total horaire */
 .total-seconde { color: var(--texte-att); font-size: 0.85em; }
 
+/* Multiplicateur de revenu appliqué au total, mis en avant. */
+.total-mult {
+  display: inline-flex; align-items: center;
+  padding: 0.05rem 0.4rem; border-radius: 999px;
+  background: var(--primaire); color: var(--sur-primaire);
+  font-weight: 800; font-size: 0.9em;
+  box-shadow: 0 0 8px -1px var(--primaire);
+}
+
+/* Champ de saisie du multiplicateur, au-dessus du rendement total. */
+.ligne-multiplicateur {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem 0.8rem;
+  margin: 0 0 0.7rem;
+}
+.ligne-multiplicateur > label {
+  font-size: 0.8rem; font-weight: 600; color: var(--texte);
+}
+.champ-multiplicateur {
+  display: inline-flex; align-items: center; gap: 0.15rem;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--bordure); border-radius: 10px;
+  background: var(--carte);
+}
+.champ-multiplicateur .signe-mult { color: var(--primaire); font-weight: 800; font-size: 1.05rem; }
+.champ-multiplicateur input {
+  width: 5.5rem; border: none; background: transparent; color: var(--texte);
+  font-size: 1rem; font-weight: 700; padding: 0.1rem 0.1rem;
+}
+.champ-multiplicateur input:focus { outline: none; }
+.aide-mult { font-size: 0.75rem; color: var(--texte-att); }
+
 /* ===== Panneau admin sur mobile =====
    Les grilles à colonnes sont pensées pour un écran large. En dessous de
    620 px, la colonne de saisie tombait à une vingtaine de pixels — un champ
