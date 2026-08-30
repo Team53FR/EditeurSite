@@ -260,6 +260,7 @@ function afficherDroidex() {
   const filtreClasse = document.getElementById("filtreClasse").value;
   const filtreRarete = document.getElementById("filtreRarete").value;
   const filtrePossede = document.getElementById("filtrePossede").value;
+  const filtreFusion = document.getElementById("filtreFusion").value;
 
   const disponibles = combinaisonsDroidex();
 
@@ -268,6 +269,9 @@ function afficherDroidex() {
     if (recherche && !d.nom.toLowerCase().includes(recherche)) return false;
     if (filtreClasse && d.classe !== filtreClasse) return false;
     if (filtreRarete && d.rarete !== filtreRarete) return false;
+    const fusion = estDroideFusion(d.nom);
+    if (filtreFusion === "masquer" && fusion) return false;
+    if (filtreFusion === "seulement" && !fusion) return false;
     const possede = perso.droidesPossedes.includes(clePossession(d.id, c.palier));
     if (filtrePossede === "oui" && !possede) return false;
     if (filtrePossede === "non" && possede) return false;

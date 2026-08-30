@@ -698,6 +698,16 @@ function construireCarteDroide(d, options) {
       ligneChiffresHtml(d, o.palier) +
     `</div>`;
 
+  // Repère « droïde de fusion » : petit médaillon distinct, pour reconnaître
+  // d'un coup d'œil les droïdes obtenus en combinant trois autres.
+  if (estDroideFusion(d.nom)) {
+    const marque = document.createElement("span");
+    marque.className = "dx-fusion";
+    marque.textContent = "\u{1F9EC}"; // 🧬
+    marque.title = "Droïde de fusion";
+    carte.appendChild(marque);
+  }
+
   appliquerVisuelDroide(carte.querySelector(".dx-visuel"), d, o.palier);
   return carte;
 }
@@ -1197,6 +1207,16 @@ function rareteResultatFusion(f) {
   const d = droideResultatFusion(f);
   if (d) return d.rarete;
   return (f && f.rarete) || "";
+}
+
+// Un droïde du catalogue est-il le RÉSULTAT d'une fusion ? Sert à l'étiqueter
+// et à le filtrer dans le Droidex. S'appuie sur la liste des fusions chargée
+// par la page ; tolère son absence (pages qui ne la chargent pas).
+function estDroideFusion(nom) {
+  const liste = (typeof fusions !== "undefined" && Array.isArray(fusions)) ? fusions : [];
+  const cible = String(nom || "").trim().toLowerCase();
+  if (!cible) return false;
+  return liste.some((f) => nomResultatFusion(f).toLowerCase() === cible);
 }
 
 function normaliserIngredients(ingredients) {

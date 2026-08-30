@@ -365,6 +365,18 @@ a { color: var(--primaire); }
 .dx-action { color: #94a3b8; cursor: pointer; padding: 0; font-size: 0.55rem; }
 .dx-action:hover { color: #fff; background: var(--danger); border-color: var(--danger); }
 
+/* Repère « droïde de fusion » : sous le nom, à gauche, teinte violette
+   distincte des raretés pour se reconnaître d'un coup d'œil. */
+.dx-fusion {
+  position: absolute; top: 20px; left: 3px; z-index: 3;
+  display: flex; align-items: center; justify-content: center;
+  height: 15px; padding: 0 3px; border-radius: 3px;
+  background: rgba(168, 85, 247, .9);
+  font-size: 0.58rem; line-height: 1;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, .18);
+}
+.carte-droide:not(.possede) .dx-fusion { opacity: .7; }
+
 /* Zone du visuel : occupe toute la carte, le pied se pose par-dessus */
 .dx-visuel {
   position: absolute; inset: 0;
