@@ -365,17 +365,23 @@ a { color: var(--primaire); }
 .dx-action { color: #94a3b8; cursor: pointer; padding: 0; font-size: 0.55rem; }
 .dx-action:hover { color: #fff; background: var(--danger); border-color: var(--danger); }
 
-/* Repère « droïde de fusion » : sous le nom, à gauche, teinte violette
-   distincte des raretés pour se reconnaître d'un coup d'œil. */
+/* Repère « droïde de fusion » : sous le nom, à gauche. Violet vif plein,
+   texte + halo pour se repérer immédiatement, même quand le droïde n'est pas
+   possédé (contrairement au reste de la carte, il ne s'estompe pas). */
 .dx-fusion {
-  position: absolute; top: 20px; left: 3px; z-index: 3;
-  display: flex; align-items: center; justify-content: center;
-  height: 15px; padding: 0 3px; border-radius: 3px;
-  background: rgba(168, 85, 247, .9);
-  font-size: 0.58rem; line-height: 1;
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, .18);
+  position: absolute; top: 21px; left: 3px; z-index: 4;
+  display: flex; align-items: center; gap: 3px;
+  height: 18px; padding: 0 5px; border-radius: 4px;
+  background: #a855f7;
+  color: #fff;
+  font-weight: 800; line-height: 1; letter-spacing: 0.03em;
+  border: 1px solid rgba(255, 255, 255, .55);
+  box-shadow: 0 0 9px rgba(168, 85, 247, .95), 0 1px 3px rgba(0, 0, 0, .55);
 }
-.carte-droide:not(.possede) .dx-fusion { opacity: .7; }
+.dx-fusion-ico { font-size: 0.72rem; }
+.dx-fusion-txt { font-size: 0.56rem; }
+/* Reste pleinement visible même sur une carte non possédée. */
+.carte-droide:not(.possede) .dx-fusion { opacity: 1; }
 
 /* Zone du visuel : occupe toute la carte, le pied se pose par-dessus */
 .dx-visuel {

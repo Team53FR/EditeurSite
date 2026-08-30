@@ -703,7 +703,7 @@ function construireCarteDroide(d, options) {
   if (estDroideFusion(d.nom)) {
     const marque = document.createElement("span");
     marque.className = "dx-fusion";
-    marque.textContent = "\u{1F9EC}"; // 🧬
+    marque.innerHTML = '<span class="dx-fusion-ico">\u{1F9EC}</span><span class="dx-fusion-txt">FUSION</span>';
     marque.title = "Droïde de fusion";
     carte.appendChild(marque);
   }
