@@ -1108,14 +1108,6 @@ function valeurNumerique(v) {
   return isFinite(n) ? n : null;
 }
 
-// Durée de rentabilisation (prix / rendement, en secondes) en texte lisible.
-function formaterDuree(sec) {
-  if (!isFinite(sec) || sec <= 0) return "—";
-  if (sec < 60) return Math.round(sec) + " s";
-  if (sec < 3600) return Math.round(sec / 60) + " min";
-  if (sec < 86400) return (Math.round(sec / 3600 * 10) / 10) + " h";
-  return (Math.round(sec / 86400 * 10) / 10) + " j";
-}
 
 function construireOngletsPalierAnalyse() {
   const zone = document.getElementById("ongletsPalierAnalyse");
@@ -1189,8 +1181,6 @@ function afficherAnalyse() {
       if (prix === null || rdt === null || prix <= 0 || rdt <= 0) return;
       lignes.push({
         droide: d, palier: pnom, prix, rdt,
-        ratio: rdt / prix,       // rendement par crédit dépensé
-        payback: prix / rdt,     // secondes pour se rembourser
         possede: perso.droidesPossedes.includes(clePossession(d.id, pnom))
       });
     });
@@ -1198,11 +1188,8 @@ function afficherAnalyse() {
 
   if (budget > 0 && budgetSeul) lignes = lignes.filter((l) => l.prix <= budget);
 
-  const parRatio = trierAnalyse(lignes, budget, (l) => l.ratio).slice(0, 15);
-  const parRdt = trierAnalyse(lignes, budget, (l) => l.rdt).slice(0, 15);
+  const parRdt = trierAnalyse(lignes, budget, (l) => l.rdt).slice(0, 20);
 
-  rendreBarres("graphRatio", parRatio, (l) => l.ratio,
-    (l) => "rentable en " + formaterDuree(l.payback), tousPaliers, budget);
   rendreBarres("graphRendement", parRdt, (l) => l.rdt,
     (l) => formaterCredits(arrondirCredits(l.rdt)) + "/s", tousPaliers, budget);
 }
