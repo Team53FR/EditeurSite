@@ -79,10 +79,9 @@ async function chargerTout() {
     unites = unitesChargees.length ? unitesChargees : UNITES_INITIALES;
     raretes = normaliserRaretes(rRaretes.contenu);
     appliquerCouleursRaretes();
-    // Les deux listes déroulantes suivent la liste des raretés, qui peut
+    // Les pastilles de rareté du filtre suivent la liste des raretés, qui peut
     // s'allonger depuis le panneau admin.
-    remplirSelectRaretes(document.getElementById("filtreRarete"), "", "Toutes les raretés");
-    remplirSelectRaretes(document.getElementById("champDroideRarete"), raretes[0] && raretes[0].nom);
+    construireFiltreRareteChips();
   } catch (e) {
     document.getElementById("chargement").innerHTML =
       `<p style="color:var(--danger);text-align:center">${echapperHTML(e.message)}</p>`;
@@ -257,12 +256,57 @@ function combinaisonsDroidex() {
   return combos;
 }
 
+// ----- Filtres compacts (icônes toggle) -----
+// Chaque filtre est mono-choix : recliquer l'icône active la désactive (= tous).
+let filtresDroidex = { classe: "", rarete: "", possede: "", fusion: "" };
+
+function basculerFiltre(type, valeur) {
+  filtresDroidex[type] = (filtresDroidex[type] === valeur) ? "" : valeur;
+  majFiltresActifs();
+  afficherDroidex();
+}
+
+function majFiltresActifs() {
+  const marquer = (sel, cle, attr) => {
+    document.querySelectorAll(sel).forEach((b) =>
+      b.classList.toggle("actif", b.dataset[attr] === filtresDroidex[cle] && filtresDroidex[cle] !== ""));
+  };
+  marquer("#filtreClasseChips .chip-icone", "classe", "classe");
+  marquer("#filtreRareteChips .chip-icone", "rarete", "rarete");
+  marquer("#filtrePossedeChips .chip-icone", "possede", "possede");
+  const fus = document.querySelector(".chip-fusion");
+  if (fus) fus.classList.toggle("actif", filtresDroidex.fusion === "masquer");
+}
+
+// Une pastille par rareté, teintée de sa couleur, avec son initiale.
+function construireFiltreRareteChips() {
+  const zone = document.getElementById("filtreRareteChips");
+  if (!zone) return;
+  zone.innerHTML = "";
+  // Une rareté filtrée qui n'existe plus est réinitialisée.
+  if (filtresDroidex.rarete && !raretes.some((r) => r.nom === filtresDroidex.rarete)) {
+    filtresDroidex.rarete = "";
+  }
+  raretes.forEach((r) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "chip-icone chip-rarete" + (filtresDroidex.rarete === r.nom ? " actif" : "");
+    b.dataset.rarete = r.nom;
+    b.title = r.nom;
+    b.textContent = r.nom.charAt(0).toUpperCase();
+    b.style.setProperty("--teinte-rarete", r.fond);
+    b.style.setProperty("--teinte-rarete-texte", r.texte);
+    b.onclick = () => basculerFiltre("rarete", r.nom);
+    zone.appendChild(b);
+  });
+}
+
 function afficherDroidex() {
   const recherche = (document.getElementById("champRecherche").value || "").trim().toLowerCase();
-  const filtreClasse = document.getElementById("filtreClasse").value;
-  const filtreRarete = document.getElementById("filtreRarete").value;
-  const filtrePossede = document.getElementById("filtrePossede").value;
-  const filtreFusion = document.getElementById("filtreFusion").value;
+  const filtreClasse = filtresDroidex.classe;
+  const filtreRarete = filtresDroidex.rarete;
+  const filtrePossede = filtresDroidex.possede;
+  const filtreFusion = filtresDroidex.fusion;
 
   const disponibles = combinaisonsDroidex();
 

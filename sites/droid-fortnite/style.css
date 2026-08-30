@@ -266,6 +266,60 @@ a { color: var(--primaire); }
   font-size: 0.84rem;
 }
 
+/* ===== Filtres compacts du Droidex : icônes toggle sur une ligne ===== */
+.filtres-compacts {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem;
+  margin-top: 0.6rem;
+}
+.groupe-filtre { display: inline-flex; gap: 0.25rem; }
+.sep-filtre { align-self: stretch; width: 1px; background: var(--bordure); margin: 2px 0.2rem; }
+
+.chip-icone {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 34px; height: 34px; padding: 0 0.4rem;
+  border: 1px solid var(--bordure); border-radius: 9px;
+  background: var(--carte); color: var(--texte);
+  font-size: 0.95rem; line-height: 1; cursor: pointer;
+  transition: border-color .12s, background .12s, box-shadow .12s, opacity .12s;
+}
+.chip-icone:hover { border-color: var(--primaire); }
+.chip-icone.actif {
+  border-color: var(--primaire);
+  background: color-mix(in srgb, var(--primaire) 22%, var(--carte));
+  box-shadow: 0 0 0 1px var(--primaire) inset;
+}
+.chip-possede.actif {
+  border-color: var(--succes); color: var(--succes);
+  background: color-mix(in srgb, var(--succes) 22%, var(--carte));
+  box-shadow: 0 0 0 1px var(--succes) inset;
+}
+.chip-manquant.actif {
+  border-color: var(--danger); color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 20%, var(--carte));
+  box-shadow: 0 0 0 1px var(--danger) inset;
+}
+.chip-fusion.actif {
+  border-color: #a855f7;
+  background: color-mix(in srgb, #a855f7 25%, var(--carte));
+  box-shadow: 0 0 0 1px #a855f7 inset;
+}
+
+/* Pastilles de rareté : ronde teintée de la rareté, avec son initiale. */
+.chip-rarete {
+  min-width: 28px; width: 28px; height: 28px; padding: 0;
+  border-radius: 50%;
+  font-size: 0.72rem; font-weight: 800;
+  background: var(--teinte-rarete, var(--carte));
+  color: var(--teinte-rarete-texte, var(--texte));
+  border: 1px solid rgba(255, 255, 255, .18);
+  opacity: .55;
+}
+.chip-rarete:hover { opacity: 1; border-color: rgba(255, 255, 255, .4); }
+.chip-rarete.actif {
+  opacity: 1; border: 2px solid #fff;
+  box-shadow: 0 0 7px -1px var(--teinte-rarete-texte, #fff);
+}
+
 /* ===== Contenu ===== */
 .contenu {
   padding: 1rem 1rem calc(6rem + var(--safe-bottom));

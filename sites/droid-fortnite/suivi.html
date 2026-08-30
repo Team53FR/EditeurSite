@@ -42,26 +42,21 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         <input type="text" id="champRecherche" placeholder="Rechercher un droïde..." oninput="afficherDroidex()">
       </div>
-      <div class="filtres">
-        <select id="filtreClasse" onchange="afficherDroidex()">
-          <option value="">Toutes les classes</option>
-          <option value="Ouvrier">🔧 Ouvrier</option>
-          <option value="Astromec">📡 Astromec</option>
-          <option value="Combat">⚔️ Combat</option>
-        </select>
-        <select id="filtreRarete" onchange="afficherDroidex()">
-          <option value="">Toutes les raretés</option>
-        </select>
-        <select id="filtrePossede" onchange="afficherDroidex()">
-          <option value="">Tous</option>
-          <option value="oui">Possédés</option>
-          <option value="non">Non possédés</option>
-        </select>
-        <select id="filtreFusion" onchange="afficherDroidex()">
-          <option value="">Fusion : tous</option>
-          <option value="masquer">🧬 Cacher les fusions</option>
-          <option value="seulement">🧬 Fusions seulement</option>
-        </select>
+      <div class="filtres-compacts" role="toolbar" aria-label="Filtres">
+        <div class="groupe-filtre" id="filtreClasseChips" aria-label="Classe">
+          <button type="button" class="chip-icone" data-classe="Ouvrier"  onclick="basculerFiltre('classe','Ouvrier')"  title="Ouvrier">🔧</button>
+          <button type="button" class="chip-icone" data-classe="Astromec" onclick="basculerFiltre('classe','Astromec')" title="Astromec">📡</button>
+          <button type="button" class="chip-icone" data-classe="Combat"   onclick="basculerFiltre('classe','Combat')"   title="Combat">⚔️</button>
+        </div>
+        <span class="sep-filtre"></span>
+        <div class="groupe-filtre" id="filtreRareteChips" aria-label="Rareté"></div>
+        <span class="sep-filtre"></span>
+        <div class="groupe-filtre" id="filtrePossedeChips" aria-label="Possession">
+          <button type="button" class="chip-icone chip-possede" data-possede="oui" onclick="basculerFiltre('possede','oui')" title="Possédés">✓</button>
+          <button type="button" class="chip-icone chip-manquant" data-possede="non" onclick="basculerFiltre('possede','non')" title="Manquants">✗</button>
+        </div>
+        <span class="sep-filtre"></span>
+        <button type="button" class="chip-icone chip-fusion" data-fusion="masquer" onclick="basculerFiltre('fusion','masquer')" title="Cacher les droïdes de fusion">🧬</button>
       </div>
     </div>
   </header>
