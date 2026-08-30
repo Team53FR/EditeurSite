@@ -82,6 +82,9 @@ async function chargerTout() {
     // Les pastilles de rareté du filtre suivent la liste des raretés, qui peut
     // s'allonger depuis le panneau admin.
     construireFiltreRareteChips();
+    // Le menu d'unités du budget (onglet Analyse) suit la liste des unités.
+    const selUnite = document.getElementById("uniteBudget");
+    if (selUnite) selUnite.innerHTML = optionsUniteBudget();
   } catch (e) {
     document.getElementById("chargement").innerHTML =
       `<p style="color:var(--danger);text-align:center">${echapperHTML(e.message)}</p>`;
@@ -1134,19 +1137,23 @@ function construireOngletsPalierAnalyse() {
   paliers.forEach((p) => ajouter(p.nom, p.nom));
 }
 
-// Somme d'argent saisie -> nombre de crédits. Accepte une unité collée ou
-// séparée (« 60 B », « 60B », « 1,5 T »), sur la base des unités connues.
-function parseBudget(txt) {
-  const s = String(txt || "").trim().replace(",", ".");
-  if (!s) return 0;
-  const m = s.match(/^([\d.]+)\s*([a-zA-Z]*)$/);
-  if (!m) return 0;
-  const n = parseFloat(m[1]);
-  if (!isFinite(n) || n < 0) return 0;
-  const sym = m[2].toUpperCase();
-  if (!sym) return n;
-  const u = unites.find((x) => String(x.symbole).toUpperCase() === sym);
-  return u ? n * u.facteur : n;
+// Options du menu d'unités du budget (sur mobile, le clavier décimal n'a pas
+// de lettres : on choisit K/M/B/T… dans une liste plutôt qu'en tapant).
+function optionsUniteBudget() {
+  let html = '<option value="">—</option>';
+  unites.forEach((u) => {
+    html += '<option value="' + echapperHTML(u.symbole) + '">' + echapperHTML(u.symbole) + "</option>";
+  });
+  return html;
+}
+
+// Somme d'argent saisie (nombre + unité choisie) -> nombre de crédits.
+function budgetAnalyse() {
+  const champ = document.getElementById("champBudget");
+  const sel = document.getElementById("uniteBudget");
+  if (!champ) return 0;
+  const v = composerValeur(champ.value, sel ? sel.value : "");
+  return (typeof v === "number" && isFinite(v) && v > 0) ? v : 0;
 }
 
 // Tri : à budget donné, les droïdes ABORDABLES passent devant, puis on trie
@@ -1166,7 +1173,7 @@ function afficherAnalyse() {
 
   const classe = document.getElementById("filtreClasseAnalyse").value;
   const sansFusion = document.getElementById("analyseSansFusion").checked;
-  const budget = parseBudget(document.getElementById("champBudget").value);
+  const budget = budgetAnalyse();
   const budgetSeul = document.getElementById("analyseBudget").checked;
   const tousPaliers = palierAnalyse === TOUS_PALIERS;
   const nomsPaliers = tousPaliers ? paliers.map((p) => p.nom) : [palierAnalyse];

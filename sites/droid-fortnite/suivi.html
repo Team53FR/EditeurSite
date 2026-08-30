@@ -114,8 +114,9 @@
       <div class="onglets-palier" id="ongletsPalierAnalyse" role="tablist"></div>
       <div class="ligne-multiplicateur">
         <label for="champBudget">Argent disponible</label>
-        <div class="champ-multiplicateur">
-          <input type="text" id="champBudget" inputmode="decimal" placeholder="ex. 60 B" oninput="afficherAnalyse()" aria-label="Argent disponible">
+        <div class="champ-multiplicateur champ-budget">
+          <input type="text" id="champBudget" inputmode="decimal" placeholder="ex. 60" oninput="afficherAnalyse()" aria-label="Argent disponible">
+          <select id="uniteBudget" onchange="afficherAnalyse()" aria-label="Unité"></select>
         </div>
         <label class="ligne-case case-analyse">
           <input type="checkbox" id="analyseBudget" onchange="afficherAnalyse()">

@@ -1185,6 +1185,17 @@ a { color: var(--primaire); }
 .champ-multiplicateur input:focus { outline: none; }
 .aide-mult { font-size: 0.75rem; color: var(--texte-att); }
 
+/* Champ budget = nombre + menu d'unités (K/M/B/T) accolé. */
+.champ-budget input { width: 4.2rem; }
+.champ-budget select {
+  border: none; background: transparent; color: var(--texte);
+  font-size: 0.95rem; font-weight: 700; cursor: pointer;
+  padding: 0.1rem 0.15rem;
+  margin-left: 0.2rem; padding-left: 0.4rem;
+  border-left: 1px solid var(--bordure);
+}
+.champ-budget select:focus { outline: none; }
+
 /* ===== Panneau admin sur mobile =====
    Les grilles à colonnes sont pensées pour un écran large. En dessous de
    620 px, la colonne de saisie tombait à une vingtaine de pixels — un champ
