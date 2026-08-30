@@ -1117,17 +1117,47 @@ function formaterDuree(sec) {
 function construireOngletsPalierAnalyse() {
   const zone = document.getElementById("ongletsPalierAnalyse");
   if (!zone) return;
-  if (!palierAnalyse || !paliers.some((p) => p.nom === palierAnalyse)) {
-    palierAnalyse = paliers[0] && paliers[0].nom;
+  if (!palierAnalyse ||
+      (palierAnalyse !== TOUS_PALIERS && !paliers.some((p) => p.nom === palierAnalyse))) {
+    palierAnalyse = TOUS_PALIERS;   // par défaut, tous les paliers confondus
   }
   zone.innerHTML = "";
-  paliers.forEach((p) => {
+  const ajouter = (valeur, libelle) => {
     const b = document.createElement("button");
     b.type = "button";
-    b.className = "onglet-palier" + (p.nom === palierAnalyse ? " actif" : "");
-    b.textContent = p.nom;
-    b.addEventListener("click", () => { palierAnalyse = p.nom; afficherAnalyse(); });
+    b.className = "onglet-palier" + (valeur === palierAnalyse ? " actif" : "");
+    b.textContent = libelle;
+    b.addEventListener("click", () => { palierAnalyse = valeur; afficherAnalyse(); });
     zone.appendChild(b);
+  };
+  ajouter(TOUS_PALIERS, "Tous");
+  paliers.forEach((p) => ajouter(p.nom, p.nom));
+}
+
+// Somme d'argent saisie -> nombre de crédits. Accepte une unité collée ou
+// séparée (« 60 B », « 60B », « 1,5 T »), sur la base des unités connues.
+function parseBudget(txt) {
+  const s = String(txt || "").trim().replace(",", ".");
+  if (!s) return 0;
+  const m = s.match(/^([\d.]+)\s*([a-zA-Z]*)$/);
+  if (!m) return 0;
+  const n = parseFloat(m[1]);
+  if (!isFinite(n) || n < 0) return 0;
+  const sym = m[2].toUpperCase();
+  if (!sym) return n;
+  const u = unites.find((x) => String(x.symbole).toUpperCase() === sym);
+  return u ? n * u.facteur : n;
+}
+
+// Tri : à budget donné, les droïdes ABORDABLES passent devant, puis on trie
+// chaque groupe par la métrique (rapport ou rendement).
+function trierAnalyse(lignes, budget, metrique) {
+  return lignes.slice().sort((a, b) => {
+    if (budget > 0) {
+      const aa = a.prix <= budget, ba = b.prix <= budget;
+      if (aa !== ba) return aa ? -1 : 1;
+    }
+    return metrique(b) - metrique(a);
   });
 }
 
@@ -1136,38 +1166,46 @@ function afficherAnalyse() {
 
   const classe = document.getElementById("filtreClasseAnalyse").value;
   const sansFusion = document.getElementById("analyseSansFusion").checked;
+  const budget = parseBudget(document.getElementById("champBudget").value);
+  const budgetSeul = document.getElementById("analyseBudget").checked;
+  const tousPaliers = palierAnalyse === TOUS_PALIERS;
+  const nomsPaliers = tousPaliers ? paliers.map((p) => p.nom) : [palierAnalyse];
 
-  const lignes = [];
+  let lignes = [];
   catalogue.forEach((d) => {
     if (classe && d.classe !== classe) return;
     if (sansFusion && estDroideFusion(d.nom)) return;
-    if (!estDisponibleAuPalier(d, palierAnalyse)) return;
-    const prix = valeurNumerique(valeurPalier(d.prix, palierAnalyse));
-    const rdt = valeurNumerique(valeurPalier(d.rendements, palierAnalyse));
-    if (prix === null || rdt === null || prix <= 0 || rdt <= 0) return;
-    lignes.push({
-      droide: d, prix, rdt,
-      ratio: rdt / prix,       // rendement par crédit dépensé
-      payback: prix / rdt,     // secondes pour se rembourser
-      possede: perso.droidesPossedes.includes(clePossession(d.id, palierAnalyse))
+    nomsPaliers.forEach((pnom) => {
+      if (!estDisponibleAuPalier(d, pnom)) return;
+      const prix = valeurNumerique(valeurPalier(d.prix, pnom));
+      const rdt = valeurNumerique(valeurPalier(d.rendements, pnom));
+      if (prix === null || rdt === null || prix <= 0 || rdt <= 0) return;
+      lignes.push({
+        droide: d, palier: pnom, prix, rdt,
+        ratio: rdt / prix,       // rendement par crédit dépensé
+        payback: prix / rdt,     // secondes pour se rembourser
+        possede: perso.droidesPossedes.includes(clePossession(d.id, pnom))
+      });
     });
   });
 
-  const parRatio = lignes.slice().sort((a, b) => b.ratio - a.ratio).slice(0, 15);
-  const parRdt = lignes.slice().sort((a, b) => b.rdt - a.rdt).slice(0, 15);
+  if (budget > 0 && budgetSeul) lignes = lignes.filter((l) => l.prix <= budget);
+
+  const parRatio = trierAnalyse(lignes, budget, (l) => l.ratio).slice(0, 15);
+  const parRdt = trierAnalyse(lignes, budget, (l) => l.rdt).slice(0, 15);
 
   rendreBarres("graphRatio", parRatio, (l) => l.ratio,
-    (l) => "rentable en " + formaterDuree(l.payback));
+    (l) => "rentable en " + formaterDuree(l.payback), tousPaliers, budget);
   rendreBarres("graphRendement", parRdt, (l) => l.rdt,
-    (l) => formaterCredits(arrondirCredits(l.rdt)) + "/s");
+    (l) => formaterCredits(arrondirCredits(l.rdt)) + "/s", tousPaliers, budget);
 }
 
-function rendreBarres(idZone, lignes, valeurFn, labelFn) {
+function rendreBarres(idZone, lignes, valeurFn, labelFn, montrerPalier, budget) {
   const zone = document.getElementById(idZone);
   if (!zone) return;
   zone.innerHTML = "";
   if (!lignes.length) {
-    zone.innerHTML = '<p class="sous-titre">Aucune donnée à ce palier — renseigne les prix et rendements des droïdes dans l’admin.</p>';
+    zone.innerHTML = '<p class="sous-titre">Aucune donnée — renseigne les prix et rendements des droïdes dans l’admin (ou élargis ton budget).</p>';
     return;
   }
   const max = Math.max.apply(null, lignes.map(valeurFn)) || 1;
@@ -1175,13 +1213,19 @@ function rendreBarres(idZone, lignes, valeurFn, labelFn) {
     const pct = Math.max(4, (valeurFn(l) / max) * 100);
     const rar = raretes.find((r) => r.nom === l.droide.rarete);
     const couleur = (rar && rar.texte) || "var(--primaire)";
+    const horsBudget = budget > 0 && l.prix > budget;
+    const sousLigne = (montrerPalier ? echapperHTML(l.palier) + " · " : "") +
+      formaterCredits(arrondirCredits(l.prix)) + (horsBudget ? " · trop cher" : "");
     const rangee = document.createElement("div");
-    rangee.className = "barre-rangee" + (l.possede ? " possede" : "");
+    rangee.className = "barre-rangee" + (l.possede ? " possede" : "") + (horsBudget ? " hors-budget" : "");
     rangee.innerHTML =
       '<span class="barre-rang">' + (i + 1) + "</span>" +
-      '<span class="barre-nom">' + echapperHTML(l.droide.nom) +
-        (l.possede ? ' <span class="barre-check" title="Possédé">✓</span>' : "") +
-        (estDroideFusion(l.droide.nom) ? ' <span title="Droïde de fusion">\u{1F9EC}</span>' : "") +
+      '<span class="barre-nom">' +
+        '<span class="barre-nom-txt">' + echapperHTML(l.droide.nom) +
+          (l.possede ? ' <span class="barre-check" title="Possédé">✓</span>' : "") +
+          (estDroideFusion(l.droide.nom) ? ' <span title="Droïde de fusion">\u{1F9EC}</span>' : "") +
+        "</span>" +
+        '<small class="barre-sous">' + sousLigne + "</small>" +
       "</span>" +
       '<span class="barre-piste"><span class="barre-remplissage" style="width:' + pct +
         "%;background:" + couleur + '"></span></span>' +

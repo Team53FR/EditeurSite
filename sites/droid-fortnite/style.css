@@ -1126,10 +1126,17 @@ a { color: var(--primaire); }
 }
 .barre-rang { color: var(--texte-att); font-size: 0.8rem; font-weight: 700; text-align: right; }
 .barre-nom {
+  display: flex; flex-direction: column; min-width: 0;
   font-size: 0.82rem; font-weight: 600;
+}
+.barre-nom-txt { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.barre-sous {
+  font-size: 0.66rem; font-weight: 600; color: var(--texte-att);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.barre-rangee.possede .barre-nom { color: var(--primaire); }
+.barre-rangee.possede .barre-nom-txt { color: var(--primaire); }
+.barre-rangee.hors-budget { opacity: 0.5; }
+.barre-rangee.hors-budget .barre-sous { color: var(--danger); }
 .barre-check { color: var(--succes); }
 .barre-piste {
   height: 12px; border-radius: 6px;

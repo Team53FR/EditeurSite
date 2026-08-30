@@ -112,6 +112,16 @@
     <div id="zoneAnalyse" style="display:none">
       <p class="note-source">Compare les droïdes pour choisir tes achats. Le rapport rendement/prix montre le meilleur retour par crédit dépensé ; le rendement brut, la puissance absolue. Les valeurs viennent des prix et rendements saisis dans l'admin, au palier choisi. Les Iconiques (bonus en %) ne figurent pas dans ces classements par crédits.</p>
       <div class="onglets-palier" id="ongletsPalierAnalyse" role="tablist"></div>
+      <div class="ligne-multiplicateur">
+        <label for="champBudget">Argent disponible</label>
+        <div class="champ-multiplicateur">
+          <input type="text" id="champBudget" inputmode="decimal" placeholder="ex. 60 B" oninput="afficherAnalyse()" aria-label="Argent disponible">
+        </div>
+        <label class="ligne-case case-analyse">
+          <input type="checkbox" id="analyseBudget" onchange="afficherAnalyse()">
+          Seulement dans mon budget
+        </label>
+      </div>
       <div class="filtres">
         <select id="filtreClasseAnalyse" onchange="afficherAnalyse()">
           <option value="">Toutes les classes</option>
