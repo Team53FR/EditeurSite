@@ -1196,6 +1196,10 @@ a { color: var(--primaire); }
 }
 .champ-budget select:focus { outline: none; }
 
+/* Le popup natif d'un <select> s'affiche en blanc par défaut : illisible en
+   thème sombre. On force un fond et un texte lisibles pour toutes les options. */
+select option { background: var(--carte); color: var(--texte); }
+
 /* ===== Panneau admin sur mobile =====
    Les grilles à colonnes sont pensées pour un écran large. En dessous de
    620 px, la colonne de saisie tombait à une vingtaine de pixels — un champ
