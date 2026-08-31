@@ -912,8 +912,10 @@ function construireCompteurSuper() {
   if (corriger) corriger.addEventListener("click", retirerSuperRenaissance);
 }
 
+// « Super 0 » et non « Avant super » : les onglets se lisent alors comme le
+// compteur, qui part de zéro lui aussi. Une étiquette par renaissance faite.
 function nomOngletSuper(n) {
-  return n === 0 ? "Avant super" : "Super " + n;
+  return "Super " + n;
 }
 
 // Une super renaissance de plus : les paliers de l'onglet où l'on arrive
