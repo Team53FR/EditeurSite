@@ -460,7 +460,8 @@ function paliersPossedes(droide) {
   return paliers.filter((p) => ensemble.has(p.nom)).map((p) => p.nom);
 }
 
-// Rangée de pastilles : une par palier possédé, teintée de la couleur du palier.
+// Rangée d'étiquettes : une par palier possédé, avec sa pastille de couleur et
+// son nom, pour repérer d'un coup d'œil à quels paliers on détient le droïde.
 function construireStripPaliers(droide) {
   const noms = paliersPossedes(droide);
   if (!noms.length) return null;
@@ -468,11 +469,13 @@ function construireStripPaliers(droide) {
   strip.className = "paliers-possedes";
   noms.forEach((nom) => {
     const p = paliers.find((x) => x.nom === nom);
-    const dot = document.createElement("span");
-    dot.className = "pastille-possede";
-    dot.title = nom;
-    dot.style.background = fondPalier(p && p.couleur);
-    strip.appendChild(dot);
+    const chip = document.createElement("span");
+    chip.className = "chip-palier-possede";
+    chip.title = "Possédé au palier " + nom;
+    chip.innerHTML =
+      '<span class="pt-dot" style="background:' + fondPalier(p && p.couleur) + '"></span>' +
+      '<span class="pt-nom">' + echapperHTML(nom) + "</span>";
+    strip.appendChild(chip);
   });
   return strip;
 }
