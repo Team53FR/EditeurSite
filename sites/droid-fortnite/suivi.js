@@ -460,26 +460,6 @@ function paliersPossedes(droide) {
   return paliers.filter((p) => ensemble.has(p.nom)).map((p) => p.nom);
 }
 
-// Rangée d'étiquettes : une par palier possédé, avec sa pastille de couleur et
-// son nom, pour repérer d'un coup d'œil à quels paliers on détient le droïde.
-function construireStripPaliers(droide) {
-  const noms = paliersPossedes(droide);
-  if (!noms.length) return null;
-  const strip = document.createElement("div");
-  strip.className = "paliers-possedes";
-  noms.forEach((nom) => {
-    const p = paliers.find((x) => x.nom === nom);
-    const chip = document.createElement("span");
-    chip.className = "chip-palier-possede";
-    chip.title = "Possédé au palier " + nom;
-    chip.innerHTML =
-      '<span class="pt-dot" style="background:' + fondPalier(p && p.couleur) + '"></span>' +
-      '<span class="pt-nom">' + echapperHTML(nom) + "</span>";
-    strip.appendChild(chip);
-  });
-  return strip;
-}
-
 // Somme des rendements placés. Les droïdes Iconiques rapportent un
 // pourcentage du revenu total (« 15% ») et non des crédits par seconde :
 // impossible de les additionner aux autres, on les compte à part plutôt que
@@ -1184,10 +1164,22 @@ function construireRecetteFusion(f) {
   resultat.className = "recette-resultat";
   const droideResultat = droideResultatFusion(f);
   if (droideResultat) {
-    resultat.appendChild(construireCarteDroide(droideResultat,
-      { possede: possedeUnDroide(droideResultat), palier: paliers[0] && paliers[0].nom }));
-    const strip = construireStripPaliers(droideResultat);
-    if (strip) resultat.appendChild(strip);
+    // Le contour de la carte reprend les couleurs des paliers possédés : une
+    // seule couleur si un seul palier, un dégradé si plusieurs. Ainsi on voit
+    // directement à quels paliers on détient le droïde.
+    const nomsPossedes = paliersPossedes(droideResultat);
+    const couleursPossedes = [];
+    nomsPossedes.forEach((nom) => {
+      const p = paliers.find((x) => x.nom === nom);
+      couleursPalier(p && p.couleur).forEach((c) => couleursPossedes.push(c));
+    });
+    const carte = construireCarteDroide(droideResultat, {
+      possede: possedeUnDroide(droideResultat),
+      palier: paliers[0] && paliers[0].nom,
+      couleur: couleursPossedes
+    });
+    if (nomsPossedes.length) carte.title = "Possédé au(x) palier(s) : " + nomsPossedes.join(", ");
+    resultat.appendChild(carte);
   } else if (f.classe || f.rarete) {
     // Résultat hors catalogue : non possédable, on l'affiche estompé.
     resultat.appendChild(construireCarteDroide(
