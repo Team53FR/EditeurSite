@@ -434,6 +434,44 @@ function droideDeCle(cle) {
   return droide ? { droide, palier: d.palier } : null;
 }
 
+// Possède-t-on ce droïde, à N'IMPORTE QUEL palier ? (pour l'onglet Fusion, où
+// l'on veut juste savoir si on l'a, sans distinguer les paliers).
+function possedeUnDroide(droide) {
+  if (!droide) return false;
+  return perso.droidesPossedes.some((cle) => {
+    const d = decouperCle(cle);
+    return d && d.id === droide.id;
+  });
+}
+
+// Paliers auxquels on possède ce droïde, dans l'ordre des paliers.
+function paliersPossedes(droide) {
+  if (!droide) return [];
+  const ensemble = new Set();
+  perso.droidesPossedes.forEach((cle) => {
+    const d = decouperCle(cle);
+    if (d && d.id === droide.id) ensemble.add(d.palier);
+  });
+  return paliers.filter((p) => ensemble.has(p.nom)).map((p) => p.nom);
+}
+
+// Rangée de pastilles : une par palier possédé, teintée de la couleur du palier.
+function construireStripPaliers(droide) {
+  const noms = paliersPossedes(droide);
+  if (!noms.length) return null;
+  const strip = document.createElement("div");
+  strip.className = "paliers-possedes";
+  noms.forEach((nom) => {
+    const p = paliers.find((x) => x.nom === nom);
+    const dot = document.createElement("span");
+    dot.className = "pastille-possede";
+    dot.title = nom;
+    dot.style.background = fondPalier(p && p.couleur);
+    strip.appendChild(dot);
+  });
+  return strip;
+}
+
 // Somme des rendements placés. Les droïdes Iconiques rapportent un
 // pourcentage du revenu total (« 15% ») et non des crédits par seconde :
 // impossible de les additionner aux autres, on les compte à part plutôt que
@@ -1038,11 +1076,15 @@ function construireRecetteFusion(f) {
   resultat.className = "recette-resultat";
   const droideResultat = droideResultatFusion(f);
   if (droideResultat) {
-    resultat.appendChild(construireCarteDroide(droideResultat, { possede: true, palier: paliers[0] && paliers[0].nom }));
+    resultat.appendChild(construireCarteDroide(droideResultat,
+      { possede: possedeUnDroide(droideResultat), palier: paliers[0] && paliers[0].nom }));
+    const strip = construireStripPaliers(droideResultat);
+    if (strip) resultat.appendChild(strip);
   } else if (f.classe || f.rarete) {
+    // Résultat hors catalogue : non possédable, on l'affiche estompé.
     resultat.appendChild(construireCarteDroide(
       { id: f.id, nom: nomResultatFusion(f), classe: f.classe || "Ouvrier", rarete: f.rarete || "" },
-      { possede: true, palier: paliers[0] && paliers[0].nom }));
+      { possede: false, palier: paliers[0] && paliers[0].nom }));
   } else {
     const inconnu = document.createElement("div");
     inconnu.className = "element-inconnu";
@@ -1075,7 +1117,10 @@ function construireIngredientFusion(ing) {
   enveloppe.className = "ingredient-fusion";
   const droide = droideParNom(ing.nom);
   if (droide) {
-    enveloppe.appendChild(construireCarteDroide(droide, { possede: true, palier: paliers[0] && paliers[0].nom }));
+    enveloppe.appendChild(construireCarteDroide(droide,
+      { possede: possedeUnDroide(droide), palier: paliers[0] && paliers[0].nom }));
+    const strip = construireStripPaliers(droide);
+    if (strip) enveloppe.appendChild(strip);
   } else {
     const inconnu = document.createElement("div");
     inconnu.className = "element-inconnu";

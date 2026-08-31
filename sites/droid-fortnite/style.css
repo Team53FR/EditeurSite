@@ -1272,7 +1272,22 @@ select option { background: var(--carte); color: var(--texte); }
   display: flex; flex-wrap: wrap; gap: 0.6rem; flex: 1; min-width: 0;
 }
 .ingredient-fusion { position: relative; width: 78px; }
-/* La case à cocher de la carte n'a rien à dire ici (référence, pas possession). */
+
+/* Pastilles des paliers possédés, sous chaque carte : une par palier détenu,
+   teintée de sa couleur (mêmes teintes que les onglets de palier). */
+.paliers-possedes {
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 3px;
+  margin-top: 4px;
+}
+.pastille-possede {
+  width: 11px; height: 11px; border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, .45);
+  box-shadow: 0 0 3px rgba(0, 0, 0, .5);
+  box-sizing: border-box;
+}
+
+/* Le ✓ unique de la carte n'a rien à dire ici : la possession par palier est
+   indiquée par les pastilles ci-dessus. */
 .recette-fusion .dx-case { display: none; }
 
 .badge-quantite {
