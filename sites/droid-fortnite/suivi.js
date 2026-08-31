@@ -1222,10 +1222,10 @@ function construireIngredientFusion(ing) {
   enveloppe.className = "ingredient-fusion";
   const droide = droideParNom(ing.nom);
   if (droide) {
+    // Ingrédient = simple référence (ce qu'il faut) : pas d'indication de
+    // possession, qui n'est montrée que sur le droïde résultat (à gauche).
     enveloppe.appendChild(construireCarteDroide(droide,
-      { possede: possedeUnDroide(droide), palier: paliers[0] && paliers[0].nom }));
-    const strip = construireStripPaliers(droide);
-    if (strip) enveloppe.appendChild(strip);
+      { possede: true, palier: paliers[0] && paliers[0].nom }));
   } else {
     const inconnu = document.createElement("div");
     inconnu.className = "element-inconnu";
