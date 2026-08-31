@@ -449,6 +449,51 @@ function possedeUnDroide(droide) {
   });
 }
 
+// Contour de carte SEGMENTÉ par palier possédé : chaque palier occupe une part
+// égale du pourtour, avec une coupure NETTE entre paliers (pas de fondu). Un
+// palier multicolore (Arc-en-ciel) garde son dégradé, mais confiné à sa propre
+// section — on distingue donc toujours où commence et finit chaque palier.
+function appliquerContourSegmente(el, nomsPaliers) {
+  el.classList.remove("contour-degrade");
+  el.style.backgroundImage = "";
+  el.style.borderColor = "";
+  const n = nomsPaliers.length;
+  if (!n) return; // aucun palier possédé : contour par défaut
+
+  const bandes = nomsPaliers.map((nom) => {
+    const p = paliers.find((x) => x.nom === nom);
+    return couleursPalier(p && p.couleur);
+  });
+
+  // Un seul palier d'une seule couleur : contour plein, inutile de segmenter.
+  if (n === 1 && bandes[0].length <= 1) {
+    el.style.borderColor = bandes[0][0] || "#334155";
+    return;
+  }
+
+  const stops = [];
+  bandes.forEach((cs, i) => {
+    const a = (i / n) * 100, b = ((i + 1) / n) * 100;
+    if (cs.length <= 1) {
+      const c = cs[0] || "#334155";
+      // Bande pleine : même couleur au début et à la fin -> aucun fondu.
+      stops.push(c + " " + a.toFixed(2) + "%", c + " " + b.toFixed(2) + "%");
+    } else {
+      // Palier multicolore : ses couleurs réparties DANS sa bande seulement.
+      cs.forEach((c, k) => {
+        const pos = a + (b - a) * (k / (cs.length - 1));
+        stops.push(c + " " + pos.toFixed(2) + "%");
+      });
+    }
+  });
+
+  el.classList.add("contour-degrade");
+  el.style.borderColor = "transparent";
+  el.style.backgroundImage =
+    "linear-gradient(var(--fond-carte-droide), var(--fond-carte-droide)), " +
+    "linear-gradient(135deg, " + stops.join(", ") + ")";
+}
+
 // Paliers auxquels on possède ce droïde, dans l'ordre des paliers.
 function paliersPossedes(droide) {
   if (!droide) return [];
@@ -1164,20 +1209,14 @@ function construireRecetteFusion(f) {
   resultat.className = "recette-resultat";
   const droideResultat = droideResultatFusion(f);
   if (droideResultat) {
-    // Le contour de la carte reprend les couleurs des paliers possédés : une
-    // seule couleur si un seul palier, un dégradé si plusieurs. Ainsi on voit
-    // directement à quels paliers on détient le droïde.
+    // Le contour de la carte reprend les couleurs des paliers possédés, une
+    // section nette par palier (voir appliquerContourSegmente).
     const nomsPossedes = paliersPossedes(droideResultat);
-    const couleursPossedes = [];
-    nomsPossedes.forEach((nom) => {
-      const p = paliers.find((x) => x.nom === nom);
-      couleursPalier(p && p.couleur).forEach((c) => couleursPossedes.push(c));
-    });
     const carte = construireCarteDroide(droideResultat, {
       possede: possedeUnDroide(droideResultat),
-      palier: paliers[0] && paliers[0].nom,
-      couleur: couleursPossedes
+      palier: paliers[0] && paliers[0].nom
     });
+    appliquerContourSegmente(carte, nomsPossedes);
     if (nomsPossedes.length) carte.title = "Possédé au(x) palier(s) : " + nomsPossedes.join(", ");
     resultat.appendChild(carte);
   } else if (f.classe || f.rarete) {
