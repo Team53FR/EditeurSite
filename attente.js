@@ -184,6 +184,68 @@
     );
   };
 
+  // ----- Les attentes SANS réseau -----
+  //
+  // Repaginer un livre de quatre cents pages prend deux secondes, et ces
+  // deux secondes-là sont pires que celles du réseau : le calcul monopolise
+  // le fil d'exécution, la page se fige, plus rien ne répond. On croit avoir
+  // planté l'éditeur.
+  //
+  // Le voile ordinaire n'y peut rien : il s'affiche par un minuteur, et un
+  // minuteur ne se déclenche jamais pendant un calcul qui ne rend jamais la
+  // main. Il faut donc l'afficher TOUT DE SUITE, laisser le navigateur le
+  // peindre — d'où les deux images demandées, la seconde garantissant que la
+  // première a bien été rendue —, et seulement alors se lancer dans le
+  // calcul.
+  function attendreUneImage() {
+    return new Promise(function (ok) {
+      var fait = false;
+      function fini() { if (!fait) { fait = true; ok(); } }
+      requestAnimationFrame(function () { requestAnimationFrame(fini); });
+      // Filet indispensable : dans un onglet en arrière-plan, le navigateur
+      // ne peint pas et requestAnimationFrame ne se déclenche JAMAIS. Sans ce
+      // minuteur, l'action resterait suspendue indéfiniment, voile affiché —
+      // il suffisait de changer d'onglet après avoir cliqué. Il n'y a alors
+      // rien à peindre : on part sans attendre l'image.
+      setTimeout(fini, 60);
+    });
+  }
+
+  window.pendantAttenteLourde = function (libelle, travail, detail) {
+    libelleCourant = libelle || "Un instant…";
+    detailCourant = detail || "";
+    profondeur++;
+    poserStyle();
+    if (!voile) afficher(); else ecrire();
+    return attendreUneImage().then(function () {
+      try {
+        return travail();
+      } finally {
+        window.fermerAttente();
+      }
+    });
+  };
+
+  // Même service qu'envelopperAttente, pour les actions qui calculent au lieu
+  // d'attendre le réseau.
+  window.envelopperAttenteLourde = function (actions) {
+    Object.keys(actions).forEach(function (nom) {
+      var origine = window[nom];
+      if (typeof origine !== "function") {
+        if (window.console) console.warn("envelopperAttenteLourde : « " + nom + " » introuvable");
+        return;
+      }
+      var libelle = actions[nom], detail = "";
+      if (Array.isArray(libelle)) { detail = libelle[1]; libelle = libelle[0]; }
+      window[nom] = function () {
+        var args = arguments, self = this;
+        return window.pendantAttenteLourde(libelle, function () {
+          return origine.apply(self, args);
+        }, detail);
+      };
+    });
+  };
+
   // Enveloppe d'un coup plusieurs actions déjà écrites, par leur nom :
   //   envelopperAttente({ sauvegarder: "Enregistrement du livre…" })
   // Le corps de l'action n'a pas à être touché — et l'on voit d'un seul

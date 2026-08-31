@@ -10,6 +10,22 @@ envelopperAttente({
   basculerPublication: ["Publication…", "La liste des livres publiés est mise à jour."],
 });
 
+// ----- Et celles-ci ne passent par rien du tout : elles calculent -----
+// Recomposer quatre cents pages prend deux secondes pendant lesquelles la
+// page se fige — plus rien ne répond, on croit avoir planté l'éditeur. Le
+// voile de calcul (voir attente.js) s'affiche AVANT que le fil ne soit pris,
+// ce que le voile ordinaire, posé par minuteur, ne saurait faire.
+//
+// Les actions qui posent une question avant de travailler ne sont pas ici :
+// le voile s'afficherait derrière leur « confirm ». Elles appellent
+// pendantAttenteLourde elles-mêmes, une fois la réponse obtenue.
+envelopperAttenteLourde({
+  changerFormat: ["Changement de format…", "Tout le texte est recomposé aux nouvelles dimensions."],
+  appliquerInterligne: ["Nouvel interligne…", "Tout le texte est recomposé."],
+  ouvrirApercu: ["Préparation de l'aperçu…", "Les pages sont recalculées au découpage exact."],
+  fermerApercu: ["Retour à l'édition…"],
+});
+
 let bibliotheque = null;
 let shaBiblio = null;
 let nomFichierBiblio = null;
@@ -2890,29 +2906,33 @@ function supprimerChapitre(indexChapitre) {
     return;
   }
 
-  cible.noeuds.forEach(n => { if (n.parentNode === conteneur) conteneur.removeChild(n); });
+  // Comme pour la remise aux tailles du format : le voile vient après la
+  // question, sans quoi il s'afficherait derrière elle.
+  pendantAttenteLourde("Suppression du chapitre…", () => {
+    cible.noeuds.forEach(n => { if (n.parentNode === conteneur) conteneur.removeChild(n); });
 
-  const livre = livreActuel();
-  livre.spreads = [conteneur.innerHTML || ""];
-  indexSpread = 0;
-  repaginerTout();
+    const livre = livreActuel();
+    livre.spreads = [conteneur.innerHTML || ""];
+    indexSpread = 0;
+    repaginerTout();
 
-  const spreads = spreadsLivre();
-  if (numSpread() >= spreads.length) indexSpread = Math.max(0, (spreads.length - 1) * 2);
+    const spreads = spreadsLivre();
+    if (numSpread() >= spreads.length) indexSpread = Math.max(0, (spreads.length - 1) * 2);
 
-  afficherSpread();
-  afficherSommaire();
-  majCompteurMots();
-  marquerModifie();
-  planifierBrouillon();
+    afficherSpread();
+    afficherSommaire();
+    majCompteurMots();
+    marquerModifie();
+    planifierBrouillon();
 
-  const message = document.getElementById("message");
-  if (message) {
-    message.textContent = "Chapitre « " + cible.titre + " » supprimé.";
-    setTimeout(() => {
-      if (message.textContent.indexOf("supprimé") !== -1) message.textContent = "";
-    }, 3000);
-  }
+    const message = document.getElementById("message");
+    if (message) {
+      message.textContent = "Chapitre « " + cible.titre + " » supprimé.";
+      setTimeout(() => {
+        if (message.textContent.indexOf("supprimé") !== -1) message.textContent = "";
+      }, 3000);
+    }
+  }, "Le livre est recomposé sans lui.");
 }
 
 // ===== Casse des titres de chapitre =====
@@ -3819,33 +3839,39 @@ function reinitialiserTailles() {
       ", et l'espace au-dessus des titres à " + t.espaceTitre + ".\n\n" +
       "Les tailles de police que vous avez réglées à la main seront perdues.")) return;
 
-  flushSpread();
+  // Le voile ne se pose qu'ICI, après la question : posé avant, il se serait
+  // affiché derrière le « confirm ».
+  pendantAttenteLourde("Remise aux tailles du format…",
+    () => {
+      flushSpread();
 
-  // L'espace au-dessus des titres fait partie de la mise en page du format :
-  // il revient lui aussi à sa valeur.
-  livreActuel().espaceTitre = t.espaceTitre;
-  initEspaceTitre();
+      // L'espace au-dessus des titres fait partie de la mise en page du
+      // format : il revient lui aussi à sa valeur.
+      livreActuel().espaceTitre = t.espaceTitre;
+      initEspaceTitre();
 
-  const spreads = spreadsLivre();
-  for (let i = 0; i < spreads.length; i++) spreads[i] = nettoyerTaillesHtml(spreads[i]);
+      const spreads = spreadsLivre();
+      for (let i = 0; i < spreads.length; i++) spreads[i] = nettoyerTaillesHtml(spreads[i]);
 
-  // Les tailles changent : on repagine tout le texte continu.
-  repaginerTout();
+      // Les tailles changent : on repagine tout le texte continu.
+      repaginerTout();
 
-  const n = spreadsLivre();
-  if (numSpread() >= n.length) indexSpread = Math.max(0, (n.length - 1) * 2);
+      const n = spreadsLivre();
+      if (numSpread() >= n.length) indexSpread = Math.max(0, (n.length - 1) * 2);
 
-  afficherSpread();
-  afficherSommaire();
-  majCompteurMots();
-  marquerModifie();
-  planifierBrouillon();
+      afficherSpread();
+      afficherSommaire();
+      majCompteurMots();
+      marquerModifie();
+      planifierBrouillon();
 
-  const message = document.getElementById("message");
-  if (message) {
-    message.textContent = "Tailles remises aux valeurs du format sur tout le livre.";
-    setTimeout(() => { if (message.textContent.startsWith("Tailles remises")) message.textContent = ""; }, 2500);
-  }
+      const message = document.getElementById("message");
+      if (message) {
+        message.textContent = "Tailles remises aux valeurs du format sur tout le livre.";
+        setTimeout(() => { if (message.textContent.startsWith("Tailles remises")) message.textContent = ""; }, 2500);
+      }
+    },
+    "Tout le texte est recomposé.");
 }
 
 // =====================================================================
