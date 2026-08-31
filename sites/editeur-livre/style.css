@@ -2180,6 +2180,25 @@ button.danger {
 }
 .mi-lancer:hover { filter: brightness(1.06); }
 
+/* L'essai de contour n'est pas l'action principale du dialogue, mais celle
+   qu'on devrait faire d'abord : d'où le trait, plus visible qu'un simple
+   « Annuler », sans voler la couleur pleine du bouton d'impression. */
+.dc-essai {
+  margin-right: 10px;
+  padding: 11px 20px;
+  border: 1px dashed var(--s-accent, #8a4b2a); border-radius: 10px;
+  background: none;
+  color: var(--s-accent, #8a4b2a);
+  font-size: 15px; font-weight: 600;
+  cursor: pointer;
+}
+.dc-essai:hover { background: var(--s-cream, #f6efe0); border-style: solid; }
+
+@media (max-width: 560px) {
+  .mi-actions { flex-wrap: wrap; gap: 8px; }
+  .mi-actions .ci-annuler, .dc-essai { margin-right: 0; }
+}
+
 /* ===== Dialogue de la couverture ===== */
 .dc-apercu { display: flex; justify-content: center; margin: 16px 0 4px; }
 .dc-schema {

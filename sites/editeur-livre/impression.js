@@ -1523,8 +1523,15 @@ function ouvrirDialogueCouvertureSeule(livre, f, nbPages, agrafe) {
     "(jamais « ajuster à la page »), marges « aucune », et décochez les en-têtes et " +
     "pieds de page du navigateur. Sans quoi les plis ne tomberaient plus au bon endroit.</p>";
 
+  html += '<p class="mi-groupe-aide">Une couverture, c\'est une feuille noircie ' +
+    "d'un bord à l'autre : de quoi vider une cartouche pour découvrir que le dos " +
+    "tombe deux millimètres à côté. L'<b>essai de contour</b> sort la même planche, " +
+    "aux mêmes cotes, mais réduite à ses traits — vous la pliez sur votre bloc de " +
+    "pages pour vérifier avant d'y mettre la couleur.</p>";
+
   html += '<div class="mi-actions">' +
     '<button class="ci-annuler" type="button">Annuler</button>' +
+    '<button class="dc-essai" type="button">Essai de contour</button>' +
     '<button class="mi-lancer" type="button">Imprimer la couverture</button>' +
   "</div></div>";
 
@@ -1606,6 +1613,114 @@ function ouvrirDialogueCouvertureSeule(livre, f, nbPages, agrafe) {
     // Aucune page intérieure à fournir : la planche de couverture n'en utilise pas.
     setTimeout(() => genererFichierImprimeur("couverture", dosMm, livre, f, [], papier), 50);
   };
+  fond.querySelector(".dc-essai").onclick = () => {
+    const dosMm = dosSaisi();
+    const papier = papierParCle(selPapier.value);
+    // Le dialogue reste ouvert : on va chercher la feuille, on mesure, et l'on
+    // corrige le dos sans avoir à refaire tout le parcours.
+    imprimerEssaiCouverture(f, dosMm, papier, agrafe);
+  };
+}
+
+// ----- L'essai de contour -----
+//
+// Une couverture est noircie d'un bord à l'autre : l'imprimer pour découvrir
+// que le dos tombe deux millimètres à côté coûte une cartouche. L'essai sort
+// donc EXACTEMENT la même planche — mêmes cotes, même papier, mêmes repères —
+// mais réduite à ses traits. On la plie sur son bloc de pages, on vérifie que
+// le dos l'enserre juste, et l'on n'imprime la vraie qu'ensuite.
+//
+// Les cotes sont écrites dessus : une planche muette obligerait à ressortir le
+// réglet pour savoir ce qu'on est en train de vérifier.
+function imprimerEssaiCouverture(f, dosMm, papier, agrafe) {
+  const largTrim = 2 * f.larg + dosMm;
+
+  let stylePage = document.getElementById("stylePageImpression");
+  if (!stylePage) {
+    stylePage = document.createElement("style");
+    stylePage.id = "stylePageImpression";
+    document.head.appendChild(stylePage);
+  }
+  if (papier) reglerPagePapier(stylePage, papier);
+  else {
+    stylePage.textContent = "@page { size: " + (largTrim + 2 * MARGE_TECHNIQUE_MM) + "mm " +
+      (f.haut + 2 * MARGE_TECHNIQUE_MM) + "mm; margin: 0; }";
+  }
+
+  let zone = document.getElementById("zoneImpression");
+  if (zone) zone.remove();
+  zone = document.createElement("div");
+  zone.id = "zoneImpression";
+  zone.classList.add("zone-pro");
+  document.body.appendChild(zone);
+
+  const planche = creerCouvertureEssai(f, dosMm, agrafe, papier);
+  zone.appendChild(papier ? poserSurPapier(planche, papier, largTrim, f.haut) : planche);
+
+  definirPasseLivret(null);
+  window.print();
+}
+
+function creerCouvertureEssai(f, dosMm, agrafe, papier) {
+  const largTrim = 2 * f.larg + dosMm;
+  const feuille = creerFeuillePro(largTrim, f.haut);
+  const zone = creerZoneRognePro(largTrim, f.haut);
+  zone.classList.add("couv-essai");
+
+  const panneau = (largeur, titre, detail) => {
+    const d = document.createElement("div");
+    d.className = "essai-panneau";
+    d.style.width = largeur + "mm";
+    d.innerHTML = '<span class="essai-panneau-nom">' + titre + "</span>" +
+      '<span class="essai-panneau-cote">' + detail + "</span>";
+    return d;
+  };
+
+  const cote = (v) => String(Math.round(v * 10) / 10).replace(".", ",");
+
+  zone.appendChild(panneau(f.larg, "4e de couverture", cote(f.larg) + " × " + cote(f.haut) + " mm"));
+  if (dosMm > 0) {
+    // Sous six millimètres, même écrit en hauteur le mot déborde du dos et
+    // vient mordre sur les plats. La cote est de toute façon rappelée dans la
+    // légende : mieux vaut un dos vide qu'un dos illisible.
+    const large = dosMm >= 6;
+    const dos = panneau(dosMm, large ? "dos" : "", large ? cote(dosMm) + " mm" : "");
+    dos.classList.add("essai-dos");
+    zone.appendChild(dos);
+  }
+  zone.appendChild(panneau(f.larg, "1re de couverture", cote(f.larg) + " × " + cote(f.haut) + " mm"));
+
+  feuille.appendChild(zone);
+
+  // Les plis, en tirets, comme sur la vraie planche — mais ici ils traversent
+  // la feuille : elle finira à la poubelle, et c'est justement le pli qu'on
+  // vient éprouver.
+  const positions = dosMm > 0 ? [f.larg, f.larg + dosMm] : [f.larg];
+  positions.forEach((x) => {
+    const t = document.createElement("div");
+    t.className = "essai-pli";
+    t.style.left = (MARGE_TECHNIQUE_MM + x) + "mm";
+    t.style.top = MARGE_TECHNIQUE_MM + "mm";
+    t.style.height = f.haut + "mm";
+    feuille.appendChild(t);
+  });
+
+  const legende = document.createElement("div");
+  legende.className = "essai-legende-couv";
+  legende.style.left = MARGE_TECHNIQUE_MM + "mm";
+  legende.style.top = (MARGE_TECHNIQUE_MM + f.haut + 3) + "mm";
+  legende.style.width = largTrim + "mm";
+  legende.innerHTML =
+    "<b>Essai de contour</b> — planche " + cote(largTrim) + " × " + cote(f.haut) + " mm" +
+    (dosMm > 0 ? ", dos " + cote(dosMm) + " mm" : "") +
+    (papier ? ", sur " + papier.nom : "") + ". " +
+    (agrafe
+      ? "Pliez sur le trait central et glissez le cahier dedans."
+      : "Pliez sur les deux traits et enserrez votre bloc de pages : le dos doit " +
+        "tomber juste. Sinon, corrigez « Dos obtenu » et refaites un essai.");
+  feuille.appendChild(legende);
+
+  return feuille;
 }
 
 // La planche vue de dessus : 4e de couverture, dos, 1re — avec le dos à
