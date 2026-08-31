@@ -1143,6 +1143,36 @@ function epaisseurDosMm(nbPages, grammage, main) {
   return (nbPages / 2) * grammage * main / 1000;
 }
 
+// ----- Plastification de la couverture -----
+//
+// Une pochette à plastifier enferme la feuille entre DEUX films : la
+// couverture épaissit donc de deux fois l'épaisseur annoncée sur la boîte.
+//
+// Et cette épaisseur compte deux fois de plus au dos : le dos est délimité
+// par deux plis, et chaque pli s'écarte de l'épaisseur du matériau qu'il
+// plie. Une pochette de 125 µm ajoute ainsi un demi-millimètre au dos —
+// invisible sur un pavé, mais c'est le tiers du dos d'un livret de 80 pages.
+//
+// Les épaisseurs sont celles des pochettes courantes du commerce, en microns
+// PAR FACE, comme elles sont vendues.
+const PLASTIFICATIONS = [
+  { cle: "aucune", nom: "Non plastifiée", micronsParFace: 0 },
+  { cle: "80",  nom: "Pochette 80 µm (la plus courante)", micronsParFace: 80 },
+  { cle: "100", nom: "Pochette 100 µm", micronsParFace: 100 },
+  { cle: "125", nom: "Pochette 125 µm (rigide)", micronsParFace: 125 },
+  { cle: "175", nom: "Pochette 175 µm (très rigide)", micronsParFace: 175 }
+];
+const PLASTIFICATION_DEFAUT = "aucune";
+
+function plastificationParCle(cle) {
+  return PLASTIFICATIONS.find((p) => p.cle === cle) || PLASTIFICATIONS[0];
+}
+
+// Deux films sur la feuille, deux plis autour du dos : quatre fois le micron.
+function supplementDosPlastificationMm(cle) {
+  return 4 * plastificationParCle(cle).micronsParFace / 1000;
+}
+
 // Nom de fichier accepté : A-Z, a-z, 0-9 et _ uniquement, précédé de
 // l'abréviation du type de fichier (int = intérieur, cv = couverture).
 function nomFichierConforme(prefixe, titre) {
@@ -1483,13 +1513,22 @@ function ouvrirDialogueCouvertureSeule(livre, f, nbPages, agrafe) {
           '<input type="number" id="dcDos" value="' + dosCalcule.toFixed(1) +
           '" min="0" max="60" step="0.1"> <small>mm</small></label>' +
       "</div>" +
+      '<div class="dc-ligne">' +
+        '<label class="tr-champ"><span>Couverture plastifiée ?</span>' +
+          '<select id="dcPlastification">' +
+            PLASTIFICATIONS.map((p) => '<option value="' + p.cle + '"' +
+              (p.cle === PLASTIFICATION_DEFAUT ? " selected" : "") + ">" + p.nom + "</option>").join("") +
+          "</select></label>" +
+      "</div>" +
       '<p class="mi-groupe-aide dc-calcul"></p>' +
       '<details class="mi-details-schema"><summary>Le dos ne tombe pas juste ?</summary>' +
         "<p>Le calcul part d'un papier moyen ; le vôtre gonfle peut-être un peu plus " +
         "ou un peu moins. La mesure vaut mieux que le calcul : <b>imprimez vos pages, " +
         "tassez la pile sur une table, mesurez son épaisseur à la règle</b> et reportez-la " +
-        "dans « Dos obtenu ». La couverture elle-même ajoute une fraction de millimètre, " +
-        "absorbée par les plis.</p>" +
+        "dans « Dos obtenu » — en lui ajoutant la plastification si vous en mettez une, " +
+        "puisque le calcul ne connaît plus alors l'épaisseur de vos pages. Le papier de la " +
+        "couverture, lui, n'est pas compté : sa fraction de millimètre s'absorbe dans les " +
+        "plis, là où le film d'une pochette, quatre fois plus épais, ne s'absorbe pas.</p>" +
         '<label class="tr-champ tr-court"><span>Main du papier</span>' +
           '<input type="number" id="dcMain" value="' + papierPages.main +
           '" min="0.8" max="2.5" step="0.05"></label>' +
@@ -1523,8 +1562,15 @@ function ouvrirDialogueCouvertureSeule(livre, f, nbPages, agrafe) {
     "(jamais « ajuster à la page »), marges « aucune », et décochez les en-têtes et " +
     "pieds de page du navigateur. Sans quoi les plis ne tomberaient plus au bon endroit.</p>";
 
+  html += '<p class="mi-groupe-aide">Une couverture, c\'est une feuille noircie ' +
+    "d'un bord à l'autre : de quoi vider une cartouche pour découvrir que le dos " +
+    "tombe deux millimètres à côté. L'<b>essai de contour</b> sort la même planche, " +
+    "aux mêmes cotes, mais réduite à ses traits — vous la pliez sur votre bloc de " +
+    "pages pour vérifier avant d'y mettre la couleur.</p>";
+
   html += '<div class="mi-actions">' +
     '<button class="ci-annuler" type="button">Annuler</button>' +
+    '<button class="dc-essai" type="button">Essai de contour</button>' +
     '<button class="mi-lancer" type="button">Imprimer la couverture</button>' +
   "</div></div>";
 
@@ -1538,6 +1584,7 @@ function ouvrirDialogueCouvertureSeule(livre, f, nbPages, agrafe) {
   const champDos = fond.querySelector("#dcDos");
   const selPapier = fond.querySelector("#dcPapier");
   const selPages = fond.querySelector("#dcPapierPages");
+  const selPlast = fond.querySelector("#dcPlastification");
   const champMain = fond.querySelector("#dcMain");
 
   const dosSaisi = () => {
@@ -1558,9 +1605,18 @@ function ouvrirDialogueCouvertureSeule(livre, f, nbPages, agrafe) {
     if (calcul && selPages) {
       const pa = papierInterieur(selPages.value);
       const m = parseFloat(champMain && champMain.value) || pa.main;
+      const pages = epaisseurDosMm(nbPages, pa.grammage, m);
+      const plast = selPlast ? supplementDosPlastificationMm(selPlast.value) : 0;
+      const mm = (v) => v.toFixed(1).replace(".", ",");
+      // Le détail plutôt que le seul total : on doit pouvoir vérifier d'où
+      // sort le chiffre, et voir ce que la plastification lui ajoute.
       calcul.textContent = "Calculé pour " + nbPages + " pages, soit " +
         Math.ceil(nbPages / 2) + " feuilles de " + pa.grammage + " g/m² : " +
-        epaisseurDosMm(nbPages, pa.grammage, m).toFixed(1).replace(".", ",") + " mm.";
+        mm(pages) + " mm" +
+        (plast
+          ? ", plus " + mm(plast) + " mm pour la plastification (deux films sur la " +
+            "couverture, comptés à chacun des deux plis) — soit " + mm(pages + plast) + " mm."
+          : ".");
     }
 
     const papier = papierParCle(selPapier.value);
@@ -1581,14 +1637,18 @@ function ouvrirDialogueCouvertureSeule(livre, f, nbPages, agrafe) {
     }
   };
 
-  // Changer de papier recalcule le dos ; le modifier à la main fige la valeur.
+  // Changer de papier ou de plastification recalcule le dos ; le modifier à
+  // la main fige la valeur.
   const recalculerDos = () => {
     const pa = papierInterieur(selPages.value);
     const m = parseFloat(champMain && champMain.value) || pa.main;
-    champDos.value = epaisseurDosMm(nbPages, pa.grammage, m).toFixed(1);
+    const total = epaisseurDosMm(nbPages, pa.grammage, m) +
+                  (selPlast ? supplementDosPlastificationMm(selPlast.value) : 0);
+    champDos.value = total.toFixed(1);
     rafraichir();
   };
   if (selPages) selPages.onchange = recalculerDos;
+  if (selPlast) selPlast.onchange = recalculerDos;
   if (champMain) champMain.oninput = recalculerDos;
   champDos.oninput = rafraichir;
   selPapier.onchange = rafraichir;
@@ -1606,6 +1666,114 @@ function ouvrirDialogueCouvertureSeule(livre, f, nbPages, agrafe) {
     // Aucune page intérieure à fournir : la planche de couverture n'en utilise pas.
     setTimeout(() => genererFichierImprimeur("couverture", dosMm, livre, f, [], papier), 50);
   };
+  fond.querySelector(".dc-essai").onclick = () => {
+    const dosMm = dosSaisi();
+    const papier = papierParCle(selPapier.value);
+    // Le dialogue reste ouvert : on va chercher la feuille, on mesure, et l'on
+    // corrige le dos sans avoir à refaire tout le parcours.
+    imprimerEssaiCouverture(f, dosMm, papier, agrafe);
+  };
+}
+
+// ----- L'essai de contour -----
+//
+// Une couverture est noircie d'un bord à l'autre : l'imprimer pour découvrir
+// que le dos tombe deux millimètres à côté coûte une cartouche. L'essai sort
+// donc EXACTEMENT la même planche — mêmes cotes, même papier, mêmes repères —
+// mais réduite à ses traits. On la plie sur son bloc de pages, on vérifie que
+// le dos l'enserre juste, et l'on n'imprime la vraie qu'ensuite.
+//
+// Les cotes sont écrites dessus : une planche muette obligerait à ressortir le
+// réglet pour savoir ce qu'on est en train de vérifier.
+function imprimerEssaiCouverture(f, dosMm, papier, agrafe) {
+  const largTrim = 2 * f.larg + dosMm;
+
+  let stylePage = document.getElementById("stylePageImpression");
+  if (!stylePage) {
+    stylePage = document.createElement("style");
+    stylePage.id = "stylePageImpression";
+    document.head.appendChild(stylePage);
+  }
+  if (papier) reglerPagePapier(stylePage, papier);
+  else {
+    stylePage.textContent = "@page { size: " + (largTrim + 2 * MARGE_TECHNIQUE_MM) + "mm " +
+      (f.haut + 2 * MARGE_TECHNIQUE_MM) + "mm; margin: 0; }";
+  }
+
+  let zone = document.getElementById("zoneImpression");
+  if (zone) zone.remove();
+  zone = document.createElement("div");
+  zone.id = "zoneImpression";
+  zone.classList.add("zone-pro");
+  document.body.appendChild(zone);
+
+  const planche = creerCouvertureEssai(f, dosMm, agrafe, papier);
+  zone.appendChild(papier ? poserSurPapier(planche, papier, largTrim, f.haut) : planche);
+
+  definirPasseLivret(null);
+  window.print();
+}
+
+function creerCouvertureEssai(f, dosMm, agrafe, papier) {
+  const largTrim = 2 * f.larg + dosMm;
+  const feuille = creerFeuillePro(largTrim, f.haut);
+  const zone = creerZoneRognePro(largTrim, f.haut);
+  zone.classList.add("couv-essai");
+
+  const panneau = (largeur, titre, detail) => {
+    const d = document.createElement("div");
+    d.className = "essai-panneau";
+    d.style.width = largeur + "mm";
+    d.innerHTML = '<span class="essai-panneau-nom">' + titre + "</span>" +
+      '<span class="essai-panneau-cote">' + detail + "</span>";
+    return d;
+  };
+
+  const cote = (v) => String(Math.round(v * 10) / 10).replace(".", ",");
+
+  zone.appendChild(panneau(f.larg, "4e de couverture", cote(f.larg) + " × " + cote(f.haut) + " mm"));
+  if (dosMm > 0) {
+    // Sous six millimètres, même écrit en hauteur le mot déborde du dos et
+    // vient mordre sur les plats. La cote est de toute façon rappelée dans la
+    // légende : mieux vaut un dos vide qu'un dos illisible.
+    const large = dosMm >= 6;
+    const dos = panneau(dosMm, large ? "dos" : "", large ? cote(dosMm) + " mm" : "");
+    dos.classList.add("essai-dos");
+    zone.appendChild(dos);
+  }
+  zone.appendChild(panneau(f.larg, "1re de couverture", cote(f.larg) + " × " + cote(f.haut) + " mm"));
+
+  feuille.appendChild(zone);
+
+  // Les plis, en tirets, comme sur la vraie planche — mais ici ils traversent
+  // la feuille : elle finira à la poubelle, et c'est justement le pli qu'on
+  // vient éprouver.
+  const positions = dosMm > 0 ? [f.larg, f.larg + dosMm] : [f.larg];
+  positions.forEach((x) => {
+    const t = document.createElement("div");
+    t.className = "essai-pli";
+    t.style.left = (MARGE_TECHNIQUE_MM + x) + "mm";
+    t.style.top = MARGE_TECHNIQUE_MM + "mm";
+    t.style.height = f.haut + "mm";
+    feuille.appendChild(t);
+  });
+
+  const legende = document.createElement("div");
+  legende.className = "essai-legende-couv";
+  legende.style.left = MARGE_TECHNIQUE_MM + "mm";
+  legende.style.top = (MARGE_TECHNIQUE_MM + f.haut + 3) + "mm";
+  legende.style.width = largTrim + "mm";
+  legende.innerHTML =
+    "<b>Essai de contour</b> — planche " + cote(largTrim) + " × " + cote(f.haut) + " mm" +
+    (dosMm > 0 ? ", dos " + cote(dosMm) + " mm" : "") +
+    (papier ? ", sur " + papier.nom : "") + ". " +
+    (agrafe
+      ? "Pliez sur le trait central et glissez le cahier dedans."
+      : "Pliez sur les deux traits et enserrez votre bloc de pages : le dos doit " +
+        "tomber juste. Sinon, corrigez « Dos obtenu » et refaites un essai.");
+  feuille.appendChild(legende);
+
+  return feuille;
 }
 
 // La planche vue de dessus : 4e de couverture, dos, 1re — avec le dos à

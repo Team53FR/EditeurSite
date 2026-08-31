@@ -285,6 +285,52 @@
     background: white;
   }
 
+  /* ----- Essai de contour de la couverture -----
+     La même planche, aux mêmes cotes, mais sans un gramme d'encre inutile :
+     des filets, trois étiquettes et les mesures. On la plie sur son bloc de
+     pages pour vérifier le dos avant d'imprimer la vraie. */
+  .couv-essai {
+    display: flex;
+    align-items: stretch;
+    border: 0.4pt solid #000;
+  }
+  .essai-panneau {
+    flex-shrink: 0;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2mm;
+    text-align: center;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  .essai-panneau-nom { font-size: 4mm; font-weight: 700; }
+  .essai-panneau-cote { font-size: 3.2mm; }
+  /* Le dos est souvent trop étroit pour un mot posé à plat : on le tourne,
+     comme le texte d'une vraie tranche. */
+  .essai-dos { justify-content: flex-start; padding-top: 10mm; }
+  .essai-dos .essai-panneau-nom,
+  .essai-dos .essai-panneau-cote {
+    writing-mode: vertical-rl;
+    font-size: 3mm;
+    white-space: nowrap;
+  }
+  .essai-pli {
+    position: absolute;
+    width: 0;
+    border-left: 0.5pt dashed #000;
+  }
+  .essai-legende-couv {
+    position: absolute;
+    box-sizing: border-box;
+    text-align: center;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 2.8mm;
+    line-height: 1.4;
+    color: #000;
+  }
+
   /* Traits de coupe et de pli : filet de 0,25 pt, minimum exigé.
      Dessinés en noir pur, jamais dans la zone de fond perdu. */
   .repere-pro { position: absolute; box-sizing: content-box; }

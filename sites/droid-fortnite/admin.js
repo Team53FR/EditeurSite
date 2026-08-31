@@ -961,7 +961,9 @@ function construireSelecteurSuper() {
     const bouton = document.createElement("button");
     bouton.type = "button";
     bouton.className = "onglet-palier" + (n === superEdite ? " actif" : "");
-    bouton.textContent = n === 0 ? "Avant super" : "Super " + n;
+    // Même étiquette que côté joueur : « Super 0 », pour que l'onglet qu'on
+    // remplit ici et celui qu'il lit là-bas portent le même nom.
+    bouton.textContent = "Super " + n;
     bouton.onclick = () => { superEdite = n; afficherRenaissanceAdmin(); };
     zone.appendChild(bouton);
   }

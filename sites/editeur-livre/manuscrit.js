@@ -19,6 +19,15 @@
 //  ce qui garantit qu'un chapitre édité ici est exactement le chapitre
 //  listé là.
 
+// Enregistrer recolle le livre et le repagine d'un bloc : sur un gros
+// manuscrit, deux secondes de fil bloqué. Le voile de calcul (attente.js) le
+// dit. Il est posé ici et non dans editeur.js, qui se charge AVANT ce
+// fichier : la fonction n'y existerait pas encore.
+envelopperAttenteLourde({
+  enregistrerManuscrit: ["Recomposition du livre…",
+    "Le chapitre reprend sa place et la pagination se refait."]
+});
+
 // Chapitre en cours d'édition, ou null. `htmlOrigine` sert à savoir si
 // quelque chose a bougé : sans lui, fermer demanderait confirmation même
 // quand on n'a rien touché.
