@@ -99,6 +99,10 @@ async function chargerTout() {
   document.getElementById("zoneDroidex").style.display = "";
   afficherDroidex();
   afficherRendement();
+  // L'onglet ouvert découle du compte : on arrive sur la super renaissance
+  // qu'on est en train de faire, pas sur la première de la liste.
+  superActif = ongletPourCompteur(perso.superRenaissances);
+  construireCompteurSuper();
   construireOngletsSuper();
   afficherRenaissance();
 }
@@ -150,12 +154,13 @@ async function chargerBibliothequePerso() {
     perso = {
       droidesPossedes,
       renaissanceAtteinte: progressionParSuper(contenu && contenu.renaissanceAtteinte),
+      superRenaissances: entierPositif(contenu && contenu.superRenaissances),
       rendement: (contenu && contenu.rendement) || null
     };
     shaPerso = sha;
   } catch (e) {
     if (e.status !== 404) throw e;
-    perso = { droidesPossedes: [], renaissanceAtteinte: {}, rendement: null };
+    perso = { droidesPossedes: [], renaissanceAtteinte: {}, superRenaissances: 0, rendement: null };
     shaPerso = null;
   }
 }
@@ -853,6 +858,104 @@ function atteintsSuper() {
   return perso.renaissanceAtteinte[superActif];
 }
 
+// ----- Compteur de super renaissances -----
+//
+// Une super renaissance remet tout à zéro dans le jeu : les paliers se
+// refont, mais avec les droïdes de la super suivante. Le suivi doit donc
+// savoir combien on en a faites — c'est ce nombre, et lui seul, qui dit quel
+// onglet regarder et quels paliers sont à recommencer.
+//
+// Le compte appartient au joueur, pas au catalogue : il vit dans le fichier
+// personnel, à côté de la progression.
+
+function entierPositif(v) {
+  const n = Math.floor(Number(v));
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+// Le catalogue ne décrit qu'un nombre fini de super renaissances. Au-delà,
+// le cycle recommence : la cinquième super d'un catalogue qui en décrit
+// quatre reprend les exigences de la première.
+function ongletPourCompteur(n) {
+  const nb = nombreSuperRenaissances(renaissance);
+  return nb > 0 ? entierPositif(n) % nb : 0;
+}
+
+function construireCompteurSuper() {
+  const zone = document.getElementById("compteurSuper");
+  if (!zone) return;
+  const n = entierPositif(perso.superRenaissances);
+  const nb = nombreSuperRenaissances(renaissance);
+  const cible = ongletPourCompteur(n + 1);
+
+  zone.innerHTML =
+    '<div class="cs-nombre"><span class="cs-libelle">Super renaissances faites</span>' +
+      '<strong class="cs-valeur">' + n + "</strong></div>" +
+    '<div class="cs-actions">' +
+      (n > 0
+        ? '<button type="button" class="cs-corriger" title="Corriger le compte : ' +
+          'retirer une super renaissance. Les paliers ne sont pas touchés.">−</button>'
+        : "") +
+      '<button type="button" class="cs-plus">J\'en ai fait une de plus</button>' +
+    "</div>" +
+    '<p class="cs-aide">Le prochain passage remettra à zéro les paliers de ' +
+      "<b>" + nomOngletSuper(cible) + "</b>" +
+      (nb > 1 && cible === 0 && n + 1 >= nb
+        ? " — le catalogue décrit " + nb + " super renaissance" + (nb > 1 ? "s" : "") +
+          ", au-delà le cycle recommence."
+        : "") +
+    ".</p>";
+
+  const plus = zone.querySelector(".cs-plus");
+  if (plus) plus.addEventListener("click", ajouterSuperRenaissance);
+  const corriger = zone.querySelector(".cs-corriger");
+  if (corriger) corriger.addEventListener("click", retirerSuperRenaissance);
+}
+
+function nomOngletSuper(n) {
+  return n === 0 ? "Avant super" : "Super " + n;
+}
+
+// Une super renaissance de plus : les paliers de l'onglet où l'on arrive
+// repartent de zéro — c'est tout l'intérêt du bouton, sans quoi il faudrait
+// décocher trente-cinq cases à la main.
+function ajouterSuperRenaissance() {
+  const n = entierPositif(perso.superRenaissances) + 1;
+  const cible = ongletPourCompteur(n);
+  const dejaCoches = (perso.renaissanceAtteinte && perso.renaissanceAtteinte[cible]) || [];
+
+  const message = "Compter une super renaissance de plus ?\n\n" +
+    "Vous passerez à « " + nomOngletSuper(cible) + " »" +
+    (dejaCoches.length
+      ? ", dont les " + dejaCoches.length + " palier" + (dejaCoches.length > 1 ? "s" : "") +
+        " déjà validé" + (dejaCoches.length > 1 ? "s seront décochés" : " sera décoché") + "."
+      : ", dont aucun palier n'est encore validé.");
+  if (!window.confirm(message)) return;
+
+  perso.superRenaissances = n;
+  perso.renaissanceAtteinte[cible] = [];
+  allerASuper(cible);
+  marquerProgressionModifiee();
+}
+
+// Correction d'une faute de frappe, pas un retour en arrière dans le jeu :
+// on remet le compte d'aplomb et l'on suit l'onglet, sans rien décocher.
+function retirerSuperRenaissance() {
+  const n = entierPositif(perso.superRenaissances);
+  if (n <= 0) return;
+  perso.superRenaissances = n - 1;
+  allerASuper(ongletPourCompteur(n - 1));
+  marquerProgressionModifiee();
+}
+
+function allerASuper(n) {
+  superActif = n;
+  paliersDeplies = new Set();
+  construireCompteurSuper();
+  construireOngletsSuper();
+  afficherRenaissance({ recadrer: true });
+}
+
 function construireOngletsSuper() {
   const zone = document.getElementById("ongletsSuper");
   const nb = nombreSuperRenaissances(renaissance);
@@ -865,7 +968,7 @@ function construireOngletsSuper() {
     bouton.type = "button";
     bouton.className = "onglet-palier" + (n === superActif ? " actif" : "");
     bouton.dataset.super = String(n);
-    bouton.textContent = n === 0 ? "Avant super" : "Super " + n;
+    bouton.textContent = nomOngletSuper(n);
     bouton.addEventListener("click", () => changerSuperActif(n));
     zone.appendChild(bouton);
   }
