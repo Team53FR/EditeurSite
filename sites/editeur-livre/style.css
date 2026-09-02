@@ -2213,6 +2213,19 @@ button.danger {
 }
 .dc-ligne .tr-champ { flex: 1 1 200px; }
 .dc-ligne .tr-champ.tr-court { flex: 0 0 8.5rem; }
+
+/* Le calibrage du papier : deux champs courts et son bouton, sur une ligne. */
+.dc-mesure { align-items: flex-end; }
+.dc-appliquer-mesure {
+  flex: 0 0 auto;
+  padding: 0.5rem 0.9rem;
+  border: 1px solid var(--s-accent, #8a4b2a); border-radius: 8px;
+  background: none; color: var(--s-accent, #8a4b2a);
+  font-size: 0.86rem; font-weight: 600; cursor: pointer;
+}
+.dc-appliquer-mesure:hover { background: var(--s-accent, #8a4b2a); color: #fff; }
+/* Un papier calibré n'est plus une estimation : on le dit, et en vert. */
+.dc-etat-mesure.dc-mesure-faite { color: #3f6b4a; font-weight: 600; }
 .dc-ligne select, .dc-ligne input[type="number"] {
   width: 100%; box-sizing: border-box;
   padding: 0.45rem 0.55rem;

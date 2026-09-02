@@ -1180,6 +1180,7 @@ function plastificationParCle(cle) {
 // de bureau : un carton est dense, il ne gonfle pas. 1,0 est la valeur usuelle.
 const PAPIERS_COUVERTURE = [
   { cle: "80",  nom: "Papier ordinaire — 80 g",   grammage: 80,  main: 1.2 },
+  { cle: "100", nom: "Papier un peu épais — 100 g", grammage: 100, main: 1.2 },
   { cle: "120", nom: "Papier épais — 120 g",      grammage: 120, main: 1.1 },
   { cle: "160", nom: "Bristol léger — 160 g",     grammage: 160, main: 1.0 },
   { cle: "200", nom: "Bristol — 200 g",           grammage: 200, main: 1.0 },
@@ -1189,7 +1190,59 @@ const PAPIERS_COUVERTURE = [
 const PAPIER_COUVERTURE_DEFAUT = "250";
 
 function papierCouverture(cle) {
-  return PAPIERS_COUVERTURE.find((p) => p.cle === cle) || PAPIERS_COUVERTURE[4];
+  return PAPIERS_COUVERTURE.find((p) => p.cle === cle) ||
+         PAPIERS_COUVERTURE.find((p) => p.cle === PAPIER_COUVERTURE_DEFAUT);
+}
+
+// ----- La main mesurée, et non devinée -----
+//
+// La « main » dit de combien un papier gonfle à grammage égal. Les valeurs du
+// tableau sont des moyennes — et une moyenne se trompe : 207 feuilles de 100 g
+// annoncées à 24,8 mm en mesurent 27,8 sur une rame réelle, soit une main de
+// 1,34 et non 1,2. Trois millimètres d'écart sur le dos, c'est une couverture
+// ratée.
+//
+// Cette valeur appartient à la RAME, pas au livre : elle se mesure une fois et
+// se retient, comme le décalage recto-verso appartient à l'imprimante. On la
+// range donc par grammage — deux papiers différents n'ont aucune raison de
+// gonfler pareil.
+const CLE_MAINS = "gh_mains_papier";
+
+function mainsMesurees() {
+  try {
+    const brut = JSON.parse(localStorage.getItem(CLE_MAINS) || "{}");
+    return brut && typeof brut === "object" ? brut : {};
+  } catch (e) { return {}; }
+}
+
+// La main à employer pour ce papier : celle qu'on a mesurée, sinon celle du
+// tableau.
+function mainPapier(pa) {
+  const v = parseFloat(mainsMesurees()[pa.grammage]);
+  return isFinite(v) && v > 0 ? v : pa.main;
+}
+
+function papierEstMesure(pa) {
+  return isFinite(parseFloat(mainsMesurees()[pa.grammage]));
+}
+
+// « J'ai mesuré N feuilles : X mm » → la main qui en découle, retenue pour ce
+// grammage. C'est l'inverse exact du calcul d'épaisseur.
+function enregistrerMainMesuree(grammage, feuilles, epaisseurMm) {
+  const n = parseFloat(feuilles), e = parseFloat(epaisseurMm), g = parseFloat(grammage);
+  if (!isFinite(n) || !isFinite(e) || !isFinite(g) || n <= 0 || e <= 0 || g <= 0) return null;
+  const main = e * 1000 / (n * g);
+  if (main < 0.5 || main > 3) return null;   // hors du plausible : saisie fautive
+  const table = mainsMesurees();
+  table[g] = Math.round(main * 1000) / 1000;
+  try { localStorage.setItem(CLE_MAINS, JSON.stringify(table)); } catch (e2) {}
+  return table[g];
+}
+
+function oublierMainMesuree(grammage) {
+  const table = mainsMesurees();
+  delete table[parseFloat(grammage)];
+  try { localStorage.setItem(CLE_MAINS, JSON.stringify(table)); } catch (e) {}
 }
 
 // Épaisseur d'UNE feuille, en millimètres.
@@ -1576,11 +1629,28 @@ function ouvrirDialogueCouvertureSeule(livre, f, nbPages, agrafe) {
         "vos pages, pas ce qui s'enroule autour.</p>" +
         "<p>Un essai de contour tranche plus vite qu'un raisonnement : il sort la " +
         "planche aux cotes exactes, sans encre, et vous la pliez sur votre pile.</p>" +
+
+        "<p><b>Le plus sûr : donnez-lui votre mesure.</b> Prenez une pile de feuilles " +
+        "de votre rame, tassez-la et mesurez-la au réglet. L'éditeur en déduit combien " +
+        "votre papier gonfle et s'en souviendra — c'est une propriété de la rame, pas " +
+        "du livre.</p>" +
+        '<div class="dc-ligne dc-mesure">' +
+          '<label class="tr-champ tr-court"><span>J\'ai mesuré</span>' +
+            '<input type="number" id="dcMesureFeuilles" value="' + Math.ceil(nbPages / 2) +
+            '" min="1" max="2000" step="1"> <small>feuilles</small></label>' +
+          '<label class="tr-champ tr-court"><span>qui font</span>' +
+            '<input type="number" id="dcMesureMm" placeholder="27,8" min="0.1" max="300" ' +
+            'step="0.1"> <small>mm</small></label>' +
+          '<button type="button" class="dc-appliquer-mesure">Utiliser cette mesure</button>' +
+        "</div>" +
+        '<p class="mi-groupe-aide dc-etat-mesure"></p>' +
+
         '<label class="tr-champ tr-court"><span>Main du papier</span>' +
-          '<input type="number" id="dcMain" value="' + papierPages.main +
-          '" min="0.8" max="2.5" step="0.05"></label>' +
+          '<input type="number" id="dcMain" value="' + mainPapier(papierPages) +
+          '" min="0.8" max="2.5" step="0.01"></label>' +
         "<p>La « main » dit de combien un papier gonfle à grammage égal. 1,2 correspond " +
-        "à un papier de bureau courant ; un papier bouffant de roman monte à 1,8.</p>" +
+        "à un papier de bureau courant ; un papier bouffant de roman monte à 1,8. " +
+        "La mesure ci-dessus la remplit pour vous.</p>" +
       "</details>" +
     "</div>";
   } else {
@@ -1649,10 +1719,23 @@ function ouvrirDialogueCouvertureSeule(livre, f, nbPages, agrafe) {
     fond.querySelector(".dc-apercu").innerHTML = schemaPlancheHtml(f, dosMm, agrafe);
     fond.querySelector(".dc-support").textContent = l.toFixed(0) + " × " + hautSupport + " mm";
 
+    // L'état du calibrage : sans lui, on ne saurait pas si le chiffre repose
+    // sur une moyenne de tableau ou sur une pile réellement mesurée.
+    const etatMesure = fond.querySelector(".dc-etat-mesure");
+    if (etatMesure && selPages) {
+      const pa = papierInterieur(selPages.value);
+      etatMesure.textContent = papierEstMesure(pa)
+        ? "Votre papier de " + pa.grammage + " g est calibré : main " +
+          String(mainPapier(pa)).replace(".", ",") + ". Le tableau donnait " +
+          String(pa.main).replace(".", ",") + "."
+        : "Papier de " + pa.grammage + " g non calibré : le calcul emploie la moyenne du tableau.";
+      etatMesure.classList.toggle("dc-mesure-faite", papierEstMesure(pa));
+    }
+
     const calcul = fond.querySelector(".dc-calcul");
     if (calcul && selPages) {
       const pa = papierInterieur(selPages.value);
-      const m = parseFloat(champMain && champMain.value) || pa.main;
+      const m = parseFloat(champMain && champMain.value) || mainPapier(pa);
       const pages = epaisseurDosMm(nbPages, pa.grammage, m);
       const cv = papierCouverture(selCouv ? selCouv.value : PAPIER_COUVERTURE_DEFAUT);
       const plast = selPlast ? supplementDosPlastificationMm(selPlast.value) : 0;
@@ -1692,17 +1775,41 @@ function ouvrirDialogueCouvertureSeule(livre, f, nbPages, agrafe) {
   // la main fige la valeur.
   const recalculerDos = () => {
     const pa = papierInterieur(selPages.value);
-    const m = parseFloat(champMain && champMain.value) || pa.main;
+    const m = parseFloat(champMain && champMain.value) || mainPapier(pa);
     const total = epaisseurDosMm(nbPages, pa.grammage, m) +
       supplementDosCouvertureMm(selCouv ? selCouv.value : PAPIER_COUVERTURE_DEFAUT,
                                 selPlast ? selPlast.value : PLASTIFICATION_DEFAUT);
     champDos.value = total.toFixed(1);
     rafraichir();
   };
-  if (selPages) selPages.onchange = recalculerDos;
+  // Changer de papier : la main suit celle qu'on a mesurée pour CE grammage,
+  // sans quoi la valeur du papier précédent resterait en place.
+  const changerPapierPages = () => {
+    if (champMain) champMain.value = mainPapier(papierInterieur(selPages.value));
+    recalculerDos();
+  };
+  if (selPages) selPages.onchange = changerPapierPages;
   if (selCouv) selCouv.onchange = recalculerDos;
   if (selPlast) selPlast.onchange = recalculerDos;
   if (champMain) champMain.oninput = recalculerDos;
+
+  const boutonMesure = fond.querySelector(".dc-appliquer-mesure");
+  if (boutonMesure) {
+    boutonMesure.onclick = () => {
+      const pa = papierInterieur(selPages.value);
+      const feuilles = fond.querySelector("#dcMesureFeuilles").value;
+      const champMm = fond.querySelector("#dcMesureMm");
+      const main = enregistrerMainMesuree(pa.grammage, feuilles, champMm.value);
+      if (main === null) {
+        alert("Mesure inexploitable.\n\nIndiquez un nombre de feuilles et une épaisseur " +
+              "en millimètres. Une pile de 200 feuilles de papier ordinaire fait entre " +
+              "18 et 30 mm : au-delà, c'est que l'une des deux valeurs est fausse.");
+        return;
+      }
+      if (champMain) champMain.value = main;
+      recalculerDos();
+    };
+  }
   champDos.oninput = rafraichir;
   selPapier.onchange = rafraichir;
 
