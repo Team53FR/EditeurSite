@@ -1250,14 +1250,67 @@ function epaisseurFeuilleMm(grammage, main) {
   return grammage * main / 1000;
 }
 
-// Ce que la couverture ajoute au dos : son épaisseur, comptée à chacun des
-// deux plis — le film de plastification compris, puisqu'il fait corps avec
-// elle. Une pochette enferme la feuille entre DEUX films, d'où le doublement
-// avant celui des plis.
-function supplementDosCouvertureMm(cleCouverture, clePlastification) {
+// ----- Le « tour » : tout ce qui s'ajoute autour de la pile -----
+//
+// Le dos ne vaut pas l'épaisseur des pages. S'y ajoutent, dans l'ordre :
+//   — la colle, déposée sur la tranche entre la pile et la couverture ;
+//   — la couverture, qui s'écarte de sa propre épaisseur à chacun des plis ;
+//   — le film de plastification, qui fait corps avec elle.
+//
+// AUCUN de ces trois termes ne se calcule exactement. Le facteur 2 des plis
+// est une convention d'atelier, pas une loi : il dépend du rayon du pli et de
+// la force du marquage. Et l'épaisseur de colle dépend entièrement de la main
+// qui l'étale — une vinylique passée fin donne trois dixièmes, une
+// thermofusible au pistolet peut en donner huit.
+//
+// D'où la règle de ce panneau : le calcul propose une ESTIMATION honnête,
+// mais dès qu'un livre a été relié, sa mesure la remplace. Un tour mesuré est
+// exact pour tous les livres suivants faits des mêmes matériaux — c'est la
+// seule voie vers un dos juste au dixième.
+const COLLE_PAR_DEFAUT_MM = 0.5;
+const CLE_TOUR = "gh_tour_couverture";
+
+function tourMesure() {
+  try {
+    const t = JSON.parse(localStorage.getItem(CLE_TOUR) || "null");
+    return t && isFinite(parseFloat(t.mm)) ? t : null;
+  } catch (e) { return null; }
+}
+
+function enregistrerTourMesure(mm, materiaux) {
+  const v = parseFloat(mm);
+  if (!isFinite(v) || v < 0 || v > 15) return null;
+  const t = { mm: Math.round(v * 100) / 100, materiaux: materiaux || "" };
+  try { localStorage.setItem(CLE_TOUR, JSON.stringify(t)); } catch (e) {}
+  return t;
+}
+
+function oublierTourMesure() {
+  try { localStorage.removeItem(CLE_TOUR); } catch (e) {}
+}
+
+function colleMm() {
+  const v = parseFloat(localStorage.getItem("gh_colle_mm"));
+  return isFinite(v) && v >= 0 && v <= 5 ? v : COLLE_PAR_DEFAUT_MM;
+}
+
+// L'estimation, quand rien n'a encore été mesuré.
+function tourEstimeMm(cleCouverture, clePlastification) {
   const pa = papierCouverture(cleCouverture);
   const film = 2 * plastificationParCle(clePlastification).micronsParFace / 1000;
-  return 2 * (epaisseurFeuilleMm(pa.grammage, pa.main) + film);
+  return 2 * (epaisseurFeuilleMm(pa.grammage, pa.main) + film) + colleMm();
+}
+
+// Ce qui s'ajoute réellement : la mesure si on en a une, l'estimation sinon.
+function supplementDosCouvertureMm(cleCouverture, clePlastification) {
+  const t = tourMesure();
+  return t ? parseFloat(t.mm) : tourEstimeMm(cleCouverture, clePlastification);
+}
+
+function libelleMateriaux(cleCouverture, clePlastification) {
+  const pa = papierCouverture(cleCouverture);
+  const pl = plastificationParCle(clePlastification);
+  return pa.grammage + " g" + (pl.micronsParFace ? " + " + pl.micronsParFace + " µm" : ", non plastifiée");
 }
 
 // La part du seul film, pour pouvoir la détailler à l'écran.
@@ -1661,6 +1714,34 @@ function ouvrirDialogueCouvertureSeule(livre, f, nbPages, agrafe) {
         "<p>La « main » dit de combien un papier gonfle à grammage égal. 1,2 correspond " +
         "à un papier de bureau courant ; un papier bouffant de roman monte à 1,8. " +
         "La mesure ci-dessus la remplit pour vous.</p>" +
+
+        "<h4>Le tour de couverture</h4>" +
+        "<p>C'est tout ce qui vient s'ajouter autour de la pile : la <b>colle</b> déposée " +
+        "sur la tranche, la <b>couverture</b> qui s'écarte de son épaisseur à chacun des " +
+        "plis, le <b>film</b> s'il y en a un. Aucun des trois ne se calcule exactement — " +
+        "l'épaisseur de colle dépend de la main qui l'étale, et le pli du soin qu'on y met. " +
+        "Le calcul en donne une estimation honnête, rien de plus.</p>" +
+        "<p><b>Pour en finir avec l'à-peu-près :</b> dès qu'un livre est relié, mesurez-le. " +
+        "L'écart entre son dos et l'épaisseur de ses pages, c'est votre tour — exact, et " +
+        "valable pour tous les livres suivants faits des mêmes matériaux.</p>" +
+        '<div class="dc-ligne dc-mesure">' +
+          '<label class="tr-champ tr-court"><span>Pages de ce livre</span>' +
+            '<input type="number" id="dcTourPages" placeholder="27,8" min="0.1" max="300" ' +
+            'step="0.1"> <small>mm</small></label>' +
+          '<label class="tr-champ tr-court"><span>Son dos, qui tombe juste</span>' +
+            '<input type="number" id="dcTourDos" placeholder="29,0" min="0.1" max="310" ' +
+            'step="0.1"> <small>mm</small></label>' +
+          '<button type="button" class="dc-appliquer-tour">Utiliser cet écart</button>' +
+        "</div>" +
+        '<p class="mi-groupe-aide dc-etat-tour"></p>' +
+        '<div class="dc-ligne">' +
+          '<label class="tr-champ tr-court"><span>Épaisseur de colle</span>' +
+            '<input type="number" id="dcColle" value="' + colleMm() +
+            '" min="0" max="5" step="0.1"> <small>mm</small></label>' +
+        "</div>" +
+        "<p>La colle n'entre dans le calcul que tant qu'aucun tour n'a été mesuré : une " +
+        "mesure la contient déjà. Une vinylique passée fin donne trois dixièmes, une " +
+        "thermofusible au pistolet peut en donner huit.</p>" +
       "</details>" +
     "</div>";
   } else {
@@ -1742,25 +1823,60 @@ function ouvrirDialogueCouvertureSeule(livre, f, nbPages, agrafe) {
       etatMesure.classList.toggle("dc-mesure-faite", papierEstMesure(pa));
     }
 
+    // L'état du tour : mesuré une bonne fois, ou encore estimé.
+    const etatTour = fond.querySelector(".dc-etat-tour");
+    if (etatTour) {
+      const t = tourMesure();
+      const materiauxCourants = libelleMateriaux(
+        selCouv ? selCouv.value : PAPIER_COUVERTURE_DEFAUT,
+        selPlast ? selPlast.value : PLASTIFICATION_DEFAUT);
+      if (t) {
+        etatTour.innerHTML = "Tour mesuré : <b>" +
+          String(t.mm).replace(".", ",") + " mm</b>" +
+          (t.materiaux ? ", relevé avec une couverture " + echapperTitre(t.materiaux) : "") +
+          ". Il remplace le calcul." +
+          (t.materiaux && t.materiaux !== materiauxCourants
+            ? " <b>Vos réglages actuels (" + echapperTitre(materiauxCourants) +
+              ") ne correspondent pas : refaites la mesure.</b>"
+            : "") +
+          ' <button type="button" class="dc-oublier-tour">Revenir au calcul</button>';
+        etatTour.classList.add("dc-mesure-faite");
+        const oublier = etatTour.querySelector(".dc-oublier-tour");
+        if (oublier) oublier.onclick = () => { oublierTourMesure(); recalculerDos(); };
+      } else {
+        etatTour.textContent = "Tour non mesuré : le calcul emploie une estimation.";
+        etatTour.classList.remove("dc-mesure-faite");
+      }
+    }
+
     const calcul = fond.querySelector(".dc-calcul");
     if (calcul && selPages) {
       const pa = papierInterieur(selPages.value);
       const m = parseFloat(champMain && champMain.value) || mainPapier(pa);
       const pages = epaisseurDosMm(nbPages, pa.grammage, m);
-      const cv = papierCouverture(selCouv ? selCouv.value : PAPIER_COUVERTURE_DEFAUT);
-      const plast = selPlast ? supplementDosPlastificationMm(selPlast.value) : 0;
-      const couvSeule = 2 * epaisseurFeuilleMm(cv.grammage, cv.main);
+      const cleCouv = selCouv ? selCouv.value : PAPIER_COUVERTURE_DEFAUT;
+      const clePlast = selPlast ? selPlast.value : PLASTIFICATION_DEFAUT;
+      const cv = papierCouverture(cleCouv);
+      const mesure = tourMesure();
+      const tour = supplementDosCouvertureMm(cleCouv, clePlast);
       const mm = (v) => v.toFixed(2).replace(".", ",");
+
       // Le détail poste par poste, et non le seul total : c'est le seul moyen
       // de voir d'où sort le chiffre — et de repérer celui qui cloche.
-      const lignes = [
-        Math.ceil(nbPages / 2) + " feuilles de " + pa.grammage + " g/m² : " + mm(pages) + " mm",
-        "couverture " + cv.grammage + " g/m², comptée à chacun des deux plis : " +
-          mm(couvSeule) + " mm"
-      ];
-      if (plast) lignes.push("plastification, deux films aux deux plis : " + mm(plast) + " mm");
-      calcul.textContent = "Pour " + nbPages + " pages — " + lignes.join(" ; ") +
-        ". Total : " + mm(pages + couvSeule + plast) + " mm.";
+      let texte = "Pour " + nbPages + " pages — " +
+        Math.ceil(nbPages / 2) + " feuilles de " + pa.grammage + " g/m² : " + mm(pages) + " mm" +
+        (papierEstMesure(pa) ? " (mesuré)" : " (estimé)") + " ; ";
+      if (mesure) {
+        texte += "tour de couverture mesuré sur un livre relié : " + mm(tour) + " mm";
+      } else {
+        const plast = supplementDosPlastificationMm(clePlast);
+        const couvSeule = 2 * epaisseurFeuilleMm(cv.grammage, cv.main);
+        const parts = ["colle " + mm(colleMm()) + " mm",
+                       "couverture " + cv.grammage + " g/m² aux deux plis " + mm(couvSeule) + " mm"];
+        if (plast) parts.push("plastification " + mm(plast) + " mm");
+        texte += "tour de couverture estimé " + mm(tour) + " mm (" + parts.join(", ") + ")";
+      }
+      calcul.textContent = texte + ". Total : " + mm(pages + tour) + " mm.";
     }
 
     const papier = papierParCle(selPapier.value);
@@ -1802,6 +1918,36 @@ function ouvrirDialogueCouvertureSeule(livre, f, nbPages, agrafe) {
   if (selCouv) selCouv.onchange = recalculerDos;
   if (selPlast) selPlast.onchange = recalculerDos;
   if (champMain) champMain.oninput = recalculerDos;
+
+  const boutonTour = fond.querySelector(".dc-appliquer-tour");
+  if (boutonTour) {
+    boutonTour.onclick = () => {
+      const p = parseFloat(fond.querySelector("#dcTourPages").value);
+      const dosJuste = parseFloat(fond.querySelector("#dcTourDos").value);
+      const ecart = dosJuste - p;
+      const t = enregistrerTourMesure(ecart, libelleMateriaux(
+        selCouv ? selCouv.value : PAPIER_COUVERTURE_DEFAUT,
+        selPlast ? selPlast.value : PLASTIFICATION_DEFAUT));
+      if (!t) {
+        alert("Mesures inexploitables.\n\nLe dos d'un livre relié est forcément PLUS " +
+              "épais que ses pages seules, et de quelques millimètres au plus : c'est " +
+              "l'épaisseur de la colle, de la couverture et du film réunis.");
+        return;
+      }
+      recalculerDos();
+    };
+  }
+
+  const champColle = fond.querySelector("#dcColle");
+  if (champColle) {
+    champColle.oninput = () => {
+      const v = parseFloat(champColle.value);
+      if (isFinite(v) && v >= 0 && v <= 5) {
+        try { localStorage.setItem("gh_colle_mm", String(v)); } catch (e) {}
+      }
+      recalculerDos();
+    };
+  }
 
   const boutonMesure = fond.querySelector(".dc-appliquer-mesure");
   if (boutonMesure) {

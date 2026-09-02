@@ -2225,7 +2225,16 @@ button.danger {
 }
 .dc-appliquer-mesure:hover { background: var(--s-accent, #8a4b2a); color: #fff; }
 /* Un papier calibré n'est plus une estimation : on le dit, et en vert. */
-.dc-etat-mesure.dc-mesure-faite { color: #3f6b4a; font-weight: 600; }
+.dc-etat-mesure.dc-mesure-faite,
+.dc-etat-tour.dc-mesure-faite { color: #3f6b4a; font-weight: 600; }
+.dc-oublier-tour {
+  margin-left: 6px;
+  padding: 2px 8px;
+  border: 1px solid var(--s-line, #e6ddc9); border-radius: 999px;
+  background: var(--s-paper, #fffdf8); color: var(--s-ink-soft, #6f6455);
+  font-size: 0.74rem; font-weight: 400; cursor: pointer;
+}
+.dc-oublier-tour:hover { border-color: var(--s-accent, #8a4b2a); color: var(--s-accent, #8a4b2a); }
 .dc-ligne select, .dc-ligne input[type="number"] {
   width: 100%; box-sizing: border-box;
   padding: 0.45rem 0.55rem;
