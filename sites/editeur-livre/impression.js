@@ -1630,20 +1630,26 @@ function ouvrirDialogueCouvertureSeule(livre, f, nbPages, agrafe) {
         "<p>Un essai de contour tranche plus vite qu'un raisonnement : il sort la " +
         "planche aux cotes exactes, sans encre, et vous la pliez sur votre pile.</p>" +
 
-        "<p><b>Le plus sûr : donnez-lui votre mesure.</b> Prenez une pile de feuilles " +
-        "de votre rame, tassez-la et mesurez-la au réglet. L'éditeur en déduit combien " +
-        "votre papier gonfle et s'en souviendra — c'est une propriété de la rame, pas " +
-        "du livre.</p>" +
+        "<p><b>Le plus sûr : donnez-lui votre mesure.</b> Rien à imprimer — la main " +
+        "est une propriété du papier, pas de ce qu'on écrit dessus. Prenez des feuilles " +
+        "<b>blanches</b> dans votre rame, tassez la pile sur une table et mesurez-la au " +
+        "réglet. L'éditeur en déduit combien votre papier gonfle et s'en souviendra.</p>" +
         '<div class="dc-ligne dc-mesure">' +
           '<label class="tr-champ tr-court"><span>J\'ai mesuré</span>' +
-            '<input type="number" id="dcMesureFeuilles" value="' + Math.ceil(nbPages / 2) +
-            '" min="1" max="2000" step="1"> <small>feuilles</small></label>' +
+            '<input type="number" id="dcMesureFeuilles" value="100" ' +
+            'min="1" max="2000" step="1"> <small>feuilles</small></label>' +
           '<label class="tr-champ tr-court"><span>qui font</span>' +
-            '<input type="number" id="dcMesureMm" placeholder="27,8" min="0.1" max="300" ' +
+            '<input type="number" id="dcMesureMm" placeholder="13,4" min="0.1" max="300" ' +
             'step="0.1"> <small>mm</small></label>' +
           '<button type="button" class="dc-appliquer-mesure">Utiliser cette mesure</button>' +
         "</div>" +
         '<p class="mi-groupe-aide dc-etat-mesure"></p>' +
+        '<p class="mi-groupe-aide">Plus la pile est haute, plus la mesure est juste : ' +
+        "le demi-millimètre d'imprécision du réglet se divise par le nombre de feuilles. " +
+        "Sur 100 feuilles il fausse le dos d'un bon millimètre ; sur une <b>rame entière " +
+        "de 500, encore fermée</b>, de deux dixièmes. Autre voie sans rien mesurer : " +
+        "l'emballage de la rame indique parfois l'épaisseur d'une feuille — divisez-la " +
+        "par le grammage et multipliez par mille.</p>" +
 
         '<label class="tr-champ tr-court"><span>Main du papier</span>' +
           '<input type="number" id="dcMain" value="' + mainPapier(papierPages) +
