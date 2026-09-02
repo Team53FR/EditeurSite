@@ -1168,7 +1168,46 @@ function plastificationParCle(cle) {
   return PLASTIFICATIONS.find((p) => p.cle === cle) || PLASTIFICATIONS[0];
 }
 
-// Deux films sur la feuille, deux plis autour du dos : quatre fois le micron.
+// ----- Le papier de la COUVERTURE -----
+//
+// Il manquait au calcul, et c'était une erreur de fond : le panneau affirmait
+// même que seule l'épaisseur des pages comptait. C'est faux. La couverture
+// s'enroule autour de la pile, et à chacun des deux plis elle s'écarte de sa
+// propre épaisseur. Un bristol de 250 g élargit ainsi le dos d'un bon demi-
+// millimètre — sur un dos de 5 mm, l'erreur saute aux yeux.
+//
+// La « main » d'un papier de couverture est plus faible que celle d'un papier
+// de bureau : un carton est dense, il ne gonfle pas. 1,0 est la valeur usuelle.
+const PAPIERS_COUVERTURE = [
+  { cle: "80",  nom: "Papier ordinaire — 80 g",   grammage: 80,  main: 1.2 },
+  { cle: "120", nom: "Papier épais — 120 g",      grammage: 120, main: 1.1 },
+  { cle: "160", nom: "Bristol léger — 160 g",     grammage: 160, main: 1.0 },
+  { cle: "200", nom: "Bristol — 200 g",           grammage: 200, main: 1.0 },
+  { cle: "250", nom: "Bristol fort — 250 g",      grammage: 250, main: 1.0 },
+  { cle: "300", nom: "Carte — 300 g",             grammage: 300, main: 1.0 }
+];
+const PAPIER_COUVERTURE_DEFAUT = "250";
+
+function papierCouverture(cle) {
+  return PAPIERS_COUVERTURE.find((p) => p.cle === cle) || PAPIERS_COUVERTURE[4];
+}
+
+// Épaisseur d'UNE feuille, en millimètres.
+function epaisseurFeuilleMm(grammage, main) {
+  return grammage * main / 1000;
+}
+
+// Ce que la couverture ajoute au dos : son épaisseur, comptée à chacun des
+// deux plis — le film de plastification compris, puisqu'il fait corps avec
+// elle. Une pochette enferme la feuille entre DEUX films, d'où le doublement
+// avant celui des plis.
+function supplementDosCouvertureMm(cleCouverture, clePlastification) {
+  const pa = papierCouverture(cleCouverture);
+  const film = 2 * plastificationParCle(clePlastification).micronsParFace / 1000;
+  return 2 * (epaisseurFeuilleMm(pa.grammage, pa.main) + film);
+}
+
+// La part du seul film, pour pouvoir la détailler à l'écran.
 function supplementDosPlastificationMm(cle) {
   return 4 * plastificationParCle(cle).micronsParFace / 1000;
 }
@@ -1482,7 +1521,9 @@ function ouvrirDialogueCouvertureSeule(livre, f, nbPages, agrafe) {
   if (ancien) ancien.remove();
 
   const papierPages = papierInterieur(PAPIER_INTERIEUR_DEFAUT);
-  const dosCalcule = agrafe ? 0 : epaisseurDosMm(nbPages, papierPages.grammage, papierPages.main);
+  const dosCalcule = agrafe ? 0 :
+    epaisseurDosMm(nbPages, papierPages.grammage, papierPages.main) +
+    supplementDosCouvertureMm(PAPIER_COUVERTURE_DEFAUT, PLASTIFICATION_DEFAUT);
   const largSupport = (dosMm) => 2 * f.larg + dosMm + 2 * MARGE_TECHNIQUE_MM;
   const hautSupport = f.haut + 2 * MARGE_TECHNIQUE_MM;
 
@@ -1500,9 +1541,9 @@ function ouvrirDialogueCouvertureSeule(livre, f, nbPages, agrafe) {
 
   if (!agrafe) {
     html += '<div class="mi-groupe"><h4>Quelle épaisseur fera le dos ?</h4>' +
-      '<p class="mi-groupe-aide">Le dos entoure la pile de vos pages : c\'est ' +
-      "l'épaisseur de <b>leur</b> papier qui compte, pas celle de la couverture. " +
-      "Choisissez le papier que vous mettrez dans le bac.</p>" +
+      '<p class="mi-groupe-aide">Le dos enserre la pile de vos pages, et la ' +
+      "couverture s'enroule autour : les <b>deux</b> papiers comptent, plus le " +
+      "film si vous plastifiez. Indiquez ce que vous mettrez réellement dans le bac.</p>" +
       '<div class="dc-ligne">' +
         '<label class="tr-champ"><span>Papier de vos pages</span>' +
           '<select id="dcPapierPages">' +
@@ -1514,6 +1555,11 @@ function ouvrirDialogueCouvertureSeule(livre, f, nbPages, agrafe) {
           '" min="0" max="60" step="0.1"> <small>mm</small></label>' +
       "</div>" +
       '<div class="dc-ligne">' +
+        '<label class="tr-champ"><span>Papier de la couverture</span>' +
+          '<select id="dcPapierCouv">' +
+            PAPIERS_COUVERTURE.map((pa) => '<option value="' + pa.cle + '"' +
+              (pa.cle === PAPIER_COUVERTURE_DEFAUT ? " selected" : "") + ">" + pa.nom + "</option>").join("") +
+          "</select></label>" +
         '<label class="tr-champ"><span>Couverture plastifiée ?</span>' +
           '<select id="dcPlastification">' +
             PLASTIFICATIONS.map((p) => '<option value="' + p.cle + '"' +
@@ -1524,11 +1570,12 @@ function ouvrirDialogueCouvertureSeule(livre, f, nbPages, agrafe) {
       '<details class="mi-details-schema"><summary>Le dos ne tombe pas juste ?</summary>' +
         "<p>Le calcul part d'un papier moyen ; le vôtre gonfle peut-être un peu plus " +
         "ou un peu moins. La mesure vaut mieux que le calcul : <b>imprimez vos pages, " +
-        "tassez la pile sur une table, mesurez son épaisseur à la règle</b> et reportez-la " +
-        "dans « Dos obtenu » — en lui ajoutant la plastification si vous en mettez une, " +
-        "puisque le calcul ne connaît plus alors l'épaisseur de vos pages. Le papier de la " +
-        "couverture, lui, n'est pas compté : sa fraction de millimètre s'absorbe dans les " +
-        "plis, là où le film d'une pochette, quatre fois plus épais, ne s'absorbe pas.</p>" +
+        "tassez la pile sur une table, mesurez son épaisseur à la règle</b>, puis " +
+        "reportez cette mesure dans « Dos obtenu » <b>en y ajoutant</b> ce que le " +
+        "calcul annonce pour la couverture et la plastification — la règle mesure " +
+        "vos pages, pas ce qui s'enroule autour.</p>" +
+        "<p>Un essai de contour tranche plus vite qu'un raisonnement : il sort la " +
+        "planche aux cotes exactes, sans encre, et vous la pliez sur votre pile.</p>" +
         '<label class="tr-champ tr-court"><span>Main du papier</span>' +
           '<input type="number" id="dcMain" value="' + papierPages.main +
           '" min="0.8" max="2.5" step="0.05"></label>' +
@@ -1584,6 +1631,7 @@ function ouvrirDialogueCouvertureSeule(livre, f, nbPages, agrafe) {
   const champDos = fond.querySelector("#dcDos");
   const selPapier = fond.querySelector("#dcPapier");
   const selPages = fond.querySelector("#dcPapierPages");
+  const selCouv = fond.querySelector("#dcPapierCouv");
   const selPlast = fond.querySelector("#dcPlastification");
   const champMain = fond.querySelector("#dcMain");
 
@@ -1606,17 +1654,20 @@ function ouvrirDialogueCouvertureSeule(livre, f, nbPages, agrafe) {
       const pa = papierInterieur(selPages.value);
       const m = parseFloat(champMain && champMain.value) || pa.main;
       const pages = epaisseurDosMm(nbPages, pa.grammage, m);
+      const cv = papierCouverture(selCouv ? selCouv.value : PAPIER_COUVERTURE_DEFAUT);
       const plast = selPlast ? supplementDosPlastificationMm(selPlast.value) : 0;
-      const mm = (v) => v.toFixed(1).replace(".", ",");
-      // Le détail plutôt que le seul total : on doit pouvoir vérifier d'où
-      // sort le chiffre, et voir ce que la plastification lui ajoute.
-      calcul.textContent = "Calculé pour " + nbPages + " pages, soit " +
-        Math.ceil(nbPages / 2) + " feuilles de " + pa.grammage + " g/m² : " +
-        mm(pages) + " mm" +
-        (plast
-          ? ", plus " + mm(plast) + " mm pour la plastification (deux films sur la " +
-            "couverture, comptés à chacun des deux plis) — soit " + mm(pages + plast) + " mm."
-          : ".");
+      const couvSeule = 2 * epaisseurFeuilleMm(cv.grammage, cv.main);
+      const mm = (v) => v.toFixed(2).replace(".", ",");
+      // Le détail poste par poste, et non le seul total : c'est le seul moyen
+      // de voir d'où sort le chiffre — et de repérer celui qui cloche.
+      const lignes = [
+        Math.ceil(nbPages / 2) + " feuilles de " + pa.grammage + " g/m² : " + mm(pages) + " mm",
+        "couverture " + cv.grammage + " g/m², comptée à chacun des deux plis : " +
+          mm(couvSeule) + " mm"
+      ];
+      if (plast) lignes.push("plastification, deux films aux deux plis : " + mm(plast) + " mm");
+      calcul.textContent = "Pour " + nbPages + " pages — " + lignes.join(" ; ") +
+        ". Total : " + mm(pages + couvSeule + plast) + " mm.";
     }
 
     const papier = papierParCle(selPapier.value);
@@ -1643,11 +1694,13 @@ function ouvrirDialogueCouvertureSeule(livre, f, nbPages, agrafe) {
     const pa = papierInterieur(selPages.value);
     const m = parseFloat(champMain && champMain.value) || pa.main;
     const total = epaisseurDosMm(nbPages, pa.grammage, m) +
-                  (selPlast ? supplementDosPlastificationMm(selPlast.value) : 0);
+      supplementDosCouvertureMm(selCouv ? selCouv.value : PAPIER_COUVERTURE_DEFAUT,
+                                selPlast ? selPlast.value : PLASTIFICATION_DEFAUT);
     champDos.value = total.toFixed(1);
     rafraichir();
   };
   if (selPages) selPages.onchange = recalculerDos;
+  if (selCouv) selCouv.onchange = recalculerDos;
   if (selPlast) selPlast.onchange = recalculerDos;
   if (champMain) champMain.oninput = recalculerDos;
   champDos.oninput = rafraichir;
