@@ -1647,9 +1647,13 @@ function ouvrirDialogueCouvertureSeule(livre, f, nbPages, agrafe) {
         '<p class="mi-groupe-aide">Plus la pile est haute, plus la mesure est juste : ' +
         "le demi-millimètre d'imprécision du réglet se divise par le nombre de feuilles. " +
         "Sur 100 feuilles il fausse le dos d'un bon millimètre ; sur une <b>rame entière " +
-        "de 500, encore fermée</b>, de deux dixièmes. Autre voie sans rien mesurer : " +
-        "l'emballage de la rame indique parfois l'épaisseur d'une feuille — divisez-la " +
-        "par le grammage et multipliez par mille.</p>" +
+        "de 500, encore fermée</b>, de deux dixièmes seulement.</p>" +
+        '<p class="mi-groupe-aide">Inutile de chercher cette valeur sur l\'emballage : ' +
+        "une rame de bureau y annonce son grammage et sa blancheur, presque jamais son " +
+        "épaisseur, et la main pour ainsi dire jamais. Elle figure sur la fiche technique " +
+        "du fabricant, sous le nom d'<b>épaisseur</b> en µm (norme ISO 534) — divisez-la " +
+        "alors par le grammage et multipliez par mille. Mais votre réglet vaut mieux " +
+        "qu'une fiche : celle-ci donne une valeur nominale, le vôtre mesure votre rame.</p>" +
 
         '<label class="tr-champ tr-court"><span>Main du papier</span>' +
           '<input type="number" id="dcMain" value="' + mainPapier(papierPages) +
