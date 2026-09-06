@@ -1294,6 +1294,41 @@ function colleMm() {
   return isFinite(v) && v >= 0 && v <= 5 ? v : COLLE_PAR_DEFAUT_MM;
 }
 
+// ----- Ajustement de la taille de la couverture -----
+//
+// Le format donne la cote THÉORIQUE de la page (105 × 148 pour un A6). Un livre
+// relié à la maison tombe presque toujours un peu plus grand : le pli épaissit,
+// la coupe n'est jamais au dixième, et la couverture, pour bien envelopper, doit
+// mordre de quelques dixièmes au-delà des pages. On laisse donc l'utilisateur
+// AGRANDIR la seule couverture — mesure du livre fini à l'appui — sans toucher
+// aux pages intérieures. La valeur est propre à sa reliure, on la retient.
+const CLE_DEBORD = "gh_couv_debord";
+
+function debordCouverture() {
+  try {
+    const d = JSON.parse(localStorage.getItem(CLE_DEBORD) || "null");
+    const l = parseFloat(d && d.larg);
+    const h = parseFloat(d && d.haut);
+    return {
+      larg: isFinite(l) && l >= 0 && l <= 10 ? l : 0,
+      haut: isFinite(h) && h >= 0 && h <= 10 ? h : 0
+    };
+  } catch (e) { return { larg: 0, haut: 0 }; }
+}
+
+function enregistrerDebordCouverture(larg, haut) {
+  const l = Math.min(10, Math.max(0, parseFloat(larg) || 0));
+  const h = Math.min(10, Math.max(0, parseFloat(haut) || 0));
+  try { localStorage.setItem(CLE_DEBORD, JSON.stringify({ larg: l, haut: h })); } catch (e) {}
+  return { larg: l, haut: h };
+}
+
+// Le format agrandi du débord, à n'employer QUE pour la planche de couverture.
+function formatAvecDebord(f, debord) {
+  const d = debord || debordCouverture();
+  return Object.assign({}, f, { larg: f.larg + d.larg, haut: f.haut + d.haut });
+}
+
 // L'estimation, quand rien n'a encore été mesuré.
 function tourEstimeMm(cleCouverture, clePlastification) {
   const pa = papierCouverture(cleCouverture);
@@ -1630,8 +1665,15 @@ function ouvrirDialogueCouvertureSeule(livre, f, nbPages, agrafe) {
   const dosCalcule = agrafe ? 0 :
     epaisseurDosMm(nbPages, papierPages.grammage, papierPages.main) +
     supplementDosCouvertureMm(PAPIER_COUVERTURE_DEFAUT, PLASTIFICATION_DEFAUT);
-  const largSupport = (dosMm) => 2 * f.larg + dosMm + 2 * MARGE_TECHNIQUE_MM;
-  const hautSupport = f.haut + 2 * MARGE_TECHNIQUE_MM;
+
+  // La couverture peut être agrandie de quelques dixièmes pour bien envelopper
+  // le livre relié ; les pages, elles, gardent le format nominal. `fCouv()` rend
+  // le format agrandi courant, relu à chaque frappe dans les champs de débord.
+  let debord = debordCouverture();
+  const fCouv = () => formatAvecDebord(f, debord);
+  const largSupport = (dosMm) => 2 * fCouv().larg + dosMm + 2 * MARGE_TECHNIQUE_MM;
+  const hautSupport = () => fCouv().haut + 2 * MARGE_TECHNIQUE_MM;
+  const coteMm = (v) => String(Math.round(v * 10) / 10).replace(".", ",");
 
   let html = '<div class="modal-impression-carte mi-carte" role="dialog" aria-modal="true">' +
     '<button class="mi-fermer" aria-label="Fermer">&#10005;</button>' +
@@ -1643,7 +1685,7 @@ function ouvrirDialogueCouvertureSeule(livre, f, nbPages, agrafe) {
         "Des traits marquent où plier et où couper.") + "</p>";
 
   // Le dessin dit en un coup d'œil ce qui va sortir de l'imprimante.
-  html += '<div class="dc-apercu">' + schemaPlancheHtml(f, dosCalcule, agrafe) + "</div>";
+  html += '<div class="dc-apercu">' + schemaPlancheHtml(fCouv(), dosCalcule, agrafe) + "</div>";
 
   if (!agrafe) {
     html += '<div class="mi-groupe"><h4>Quelle épaisseur fera le dos ?</h4>' +
@@ -1714,34 +1756,6 @@ function ouvrirDialogueCouvertureSeule(livre, f, nbPages, agrafe) {
         "<p>La « main » dit de combien un papier gonfle à grammage égal. 1,2 correspond " +
         "à un papier de bureau courant ; un papier bouffant de roman monte à 1,8. " +
         "La mesure ci-dessus la remplit pour vous.</p>" +
-
-        "<h4>Le tour de couverture</h4>" +
-        "<p>C'est tout ce qui vient s'ajouter autour de la pile : la <b>colle</b> déposée " +
-        "sur la tranche, la <b>couverture</b> qui s'écarte de son épaisseur à chacun des " +
-        "plis, le <b>film</b> s'il y en a un. Aucun des trois ne se calcule exactement — " +
-        "l'épaisseur de colle dépend de la main qui l'étale, et le pli du soin qu'on y met. " +
-        "Le calcul en donne une estimation honnête, rien de plus.</p>" +
-        "<p><b>Pour en finir avec l'à-peu-près :</b> dès qu'un livre est relié, mesurez-le. " +
-        "L'écart entre son dos et l'épaisseur de ses pages, c'est votre tour — exact, et " +
-        "valable pour tous les livres suivants faits des mêmes matériaux.</p>" +
-        '<div class="dc-ligne dc-mesure">' +
-          '<label class="tr-champ tr-court"><span>Pages de ce livre</span>' +
-            '<input type="number" id="dcTourPages" placeholder="27,8" min="0.1" max="300" ' +
-            'step="0.1"> <small>mm</small></label>' +
-          '<label class="tr-champ tr-court"><span>Son dos, qui tombe juste</span>' +
-            '<input type="number" id="dcTourDos" placeholder="29,0" min="0.1" max="310" ' +
-            'step="0.1"> <small>mm</small></label>' +
-          '<button type="button" class="dc-appliquer-tour">Utiliser cet écart</button>' +
-        "</div>" +
-        '<p class="mi-groupe-aide dc-etat-tour"></p>' +
-        '<div class="dc-ligne">' +
-          '<label class="tr-champ tr-court"><span>Épaisseur de colle</span>' +
-            '<input type="number" id="dcColle" value="' + colleMm() +
-            '" min="0" max="5" step="0.1"> <small>mm</small></label>' +
-        "</div>" +
-        "<p>La colle n'entre dans le calcul que tant qu'aucun tour n'a été mesuré : une " +
-        "mesure la contient déjà. Une vinylique passée fin donne trois dixièmes, une " +
-        "thermofusible au pistolet peut en donner huit.</p>" +
       "</details>" +
     "</div>";
   } else {
@@ -1750,6 +1764,23 @@ function ouvrirDialogueCouvertureSeule(livre, f, nbPages, agrafe) {
       "repassez par « La couverture » du dos collé.</p>" +
       '<input type="hidden" id="dcDos" value="0">';
   }
+
+  html += '<div class="mi-groupe"><h4>Ajuster la taille de la couverture</h4>' +
+    '<p class="mi-groupe-aide">Le format prévoit une page de <b>' + coteMm(f.larg) + " × " +
+      coteMm(f.haut) + " mm</b>. Un livre relié à la maison tombe souvent un peu plus grand : " +
+      "si la couverture imprimée couvre juste, agrandissez-la. Mesurez le livre fini et " +
+      "reportez ici les millimètres qui manquent — les pages intérieures, elles, ne bougent pas.</p>" +
+    '<div class="dc-ligne">' +
+      '<label class="tr-champ tr-court"><span>Élargir la couverture</span>' +
+        '<input type="number" id="dcDebordLarg" value="' + debord.larg +
+        '" min="0" max="10" step="0.5"> <small>mm</small></label>' +
+      '<label class="tr-champ tr-court"><span>Rehausser la couverture</span>' +
+        '<input type="number" id="dcDebordHaut" value="' + debord.haut +
+        '" min="0" max="10" step="0.5"> <small>mm</small></label>' +
+      '<div class="tr-champ"><span>Couverture obtenue</span>' +
+        '<strong class="dc-cote-couv"></strong></div>' +
+    "</div>" +
+  "</div>";
 
   html += '<div class="mi-groupe"><h4>Sur quelle feuille imprimez-vous ?</h4>' +
     '<div class="dc-ligne">' +
@@ -1761,7 +1792,7 @@ function ouvrirDialogueCouvertureSeule(livre, f, nbPages, agrafe) {
         "</select></label>" +
       '<div class="tr-champ"><span>Planche à plat</span>' +
         '<strong class="dc-support">' + largSupport(dosCalcule).toFixed(0) +
-        " × " + hautSupport + " mm</strong></div>" +
+        " × " + hautSupport().toFixed(0) + " mm</strong></div>" +
     "</div>" +
     '<p class="mi-groupe-aide dc-papier"></p>' +
   "</div>";
@@ -1805,10 +1836,13 @@ function ouvrirDialogueCouvertureSeule(livre, f, nbPages, agrafe) {
   // chaque frappe : on voit tout de suite l'effet de ce qu'on change.
   const rafraichir = () => {
     const dosMm = dosSaisi();
+    const fc = fCouv();
     const l = largSupport(dosMm);
 
-    fond.querySelector(".dc-apercu").innerHTML = schemaPlancheHtml(f, dosMm, agrafe);
-    fond.querySelector(".dc-support").textContent = l.toFixed(0) + " × " + hautSupport + " mm";
+    fond.querySelector(".dc-apercu").innerHTML = schemaPlancheHtml(fc, dosMm, agrafe);
+    fond.querySelector(".dc-support").textContent = l.toFixed(0) + " × " + hautSupport().toFixed(0) + " mm";
+    const coteCouv = fond.querySelector(".dc-cote-couv");
+    if (coteCouv) coteCouv.textContent = coteMm(fc.larg) + " × " + coteMm(fc.haut) + " mm";
 
     // L'état du calibrage : sans lui, on ne saurait pas si le chiffre repose
     // sur une moyenne de tableau ou sur une pile réellement mesurée.
@@ -1886,8 +1920,8 @@ function ouvrirDialogueCouvertureSeule(livre, f, nbPages, agrafe) {
         "ramènerait la planche au format du papier chargé, et la couverture ne ferait plus " +
         "la bonne taille.";
       note.classList.add("dc-alerte");
-    } else if (papier.larg < l || papier.haut < hautSupport) {
-      const mieux = papierMinimal(l, hautSupport);
+    } else if (papier.larg < l || papier.haut < hautSupport()) {
+      const mieux = papierMinimal(l, hautSupport());
       note.textContent = "La planche ne tient pas sur cette feuille : elle serait rognée. " +
         "Prenez du " + (mieux ? mieux.nom : "plus grand") + ".";
       note.classList.add("dc-alerte");
@@ -1969,7 +2003,19 @@ function ouvrirDialogueCouvertureSeule(livre, f, nbPages, agrafe) {
   champDos.oninput = rafraichir;
   selPapier.onchange = rafraichir;
 
-  const parDefaut = papierMinimal(largSupport(dosCalcule), hautSupport);
+  // Agrandir la couverture : on retient la mesure et l'on redessine la planche.
+  const champDebordL = fond.querySelector("#dcDebordLarg");
+  const champDebordH = fond.querySelector("#dcDebordHaut");
+  const majDebord = () => {
+    debord = enregistrerDebordCouverture(
+      champDebordL ? champDebordL.value : 0,
+      champDebordH ? champDebordH.value : 0);
+    rafraichir();
+  };
+  if (champDebordL) champDebordL.oninput = majDebord;
+  if (champDebordH) champDebordH.oninput = majDebord;
+
+  const parDefaut = papierMinimal(largSupport(dosCalcule), hautSupport());
   if (parDefaut) selPapier.value = parDefaut.cle;
   rafraichir();
 
@@ -1979,15 +2025,16 @@ function ouvrirDialogueCouvertureSeule(livre, f, nbPages, agrafe) {
     const dosMm = dosSaisi();
     const papier = papierParCle(selPapier.value);
     fond.remove();
+    // La couverture sort au format agrandi ; les pages, elles, gardent le leur.
     // Aucune page intérieure à fournir : la planche de couverture n'en utilise pas.
-    setTimeout(() => genererFichierImprimeur("couverture", dosMm, livre, f, [], papier), 50);
+    setTimeout(() => genererFichierImprimeur("couverture", dosMm, livre, fCouv(), [], papier), 50);
   };
   fond.querySelector(".dc-essai").onclick = () => {
     const dosMm = dosSaisi();
     const papier = papierParCle(selPapier.value);
     // Le dialogue reste ouvert : on va chercher la feuille, on mesure, et l'on
     // corrige le dos sans avoir à refaire tout le parcours.
-    imprimerEssaiCouverture(f, dosMm, papier, agrafe);
+    imprimerEssaiCouverture(fCouv(), dosMm, papier, agrafe);
   };
 }
 
