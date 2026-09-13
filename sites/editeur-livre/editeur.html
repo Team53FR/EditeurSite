@@ -9,6 +9,9 @@
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="impression.css">
 <link rel="stylesheet" href="tutoriel.css">
+<link rel="stylesheet" href="manuscrit.css">
+<link rel="icon" href="icone-192.png">
+<link rel="apple-touch-icon" href="icone-192.png">
 </head>
 <body>
   <div class="conteneur-livre">
@@ -29,6 +32,7 @@
       <div class="sommaire-couvertures">
         <button onclick="ouvrirCouverture('couverture')" id="btnCouv" class="secondaire petit btn-couv">📖 Couverture</button>
         <button onclick="ouvrirCouverture('quatrieme')" id="btnQuatr" class="secondaire petit btn-couv">📕 4e de couv.</button>
+        <button onclick="ouvrirTranche()" id="btnTranche" class="secondaire petit btn-couv" title="Couleurs et texte du dos du livre">📗 Tranche</button>
       </div>
 
       <div class="sommaire-separateur"></div>
@@ -59,6 +63,7 @@
 
       <div class="sommaire-section">Chapitres</div>
       <button onclick="ajouterChapitre()" class="secondaire petit btn-chapitre" title="Ajouter un chapitre (démarre sur une nouvelle page)">+ Chapitre</button>
+      <button onclick="ouvrirRenommageChapitres()" class="secondaire petit btn-renommer" title="Renommer les chapitres l'un après l'autre, sans quitter la page">✎ Renommer les chapitres</button>
 
       <ul id="listePages"></ul>
 
@@ -115,7 +120,7 @@
           onchange="appliquerTaille(this.value)"
           onkeydown="if(event.key==='Enter'){appliquerTaille(this.value);event.preventDefault();}">
         <span style="font-size:12px;color:#666;">pt</span>
-        <button onmousedown="event.preventDefault()" onclick="reinitialiserTailles()" title="Remettre tout le livre aux tailles par défaut (titre 20, sous-titre 13, paragraphe 11)">
+        <button onmousedown="event.preventDefault()" onclick="reinitialiserTailles()" title="Remettre tout le livre aux tailles par défaut de son format">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><text x="12" y="16" font-size="9" stroke="none" fill="currentColor" text-anchor="middle" font-family="serif">A</text></svg>
         </button>
         <span class="separateur-outils"></span>
@@ -234,6 +239,57 @@
               <span class="val-pos" id="valTailleAuteur">100</span>
             </div>
 
+            <div id="blocResume" style="display:none">
+              <label class="label-couv" for="texteResume">Texte de la 4e de couverture</label>
+              <textarea id="texteResume" class="zone-resume" rows="5" placeholder="Le résumé, une citation, ce que vous voulez…"
+                        oninput="setTexteResumeCouv(this.value)"></textarea>
+
+              <label class="label-couv">Texte — police et taille</label>
+              <select id="policeResume" class="select-couv" onchange="setPoliceTexteCouv('resume', this.value)">
+                <option value="">Garamond (défaut)</option>
+                <option value="Georgia, serif">Georgia</option>
+                <option value="'Times New Roman', serif">Times</option>
+                <option value="Arial, sans-serif">Arial</option>
+                <option value="'Courier New', monospace">Courier</option>
+                <option value="'Trebuchet MS', sans-serif">Trebuchet</option>
+                <option value="Impact, sans-serif">Impact</option>
+              </select>
+              <div class="reglage-pos">
+                <span class="ico-pos" title="Taille">A</span>
+                <input type="range" id="taillePosResume" min="50" max="250" step="5" value="100"
+                       oninput="setTailleTexteCouv('resume', this.value)">
+                <span class="val-pos" id="valTailleResume">100</span>
+              </div>
+
+              <label class="label-couv">Largeur et alignement</label>
+              <div class="reglage-pos">
+                <span class="ico-pos" title="Largeur de la colonne">⇥</span>
+                <input type="range" id="largeurResume" min="20" max="100" step="5" value="80"
+                       oninput="setLargeurResumeCouv(this.value)">
+                <span class="val-pos" id="valLargeurResume">80</span>
+              </div>
+              <select id="alignResume" class="select-couv" onchange="setAlignResumeCouv(this.value)">
+                <option value="left">Aligné à gauche</option>
+                <option value="center">Centré</option>
+                <option value="right">Aligné à droite</option>
+                <option value="justify">Justifié</option>
+              </select>
+
+              <label class="label-couv">Position du texte</label>
+              <div class="reglage-pos">
+                <span class="ico-pos" title="Gauche / droite">↔</span>
+                <input type="range" id="posResumeX" min="-50" max="50" step="1" value="0"
+                       oninput="setPositionTexteCouv('resume','X',this.value)">
+                <span class="val-pos" id="valPosResumeX">0</span>
+              </div>
+              <div class="reglage-pos">
+                <span class="ico-pos" title="Bas / haut">↕</span>
+                <input type="range" id="posResumeY" min="0" max="100" step="1" value="0"
+                       oninput="setPositionTexteCouv('resume','Y',this.value)">
+                <span class="val-pos" id="valPosResumeY">0</span>
+              </div>
+            </div>
+
             <div id="blocPosTitre">
               <label class="label-couv">Position du titre</label>
               <div class="reglage-pos">
@@ -332,9 +388,11 @@
        sans jamais toucher à la zone d'édition ni au curseur. -->
   <div id="mesureSpread" class="texte-livre editeur-spread" style="position:absolute; visibility:hidden; left:-99999px; top:0;"></div>
 
+  <script src="attente.js"></script>
   <script src="script.js"></script>
   <script src="tutoriel.js"></script>
   <script src="editeur.js"></script>
+  <script src="manuscrit.js"></script>
   <script src="impression.js"></script>
   <script src="retour-portail.js"></script>
 </body>

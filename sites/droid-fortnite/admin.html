@@ -3,13 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#f6f4ee">
 <meta name="theme-color" content="#05060c" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f6f4ee">
 <title>Gestion — Droid Fortnite</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
+<link rel="icon" href="icone-192.png">
+<link rel="apple-touch-icon" href="icone-192.png">
 </head>
 <body>
 
@@ -30,7 +32,10 @@
       <button type="button" class="onglet-type actif" data-type="droides" onclick="changerOngletAdmin('droides')">🤖 Droïdes</button>
       <button type="button" class="onglet-type" data-type="ajout" onclick="ouvrirOngletAjout()">➕ Ajouter</button>
       <button type="button" class="onglet-type" data-type="paliers" onclick="changerOngletAdmin('paliers')">🎚️ Paliers</button>
-      <button type="button" class="onglet-type" data-type="classes" onclick="changerOngletAdmin('classes')">🧩 Types</button>
+      <button type="button" class="onglet-type" data-type="renaissance" onclick="changerOngletAdmin('renaissance')">🚀 Renaissance</button>
+      <button type="button" class="onglet-type" data-type="fusion" onclick="changerOngletAdmin('fusion')">🧬 Fusion</button>
+      <button type="button" class="onglet-type" data-type="unites" onclick="changerOngletAdmin('unites')">📏 Unités</button>
+      <button type="button" class="onglet-type" data-type="raretes" onclick="changerOngletAdmin('raretes')">🎨 Raretés</button>
     </div>
   </header>
 
@@ -39,7 +44,7 @@
     <div id="zoneDroides">
       <div class="bloc-carte">
         <h2>Droïdes</h2>
-        <p class="sous-titre">Catalogue partagé, trié par rareté (Typique en premier) — clique une carte pour la modifier.</p>
+        <p class="sous-titre">Catalogue partagé, dans l'ordre du jeu — le même que le Droidex. Clique une carte pour la modifier.</p>
         <div class="grille-droides" id="listeDroides"></div>
       </div>
     </div>
@@ -68,19 +73,28 @@
         </div>
         <div class="champ">
           <label for="champClasse">Classe</label>
-          <select id="champClasse"></select>
+          <select id="champClasse">
+            <option value="Ouvrier">🔧 Ouvrier</option>
+            <option value="Astromec">📡 Astromec</option>
+            <option value="Combat">⚔️ Combat</option>
+          </select>
         </div>
         <div class="champ">
           <label for="champRarete">Rareté</label>
-          <select id="champRarete">
-            <option value="Typique">Typique</option>
-            <option value="Rare">Rare</option>
-            <option value="Épique">Épique</option>
-            <option value="Légendaire">Légendaire</option>
-            <option value="Mythique">Mythique</option>
-            <option value="Iconique">Iconique</option>
-          </select>
+          <!-- Rempli au chargement depuis raretes.json (remplirSelectRaretes) -->
+          <select id="champRarete" onchange="construireGrillePrixRendement(droideEnEdition())"></select>
         </div>
+        <div class="champ">
+          <label>Prix et rendement, palier par palier</label>
+          <p class="aide-champ" style="margin:-0.2rem 0 0.6rem">Le rendement d'un droïde monte à chaque amélioration : une valeur par palier. Laissez vide ce que vous ne connaissez pas encore.</p>
+          <div class="grille-paliers" id="grillePrixRendement"></div>
+          <p class="aide-champ" id="noteIconique" style="display:none; margin-top:0.6rem">
+            Un droïde Iconique n'existe qu'au premier palier, et son rendement s'exprime
+            en pourcentage du revenu total — pas en crédits par seconde. L'unité <b>%</b>
+            lui est donc proposée d'office.
+          </p>
+        </div>
+
         <div style="display:flex; gap:0.7rem;">
           <button class="btn btn-primaire" id="btnEnregistrerDroide" onclick="enregistrerDroideAdmin()">Ajouter</button>
           <button class="btn btn-fantome" id="btnAnnulerDroide" style="display:none" onclick="annulerEtRevenir()">Annuler</button>
@@ -89,10 +103,79 @@
       </div>
     </div>
 
+    <div id="zoneRaretes" style="display:none">
+      <div class="bloc-carte">
+        <h2>Couleurs des raretés</h2>
+        <p class="sous-titre">Le fond et le texte de chaque pastille de rareté, partout où elle apparaît. L'ordre va du plus faible au plus fort et sert au tri du catalogue. Le bouton ⭑ marque une rareté qui n'existe qu'au premier palier, comme les Iconiques. Le renommage n'est pas possible : chaque droïde stocke le nom de sa rareté.</p>
+        <ul class="liste-simple" id="listeRaretes"></ul>
+
+        <div class="champ">
+          <label for="champNouvelleRarete">Ajouter une rareté (en fin de liste, donc la plus forte)</label>
+          <input type="text" id="champNouvelleRarete" placeholder="ex. Suprême" onkeydown="if(event.key==='Enter'){ajouterRarete();}">
+        </div>
+        <button class="btn btn-primaire" onclick="ajouterRarete()">Ajouter la rareté</button>
+        <p id="messageRaretes" class="message"></p>
+      </div>
+    </div>
+
+    <div id="zoneRenaissance" style="display:none">
+      <div class="bloc-carte">
+        <h2>Paliers de renaissance</h2>
+        <p class="sous-titre">Crédits et droïdes requis pour chaque niveau. Chaque palier a trois emplacements : on clique une case pour y placer un droïde et son palier. Ils changent à chaque super renaissance : le sélecteur ci-dessous indique celle qu'on modifie. Niveaux et crédits, eux, sont communs à toutes. Les modifications s'enregistrent dès qu'un champ est quitté.</p>
+        <div class="onglets-palier" id="selecteurSuper" style="margin-bottom:0.9rem"></div>
+        <div id="listeRenaissanceAdmin"></div>
+
+        <div class="champ" style="margin-top:1.2rem">
+          <label for="champNouveauNiveau">Niveau</label>
+          <input type="number" id="champNouveauNiveau" min="1" placeholder="ex. 13">
+        </div>
+        <div class="champ">
+          <label for="champNouveauxCredits">Crédits requis</label>
+          <div class="duo-valeur">
+            <input type="text" id="champNouveauxCredits" inputmode="decimal" placeholder="ex. 10">
+            <select id="champUniteCredits"></select>
+          </div>
+        </div>
+        <p class="aide-champ" style="margin:0 0 1rem">Les droïdes requis se choisissent ensuite, dans les emplacements du palier.</p>
+        <button class="btn btn-primaire" onclick="ajouterRenaissanceAdmin()">Ajouter le palier</button>
+        <p id="messageRenaissanceAdmin" class="message"></p>
+      </div>
+    </div>
+
+    <div id="zoneFusion" style="display:none">
+      <div class="bloc-carte">
+        <h2>Recettes de fusion</h2>
+        <p class="sous-titre">Le résultat d'une fusion est un droïde du catalogue : on le choisit directement (ajoute-le d'abord dans l'onglet Droïdes s'il n'y est pas). On clique ensuite une case pour choisir un droïde ingrédient puis sa quantité. Les modifications s'enregistrent aussitôt.</p>
+        <div id="listeFusionAdmin"></div>
+
+        <button class="btn btn-primaire" style="margin-top:1.2rem" onclick="nouvelleFusionAdmin()">➕ Nouvelle recette</button>
+        <p id="messageFusionAdmin" class="message"></p>
+      </div>
+    </div>
+
+    <div id="zoneUnites" style="display:none">
+      <div class="bloc-carte">
+        <h2>Unités de grandeur</h2>
+        <p class="sous-titre">Servent à saisir et afficher les prix et rendements : on entre « 4 » + « K » plutôt que 4000. Ajoute une unité le jour où les montants du jeu dépassent les existantes. Le pourcentage des Iconiques n'en est pas une : il est toujours proposé.</p>
+        <ul class="liste-simple" id="listeUnites"></ul>
+
+        <div class="champ">
+          <label for="champNouvelleUnite">Symbole</label>
+          <input type="text" id="champNouvelleUnite" placeholder="ex. Qa" maxlength="4" onkeydown="if(event.key==='Enter'){ajouterUnite();}">
+        </div>
+        <div class="champ">
+          <label for="champFacteurUnite">Vaut combien de crédits ?</label>
+          <input type="text" id="champFacteurUnite" inputmode="numeric" placeholder="ex. 1000000000000000">
+        </div>
+        <button class="btn btn-primaire" onclick="ajouterUnite()">Ajouter l'unité</button>
+        <p id="messageUnites" class="message"></p>
+      </div>
+    </div>
+
     <div id="zonePaliers" style="display:none">
       <div class="bloc-carte">
         <h2>Paliers de variante</h2>
-        <p class="sous-titre">Ordre du plus faible au plus fort — détermine les onglets du Droidex. La couleur de chaque palier teinte le contour des cartes quand son onglet est actif. Un droïde de rareté Iconique n'existe qu'au premier palier de la liste.</p>
+        <p class="sous-titre">Ordre du plus faible au plus fort — détermine les onglets du Droidex. La couleur de chaque palier teinte le contour des cartes quand son onglet est actif. Un droïde de rareté Iconique n'existe qu'au premier palier de la liste. Le bouton ＋ ajoute une couleur à un palier : à partir de deux, son contour devient un dégradé — c'est ainsi qu'« Arc-en-ciel » en porte plusieurs.</p>
         <ul class="liste-simple" id="listePaliers"></ul>
 
         <div class="champ">
@@ -108,27 +191,43 @@
       </div>
     </div>
 
-    <div id="zoneClasses" style="display:none">
-      <div class="bloc-carte">
-        <h2>Types de droïde</h2>
-        <p class="sous-titre">Détermine les options de classe proposées à l'ajout d'un droïde, et l'icône affichée sur ses cartes tant qu'aucune photo perso n'est ajoutée.</p>
-        <ul class="liste-simple" id="listeClasses"></ul>
-
-        <div class="champ">
-          <label for="champNouvelleClasse">Ajouter un type</label>
-          <input type="text" id="champNouvelleClasse" placeholder="ex. Espion" onkeydown="if(event.key==='Enter'){ajouterClasse();}">
-        </div>
-        <div class="champ">
-          <label for="champIconeNouvelleClasse">Icône (emoji)</label>
-          <input type="text" id="champIconeNouvelleClasse" class="classe-icone" maxlength="4" placeholder="🤖">
-        </div>
-        <button class="btn btn-primaire" onclick="ajouterClasse()">Ajouter le type</button>
-        <p id="messageClasses" class="message"></p>
-      </div>
-    </div>
-
   </div>
 
+  <!-- Choix d'un droïde requis : le droïde, puis son palier -->
+  <div class="voile" id="voileDroideRenaissance" onclick="if(event.target===this)fermerChoixDroideRenaissance()">
+    <div class="feuille">
+      <div class="feuille-entete">
+        <h2 id="titreChoixDroideRenaissance">Choisir un droïde</h2>
+        <button type="button" onclick="fermerChoixDroideRenaissance()">✕</button>
+      </div>
+      <div class="feuille-corps">
+        <div class="recherche">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" id="rechercheDroideRenaissance" placeholder="Rechercher un droïde..." oninput="afficherEtapeDroide()">
+        </div>
+        <div class="liste-choix" id="listeChoixDroideRenaissance"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Choix d'un ingrédient de fusion : le droïde, puis sa quantité -->
+  <div class="voile" id="voileDroideFusion" onclick="if(event.target===this)fermerChoixDroideFusion()">
+    <div class="feuille">
+      <div class="feuille-entete">
+        <h2 id="titreChoixDroideFusion">Choisir un droïde</h2>
+        <button type="button" onclick="fermerChoixDroideFusion()">✕</button>
+      </div>
+      <div class="feuille-corps">
+        <div class="recherche" id="rechercheFusionEnveloppe">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" id="rechercheDroideFusion" placeholder="Rechercher un droïde..." oninput="afficherEtapeDroideFusion()">
+        </div>
+        <div class="liste-choix" id="listeChoixDroideFusion"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="attente.js"></script>
   <script src="script.js"></script>
   <script src="admin.js"></script>
   <script src="retour-portail.js"></script>

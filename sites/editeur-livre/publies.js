@@ -1,13 +1,22 @@
+// ----- Ces actions passent par le reseau : on le dit, et on empeche d'y toucher -----
+// Voir attente.js. Les actions de FOND (sauvegarde differee, chargement d'une
+// vignette, migration silencieuse) n'y figurent surtout pas : les voiler
+// bloquerait la page pour un travail que l'on a justement choisi de rendre
+// invisible.
+envelopperAttente({
+  chargerPublies: "Chargement des livres publiés…",
+});
+
 // ===== Galerie des livres publiés (lecture seule, utilisateurs connectés) =====
 
 let listePubliesData = [];
 
 async function chargerPublies() {
-  const token = sessionStorage.getItem("gh_token");
+  const token = localStorage.getItem("gh_token");
   const message = document.getElementById("message");
 
-  if (!token || !sessionStorage.getItem("gh_login")) {
-    window.location.href = "connexion.html";
+  if (!token || !localStorage.getItem("gh_login")) {
+    window.location.replace("connexion.html");
     return;
   }
 
@@ -93,7 +102,7 @@ function afficherPublies() {
 
 let cacheImagesPub = {};
 async function chargerImageFondVignette(couvDiv, chemin) {
-  const token = sessionStorage.getItem("gh_token");
+  const token = localStorage.getItem("gh_token");
   if (!token) return;
   try {
     if (!cacheImagesPub[chemin]) cacheImagesPub[chemin] = await obtenirUrlImage(chemin, token);
@@ -110,13 +119,5 @@ function lireLivre(entree) {
   window.location.href = "lecture.html?" + params.toString();
 }
 
-function seDeconnecter() {
-  sessionStorage.removeItem("gh_token");
-  sessionStorage.removeItem("gh_login");
-  sessionStorage.removeItem("gh_role");
-  sessionStorage.removeItem("gh_nom");
-  sessionStorage.removeItem("livre_id");
-  window.location.href = "index.html";
-}
 
 chargerPublies();

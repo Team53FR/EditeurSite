@@ -194,9 +194,20 @@ a { color: var(--primaire); }
 .app-header .icone-bouton:hover { background: var(--fond); color: var(--primaire); }
 .app-header .icone-deconnexion:hover { background: var(--fond); color: var(--danger); }
 
-.onglets-type { display: flex; gap: 0.4rem; margin-bottom: 0.75rem; }
+/* Les onglets défilent horizontalement plutôt que d'élargir la page : à six
+   onglets (le gestionnaire), « flex: 1 » les comprimait jusqu'au débordement,
+   et c'est toute la page qui se décalait. */
+.onglets-type {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 0.75rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.onglets-type::-webkit-scrollbar { display: none; }
 .onglet-type {
-  flex: 1;
+  flex: 1 0 auto;
+  white-space: nowrap;
   padding: 0.55rem 0.6rem;
   border-radius: 10px;
   border: 1px solid var(--bordure);
@@ -255,6 +266,60 @@ a { color: var(--primaire); }
   font-size: 0.84rem;
 }
 
+/* ===== Filtres compacts du Droidex : icônes toggle sur une ligne ===== */
+.filtres-compacts {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem;
+  margin-top: 0.6rem;
+}
+.groupe-filtre { display: inline-flex; gap: 0.25rem; }
+.sep-filtre { align-self: stretch; width: 1px; background: var(--bordure); margin: 2px 0.2rem; }
+
+.chip-icone {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 34px; height: 34px; padding: 0 0.4rem;
+  border: 1px solid var(--bordure); border-radius: 9px;
+  background: var(--carte); color: var(--texte);
+  font-size: 0.95rem; line-height: 1; cursor: pointer;
+  transition: border-color .12s, background .12s, box-shadow .12s, opacity .12s;
+}
+.chip-icone:hover { border-color: var(--primaire); }
+.chip-icone.actif {
+  border-color: var(--primaire);
+  background: color-mix(in srgb, var(--primaire) 22%, var(--carte));
+  box-shadow: 0 0 0 1px var(--primaire) inset;
+}
+.chip-possede.actif {
+  border-color: var(--succes); color: var(--succes);
+  background: color-mix(in srgb, var(--succes) 22%, var(--carte));
+  box-shadow: 0 0 0 1px var(--succes) inset;
+}
+.chip-manquant.actif {
+  border-color: var(--danger); color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 20%, var(--carte));
+  box-shadow: 0 0 0 1px var(--danger) inset;
+}
+.chip-fusion.actif {
+  border-color: #a855f7;
+  background: color-mix(in srgb, #a855f7 25%, var(--carte));
+  box-shadow: 0 0 0 1px #a855f7 inset;
+}
+
+/* Pastilles de rareté : ronde teintée de la rareté, avec son initiale. */
+.chip-rarete {
+  min-width: 28px; width: 28px; height: 28px; padding: 0;
+  border-radius: 50%;
+  font-size: 0.72rem; font-weight: 800;
+  background: var(--teinte-rarete, var(--carte));
+  color: var(--teinte-rarete-texte, var(--texte));
+  border: 1px solid rgba(255, 255, 255, .18);
+  opacity: .55;
+}
+.chip-rarete:hover { opacity: 1; border-color: rgba(255, 255, 255, .4); }
+.chip-rarete.actif {
+  opacity: 1; border: 2px solid #fff;
+  box-shadow: 0 0 7px -1px var(--teinte-rarete-texte, #fff);
+}
+
 /* ===== Contenu ===== */
 .contenu {
   padding: 1rem 1rem calc(6rem + var(--safe-bottom));
@@ -278,75 +343,285 @@ a { color: var(--primaire); }
 }
 .compteur-global b { font-size: 1.1rem; font-family: var(--police-titre); color: var(--primaire); }
 .compteur-global .barre-progression { flex: 1; }
+.btn-decocher {
+  flex-shrink: 0;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--bordure); border-radius: 999px;
+  background: var(--fond); color: var(--texte-att);
+  font-size: 0.76rem; cursor: pointer;
+}
+.btn-decocher:hover:not(:disabled) { border-color: var(--danger); color: var(--danger); }
+.btn-decocher:disabled { opacity: 0.4; cursor: default; }
+
+/* ===== Compteur de super renaissances ===== */
+/* Il commande tout le reste de l'onglet — l'onglet ouvert, les paliers à
+   refaire —, donc il se pose au-dessus et se lit d'un coup d'oeil : le
+   nombre en gros, l'action à côté, la conséquence dessous. */
+.compteur-super {
+  display: flex; align-items: center; gap: 0.7rem 0.9rem; flex-wrap: wrap;
+  padding: 0.8rem 0.9rem; margin-bottom: 0.7rem;
+  background: var(--carte); border: 1px solid var(--bordure); border-radius: var(--rayon);
+}
+.cs-nombre { display: flex; align-items: baseline; gap: 0.55rem; min-width: 0; }
+.cs-libelle {
+  font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--texte-att);
+}
+.cs-valeur {
+  font-family: var(--police-titre);
+  font-size: 1.5rem; line-height: 1;
+  color: var(--primaire);
+}
+.cs-actions { display: flex; align-items: center; gap: 0.4rem; margin-left: auto; }
+.cs-plus {
+  padding: 0.45rem 0.9rem;
+  border: none; border-radius: 999px;
+  background: var(--primaire); color: var(--sur-primaire);
+  font-weight: 600; font-size: 0.82rem; cursor: pointer;
+  box-shadow: 0 0 0 1px var(--primaire-fonce), 0 0 14px -2px var(--primaire);
+}
+.cs-plus:hover { background: var(--primaire-fonce); }
+/* La correction est un repentir, pas une action du jeu : elle reste discrète
+   et ne prend pas la couleur d'accent. */
+.cs-corriger {
+  width: 1.9rem; height: 1.9rem;
+  display: grid; place-items: center;
+  padding: 0; border: 1px solid var(--bordure); border-radius: 999px;
+  background: var(--fond); color: var(--texte-att);
+  font-size: 1rem; line-height: 1; cursor: pointer;
+}
+.cs-corriger:hover { border-color: var(--danger); color: var(--danger); }
+.cs-aide {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 0.78rem; line-height: 1.45; color: var(--texte-att);
+}
+.cs-aide b { color: var(--texte); font-weight: 600; }
+
+@media (max-width: 460px) {
+  .cs-actions { margin-left: 0; width: 100%; }
+  .cs-plus { flex: 1; }
+}
 
 /* ===== Grille de droïdes ===== */
+/* Beaucoup de petites vignettes portrait, comme sur le tracker Droidex :
+   la grille se remplit toute seule selon la largeur disponible. */
 .grille-droides {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 0.8rem;
-}
-@media (min-width: 520px) { .grille-droides { grid-template-columns: repeat(3, 1fr); } }
-@media (min-width: 760px) { .grille-droides { grid-template-columns: repeat(4, 1fr); } }
-@media (min-width: 980px) { .grille-droides { grid-template-columns: repeat(5, 1fr); } }
-
-.carte-droide {
-  background: var(--carte);
-  border: 1px solid var(--bordure);
-  overflow: hidden;
-  padding: 0.9rem 0.8rem;
-  display: flex;
-  flex-direction: column;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
   gap: 0.5rem;
-  /* Coins coupés façon panneau HUD futuriste plutôt qu'arrondis. */
-  clip-path: polygon(var(--coin-hud) 0, 100% 0, 100% calc(100% - var(--coin-hud)), calc(100% - var(--coin-hud)) 100%, 0 100%, 0 var(--coin-hud));
 }
-.carte-droide.possede { border-color: var(--primaire); box-shadow: 0 0 0 2px var(--primaire-clair) inset, 0 0 12px -3px var(--primaire); }
-.droide-entete { display: flex; align-items: flex-start; gap: 0.5rem; }
-.droide-icone {
-  width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0;
-  background: var(--primaire-clair); color: var(--primaire);
-  display: flex; align-items: center; justify-content: center; font-size: 1.1rem;
+@media (min-width: 520px) { .grille-droides { grid-template-columns: repeat(auto-fill, minmax(108px, 1fr)); } }
+@media (min-width: 980px) { .grille-droides { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); } }
+
+/* ===== Carte de droïde =====
+   Vignette au format portrait : le visuel occupe toute la carte, les
+   informations sont posées par-dessus. Le fond reste sombre dans les deux
+   thèmes — c'est un écran, pas un panneau de l'interface. */
+.carte-droide {
+  position: relative;
+  aspect-ratio: 5 / 7;
+  overflow: hidden;
+  --fond-carte-droide: #0d1117;
+  background: var(--fond-carte-droide);
+  border: 3px solid var(--bordure);
+  border-radius: 8px;
+  padding: 0;
+  cursor: pointer;
+  -webkit-user-select: none; user-select: none;
+  transition: transform .2s, box-shadow .2s, border-color .2s;
+}
+
+/* Non possédé : c'est le CONTENU qui s'estompe, pas la carte. Baisser
+   l'opacité de la carte entière la délaverait vers le fond de page, illisible
+   en thème clair ; le panneau doit rester sombre dans les deux thèmes. */
+.carte-droide:not(.possede) .dx-visuel { opacity: .3; filter: grayscale(.65); }
+.carte-droide:not(.possede) .dx-nom { color: #8a94a6; }
+.carte-droide:not(.possede) .dx-pied { opacity: .55; }
+.carte-droide:hover { transform: translateY(-2px); }
+.carte-droide.possede:hover { box-shadow: 0 6px 18px -6px rgba(0, 0, 0, .6); }
+.carte-droide:active { transform: scale(0.97); }
+
+/* Nom, en médaillon sur fond sombre pour rester lisible sur tout visuel */
+.dx-nom {
+  position: absolute; top: 3px; left: 3px; z-index: 3;
+  max-width: 74%;
+  padding: 1px 4px; border-radius: 3px;
+  background: rgba(0, 0, 0, .7);
+  color: #fff;
+  font-size: 0.62rem; font-weight: 700; line-height: 1.3;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* Case à cocher (Droidex) ou corbeille (admin), même emplacement */
+.dx-case, .dx-action {
+  position: absolute; top: 3px; right: 3px; z-index: 3;
+  width: 16px; height: 16px;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid #334155; border-radius: 3px;
+  background: #1e293b;
+  font-size: 0.6rem; line-height: 1;
+  color: transparent;
+}
+.carte-droide.possede .dx-case {
+  background: var(--primaire); border-color: var(--primaire); color: var(--sur-primaire);
+}
+.dx-action { color: #94a3b8; cursor: pointer; padding: 0; font-size: 0.55rem; }
+.dx-action:hover { color: #fff; background: var(--danger); border-color: var(--danger); }
+
+/* Repère « droïde de fusion » : sous le nom, à gauche. Violet vif plein,
+   texte + halo pour se repérer immédiatement, même quand le droïde n'est pas
+   possédé (contrairement au reste de la carte, il ne s'estompe pas). */
+.dx-fusion {
+  position: absolute; top: 21px; left: 3px; z-index: 4;
+  display: flex; align-items: center; gap: 3px;
+  height: 18px; padding: 0 5px; border-radius: 4px;
+  background: #a855f7;
+  color: #fff;
+  font-weight: 800; line-height: 1; letter-spacing: 0.03em;
+  border: 1px solid rgba(255, 255, 255, .55);
+  box-shadow: 0 0 9px rgba(168, 85, 247, .95), 0 1px 3px rgba(0, 0, 0, .55);
+}
+.dx-fusion-ico { font-size: 0.72rem; }
+.dx-fusion-txt { font-size: 0.56rem; }
+/* Reste pleinement visible même sur une carte non possédée. */
+.carte-droide:not(.possede) .dx-fusion { opacity: 1; }
+
+/* Zone du visuel : occupe toute la carte, le pied se pose par-dessus */
+.dx-visuel {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
   overflow: hidden;
 }
-.droide-icone img { width: 100%; height: 100%; object-fit: cover; }
-.droide-nom { flex: 1; min-width: 0; font-weight: 600; font-size: 0.9rem; line-height: 1.25; }
-.droide-supprimer {
-  flex-shrink: 0; background: transparent; border: none; color: var(--texte-att);
-  padding: 0.2rem; border-radius: 6px; cursor: pointer; font-size: 0.9rem; line-height: 1;
+.dx-visuel img {
+  width: 100%; height: 100%;
+  object-fit: contain;
+  /* Les visuels sont de petites images : mieux vaut les assumer pixelisées
+     que de les laisser flouter à l'agrandissement. */
+  image-rendering: pixelated;
+  transition: transform .4s;
 }
-.droide-supprimer:hover { color: var(--danger); background: var(--fond); }
+.carte-droide:hover .dx-visuel img { transform: scale(1.06); }
 
-.badge-rarete {
-  display: inline-flex; align-self: flex-start;
-  font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em;
-  padding: 0.15rem 0.5rem; border-radius: 999px;
-}
-.badge-rarete.typique { background: #e0f2f4; color: #0e7490; }
-.badge-rarete.rare { background: #cffafe; color: #0891b2; }
-.badge-rarete.epique { background: #ede9fe; color: #7c3aed; }
-.badge-rarete.legendaire { background: #fef3c7; color: #b45309; }
-.badge-rarete.mythique { background: #fce7f3; color: #be185d; }
-.badge-rarete.iconique { background: #d1fae5; color: #047857; }
-@media (prefers-color-scheme: dark) {
-  .badge-rarete.typique { background: #123540; color: #7dd3e0; }
-  .badge-rarete.rare { background: #0e3a44; color: #22d3ee; }
-  .badge-rarete.epique { background: #4c1d95; color: #ddd6fe; }
-  .badge-rarete.legendaire { background: #78350f; color: #fde68a; }
-  .badge-rarete.mythique { background: #831843; color: #fbcfe8; }
-  .badge-rarete.iconique { background: #065f46; color: #a7f3d0; }
-}
-
-.carte-droide { cursor: pointer; -webkit-user-select: none; user-select: none; }
-.carte-droide:active { transform: scale(0.97); }
-.droide-case {
-  margin-left: auto; flex-shrink: 0;
-  width: 20px; height: 20px; border-radius: 50%;
-  border: 1.5px solid var(--bordure);
+/* Teinte générée, visible tant qu'aucune image n'est disponible */
+.dx-vide {
   display: flex; align-items: center; justify-content: center;
-  font-size: 0.7rem; color: transparent;
+  width: 100%; height: 100%;
+  font-size: 1.7rem;
+  /* La teinte propre au droïde reste une lueur discrète : la carte doit se
+     lire comme un panneau sombre, pas comme un aplat de couleur. */
+  background:
+    radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--teinte) 45%, transparent) 0%, transparent 62%),
+    #0d1117;
 }
-.carte-droide.possede .droide-case {
-  background: var(--primaire); border-color: var(--primaire); color: var(--sur-primaire);
+/* Repli pour les navigateurs sans color-mix() */
+@supports not (background: color-mix(in srgb, red 50%, transparent)) {
+  .dx-vide { background: radial-gradient(circle at 50% 42%, var(--teinte) 0%, #0d1117 72%); opacity: .85; }
+}
+
+/* Ligne de balayage, qui parcourt la vignette au survol */
+.dx-scan {
+  position: absolute; left: 0; right: 0; top: 0; height: 1px; z-index: 2;
+  background: rgba(34, 211, 238, .5);
+  opacity: 0;
+  pointer-events: none;
+}
+.carte-droide:hover .dx-scan { opacity: 1; animation: dx-balayage 1.5s linear infinite; }
+@keyframes dx-balayage { from { transform: translateY(0); } to { transform: translateY(100%); } }
+
+/* Bas de carte : classe et rareté, puis prix et rendement du palier
+   affiché. Le tout sur un dégradé qui détache le texte du visuel. */
+.dx-bas {
+  position: absolute; bottom: 0; left: 0; right: 0; z-index: 3;
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 14px 3px 3px;
+  background: linear-gradient(to top, rgba(0, 0, 0, .88) 55%, transparent);
+}
+.dx-pied { display: flex; align-items: center; gap: 3px; }
+.dx-classe { font-size: 0.7rem; line-height: 1; flex-shrink: 0; }
+
+/* Prix à gauche, rendement à droite — comme sur le tracker de référence. */
+.dx-chiffres {
+  display: flex; align-items: center; justify-content: space-between; gap: 4px;
+  font-size: 0.5rem; font-weight: 700; line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.dx-prix { color: #fcd34d; }
+.dx-rendement { color: #6ee7b7; }
+.dx-prix, .dx-rendement {
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  text-shadow: 0 0 2px rgba(0, 0, 0, .9);
+}
+
+/* Grille de saisie prix/rendement du formulaire admin */
+.grille-paliers { display: flex; flex-direction: column; gap: 0.4rem; }
+.ligne-palier {
+  display: grid;
+  grid-template-columns: minmax(5.5rem, 1fr) 1fr 1fr;
+  align-items: center; gap: 0.4rem;
+}
+/* Valeur + unité : « 4 » et « K » plutôt qu'un « 4K » que rien ne sait
+   additionner. Le sélecteur reste étroit, la valeur prend le reste. */
+.duo-valeur { display: flex; gap: 0.25rem; min-width: 0; }
+.duo-valeur input { flex: 1; min-width: 0; }
+.duo-valeur select {
+  flex: 0 0 auto; width: 4.2rem;
+  padding: 0.45rem 0.3rem;
+  border-radius: 8px; border: 1px solid var(--bordure);
+  background: var(--fond); color: var(--texte);
+  font-size: 0.82rem;
+}
+.duo-valeur select:focus { outline: 2px solid var(--primaire); outline-offset: 1px; }
+.ligne-palier .nom-palier {
+  display: flex; align-items: center; gap: 0.35rem;
+  font-size: 0.82rem; font-weight: 600; color: var(--texte-att);
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ligne-palier .pastille-palier {
+  width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0;
+  border: 1px solid var(--bordure);
+}
+.ligne-palier input {
+  width: 100%; min-width: 0;
+  padding: 0.45rem 0.55rem;
+  border-radius: 8px; border: 1px solid var(--bordure);
+  background: var(--fond); color: var(--texte);
+  font-size: 0.85rem;
+}
+.ligne-palier input:focus { outline: 2px solid var(--primaire); outline-offset: 1px; }
+.entete-paliers {
+  display: grid;
+  grid-template-columns: minmax(5.5rem, 1fr) 1fr 1fr;
+  gap: 0.4rem;
+  font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em;
+  color: var(--texte-att);
+}
+
+/* Sur la carte sombre, la rareté garde ses couleurs de thème sombre dans
+   les deux thèmes du site. */
+.carte-droide .badge-rarete {
+  flex: 1; min-width: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; text-transform: uppercase;
+  padding: 1px 3px; border-radius: 3px;
+  font-size: 0.55rem; letter-spacing: 0.01em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* Les couleurs de chaque rareté sont injectées au chargement depuis
+   raretes.json (appliquerCouleursRaretes() dans script.js), pour être
+   modifiables depuis le panneau admin. Rien ici : une règle figée
+   l'emporterait en spécificité et annulerait l'injection. */
+
+/* En admin on gère le catalogue : la notion de « possédé » n'a pas cours,
+   toutes les cartes sont donc pleinement visibles. */
+.carte-droide.admin .dx-visuel { opacity: 1; filter: none; }
+.carte-droide.admin .dx-nom { color: #fff; }
+.carte-droide.admin .dx-pied { opacity: 1; }
+
+@media (prefers-reduced-motion: reduce) {
+  .carte-droide, .dx-visuel, .dx-visuel img { transition: none; }
+  .carte-droide:hover .dx-scan { animation: none; }
+  .carte-droide:hover .dx-visuel img { transform: none; }
 }
 
 /* ===== Liste renaissance ===== */
@@ -373,6 +648,23 @@ a { color: var(--primaire); }
 .renaissance-titre small { color: var(--accent); font-weight: 600; font-size: 0.8rem; }
 .renaissance-elements { font-size: 0.84rem; color: var(--texte-att); margin: 0.3rem 0 0; line-height: 1.4; }
 .renaissance-case { flex-shrink: 0; width: 22px; height: 22px; }
+
+/* Palier validé : replié sur son en-tête, pour ne pas noyer celui en cours
+   sous des dizaines d'écrans de cartes déjà acquises. */
+.item-renaissance.replie { padding: 0.5rem 1rem; opacity: 0.72; }
+.item-renaissance.replie .renaissance-entete { margin-bottom: 0; }
+.item-renaissance.replie .renaissance-niveau { width: 28px; height: 28px; font-size: 0.8rem; }
+.item-renaissance.replie:hover { opacity: 1; }
+.renaissance-plier {
+  flex-shrink: 0;
+  width: 28px; height: 28px; padding: 0;
+  border: 1px solid var(--bordure); border-radius: 8px;
+  background: var(--fond); color: var(--texte-att);
+  font-size: 0.7rem; line-height: 1; cursor: pointer;
+  transition: transform 0.15s;
+}
+.renaissance-plier[aria-expanded="false"] { transform: rotate(-90deg); }
+.renaissance-plier:hover { border-color: var(--primaire); color: var(--primaire); }
 
 .barre-progression {
   height: 5px; border-radius: 3px; background: var(--bordure); overflow: hidden;
@@ -562,3 +854,548 @@ a { color: var(--primaire); }
 .btn-mini:hover { border-color: var(--primaire); color: var(--primaire); }
 .btn-mini.danger { color: var(--danger); }
 .btn-mini.danger:hover { background: var(--danger); border-color: var(--danger); color: #fff; }
+
+/* ===== Onglet Rendement : l'escouade ===== */
+.compteur-global .compteur-detail {
+  display: block; width: 100%;
+  font-size: 0.78rem; color: var(--texte-att); margin-top: 0.2rem;
+}
+.total-bonus { color: var(--succes); font-weight: 600; }
+.total-inconnu { color: var(--texte-att); font-size: 0.82em; }
+
+.section-escouade { margin-bottom: 1.4rem; }
+/* Le titre et le réglage des emplacements sur une ligne, le total sur la
+   suivante : à trois de front, le total se tassait en colonne illisible
+   dès que la fenêtre se rétrécissait. */
+.entete-escouade {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem 0.5rem;
+  margin-bottom: 0.6rem;
+}
+.entete-escouade h3 {
+  flex: 1; min-width: 0; margin: 0;
+  font-size: 0.95rem; letter-spacing: 0.04em; text-transform: uppercase;
+  font-family: var(--police-titre);
+}
+.total-section {
+  order: 3; flex-basis: 100%;
+  font-size: 0.85rem; color: var(--texte-att); line-height: 1.5;
+}
+.total-section b { color: var(--secondaire); font-size: 0.95rem; }
+
+/* Réglage du nombre d'emplacements : il grandit avec la progression en jeu */
+.reglage-slots { display: flex; align-items: center; gap: 0.4rem; flex-shrink: 0; }
+.btn-slot {
+  width: 30px; height: 30px; flex-shrink: 0;
+  border: 1px solid var(--bordure); border-radius: 8px;
+  background: var(--carte); color: var(--texte);
+  font-size: 1.05rem; line-height: 1; cursor: pointer;
+}
+.btn-slot:hover:not(:disabled) { border-color: var(--primaire); color: var(--primaire); }
+.btn-slot:disabled { opacity: 0.4; cursor: default; }
+.nb-slots {
+  min-width: 3.5em; text-align: center;
+  font-size: 0.82rem; color: var(--texte-att); font-variant-numeric: tabular-nums;
+}
+
+.grille-slots {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 0.5rem;
+}
+@media (min-width: 520px) { .grille-slots { grid-template-columns: repeat(auto-fill, minmax(108px, 1fr)); } }
+
+.slot { position: relative; }
+.slot.vide {
+  aspect-ratio: 5 / 7;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 0.2rem;
+  border: 2px dashed var(--bordure); border-radius: 8px;
+  color: var(--texte-att); cursor: pointer;
+  transition: border-color .15s, color .15s;
+}
+.slot.vide:hover, .slot.vide:focus-visible {
+  border-color: var(--primaire); color: var(--primaire); outline: none;
+}
+.slot-plus { font-size: 1.5rem; line-height: 1; }
+.slot-libelle { font-size: 0.7rem; }
+
+/* Emplacement occupé : la carte du Droidex, surmontée du palier et du
+   rendement effectif de ce palier. */
+.slot.rempli .carte-droide { cursor: pointer; }
+.slot-pied {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.3rem;
+  margin-top: 0.25rem; font-size: 0.62rem;
+}
+.slot-palier { color: var(--texte-att); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.slot-rendement { color: var(--succes); font-weight: 700; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.slot-retirer {
+  position: absolute; top: -6px; right: -6px; z-index: 5;
+  width: 20px; height: 20px; padding: 0;
+  border: 1px solid var(--bordure); border-radius: 50%;
+  background: var(--carte); color: var(--texte-att);
+  font-size: 0.62rem; line-height: 1; cursor: pointer;
+}
+.slot-retirer:hover { background: var(--danger); border-color: var(--danger); color: #fff; }
+.aucun-slot { font-size: 0.82rem; color: var(--texte-att); margin: 0; }
+
+/* ----- Feuille de choix d'un droïde ----- */
+.ligne-case {
+  display: flex; align-items: center; gap: 0.5rem;
+  font-size: 0.85rem; color: var(--texte-att); margin: 0.6rem 0 0.9rem;
+  cursor: pointer;
+}
+.liste-choix { display: flex; flex-direction: column; gap: 0.4rem; }
+.choix-droide {
+  display: flex; align-items: center; gap: 0.55rem; width: 100%;
+  padding: 0.6rem 0.7rem; text-align: left;
+  border: 1px solid var(--bordure); border-radius: 10px;
+  background: var(--carte); color: var(--texte); cursor: pointer;
+}
+.choix-droide:hover { border-color: var(--primaire); }
+.choix-pastille { width: 8px; height: 34px; border-radius: 3px; flex-shrink: 0; }
+.choix-nom { flex: 1; min-width: 0; display: flex; flex-direction: column; font-size: 0.88rem; font-weight: 600; }
+.choix-nom small { font-weight: 400; font-size: 0.72rem; color: var(--texte-att); }
+.choix-rendement {
+  flex-shrink: 0; font-size: 0.8rem; font-weight: 700; color: var(--succes);
+  font-variant-numeric: tabular-nums;
+}
+.choix-droide .badge-rarete { flex-shrink: 0; }
+
+/* Palier à plusieurs couleurs (« Arc-en-ciel ») : le contour devient un
+   dégradé. border-image en ferait autant mais ignore border-radius, ce qui
+   redonnerait des coins carrés ; on superpose donc deux fonds. */
+.contour-degrade {
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+}
+
+/* Pastilles de palier : un aplat, ou le même dégradé en réduction */
+.pastille-palier, .choix-pastille { background-size: cover; }
+
+/* ===== Panneau admin : couleurs des paliers et des raretés ===== */
+.apercu-palier {
+  width: 100%; max-width: 120px; height: 6px;
+  border-radius: 999px; margin-top: 0.35rem;
+}
+.couleurs-palier { display: flex; align-items: center; gap: 0.25rem; flex-wrap: wrap; }
+.couleur-stop { position: relative; display: inline-flex; }
+.couleur-stop input[type="color"] {
+  width: 34px; height: 34px; padding: 2px;
+  border: 1px solid var(--bordure); border-radius: 8px;
+  background: var(--fond); cursor: pointer;
+}
+.retirer-stop {
+  position: absolute; top: -6px; right: -6px;
+  width: 16px; height: 16px; padding: 0; line-height: 1;
+  border: 1px solid var(--bordure); border-radius: 50%;
+  background: var(--carte); color: var(--texte-att);
+  font-size: 0.55rem; cursor: pointer;
+}
+.retirer-stop:hover { background: var(--danger); border-color: var(--danger); color: #fff; }
+.ajouter-stop { width: 34px; height: 34px; flex-shrink: 0; }
+
+/* Raretés : aperçu du badge, et les deux sélecteurs de couleur */
+.apercu-rarete {
+  display: inline-flex; align-items: center;
+  padding: 0.2rem 0.6rem; border-radius: 999px;
+  font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em;
+}
+.couleur-libelle {
+  display: flex; flex-direction: column; align-items: center; gap: 0.15rem;
+  font-size: 0.65rem; color: var(--texte-att);
+}
+.couleur-libelle input[type="color"] {
+  width: 34px; height: 30px; padding: 2px;
+  border: 1px solid var(--bordure); border-radius: 8px;
+  background: var(--fond); cursor: pointer;
+}
+
+/* Bouton d'état actif dans les listes admin (rareté au premier palier) */
+.btn-mini.actif {
+  background: var(--primaire); border-color: var(--primaire); color: var(--sur-primaire);
+}
+
+/* Onglet « Tous » : le palier n'est plus déductible de l'onglet actif,
+   chaque carte porte donc son étiquette. */
+.etiquette-palier {
+  position: absolute; top: 22px; left: 3px; z-index: 3;
+  max-width: calc(100% - 6px);
+  padding: 1px 4px; border-radius: 3px;
+  background: rgba(0, 0, 0, .72);
+  color: #cbd5e1;
+  font-size: 0.55rem; font-weight: 600; line-height: 1.3;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  pointer-events: none;
+}
+.carte-droide:not(.possede) .etiquette-palier { opacity: .55; }
+
+/* ===== Renaissance : les droïdes requis, en visuel ===== */
+.elements-renaissance {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(74px, 1fr));
+  gap: 0.45rem;
+  margin-top: 0.7rem;
+}
+@media (min-width: 520px) { .elements-renaissance { grid-template-columns: repeat(auto-fill, minmax(86px, 1fr)); } }
+
+.element-renaissance { position: relative; }
+
+/* Garder ou vendre : même emplacement que la case à cocher du Droidex, qui
+   est masquée ici. Le signe est petit — c'est un rappel, pas un verdict. */
+.element-utilite {
+  position: absolute; top: 3px; right: 3px; z-index: 4;
+  width: 19px; height: 19px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 5px;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, .25);
+  font-size: 0.72rem; line-height: 1;
+  cursor: help;
+}
+.element-utilite.garder   { background: rgba(15, 23, 42, .88); }
+.element-utilite.vendable { background: rgba(22, 163, 74, .92); }
+/* Vendable pour les renaissances, mais posé dans l'escouade : on prévient. */
+.element-utilite.reserve  { background: rgba(217, 119, 6, .92); }
+
+.legende-utilite {
+  display: flex; flex-wrap: wrap; gap: 0.25rem 0.9rem;
+  margin: 0 0 0.6rem;
+  font-size: 0.74rem; color: var(--texte-att);
+}
+.legende-utilite span { display: inline-flex; align-items: center; gap: 0.3rem; }
+/* Dans la légende, le signe se pose dans le texte au lieu du coin d'une carte. */
+.legende-utilite .element-utilite { position: static; flex-shrink: 0; }
+/* Ici on montre CE QU'IL FAUT, pas ce qu'on possède : la case à cocher de la
+   carte n'aurait rien à dire, et prêterait à confusion. */
+.element-renaissance .dx-case { display: none; }
+.element-palier {
+  display: block; margin-top: 0.2rem;
+  font-size: 0.58rem; color: var(--texte-att);
+  text-align: center;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* Élément dont le nom ne correspond à aucun droïde : occupe la même cellule
+   qu'une carte, sans déborder — le texte peut être long. */
+.element-inconnu {
+  display: flex; align-items: center; justify-content: center;
+  aspect-ratio: 5 / 7; min-width: 0;
+  padding: 0.3rem; border-radius: 8px;
+  border: 2px dashed var(--bordure);
+  color: var(--texte-att); font-size: 0.62rem; line-height: 1.3;
+  text-align: center; overflow-wrap: anywhere;
+}
+
+/* ===== Panneau admin : paliers de renaissance =====
+   Chaque palier est une CARTE, pas une ligne de tableau : empilés et serrés,
+   les paliers se confondaient les uns avec les autres. */
+.ligne-renaissance {
+  border: 1px solid var(--bordure);
+  border-radius: 14px;
+  background: var(--fond);
+  padding: 0.85rem 0.9rem 0.9rem;
+  margin-bottom: 1rem;
+}
+.entete-palier-renaissance {
+  display: grid;
+  grid-template-columns: auto 4.5rem minmax(7rem, 1fr) 2rem;
+  gap: 0.45rem;
+  align-items: center;
+  padding-bottom: 0.7rem;
+  margin-bottom: 0.75rem;
+  border-bottom: 1px dashed var(--bordure);
+}
+.etiquette-niveau {
+  font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em;
+  color: var(--texte-att);
+}
+.ligne-renaissance input[type="text"], .ligne-renaissance input[type="number"] {
+  width: 100%; min-width: 0;
+  padding: 0.45rem 0.55rem;
+  border-radius: 8px; border: 1px solid var(--bordure);
+  background: var(--carte); color: var(--texte);
+  font-size: 0.85rem;
+}
+.ligne-renaissance input:focus { outline: 2px solid var(--primaire); outline-offset: 1px; }
+
+/* ----- Droïdes requis : trois emplacements qu'on remplit d'un clic -----
+   Un palier n'en demande jamais plus de trois ; les listes déroulantes
+   empilées prenaient plus de place que l'information elle-même. */
+.emplacements-droides {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+.case-droide {
+  position: relative;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 0.15rem;
+  min-height: 4.2rem;
+  padding: 0.5rem 0.4rem;
+  border: 2px solid var(--bordure); border-radius: 12px;
+  background: var(--carte); color: var(--texte);
+  font: inherit; text-align: center; cursor: pointer;
+  /* Le contour dégradé des paliers multicolores réutilise la mécanique des
+     cartes du Droidex : l'intérieur reste plein, seul le bord est peint. */
+  --fond-carte-droide: var(--carte);
+}
+/* La règle .contour-degrade est déclarée plus haut, mais le raccourci
+   « background » ci-dessus la remet à zéro : on la repose ici. */
+.case-droide.contour-degrade {
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+}
+.case-droide.vide { border-style: dashed; color: var(--texte-att); }
+.case-droide.vide:hover { border-color: var(--primaire); color: var(--primaire); }
+.case-plus { font-size: 1.3rem; line-height: 1; }
+.case-nom { font-size: 0.78rem; font-weight: 600; line-height: 1.2; overflow-wrap: anywhere; }
+.case-palier { font-size: 0.68rem; color: var(--texte-att); }
+.case-droide.inconnue { border-style: dashed; }
+.case-droide.inconnue .case-palier { color: var(--danger); }
+.case-vider {
+  position: absolute; top: -7px; right: -7px;
+  width: 18px; height: 18px;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid var(--bordure); border-radius: 50%;
+  background: var(--carte); color: var(--texte-att);
+  font-size: 0.6rem; line-height: 1;
+}
+.case-vider:hover { background: var(--danger); border-color: var(--danger); color: #fff; }
+
+/* Retour à l'étape « quel droïde » depuis la liste des paliers */
+.choix-droide.retour-choix { justify-content: flex-start; color: var(--texte-att); }
+
+/* Sélecteur de super renaissance : même aspect que les onglets de palier */
+#selecteurSuper .ajouter-super { border-style: dashed; opacity: .85; }
+#ongletsSuper { margin-bottom: 0.75rem; }
+
+/* Détail du calcul, sous le total majoré */
+.total-detail { color: var(--texte-att); font-size: 0.82em; }
+
+/* Rendement par seconde, à côté du total horaire */
+.total-seconde { color: var(--texte-att); font-size: 0.85em; }
+
+/* ===== Onglet Analyse : classements en barres ===== */
+.bloc-graph {
+  border: 1px solid var(--bordure); border-radius: 14px;
+  background: var(--carte);
+  padding: 0.9rem 1rem 1.1rem;
+  margin-bottom: 1rem;
+}
+.titre-graph { margin: 0 0 0.2rem; font-size: 1rem; font-family: var(--police-titre); }
+.sous-graph { margin: 0 0 0.9rem; font-size: 0.8rem; color: var(--texte-att); }
+
+.graph-barres { display: flex; flex-direction: column; gap: 0.4rem; }
+.barre-rangee {
+  display: grid;
+  grid-template-columns: 1.4rem minmax(6rem, 10rem) 1fr auto;
+  align-items: center; gap: 0.5rem;
+}
+.barre-rang { color: var(--texte-att); font-size: 0.8rem; font-weight: 700; text-align: right; }
+.barre-nom {
+  display: flex; flex-direction: column; min-width: 0;
+  font-size: 0.82rem; font-weight: 600;
+}
+.barre-nom-txt { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.barre-sous {
+  font-size: 0.66rem; font-weight: 600; color: var(--texte-att);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.barre-rangee.possede .barre-nom-txt { color: var(--primaire); }
+.barre-rangee.hors-budget { opacity: 0.5; }
+.barre-rangee.hors-budget .barre-sous { color: var(--danger); }
+.barre-check { color: var(--succes); }
+.barre-piste {
+  height: 12px; border-radius: 6px;
+  background: rgba(148, 163, 184, .15);
+  overflow: hidden;
+}
+.barre-remplissage { display: block; height: 100%; border-radius: 6px; transition: width .3s; }
+.barre-valeur {
+  font-size: 0.78rem; font-weight: 700; white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.case-analyse { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.85rem; }
+@media (max-width: 520px) {
+  .barre-rangee { grid-template-columns: 1.2rem minmax(4rem, 6rem) 1fr auto; gap: 0.35rem; }
+  .barre-nom, .barre-valeur { font-size: 0.72rem; }
+}
+
+/* Multiplicateur de revenu appliqué au total, mis en avant. */
+.total-mult {
+  display: inline-flex; align-items: center;
+  padding: 0.05rem 0.4rem; border-radius: 999px;
+  background: var(--primaire); color: var(--sur-primaire);
+  font-weight: 800; font-size: 0.9em;
+  box-shadow: 0 0 8px -1px var(--primaire);
+}
+
+/* Champ de saisie du multiplicateur, au-dessus du rendement total. */
+.ligne-multiplicateur {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem 0.8rem;
+  margin: 0 0 0.7rem;
+}
+.ligne-multiplicateur > label {
+  font-size: 0.8rem; font-weight: 600; color: var(--texte);
+}
+.champ-multiplicateur {
+  display: inline-flex; align-items: center; gap: 0.15rem;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--bordure); border-radius: 10px;
+  background: var(--carte);
+}
+.champ-multiplicateur .signe-mult { color: var(--primaire); font-weight: 800; font-size: 1.05rem; }
+.champ-multiplicateur input {
+  width: 5.5rem; border: none; background: transparent; color: var(--texte);
+  font-size: 1rem; font-weight: 700; padding: 0.1rem 0.1rem;
+}
+.champ-multiplicateur input:focus { outline: none; }
+.aide-mult { font-size: 0.75rem; color: var(--texte-att); }
+
+/* Champ budget = nombre + menu d'unités (K/M/B/T) accolé. */
+.champ-budget input { width: 4.2rem; }
+.champ-budget select {
+  border: none; background: transparent; color: var(--texte);
+  font-size: 0.95rem; font-weight: 700; cursor: pointer;
+  padding: 0.1rem 0.15rem;
+  margin-left: 0.2rem; padding-left: 0.4rem;
+  border-left: 1px solid var(--bordure);
+}
+.champ-budget select:focus { outline: none; }
+
+/* Le popup natif d'un <select> s'affiche en blanc par défaut : illisible en
+   thème sombre. On force un fond et un texte lisibles pour toutes les options. */
+select option { background: var(--carte); color: var(--texte); }
+
+/* ===== Panneau admin sur mobile =====
+   Les grilles à colonnes sont pensées pour un écran large. En dessous de
+   620 px, la colonne de saisie tombait à une vingtaine de pixels — un champ
+   où l'on ne voyait pas ce qu'on tapait. On empile donc. */
+@media (max-width: 620px) {
+  .entete-paliers { display: none; }
+
+  .ligne-palier {
+    grid-template-columns: 1fr;
+    gap: 0.35rem;
+    border: 1px solid var(--bordure);
+    border-radius: 10px;
+    padding: 0.6rem;
+    margin-bottom: 0.6rem;
+  }
+  .ligne-palier .nom-palier { font-size: 0.9rem; color: var(--texte); }
+
+  /* Chaque montant sur sa ligne, précédé de son intitulé — les en-têtes de
+     colonnes étant masqués, sans eux on ne saurait plus ce qu'on saisit.
+     La valeur garde la part variable : c'est elle qu'on doit pouvoir lire. */
+  .duo-valeur {
+    display: grid;
+    grid-template-columns: 5rem minmax(0, 1fr) 4.5rem;
+    align-items: center;
+  }
+  .duo-valeur::before { font-size: 0.75rem; color: var(--texte-att); }
+  .duo-valeur select { width: 100%; }
+  .ligne-palier .duo-valeur::before { content: "Prix"; }
+  .ligne-palier .duo-valeur + .duo-valeur::before { content: "Rendement"; }
+
+  /* Renaissance : niveau et suppression sur une ligne, crédits en dessous.
+     Les trois emplacements restent côte à côte, ils tiennent en largeur. */
+  .entete-palier-renaissance {
+    grid-template-columns: auto minmax(0, 1fr) 2rem;
+    row-gap: 0.5rem;
+  }
+  /* Le niveau et sa suppression tiennent sur la première rangée ; les
+     crédits prennent la largeur en dessous. */
+  .entete-palier-renaissance .btn-mini.danger { grid-column: 3; grid-row: 1; }
+  .entete-palier-renaissance .duo-valeur { grid-column: 1 / -1; grid-row: 2; }
+  .entete-palier-renaissance .duo-valeur::before { content: "Crédits"; }
+  .case-droide { min-height: 3.8rem; padding: 0.45rem 0.25rem; }
+  .case-nom { font-size: 0.72rem; }
+}
+
+/* ===== Onglet Fusion ===== */
+.section-fusion { margin-bottom: 1.5rem; }
+.titre-fusion {
+  display: flex; align-items: center; gap: 0.5rem;
+  margin: 0 0 0.7rem; font-size: 0.95rem;
+}
+.titre-fusion .badge-rarete { font-size: 0.8rem; padding: 0.22rem 0.6rem; }
+.titre-fusion-suffixe { color: var(--texte-att); font-weight: 600; letter-spacing: 0.02em; }
+
+.grille-recettes { display: flex; flex-direction: column; gap: 0.7rem; }
+
+.recette-fusion {
+  display: flex; align-items: center; gap: 0.7rem;
+  padding: 0.7rem;
+  border: 1px solid var(--bordure); border-radius: 14px;
+  background: var(--carte);
+}
+.recette-resultat { flex-shrink: 0; width: 92px; }
+.recette-egale {
+  flex-shrink: 0;
+  font-size: 1.5rem; font-weight: 700;
+  color: var(--texte-att); font-family: var(--police-titre);
+}
+.recette-ingredients {
+  display: flex; flex-wrap: wrap; gap: 0.6rem; flex: 1; min-width: 0;
+}
+.ingredient-fusion { position: relative; width: 78px; }
+
+/* Le ✓ unique de la carte n'a rien à dire ici : la possession par palier est
+   indiquée par les pastilles ci-dessus. */
+.recette-fusion .dx-case { display: none; }
+
+.badge-quantite {
+  position: absolute; top: -7px; left: -7px; z-index: 5;
+  min-width: 22px; height: 22px; padding: 0 5px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 11px;
+  background: var(--primaire); color: var(--sur-primaire);
+  font-size: 0.72rem; font-weight: 700; line-height: 1;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .4);
+}
+
+@media (max-width: 520px) {
+  .recette-fusion { flex-direction: column; align-items: stretch; }
+  .recette-resultat { width: 100%; max-width: 130px; margin: 0 auto; }
+  .recette-egale { text-align: center; }
+  .recette-ingredients { justify-content: center; }
+}
+
+/* ----- Fusion : édition admin (calquée sur les lignes de renaissance) ----- */
+.ligne-fusion {
+  border: 1px solid var(--bordure);
+  border-radius: 14px;
+  background: var(--fond);
+  padding: 0.85rem 0.9rem 0.9rem;
+  margin-bottom: 1rem;
+}
+.entete-fusion {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 2rem;
+  gap: 0.45rem;
+  align-items: center;
+  padding-bottom: 0.7rem;
+  margin-bottom: 0.75rem;
+  border-bottom: 1px dashed var(--bordure);
+}
+/* Le résultat : une case cliquable (droïde du catalogue) qui montre son nom
+   et sa rareté, plus large que les cases d'ingrédient. */
+.resultat-fusion {
+  min-height: 3.4rem;
+  flex-direction: row !important;
+  justify-content: flex-start !important;
+  gap: 0.5rem !important;
+  padding: 0.5rem 0.7rem !important;
+  text-align: left !important;
+}
+.resultat-fusion .case-nom { font-size: 0.9rem; }
+.resultat-fusion .badge-rarete { margin-left: auto; flex-shrink: 0; }
+.resultat-fusion.vide { border-style: dashed; }
+
+/* Résultat hors catalogue : la case + un bouton pour le créer d'un clic. */
+.resultat-horscatalogue { display: flex; flex-direction: column; gap: 0.4rem; min-width: 0; }
+.resultat-horscatalogue .resultat-fusion { width: 100%; }
+.btn-creer-catalogue {
+  align-self: flex-start;
+  background: var(--primaire);
+  color: var(--sur-primaire);
+  border-color: var(--primaire);
+}

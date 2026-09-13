@@ -1,3 +1,31 @@
+// ----- Ces actions passent par le reseau : on le dit, et on empeche d'y toucher -----
+// Voir attente.js. Les actions de FOND (sauvegarde differee, chargement d'une
+// vignette, migration silencieuse) n'y figurent surtout pas : les voiler
+// bloquerait la page pour un travail que l'on a justement choisi de rendre
+// invisible.
+envelopperAttente({
+  chargerLivre: ["Ouverture du livre…", "Le texte et la mise en pages sont récupérés."],
+  sauvegarder: ["Enregistrement du livre…", "Ne fermez pas la page : l'écriture est en cours."],
+  gererConflitSauvegarde: ["Résolution d'un conflit…", "Le livre a été modifié ailleurs : les deux versions sont comparées."],
+  basculerPublication: ["Publication…", "La liste des livres publiés est mise à jour."],
+});
+
+// ----- Et celles-ci ne passent par rien du tout : elles calculent -----
+// Recomposer quatre cents pages prend deux secondes pendant lesquelles la
+// page se fige — plus rien ne répond, on croit avoir planté l'éditeur. Le
+// voile de calcul (voir attente.js) s'affiche AVANT que le fil ne soit pris,
+// ce que le voile ordinaire, posé par minuteur, ne saurait faire.
+//
+// Les actions qui posent une question avant de travailler ne sont pas ici :
+// le voile s'afficherait derrière leur « confirm ». Elles appellent
+// pendantAttenteLourde elles-mêmes, une fois la réponse obtenue.
+envelopperAttenteLourde({
+  changerFormat: ["Changement de format…", "Tout le texte est recomposé aux nouvelles dimensions."],
+  appliquerInterligne: ["Nouvel interligne…", "Tout le texte est recomposé."],
+  ouvrirApercu: ["Préparation de l'aperçu…", "Les pages sont recalculées au découpage exact."],
+  fermerApercu: ["Retour à l'édition…"],
+});
+
 let bibliotheque = null;
 let shaBiblio = null;
 let nomFichierBiblio = null;
@@ -30,10 +58,21 @@ const PX_PAR_MM = 96 / 25.4;
 // Variable et non constante : l'export « fichier pour l'imprimeur » la
 // remonte le temps de la génération, pour que le folio respecte le blanc
 // tournant de 7 mm exigé par les imprimeurs (voir impression.js).
-let PIED_PAGE_PX = 32;
+// Bande réservée au bas de la page : le numéro y tient, et le texte s'arrête
+// AVANT. À 32 px, la bande était plus courte que le folio lui-même : la
+// dernière ligne venait mourir dessus, à un demi-millimètre. 64 px laissent
+// le folio à 6 mm du bord et un blanc de 4 mm au-dessus de lui.
+let PIED_PAGE_PX = 64;
+
+// Le livre courant compose selon SON format.
+function typoDuLivre() {
+  const livre = (typeof indexLivre === "number" && indexLivre !== -1) ? livreActuel() : null;
+  return typoDuFormat(livre && livre.format);
+}
 
 function appliquerFormatPage(formatKey) {
   const f = FORMATS[formatKey] || FORMATS["149x210"];
+  appliquerTypoFormat(formatKey);
 
   // --- Dimensions LOGIQUES fixes (indépendantes de la fenêtre) ---
   const largPx   = Math.round(f.larg * PX_PAR_MM);
@@ -53,7 +92,11 @@ function appliquerFormatPage(formatKey) {
     el.style.flexShrink = "0";
   });
 
-  document.querySelectorAll(".texte-livre").forEach(el => {
+  // Le manuscrit (manuscrit.js) emprunte la typographie de « .texte-livre »
+  // mais pas sa géométrie : sa feuille est large et sans fin, c'est sa raison
+  // d'être. Sans cette exception, la taille d'une page lui serait imposée ici
+  // en style en ligne, et le chapitre s'y trouverait à nouveau enfermé.
+  document.querySelectorAll(".texte-livre:not(.ms-texte)").forEach(el => {
     el.style.width  = (largPx - margeHPx * 2) + "px";
     el.style.height = (hautPx - margeVPx - numPageH) + "px";
   });
@@ -172,7 +215,7 @@ function appliquerReductionSommaire() {
 }
 
 async function chargerLivre() {
-  const token = sessionStorage.getItem("gh_token");
+  const token = localStorage.getItem("gh_token");
   const message = document.getElementById("message");
 
   livreId = sessionStorage.getItem("livre_id");
@@ -704,6 +747,9 @@ function changerFormat(nouveauFormat) {
 
   // Met à jour hauteurTextePx et les dimensions du mesureur de pagination.
   appliquerFormatPage(nouveauFormat);
+  // L'espace au-dessus des titres suit le format, tant que l'auteur n'a pas
+  // réglé le sien : un blanc de 65 px sur un poche mangerait la page.
+  initEspaceTitre();
 
   // Repagination complète depuis la première page selon la nouvelle hauteur.
   normaliserPagination(0);
@@ -728,7 +774,7 @@ function changerFormat(nouveauFormat) {
 // ----- Sauvegarde -----
 
 async function sauvegarder() {
-  const token = sessionStorage.getItem("gh_token");
+  const token = localStorage.getItem("gh_token");
   const message = document.getElementById("message");
 
   flushSpread();
@@ -757,7 +803,7 @@ async function sauvegarder() {
 
 // Résolution d'un conflit d'écriture GitHub (le livre a été modifié ailleurs) (#3)
 async function gererConflitSauvegarde() {
-  const token = sessionStorage.getItem("gh_token");
+  const token = localStorage.getItem("gh_token");
   const message = document.getElementById("message");
 
   const ecraser = confirm(
@@ -883,7 +929,7 @@ function previewCouverture() {
       afficherImageCouverture(cacheImagesURL[cheminImage], cheminImage);
     } else {
       img.style.display = "none";
-      const token = sessionStorage.getItem("gh_token");
+      const token = localStorage.getItem("gh_token");
       const requeteId = ++requeteImageEnCours;
       obtenirUrlImage(cheminImage, token).then((urlImage) => {
         cacheImagesURL[cheminImage] = urlImage;
@@ -927,12 +973,24 @@ function previewCouverture() {
     const el = document.getElementById(id);
     if (el) el.style.display = visibleTitre;
   });
+  // Inversement, le texte libre n'existe que sur la 4e.
+  const blocResume = document.getElementById("blocResume");
+  if (blocResume) blocResume.style.display = mode === "quatrieme" ? "block" : "none";
 
   const apercu = document.getElementById("previewCouverture");
   apercu.innerHTML = `
     ${mode === "couverture" && afficherTitre ? `<div class="apercu-titre" style="color:${couleurTexte};${styleTexteCouv(data, "titre")}">${livre.titre || "Titre"}</div>` : ""}
     ${afficherAuteur ? `<div class="apercu-auteur" style="color:${couleurTexte};${styleTexteCouv(data, "auteur")}">${livre.auteur || "Auteur"}</div>` : ""}
   `;
+
+  // Le texte de 4e se pose sur la page elle-même, hors de la couche des
+  // textes : c'est la seule façon que sa position soit celle qu'on a réglée.
+  const page = document.getElementById("previewCouv");
+  const ancienne = page.querySelector(".couche-resume");
+  if (ancienne) ancienne.remove();
+  if (mode === "quatrieme") {
+    page.insertAdjacentHTML("beforeend", htmlResumeCouv(data, couleurTexte, "apercu-resume"));
+  }
 }
 
 function toggleAffichageTexte(champ, valeur) {
@@ -1154,7 +1212,7 @@ function initGlissementImageCouverture() {
 function setCouleurFond(couleur) {
   const livre = livreActuel();
   const data = modeCouverture === "couverture" ? livre.couverture : livre.quatrieme;
-  const token = sessionStorage.getItem("gh_token");
+  const token = localStorage.getItem("gh_token");
 
   if (data.imageChemin) {
     supprimerFichierGithub(data.imageChemin, token, "Suppression de l'image de couverture (couleur choisie)").catch(() => {});
@@ -1184,7 +1242,7 @@ function chargerImageFond(event) {
   const fichier = event.target.files[0];
   if (!fichier) return;
 
-  const token = sessionStorage.getItem("gh_token");
+  const token = localStorage.getItem("gh_token");
   const messageCouv = document.getElementById("messageCouv");
   const livre = livreActuel();
   const modeCourant = modeCouverture;
@@ -1197,6 +1255,9 @@ function chargerImageFond(event) {
     const extension = extraireExtensionDataUrl(dataUrl);
     const chemin = `${obtenirPrefixeImagesUtilisateur()}/${livre.id}_${modeCourant}.${extension}`;
 
+    // Le travail se fait dans la réponse du lecteur de fichier, pas dans
+    // chargerImageFond : le voile se pose donc ici, et pas autour de l'appel.
+    ouvrirAttente("Envoi de l'image…", "Une image de couverture peut peser lourd : le transfert prend quelques secondes.");
     messageCouv.textContent = "Envoi de l'image en cours...";
     try {
       await uploaderImageBase64(chemin, dataUrl, token, `Image de couverture — ${livre.titre || livre.id}`);
@@ -1218,6 +1279,8 @@ function chargerImageFond(event) {
       planifierBrouillon();
     } catch (erreur) {
       messageCouv.textContent = erreur.message;
+    } finally {
+      fermerAttente();
     }
   };
   reader.readAsDataURL(fichier);
@@ -1226,7 +1289,7 @@ function chargerImageFond(event) {
 function supprimerImageFond() {
   const livre = livreActuel();
   const data = modeCouverture === "couverture" ? livre.couverture : livre.quatrieme;
-  const token = sessionStorage.getItem("gh_token");
+  const token = localStorage.getItem("gh_token");
 
   if (data.imageChemin) {
     supprimerFichierGithub(data.imageChemin, token, "Suppression de l'image de couverture").catch(() => {});
@@ -1244,14 +1307,6 @@ function supprimerImageFond() {
   planifierBrouillon();
 }
 
-function seDeconnecter() {
-  sessionStorage.removeItem("gh_token");
-  sessionStorage.removeItem("gh_login");
-  sessionStorage.removeItem("gh_role");
-  sessionStorage.removeItem("gh_nom");
-  sessionStorage.removeItem("livre_id");
-  window.location.href = "index.html";
-}
 
 // ----- Mode aperçu -----
 
@@ -1534,7 +1589,7 @@ function creerPageCouvertureApercu(mode) {
     img.style.userSelect = "none";
     page.appendChild(img);
 
-    const token = sessionStorage.getItem("gh_token");
+    const token = localStorage.getItem("gh_token");
     if (cacheImagesURL[data.imageChemin]) {
       positionnerImageApercu(img, data, cacheImagesURL[data.imageChemin], page, data.imageChemin);
     } else {
@@ -1556,6 +1611,9 @@ function creerPageCouvertureApercu(mode) {
     ${afficherAuteur ? `<div class="apercu-auteur" style="color:${couleurTexte};${styleTexteCouv(data, "auteur")}">${livre.auteur || "Auteur"}</div>` : ""}
   `;
   page.appendChild(couche);
+  if (mode === "quatrieme") {
+    page.insertAdjacentHTML("beforeend", htmlResumeCouv(data, couleurTexte, "apercu-resume"));
+  }
 
   return page;
 }
@@ -1579,7 +1637,7 @@ function positionnerImageApercu(img, data, url, page, chemin, dejaRetente) {
   img.onerror = () => {
     if (dejaRetente) return; // on ne retente qu'une fois pour éviter une boucle
     delete cacheImagesURL[chemin];
-    const token = sessionStorage.getItem("gh_token");
+    const token = localStorage.getItem("gh_token");
     obtenirUrlImage(chemin, token).then((nouvelleUrl) => {
       cacheImagesURL[chemin] = nouvelleUrl;
       positionnerImageApercu(img, data, nouvelleUrl, page, chemin, true);
@@ -1628,7 +1686,7 @@ function majIndicateur() {
 let timerBrouillon = null;
 
 function cleBrouillon() {
-  return `brouillon_${sessionStorage.getItem("gh_login")}_${livreId}`;
+  return `brouillon_${localStorage.getItem("gh_login")}_${livreId}`;
 }
 
 function planifierBrouillon() {
@@ -2774,6 +2832,15 @@ function afficherSommaire() {
     num.textContent = "p." + (ch.page + 1);
     li.appendChild(num);
 
+    // Ouvrir le chapitre d'un seul tenant, sans pages à gérer (manuscrit.js).
+    const editer = document.createElement("button");
+    editer.className = "editer-chapitre";
+    editer.textContent = "✎";
+    editer.title = "Écrire ce chapitre d'un seul tenant, sans pagination";
+    editer.setAttribute("aria-label", "Écrire le chapitre " + ch.titre);
+    editer.onclick = (e) => { e.stopPropagation(); ouvrirManuscrit(i); };
+    li.appendChild(editer);
+
     const suppr = document.createElement("button");
     suppr.className = "supprimer-chapitre";
     suppr.textContent = "✕";
@@ -2839,10 +2906,307 @@ function supprimerChapitre(indexChapitre) {
     return;
   }
 
-  cible.noeuds.forEach(n => { if (n.parentNode === conteneur) conteneur.removeChild(n); });
+  // Comme pour la remise aux tailles du format : le voile vient après la
+  // question, sans quoi il s'afficherait derrière elle.
+  pendantAttenteLourde("Suppression du chapitre…", () => {
+    cible.noeuds.forEach(n => { if (n.parentNode === conteneur) conteneur.removeChild(n); });
 
+    const livre = livreActuel();
+    livre.spreads = [conteneur.innerHTML || ""];
+    indexSpread = 0;
+    repaginerTout();
+
+    const spreads = spreadsLivre();
+    if (numSpread() >= spreads.length) indexSpread = Math.max(0, (spreads.length - 1) * 2);
+
+    afficherSpread();
+    afficherSommaire();
+    majCompteurMots();
+    marquerModifie();
+    planifierBrouillon();
+
+    const message = document.getElementById("message");
+    if (message) {
+      message.textContent = "Chapitre « " + cible.titre + " » supprimé.";
+      setTimeout(() => {
+        if (message.textContent.indexOf("supprimé") !== -1) message.textContent = "";
+      }, 3000);
+    }
+  }, "Le livre est recomposé sans lui.");
+}
+
+// ===== Casse des titres de chapitre =====
+//
+// « Chapitre 1 - Fin de l'Ère d'Harmonie » : la seconde moitié d'un titre est
+// souvent saisie en capitales de titre, à l'anglaise. En français, seule la
+// première lettre et les noms propres en portent.
+//
+// Deviner ce qui est un nom propre est impossible dans l'absolu : le livre
+// lui-même sert de dictionnaire. Un mot capitalisé AU MILIEU d'une phrase du
+// texte courant ne peut guère être qu'un nom propre — c'est ainsi que
+// « Harmonie » ou « Sylvandar » sont reconnus, tandis que « Ère » ne l'est
+// pas. La proposition reste modifiable avant d'être appliquée : l'éditeur
+// propose, l'auteur décide.
+
+function echapperTitre(txt) {
+  return String(txt == null ? "" : txt)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+// Tirets et deux-points qui séparent le numéro du titre proprement dit.
+const SEPARATEURS_TITRE = /\s[-–—:]\s/;
+
+// Un « mot » au sens de la casse : lettres accentuées, apostrophes exclues
+// (« l'Ère » compte pour deux mots, et c'est bien « Ère » qu'on examine).
+const MOT_TITRE = /[\p{L}][\p{L}\p{M}-]*/gu;
+
+// Fin de phrase : le mot qui suit porte une majuscule sans être un nom propre.
+const FIN_DE_PHRASE = /[.!?…:;»"]\s*$|^\s*$/;
+
+// Noms propres du livre : tout mot capitalisé qui n'ouvre pas une phrase.
+function nomsPropresDuLivre() {
+  const boite = document.createElement("div");
+  boite.innerHTML = contenuCompletLivre();
+  // Les titres sont justement ce qu'on cherche à corriger : ils ne peuvent pas
+  // servir de référence.
+  boite.querySelectorAll("h2").forEach((h) => h.remove());
+  const texte = boite.textContent || "";
+
+  const noms = new Set();
+  let m;
+  const balayeur = new RegExp(MOT_TITRE.source, "gu");
+  while ((m = balayeur.exec(texte)) !== null) {
+    const mot = m[0];
+    const avant = texte.slice(Math.max(0, m.index - 40), m.index);
+    const premierDePhrase = FIN_DE_PHRASE.test(avant);
+    if (!premierDePhrase && mot[0] !== mot[0].toLowerCase()) {
+      noms.add(mot.toLowerCase());
+    }
+  }
+  return noms;
+}
+
+// La proposition pour un titre. Le texte avant le séparateur n'est pas touché
+// (« Chapitre 1 » garde sa majuscule), pas plus que le premier mot d'après.
+function titreEnCasseFrancaise(titre, noms) {
+  const sep = titre.match(SEPARATEURS_TITRE);
+  const debut = sep ? sep.index + sep[0].length : 0;
+  // Sans séparateur, il n'y a rien à corriger : le titre est déjà « le titre ».
+  if (!sep) return titre;
+
+  let premier = true;
+  const suite = titre.slice(debut).replace(new RegExp(MOT_TITRE.source, "gu"), (mot) => {
+    if (premier) { premier = false; return mot; }
+    if (mot[0] === mot[0].toLowerCase()) return mot;          // déjà en minuscule
+    if (noms.has(mot.toLowerCase())) return mot;              // nom propre du livre
+    if (mot === mot.toUpperCase() && mot.length > 1) return mot; // sigle (ADN, IA…)
+    return mot[0].toLowerCase() + mot.slice(1);
+  });
+  return titre.slice(0, debut) + suite;
+}
+
+// Réécrit un titre SANS toucher à son balisage : on ne change que la casse,
+// donc les longueurs concordent et chaque nœud de texte reçoit sa tranche.
+// Remplacer textContent perdrait les italiques ou les petites capitales.
+function reecrireCasse(h2, nouveauTexte) {
+  if ((h2.textContent || "").length !== nouveauTexte.length) {
+    h2.textContent = nouveauTexte;   // sécurité : mieux vaut le texte juste
+    return;
+  }
+  let position = 0;
+  const parcours = document.createTreeWalker(h2, NodeFilter.SHOW_TEXT);
+  let noeud;
+  while ((noeud = parcours.nextNode())) {
+    const n = noeud.nodeValue.length;
+    noeud.nodeValue = nouveauTexte.substr(position, n);
+    position += n;
+  }
+}
+
+// ===== Renommer les chapitres =====
+//
+// Renommer un chapitre se faisait dans le texte, page par page : il fallait
+// retrouver le titre dans la mise en pages, cliquer dedans, corriger, puis
+// recommencer trente-quatre fois. Le sommaire connaît pourtant déjà tous les
+// titres — autant les présenter ensemble et les laisser corriger à la file.
+//
+// Un titre porte parfois des italiques ou des petites capitales : on ne
+// remplace donc pas son contenu, on réécrit ses nœuds de texte (voir
+// reecrireCasse), qui préserve le balisage tant que la longueur concorde.
+//
+// La correction de casse d'autrefois n'a pas disparu : elle est devenue un
+// bouton de ce dialogue, qui REMPLIT les champs au lieu d'appliquer d'office.
+// L'éditeur propose toujours, l'auteur décide toujours — mais dans la même
+// fenêtre que le reste.
+
+function ouvrirRenommageChapitres() {
+  if (modeApercu || modeCouverture) return;
+  flushSpread();
+
+  const conteneur = document.createElement("div");
+  conteneur.innerHTML = contenuCompletLivre();
+  const titres = [...conteneur.querySelectorAll("h2")]
+    .filter((h) => (h.textContent || "").trim());
+
+  if (!titres.length) {
+    alert("Aucun chapitre à renommer : ce livre n'a pas encore de titre.");
+    return;
+  }
+
+  // Le numéro de page vient du sommaire. Si les deux comptes divergent — un
+  // titre coupé entre deux pages, par exemple — on préfère n'afficher aucun
+  // numéro plutôt qu'un numéro faux.
+  const duSommaire = listerChapitres();
+  const pages = duSommaire.length === titres.length ? duSommaire : null;
+
+  const lignes = titres.map((h, i) => ({
+    h2: h,
+    avant: h.textContent,
+    page: pages ? pages[i].page + 1 : null
+  }));
+
+  ouvrirDialogueRenommage(lignes, conteneur);
+}
+
+function ouvrirDialogueRenommage(lignes, conteneur) {
+  const ancien = document.getElementById("dialogueRenommage");
+  if (ancien) ancien.remove();
+
+  let html = '<div class="modal-impression-carte ci-carte" role="dialog" aria-modal="true">' +
+    '<button class="mi-fermer" aria-label="Fermer">&#10005;</button>' +
+    "<h3>Renommer les chapitres</h3>" +
+    '<p class="mi-intro">Tous les titres du livre, dans l&rsquo;ordre. Corrigez ceux ' +
+    "que vous voulez et laissez les autres tels quels : seuls les titres modifiés " +
+    "seront réécrits. <b>Entrée</b> passe au suivant, <b>Ctrl+Entrée</b> enregistre.</p>" +
+    '<div class="renom-outils">' +
+      '<button type="button" class="renom-casse" ' +
+        'title="Proposer la casse française : les majuscules superflues après le tiret sont retirées, les noms propres du livre conservés">' +
+        "Aa Casse française</button>" +
+      '<button type="button" class="renom-annuler-tout" title="Remettre tous les titres tels qu&rsquo;ils sont dans le livre">Tout remettre</button>' +
+      '<span class="renom-compte"></span>' +
+    "</div>" +
+    '<div class="renom-liste">';
+
+  lignes.forEach((l, i) => {
+    html += '<div class="renom-ligne" data-i="' + i + '">' +
+      '<span class="renom-page">' + (l.page ? "p." + l.page : "&mdash;") + "</span>" +
+      '<input type="text" class="renom-champ" data-i="' + i + '" value="' + echapperTitre(l.avant) + '">' +
+      '<p class="renom-avant"></p>' +
+    "</div>";
+  });
+
+  html += "</div>" +
+    '<div class="ci-actions">' +
+      '<button class="ci-annuler">Annuler</button>' +
+      '<button class="ci-generer" disabled>Aucun changement</button>' +
+    "</div></div>";
+
+  const fond = document.createElement("div");
+  fond.id = "dialogueRenommage";
+  fond.className = "modal-impression";
+  fond.innerHTML = html;
+  document.body.appendChild(fond);
+
+  const champs = [...fond.querySelectorAll(".renom-champ")];
+  const bouton = fond.querySelector(".ci-generer");
+
+  // Ce qui a changé, et ce que cela va coûter : le bouton ne ment jamais sur
+  // le nombre de titres qu'il va réécrire.
+  const modifies = () => champs.filter((c, i) => c.value !== lignes[i].avant && c.value.trim());
+
+  const rafraichir = () => {
+    champs.forEach((c, i) => {
+      const change = c.value !== lignes[i].avant;
+      const ligne = c.closest(".renom-ligne");
+      ligne.classList.toggle("modifiee", change && !!c.value.trim());
+      ligne.classList.toggle("vide", !c.value.trim());
+      // L'ancien titre ne s'affiche que s'il diffère : sinon il ne dirait
+      // rien que le champ ne dise déjà, et la liste doublerait de hauteur.
+      const avant = ligne.querySelector(".renom-avant");
+      avant.textContent = change ? lignes[i].avant : "";
+      avant.style.display = change ? "" : "none";
+    });
+    const n = modifies().length;
+    const vides = champs.filter((c) => !c.value.trim()).length;
+    bouton.disabled = n === 0;
+    bouton.textContent = n === 0 ? "Aucun changement"
+      : "Renommer " + n + " chapitre" + (n > 1 ? "s" : "");
+    fond.querySelector(".renom-compte").textContent = vides
+      ? vides + " titre" + (vides > 1 ? "s vides seront ignorés." : " vide sera ignoré.")
+      : "";
+  };
+
+  champs.forEach((c, i) => {
+    c.addEventListener("input", rafraichir);
+    c.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); appliquer(); return; }
+      if (e.key === "Enter") {
+        e.preventDefault();
+        const suivant = champs[i + 1];
+        if (suivant) { suivant.focus(); suivant.select(); }
+        else appliquer();
+      }
+    });
+  });
+
+  fond.querySelector(".renom-casse").onclick = () => {
+    const noms = nomsPropresDuLivre();
+    champs.forEach((c) => { c.value = titreEnCasseFrancaise(c.value, noms); });
+    rafraichir();
+  };
+  fond.querySelector(".renom-annuler-tout").onclick = () => {
+    champs.forEach((c, i) => { c.value = lignes[i].avant; });
+    rafraichir();
+  };
+
+  const fermer = () => {
+    if (modifies().length &&
+        !confirm("Fermer sans renommer ?\n\nLes titres saisis seront perdus.")) return;
+    document.removeEventListener("keydown", surEchap, true);
+    fond.remove();
+  };
+  const surEchap = (e) => {
+    if (e.key === "Escape" && document.getElementById("dialogueRenommage")) {
+      e.preventDefault(); e.stopPropagation(); fermer();
+    }
+  };
+  document.addEventListener("keydown", surEchap, true);
+
+  fond.addEventListener("click", (e) => { if (e.target === fond) fermer(); });
+  fond.querySelector(".mi-fermer").onclick = fermer;
+  fond.querySelector(".ci-annuler").onclick = fermer;
+
+  function appliquer() {
+    let n = 0;
+    champs.forEach((c, i) => {
+      const valeur = c.value;
+      // Un champ vidé n'efface pas le chapitre : il serait bien trop facile de
+      // perdre un titre d'un coup de touche. On le laisse tel quel.
+      if (!valeur.trim() || valeur === lignes[i].avant) return;
+      reecrireCasse(lignes[i].h2, valeur);
+      n++;
+    });
+    document.removeEventListener("keydown", surEchap, true);
+    fond.remove();
+    if (n) {
+      appliquerContenuComplet(conteneur.innerHTML, n,
+        n + " chapitre" + (n > 1 ? "s renommés" : " renommé") + ".");
+    }
+  }
+  bouton.onclick = appliquer;
+
+  rafraichir();
+  if (champs[0]) { champs[0].focus(); champs[0].select(); }
+}
+
+// Repose le livre entier après une retouche globale, comme le fait la
+// suppression d'un chapitre : on réécrit le texte continu, puis on repagine.
+// `texteMessage` : ce qui s'affiche en bas quand l'appelant sait mieux dire
+// ce qu'il vient de faire (« 12 chapitres renommés » plutôt que « corrigés »).
+function appliquerContenuComplet(html, nbTitres, texteMessage) {
   const livre = livreActuel();
-  livre.spreads = [conteneur.innerHTML || ""];
+  livre.spreads = [html || ""];
   indexSpread = 0;
   repaginerTout();
 
@@ -2857,9 +3221,13 @@ function supprimerChapitre(indexChapitre) {
 
   const message = document.getElementById("message");
   if (message) {
-    message.textContent = "Chapitre « " + cible.titre + " » supprimé.";
+    const texte = texteMessage ||
+      (nbTitres + " titre" + (nbTitres > 1 ? "s corrigés" : " corrigé") + ".");
+    message.textContent = texte;
+    // On n'efface que SON message : entre-temps, une sauvegarde ou une erreur
+    // a pu écrire ici, et la faire disparaître serait pire que la laisser.
     setTimeout(() => {
-      if (message.textContent.indexOf("supprimé") !== -1) message.textContent = "";
+      if (message.textContent === texte) message.textContent = "";
     }, 3000);
   }
 }
@@ -2943,6 +3311,7 @@ function changerFormat(nouveauFormat) {
 
   livre.format = nouveauFormat;
   appliquerFormatPage(nouveauFormat); // met à jour la géométrie des colonnes
+  initEspaceTitre();
   repaginerTout();
 
   const spreads = spreadsLivre();
@@ -3066,7 +3435,7 @@ function surlignerMatch(match) {
 // ----- Sauvegarde : on régénère les pages dérivées avant d'écrire -----
 
 async function sauvegarder() {
-  const token = sessionStorage.getItem("gh_token");
+  const token = localStorage.getItem("gh_token");
   const message = document.getElementById("message");
 
   // Seule la double-page en cours d'édition peut déborder (flushSpread ne
@@ -3130,7 +3499,6 @@ function ouvrirApercu() {
 //  pagination, aperçu et impression.
 // =====================================================================
 
-const ESPACE_TITRE_DEFAUT = 65;
 let timerEspaceTitre = null;
 
 function appliquerEspaceTitre(px) {
@@ -3139,7 +3507,9 @@ function appliquerEspaceTitre(px) {
 
 function initEspaceTitre() {
   const livre = livreActuel();
-  let px = livre && typeof livre.espaceTitre === "number" ? livre.espaceTitre : ESPACE_TITRE_DEFAUT;
+  let px = livre && typeof livre.espaceTitre === "number"
+    ? livre.espaceTitre
+    : typoDuFormat(livre && livre.format).espaceTitre;
   px = Math.max(0, Math.min(160, px));
   appliquerEspaceTitre(px);
   const slider = document.getElementById("sliderEspaceTitre");
@@ -3197,13 +3567,50 @@ function setPoliceTexteCouv(cle, valeur) {
   planifierBrouillon();
 }
 
+// « titre » -> « Titre » : les identifiants des contrôles suivent la clé,
+// ce qui évite une table de correspondance à rallonger à chaque élément.
+function suffixeCouv(cle) {
+  return cle.charAt(0).toUpperCase() + cle.slice(1);
+}
+
 function setTailleTexteCouv(cle, valeur) {
   const data = donneesCouvCourante();
   if (!data) return;
   const v = Math.max(50, Math.min(250, parseInt(valeur, 10) || 100));
   data[cle + "Taille"] = v;
-  const etiquette = document.getElementById(cle === "titre" ? "valTailleTitre" : "valTailleAuteur");
+  const etiquette = document.getElementById("valTaille" + suffixeCouv(cle));
   if (etiquette) etiquette.textContent = v;
+  previewCouverture();
+  marquerModifie();
+  planifierBrouillon();
+}
+
+// Le texte libre de la 4e de couverture, et sa largeur de colonne.
+function setTexteResumeCouv(valeur) {
+  const data = donneesCouvCourante();
+  if (!data) return;
+  data.resumeTexte = valeur;
+  previewCouverture();
+  marquerModifie();
+  planifierBrouillon();
+}
+
+function setLargeurResumeCouv(valeur) {
+  const data = donneesCouvCourante();
+  if (!data) return;
+  const v = Math.max(20, Math.min(100, parseInt(valeur, 10) || 80));
+  data.resumeLargeur = v;
+  const etiquette = document.getElementById("valLargeurResume");
+  if (etiquette) etiquette.textContent = v;
+  previewCouverture();
+  marquerModifie();
+  planifierBrouillon();
+}
+
+function setAlignResumeCouv(valeur) {
+  const data = donneesCouvCourante();
+  if (!data) return;
+  data.resumeAlign = valeur;
   previewCouverture();
   marquerModifie();
   planifierBrouillon();
@@ -3216,9 +3623,7 @@ function setPositionTexteCouv(cle, axe, valeur) {
   const brut = parseInt(valeur, 10) || 0;
   const v = (A === "X") ? Math.max(-50, Math.min(50, brut)) : Math.max(0, Math.min(100, brut));
   data[cle + A] = v;
-  const etiquette = document.getElementById(
-    "valPos" + (cle === "titre" ? "Titre" : "Auteur") + A
-  );
+  const etiquette = document.getElementById("valPos" + suffixeCouv(cle) + A);
   if (etiquette) etiquette.textContent = v;
   previewCouverture();
   marquerModifie();
@@ -3231,8 +3636,8 @@ function synchroniserControlesCouv(data) {
   const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
   const txt = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
 
-  ["titre", "auteur"].forEach(cle => {
-    const suffixe = cle === "titre" ? "Titre" : "Auteur";
+  ["titre", "auteur", "resume"].forEach(cle => {
+    const suffixe = suffixeCouv(cle);
     const taille = typeof data[cle + "Taille"] === "number" ? data[cle + "Taille"] : 100;
     const x = typeof data[cle + "X"] === "number" ? data[cle + "X"] : 0;
     const y = typeof data[cle + "Y"] === "number" ? data[cle + "Y"] : 0;
@@ -3241,13 +3646,18 @@ function synchroniserControlesCouv(data) {
     set("pos" + suffixe + "X", x);        txt("valPos" + suffixe + "X", x);
     set("pos" + suffixe + "Y", y);        txt("valPos" + suffixe + "Y", y);
   });
+
+  const largeur = typeof data.resumeLargeur === "number" ? data.resumeLargeur : 80;
+  set("texteResume", data.resumeTexte || "");
+  set("largeurResume", largeur);  txt("valLargeurResume", largeur);
+  set("alignResume", data.resumeAlign || "left");
 }
 
 // Persiste « tutoriel éditeur vu » dans le JSON de l'utilisateur (sa
 // bibliothèque), pour qu'il ne réapparaisse jamais, même sur un autre appareil.
 async function marquerTutoEditeurVu() {
   if (!bibliotheque || bibliotheque.tutoEditeurVu) return;
-  const token = sessionStorage.getItem("gh_token");
+  const token = localStorage.getItem("gh_token");
   const nouveauSha = await marquerTutoVuDistant(
     bibliotheque, "tutoEditeurVu", nomFichierBiblio, shaBiblio, token
   );
@@ -3278,8 +3688,8 @@ function majBoutonPublier() {
 async function basculerPublication() {
   if (indexLivre === -1) return;
   const livre = livreActuel();
-  const token = sessionStorage.getItem("gh_token");
-  const login = sessionStorage.getItem("gh_login");
+  const token = localStorage.getItem("gh_token");
+  const login = localStorage.getItem("gh_login");
   const message = document.getElementById("message");
   const btn = document.getElementById("btnPublier");
   const publier = !livre.publie;
@@ -3419,30 +3829,49 @@ function nettoyerTaillesHtml(html) {
 
 function reinitialiserTailles() {
   if (indexLivre === -1 || modeApercu || modeCouverture) return;
-  if (!confirm("Remettre tout le texte du livre aux tailles par défaut (titre, sous-titre, paragraphe) ?\n\nLes tailles de police que vous avez réglées à la main seront perdues.")) return;
 
-  flushSpread();
+  // Les valeurs annoncées sont celles du FORMAT du livre : remettre un poche
+  // aux tailles d'un roman n'aurait aucun sens.
+  const t = typoDuLivre();
+  if (!confirm(
+      "Remettre tout le texte du livre aux tailles par défaut de ce format ?\n\n" +
+      "Titre " + t.titre + " · sous-titre " + t.sousTitre + " · paragraphe " + t.paragraphe +
+      ", et l'espace au-dessus des titres à " + t.espaceTitre + ".\n\n" +
+      "Les tailles de police que vous avez réglées à la main seront perdues.")) return;
 
-  const spreads = spreadsLivre();
-  for (let i = 0; i < spreads.length; i++) spreads[i] = nettoyerTaillesHtml(spreads[i]);
+  // Le voile ne se pose qu'ICI, après la question : posé avant, il se serait
+  // affiché derrière le « confirm ».
+  pendantAttenteLourde("Remise aux tailles du format…",
+    () => {
+      flushSpread();
 
-  // Les tailles changent : on repagine tout le texte continu.
-  repaginerTout();
+      // L'espace au-dessus des titres fait partie de la mise en page du
+      // format : il revient lui aussi à sa valeur.
+      livreActuel().espaceTitre = t.espaceTitre;
+      initEspaceTitre();
 
-  const n = spreadsLivre();
-  if (numSpread() >= n.length) indexSpread = Math.max(0, (n.length - 1) * 2);
+      const spreads = spreadsLivre();
+      for (let i = 0; i < spreads.length; i++) spreads[i] = nettoyerTaillesHtml(spreads[i]);
 
-  afficherSpread();
-  afficherSommaire();
-  majCompteurMots();
-  marquerModifie();
-  planifierBrouillon();
+      // Les tailles changent : on repagine tout le texte continu.
+      repaginerTout();
 
-  const message = document.getElementById("message");
-  if (message) {
-    message.textContent = "Tailles remises par défaut sur tout le livre.";
-    setTimeout(() => { if (message.textContent.startsWith("Tailles remises")) message.textContent = ""; }, 2500);
-  }
+      const n = spreadsLivre();
+      if (numSpread() >= n.length) indexSpread = Math.max(0, (n.length - 1) * 2);
+
+      afficherSpread();
+      afficherSommaire();
+      majCompteurMots();
+      marquerModifie();
+      planifierBrouillon();
+
+      const message = document.getElementById("message");
+      if (message) {
+        message.textContent = "Tailles remises aux valeurs du format sur tout le livre.";
+        setTimeout(() => { if (message.textContent.startsWith("Tailles remises")) message.textContent = ""; }, 2500);
+      }
+    },
+    "Tout le texte est recomposé.");
 }
 
 // =====================================================================

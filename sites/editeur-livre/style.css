@@ -355,7 +355,9 @@ button.danger {
 
 .texte-livre {
   font-family: "EB Garamond", Georgia, serif;
-  font-size: 11pt;   /* taille par défaut du texte des paragraphes */
+  /* Taille du texte courant : posée par le format du livre (voir
+     appliquerTypoFormat), avec celle du roman en secours. */
+  font-size: var(--taille-paragraphe, 11pt);
   line-height: 1.45;
   color: #2a2a2a;
   overflow: hidden;
@@ -409,7 +411,9 @@ button.danger {
   font-family: "EB Garamond", Georgia, serif;
   font-size: 13px;
   color: #999;
-  padding: 6px 0 10px;
+  /* Le bloc occupe toute la bande du pied (PIED_PAGE_PX) ; ce retrait pose le
+     numéro à la même hauteur qu'à l'impression, soit 6 mm du bord. */
+  padding: 24px 0 0;
 }
 
 /* ---- Animation de tournage de page (mode aperçu) ---- */
@@ -604,6 +608,31 @@ button.danger {
   word-break: break-word;
 }
 
+/* Texte libre de la 4e de couverture.
+   Il se pose sur la page entière, jamais dans le flux des autres textes :
+   sa position ne dépend donc ni des marges de la couche ni du nombre de
+   lignes. Le corps se mesure en cqw — un pourcentage de la largeur de page —
+   pour que l'aperçu à l'écran et le tirage sur papier donnent la MÊME
+   composition, au même endroit. Un corps en pixels d'un côté et en points de
+   l'autre faisait tomber le texte ailleurs qu'à l'endroit choisi. */
+.couche-resume {
+  position: absolute;
+  inset: 0;
+  container-type: size;
+  pointer-events: none;
+  overflow: hidden;
+}
+.apercu-resume, .resume-impression {
+  position: absolute;
+  transform: translateX(-50%);
+  font-family: "EB Garamond", Georgia, serif;
+  font-size: calc(2.6cqw * var(--mult-resume, 1));
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  box-sizing: border-box;
+}
+
 .apercu-auteur {
   font-family: "EB Garamond", Georgia, serif;
   font-size: calc(14px * var(--mult-auteur, 1));
@@ -748,7 +777,7 @@ button.danger {
 /* Styles de paragraphe dans les pages (#7) */
 
 .texte-livre h2 {
-  font-size: 20pt;   /* taille par défaut d'un titre de chapitre */
+  font-size: var(--taille-titre, 20pt);   /* titre de chapitre, selon le format */
   font-weight: bold;
   text-align: center;
   margin: 0 0 8px 0;
@@ -756,7 +785,7 @@ button.danger {
 }
 
 .texte-livre h3 {
-  font-size: 13pt;   /* taille par défaut d'un sous-titre */
+  font-size: var(--taille-sous-titre, 13pt);   /* sous-titre, selon le format */
   font-weight: bold;
   font-style: italic;
   text-align: center;
@@ -1468,7 +1497,12 @@ button.danger {
   background: rgba(43, 38, 34, .45);
   backdrop-filter: blur(3px);
   display: flex;
-  align-items: center;
+  /* Surtout pas « center » ici : une carte plus haute que l'écran déborde
+     alors des DEUX côtés, et le haut devient inatteignable — on ne peut pas
+     remonter au-dessus du point de départ du défilement. Le centrage est
+     confié à « margin: auto » sur la carte, qui absorbe la place libre quand
+     il y en a et ne rogne rien quand il n'y en a pas. */
+  align-items: flex-start;
   justify-content: center;
   padding: 24px;
   overflow-y: auto;
@@ -1476,6 +1510,7 @@ button.danger {
 
 .modal-impression-carte {
   position: relative;
+  margin: auto;
   width: 100%;
   max-width: 560px;
   background: var(--s-paper, #fffdf8);
@@ -1788,3 +1823,446 @@ button.danger {
   hyphens: auto;
   -webkit-hyphens: auto;
 }
+
+
+/* ===== Dialogue « Renommer les chapitres » =====
+   Une liste longue — trente, quarante titres — qu'on parcourt au clavier.
+   Elle doit donc rester dense, et ne signaler que ce qui a bougé : une ligne
+   intacte n'a aucune raison d'attirer l'oeil. */
+.renom-outils {
+  display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
+  margin: 0 0 0.7rem;
+}
+.renom-outils button {
+  padding: 0.38rem 0.7rem;
+  border: 1px solid var(--s-line, #e6ddc9); border-radius: 8px;
+  background: var(--s-cream, #f6efe0); color: var(--s-ink, #2b2622);
+  font-size: 0.8rem; cursor: pointer;
+}
+.renom-outils button:hover { border-color: var(--s-accent, #8a4b38); color: var(--s-accent, #8a4b38); }
+.renom-compte { font-size: 0.76rem; color: #b45309; }
+
+/* Tant que rien n'a bougé, le bouton d'application le montre : il garde sa
+   couleur d'accent mais s'efface, au lieu d'inviter à un clic sans effet. */
+.ci-actions .ci-generer:disabled,
+.ci-actions .ci-generer:disabled:hover {
+  opacity: 0.45;
+  cursor: default;
+  background: var(--s-accent, #8a4b38);
+  border-color: var(--s-accent, #8a4b38);
+}
+
+.renom-liste {
+  display: flex; flex-direction: column; gap: 0.3rem;
+  max-height: 52vh; overflow-y: auto;
+  margin: 0 0 1rem;
+  /* Le rentré compense la barre de défilement : sans lui, les champs sautent
+     de quelques pixels selon que la liste défile ou non. */
+  padding-right: 0.3rem;
+}
+.renom-ligne {
+  display: grid;
+  grid-template-columns: 3.2rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0.15rem 0.6rem;
+  padding: 0.35rem 0.45rem;
+  border: 1px solid transparent; border-radius: 8px;
+}
+.renom-ligne.modifiee {
+  border-color: var(--s-accent, #8a4b38);
+  background: rgba(138, 75, 56, .05);
+}
+.renom-ligne.vide { border-color: #d9a441; background: rgba(217, 164, 65, .08); }
+.renom-page {
+  font-size: 0.74rem; color: var(--s-ink-soft, #6f6455);
+  font-variant-numeric: tabular-nums; text-align: right;
+}
+.renom-champ {
+  width: 100%; min-width: 0;
+  /* Sans cela le champ vaut 100 % PLUS ses marges intérieures et sa bordure :
+     il déborde de sa colonne, et la liste se dote d'une barre horizontale. */
+  box-sizing: border-box;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--s-line, #e6ddc9); border-radius: 6px;
+  background: var(--s-paper, #fffdf8); color: var(--s-ink, #2b2622);
+  font-family: var(--s-serif, Georgia, serif);
+  font-size: 0.95rem;
+}
+.renom-champ:focus {
+  outline: none;
+  border-color: var(--s-accent, #8a4b38);
+  box-shadow: 0 0 0 3px rgba(138, 75, 56, .14);
+}
+/* Le titre d'origine, barré, sous le champ : on voit ce qu'on remplace, et
+   il ne prend de la place que sur les lignes effectivement modifiées. */
+.renom-avant {
+  grid-column: 2;
+  margin: 0;
+  font-size: 0.74rem; color: var(--s-ink-soft, #6f6455);
+  text-decoration: line-through;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+@media (max-width: 560px) {
+  .renom-ligne { grid-template-columns: minmax(0, 1fr); }
+  .renom-page { text-align: left; }
+  .renom-avant { grid-column: 1; }
+}
+
+/* Avertissement du dialogue « Imprimer la couverture » */
+.dc-alerte { color: #b45309; font-weight: 600; }
+
+
+/* ===== Réglage de la tranche ===== */
+.tr-carte { max-width: 900px; max-height: 88vh; overflow-y: auto; }
+.tranche-atelier {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1.4rem;
+  align-items: start;
+  margin: 0.9rem 0;
+}
+.tranche-reglages { min-width: 0; }
+
+.tr-bloc {
+  border: 1px solid var(--bordure, #d8d8d8);
+  border-radius: 8px;
+  padding: 0.5rem 0.8rem 0.7rem;
+  margin: 0 0 0.7rem;
+}
+.tr-bloc legend { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em; opacity: 0.7; padding: 0 0.3rem; }
+
+.tranche-duo {
+  display: flex; flex-wrap: wrap; gap: 0.5rem 0.9rem;
+  align-items: flex-end; margin: 0.4rem 0;
+}
+.tranche-duo > label { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.84rem; }
+.tranche-duo input[type="color"] {
+  width: 38px; height: 28px; padding: 2px;
+  border: 1px solid var(--bordure, #d8d8d8); border-radius: 6px; background: none;
+}
+
+/* Champ avec son étiquette au-dessus : les lignes de réglages restent
+   lisibles même quand elles en portent quatre. */
+.tr-champ { display: inline-flex; flex-direction: column; gap: 0.15rem; flex: 1 1 10rem; min-width: 0; }
+.tr-champ > span { font-size: 0.74rem; opacity: 0.7; }
+.tr-champ input, .tr-champ textarea {
+  width: 100%; box-sizing: border-box;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--bordure, #d8d8d8); border-radius: 6px;
+  font: inherit; font-size: 0.86rem;
+}
+.tr-champ.tr-court { flex: 0 0 4.6rem; }
+.tr-champ.tr-large { display: flex; margin-bottom: 0.3rem; }
+.tr-champ textarea { height: 3.4rem; resize: vertical; line-height: 1.35; }
+.tr-champ input.tr-mini { max-width: 5rem; }
+.tranche-case { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.82rem; }
+.tranche-reglages .aide-champ { font-size: 0.76rem; opacity: 0.72; margin: 0.2rem 0 0; line-height: 1.35; }
+
+/* L'aperçu : le vrai dos, réduit. La scène ne fait que réserver la place. */
+.tranche-apercu { display: flex; flex-direction: column; align-items: center; gap: 0.4rem; width: 11rem; }
+.tranche-scene {
+  position: relative;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+  border-radius: 2px;
+  overflow: hidden;
+  align-self: center;
+}
+/* Le dos est construit en millimètres puis réduit. Une transformation ne
+   change pas la place occupée : on le cale en haut à gauche et c'est la
+   scène qui porte la taille réduite. */
+.tranche-scene > .dos-pro { position: absolute; top: 0; left: 0; }
+.tranche-apercu small { font-size: 0.72rem; opacity: 0.7; text-align: center; }
+.tranche-apercu .aide-champ { font-size: 0.72rem; opacity: 0.7; text-align: center; line-height: 1.3; }
+
+.btn-lien {
+  background: none; border: none; padding: 0;
+  color: var(--accent, #7a4a2a); font-size: 0.8rem;
+  text-decoration: underline; cursor: pointer;
+}
+
+/* Un <input type=file> déguisé en bouton : le champ natif est illisible et
+   affiche « Aucun fichier sélectionné » en permanence. */
+.btn-fichier {
+  display: inline-flex; align-items: center;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--bordure, #d8d8d8); border-radius: 6px;
+  font-size: 0.8rem; cursor: pointer;
+  white-space: nowrap;
+}
+.btn-fichier:hover { border-color: var(--accent, #7a4a2a); }
+
+@media (max-width: 700px) {
+  .tranche-atelier { grid-template-columns: minmax(0, 1fr); }
+  .tranche-apercu { order: -1; width: auto; }
+}
+
+/* Le champ de saisie du texte de 4e, dans le panneau d'édition */
+.zone-resume {
+  width: 100%; box-sizing: border-box;
+  min-height: 6rem; resize: vertical;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--bordure, #d8d8d8); border-radius: 6px;
+  font: inherit; font-size: 0.88rem; line-height: 1.4;
+}
+
+/* ===== Schéma « bords longs / bords courts » (mode d'emploi du dos collé) ===== */
+.mi-schema { margin-top: 14px; }
+/* Les deux cas côte à côte : on les compare d'un coup d'œil, et le mode
+   d'emploi ne s'allonge pas d'un écran de plus. */
+.mi-schema-paire {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+}
+.mi-schema-carte {
+  flex: 1 1 200px;
+  min-width: 0;
+  box-sizing: border-box;
+  border: 1px solid var(--bordure, #d8cfc0);
+  border-radius: 10px;
+  padding: 10px 12px 12px;
+  background: rgba(255, 255, 255, 0.55);
+}
+.mi-schema-carte p { margin: 6px 0 0; font-size: 12px; line-height: 1.45; }
+.mi-schema-svg { display: block; width: 100%; height: auto; }
+.mi-schema-etiquette {
+  display: inline-block;
+  font-size: 11px; font-weight: 700;
+  padding: 2px 9px; border-radius: 999px;
+  margin-bottom: 8px;
+}
+/* Légende du trait épais : le même filet, en petit, à côté de son sens. */
+.mi-schema-legende {
+  display: flex; align-items: center; gap: 6px;
+  margin-top: 6px !important;
+  font-weight: 600;
+}
+.mi-schema-trait {
+  flex-shrink: 0;
+  display: inline-block;
+  width: 22px; height: 3px; border-radius: 2px;
+}
+.mi-schema-trait.longs { background: #b5401e; }
+.mi-schema-trait.courts { background: #2e6f6b; }
+.mi-schema-etiquette.longs { background: #f4e0d6; color: #b5401e; }
+.mi-schema-etiquette.courts { background: #dcebe9; color: #2e6f6b; }
+.mi-schema-astuce { margin-top: 10px !important; font-style: italic; }
+
+/* ===== Panneau d'impression, version guidée ===== */
+.mi-carte { max-width: 640px; }
+
+/* Étape 1 : deux grandes cartes, une par reliure. */
+.mi-reliures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+  margin: 18px 0 6px;
+}
+.mi-reliure {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 18px 18px 20px;
+  border: 1px solid var(--s-line, #e6ddc9);
+  border-radius: 14px;
+  background: var(--s-paper, #fffdf8);
+  color: var(--s-ink, #2b2622);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color .15s, box-shadow .15s, transform .15s;
+}
+.mi-reliure:hover {
+  border-color: var(--s-accent, #8a4b2a);
+  box-shadow: 0 6px 18px rgba(60, 42, 20, .12);
+  transform: translateY(-1px);
+}
+.mi-reliure-dessin {
+  width: 80px; height: 56px;
+  margin-bottom: 6px;
+  color: var(--s-accent, #8a4b2a);
+}
+.mi-reliure-nom { font-size: 17px; font-weight: 700; }
+.mi-reliure-resume { font-size: 13px; color: var(--s-ink-soft, #6f6455); }
+.mi-reliure-detail { font-size: 12px; color: var(--s-ink-soft, #6f6455); opacity: .85; margin-top: 4px; }
+
+.mi-pied-lien { font-size: 12.5px; color: var(--s-ink-soft, #6f6455); margin: 14px 0 0; }
+
+/* Étape 2 : un groupe de questions par décision. */
+.mi-retour {
+  background: none; border: none; padding: 0 0 8px;
+  color: var(--s-ink-soft, #6f6455); font-size: 13px; cursor: pointer;
+}
+.mi-retour:hover { color: var(--s-accent, #8a4b2a); }
+
+.mi-groupe { margin: 18px 0 0; }
+.mi-groupe h4 {
+  margin: 0 0 6px;
+  font-size: 14px;
+  color: var(--s-ink, #2b2622);
+}
+.mi-groupe-aide { margin: -2px 0 8px; font-size: 12.5px; color: var(--s-ink-soft, #6f6455); line-height: 1.45; }
+
+.mi-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 10px;
+}
+/* La case radio elle-même est masquée : c'est toute la carte qui se coche,
+   ce qui donne une cible bien plus large au doigt comme à la souris. */
+.mi-option {
+  position: relative;
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 12px 14px;
+  border: 1px solid var(--s-line, #e6ddc9);
+  border-radius: 10px;
+  background: var(--s-paper, #fffdf8);
+  cursor: pointer;
+}
+.mi-option input { position: absolute; opacity: 0; pointer-events: none; }
+.mi-option:hover { border-color: var(--s-accent, #8a4b2a); }
+.mi-option.actif {
+  border-color: var(--s-accent, #8a4b2a);
+  box-shadow: inset 0 0 0 1px var(--s-accent, #8a4b2a);
+  background: var(--s-paper-2, #fdf6ec);
+}
+.mi-option-nom { font-size: 13.5px; font-weight: 600; }
+.mi-option-detail { font-size: 12px; color: var(--s-ink-soft, #6f6455); line-height: 1.4; }
+
+/* Ce qu'on va obtenir, juste avant le bouton. */
+.mi-resume {
+  margin: 20px 0 0;
+  padding: 12px 14px;
+  border-left: 3px solid var(--s-accent, #8a4b2a);
+  background: var(--s-paper-2, #fdf6ec);
+  border-radius: 0 8px 8px 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--s-ink, #2b2622);
+}
+
+/* Le bouton de la feuille d'essai : une proposition, pas l'action principale
+   du panneau — d'où le trait plutôt que l'aplat. */
+.mi-essai { margin: 0 0 12px; }
+.mi-feuille-essai {
+  padding: 7px 14px;
+  border: 1px dashed var(--s-accent, #8a4b38);
+  border-radius: 9px;
+  background: none;
+  color: var(--s-accent, #8a4b38);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.mi-feuille-essai:hover {
+  background: var(--s-accent, #8a4b38);
+  border-style: solid;
+  color: #fff;
+}
+
+.mi-details-schema, .mi-details-guide { margin-top: 12px; }
+.mi-details-schema > summary, .mi-details-guide > summary {
+  cursor: pointer;
+  font-size: 12.5px;
+  color: var(--s-accent, #8a4b2a);
+  padding: 4px 0;
+}
+.mi-details-guide .mi-detail { margin-top: 8px; }
+
+.mi-actions { display: flex; justify-content: flex-end; margin-top: 18px; }
+.mi-lancer {
+  padding: 11px 26px;
+  border: none; border-radius: 10px;
+  background: var(--s-accent, #8a4b2a);
+  color: #fff;
+  font-size: 15px; font-weight: 600;
+  cursor: pointer;
+}
+.mi-lancer:hover { filter: brightness(1.06); }
+
+/* L'essai de contour n'est pas l'action principale du dialogue, mais celle
+   qu'on devrait faire d'abord : d'où le trait, plus visible qu'un simple
+   « Annuler », sans voler la couleur pleine du bouton d'impression. */
+.dc-essai {
+  margin-right: 10px;
+  padding: 11px 20px;
+  border: 1px dashed var(--s-accent, #8a4b2a); border-radius: 10px;
+  background: none;
+  color: var(--s-accent, #8a4b2a);
+  font-size: 15px; font-weight: 600;
+  cursor: pointer;
+}
+.dc-essai:hover { background: var(--s-cream, #f6efe0); border-style: solid; }
+
+@media (max-width: 560px) {
+  .mi-actions { flex-wrap: wrap; gap: 8px; }
+  .mi-actions .ci-annuler, .dc-essai { margin-right: 0; }
+}
+
+/* ===== Dialogue de la couverture ===== */
+.dc-apercu { display: flex; justify-content: center; margin: 16px 0 4px; }
+.dc-schema {
+  max-width: 100%;
+  height: auto;
+  color: var(--s-accent, #8a4b2a);
+}
+.dc-ligne {
+  display: flex; flex-wrap: wrap; gap: 12px;
+  align-items: flex-end;
+  margin-top: 6px;
+}
+.dc-ligne .tr-champ { flex: 1 1 200px; }
+.dc-ligne .tr-champ.tr-court { flex: 0 0 8.5rem; }
+
+/* Le calibrage du papier : deux champs courts et son bouton, sur une ligne. */
+.dc-mesure { align-items: flex-end; }
+.dc-appliquer-mesure {
+  flex: 0 0 auto;
+  padding: 0.5rem 0.9rem;
+  border: 1px solid var(--s-accent, #8a4b2a); border-radius: 8px;
+  background: none; color: var(--s-accent, #8a4b2a);
+  font-size: 0.86rem; font-weight: 600; cursor: pointer;
+}
+.dc-appliquer-mesure:hover { background: var(--s-accent, #8a4b2a); color: #fff; }
+/* Un papier calibré n'est plus une estimation : on le dit, et en vert. */
+.dc-etat-mesure.dc-mesure-faite,
+.dc-etat-tour.dc-mesure-faite { color: #3f6b4a; font-weight: 600; }
+.dc-oublier-tour {
+  margin-left: 6px;
+  padding: 2px 8px;
+  border: 1px solid var(--s-line, #e6ddc9); border-radius: 999px;
+  background: var(--s-paper, #fffdf8); color: var(--s-ink-soft, #6f6455);
+  font-size: 0.74rem; font-weight: 400; cursor: pointer;
+}
+.dc-oublier-tour:hover { border-color: var(--s-accent, #8a4b2a); color: var(--s-accent, #8a4b2a); }
+.dc-ligne select, .dc-ligne input[type="number"] {
+  width: 100%; box-sizing: border-box;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--s-line, #e6ddc9); border-radius: 8px;
+  font: inherit; font-size: 0.9rem;
+  background: var(--s-paper, #fffdf8);
+}
+.dc-ligne .tr-champ > span { font-size: 12px; color: var(--s-ink-soft, #6f6455); margin-bottom: 3px; }
+.dc-ligne .tr-champ > strong { font-size: 15px; }
+.dc-ligne .tr-champ small { font-size: 12px; color: var(--s-ink-soft, #6f6455); }
+.dc-calcul { margin-top: 8px !important; }
+.mi-actions .ci-annuler {
+  margin-right: 10px;
+  padding: 11px 20px;
+  border: 1px solid var(--s-line, #e6ddc9); border-radius: 10px;
+  background: var(--s-paper, #fffdf8);
+  color: var(--s-ink, #2b2622);
+  font-size: 15px; cursor: pointer;
+}
+.mi-actions .ci-annuler:hover { border-color: var(--s-accent, #8a4b2a); }
+.mi-details-schema .tr-champ { display: inline-flex; flex-direction: column; margin: 6px 0; }
+/* Le contenu replié garde la taille d'une note, pas celle du texte courant :
+   déplié, il prenait plus de place que la question à laquelle il répond. */
+.mi-details-schema > p,
+.mi-details-guide > p {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--s-ink-soft, #6f6455);
+  margin: 6px 0;
+}
+.mi-details-schema > p b { color: var(--s-ink, #2b2622); }

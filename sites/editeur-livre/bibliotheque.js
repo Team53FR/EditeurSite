@@ -1,15 +1,27 @@
+// ----- Ces actions passent par le reseau : on le dit, et on empeche d'y toucher -----
+// Voir attente.js. Les actions de FOND (sauvegarde differee, chargement d'une
+// vignette, migration silencieuse) n'y figurent surtout pas : les voiler
+// bloquerait la page pour un travail que l'on a justement choisi de rendre
+// invisible.
+envelopperAttente({
+  chargerBibliotheque: "Ouverture de la bibliothèque…",
+  creerLivre: "Création du livre…",
+  supprimerLivre: "Suppression du livre…",
+  enregistrerNom: "Enregistrement du pseudo…",
+});
+
 let bibliotheque = null;
 let shaBiblio = null;
 let nomFichierBiblio = null;
 
 async function chargerBibliotheque() {
-  const token = sessionStorage.getItem("gh_token");
+  const token = localStorage.getItem("gh_token");
   const message = document.getElementById("message");
 
   nomFichierBiblio = obtenirNomFichierBibliotheque();
 
   if (!token || !nomFichierBiblio) {
-    window.location.href = "connexion.html";
+    window.location.replace("connexion.html");
     return;
   }
 
@@ -29,6 +41,10 @@ async function chargerBibliotheque() {
   }
 
   if (!bibliotheque.livres) bibliotheque.livres = [];
+
+  // Le pseudo affiché vient du fichier central, pas d'une copie locale figée
+  // à la dernière connexion.
+  await rafraichirIdentiteCentrale(token);
 
   try {
     const modifie = await migrerImagesEmbarquees(token);
@@ -51,7 +67,7 @@ async function chargerBibliotheque() {
 // pour qu'il ne réapparaisse jamais, même sur un autre appareil.
 async function marquerTutoVu(champ) {
   if (!bibliotheque || bibliotheque[champ]) return; // déjà marqué : rien à faire
-  const token = sessionStorage.getItem("gh_token");
+  const token = localStorage.getItem("gh_token");
   const nouveauSha = await marquerTutoVuDistant(
     bibliotheque, champ, nomFichierBiblio, shaBiblio, token
   );
@@ -108,8 +124,8 @@ function echapper(txt) {
 }
 
 function nomAffiche() {
-  const login = sessionStorage.getItem("gh_login") || "";
-  const perso = (sessionStorage.getItem("gh_nom") || "").trim();
+  const login = localStorage.getItem("gh_login") || "";
+  const perso = (localStorage.getItem("gh_nom") || "").trim();
   return perso || login || "Auteur";
 }
 
@@ -134,7 +150,7 @@ function remplirProfil() {
 
   // Bouton de gestion des utilisateurs réservé aux admins
   const btnAdmin = document.getElementById("btnAdmin");
-  if (btnAdmin) btnAdmin.style.display = (sessionStorage.getItem("gh_role") === "admin") ? "" : "none";
+  if (btnAdmin) btnAdmin.style.display = (localStorage.getItem("gh_role") === "admin") ? "" : "none";
 
   const livres = (bibliotheque && bibliotheque.livres) || [];
   const totalPages = livres.reduce((n, l) => n + (l.pages ? l.pages.length : 0), 0);
@@ -237,7 +253,7 @@ function dimensionsPageReference(formatKey) {
 // (comme object-fit: contain), avec le zoom et le décalage choisis, le tout
 // mis à l'échelle pour tenir dans la vignette.
 async function chargerImageCouvVignette(couvDiv, chemin, formatKey, data) {
-  const token = sessionStorage.getItem("gh_token");
+  const token = localStorage.getItem("gh_token");
   if (!token) return;
   let url;
   try {
@@ -300,7 +316,7 @@ function ouvrirLivre(id) {
 }
 
 async function creerLivre() {
-  const token = sessionStorage.getItem("gh_token");
+  const token = localStorage.getItem("gh_token");
   const message = document.getElementById("message");
   const champTitre = document.getElementById("titreNouveauLivre");
   const titre = champTitre.value.trim();
@@ -331,7 +347,7 @@ async function creerLivre() {
 }
 
 async function supprimerLivre(id) {
-  const token = sessionStorage.getItem("gh_token");
+  const token = localStorage.getItem("gh_token");
   const message = document.getElementById("message");
   const livre = bibliotheque.livres.find(l => l.id === id);
   if (!livre) return;
@@ -357,13 +373,13 @@ async function supprimerLivre(id) {
   }
 }
 
-// ----- Nom d'affichage (libre-service, stocké dans users.json) -----
+// ----- Nom d'affichage (libre-service, dans le fichier central) -----
 
 function modifierNom() {
   const edition = document.getElementById("editionNom");
   const champ = document.getElementById("champNom");
   if (!edition || !champ) return;
-  champ.value = sessionStorage.getItem("gh_nom") || "";
+  champ.value = localStorage.getItem("gh_nom") || "";
   edition.style.display = "flex";
   const btn = document.getElementById("btnModifNom");
   if (btn) btn.style.display = "none";
@@ -381,28 +397,34 @@ function annulerNom() {
 }
 
 async function enregistrerNom() {
-  const token = sessionStorage.getItem("gh_token");
-  const login = sessionStorage.getItem("gh_login");
+  const token = localStorage.getItem("gh_token");
+  const login = localStorage.getItem("gh_login");
   const message = document.getElementById("message");
   const champ = document.getElementById("champNom");
   if (!champ) return;
 
   const nouveau = champ.value.trim();
-  const ancien = sessionStorage.getItem("gh_nom") || "";
+  const ancien = localStorage.getItem("gh_nom") || "";
   if (nouveau === ancien) { annulerNom(); return; }
 
   try {
-    // Le nom d'affichage est stocké dans users.json (champ nomAffichage du compte)
-    const { contenu: utilisateurs, sha } = await lireFichierJSON("users.json", token);
-    const u = Array.isArray(utilisateurs) ? utilisateurs.find(x => x.login === login) : null;
-    if (!u) { message.textContent = "Compte introuvable dans users.json."; return; }
+    // Le pseudo vit dans le fichier central des comptes : le changer ici le
+    // change pour le portail et pour tous les sites, comme le fait « Mon
+    // compte ». On relit juste avant d'écrire et on ne touche qu'à sa propre
+    // entrée, pour ne pas écraser ce qu'un administrateur aurait modifié.
+    const { contenu, sha } = await lireFichierJSON(CHEMIN_UTILISATEURS, token);
+    const utilisateurs = Array.isArray(contenu) ? contenu : [];
+    const u = utilisateurs.find(x => x.login === login);
+    if (!u) { message.textContent = "Compte introuvable dans les comptes du portail."; return; }
 
     if (nouveau) u.nomAffichage = nouveau;
     else delete u.nomAffichage; // un nom vide = revenir à l'identifiant
 
-    await ecrireFichierJSON("users.json", utilisateurs, sha, token, "Mise à jour du nom d'affichage");
+    await ecrireFichierJSON(CHEMIN_UTILISATEURS, utilisateurs, sha, token,
+      `Changement de pseudo de ${login}`);
 
-    sessionStorage.setItem("gh_nom", nouveau);
+    localStorage.setItem("gh_nom", nouveau);
+    localStorage.setItem("team53_nom", nouveau);
     annulerNom();
     remplirProfil();
     message.textContent = "Nom mis à jour.";
@@ -414,13 +436,5 @@ async function enregistrerNom() {
   }
 }
 
-function seDeconnecter() {
-  sessionStorage.removeItem("gh_token");
-  sessionStorage.removeItem("gh_login");
-  sessionStorage.removeItem("gh_role");
-  sessionStorage.removeItem("gh_nom");
-  sessionStorage.removeItem("livre_id");
-  window.location.href = "index.html";
-}
 
 chargerBibliotheque();

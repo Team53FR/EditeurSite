@@ -9,6 +9,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="site.css">
+<link rel="icon" href="icone-192.png">
+<link rel="apple-touch-icon" href="icone-192.png">
 </head>
 <body>
 
@@ -391,7 +393,7 @@
     // Si une session est ouverte, les boutons mènent directement aux livres.
     (function(){
       try {
-        if (sessionStorage.getItem("gh_token")) {
+        if (localStorage.getItem("gh_token") || localStorage.getItem("team53_token")) {
           document.querySelectorAll('a[href="connexion.html"]').forEach(function(a){
             a.setAttribute("href", "bibliotheque.html");
             if (a.textContent.indexOf("connecter") !== -1) a.textContent = "Mes livres";

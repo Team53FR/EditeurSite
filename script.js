@@ -1,3 +1,12 @@
+// ----- Ces actions passent par le reseau : on le dit, et on empeche d'y toucher -----
+// Voir attente.js. Les actions de FOND (sauvegarde differee, chargement d'une
+// vignette, migration silencieuse) n'y figurent surtout pas : les voiler
+// bloquerait la page pour un travail que l'on a justement choisi de rendre
+// invisible.
+envelopperAttente({
+  seConnecter: ["Connexion…", "Votre identifiant est vérifié."],
+});
+
 // ===== Portail central Team53FR — connexion à la base « BDD » sur GitHub =====
 // Même dépôt BDD que les sites (Team53FR/BDD), dans son propre dossier "Web/"
 // pour ne jamais toucher aux données des sites eux-mêmes.
@@ -18,7 +27,7 @@ const DEFAULT_SITES = [
     icone: "📖",
     pageArrivee: "sites/editeur-livre/bibliotheque.html",
     relais: {
-      stockage: "sessionStorage",
+      stockage: "localStorage",
       cles: { token: "gh_token", login: "gh_login", role: "gh_role", nom: "gh_nom" }
     }
   },
@@ -86,12 +95,27 @@ async function _lireFichierJSONParUrl(url, nomAffiche, token) {
     } catch (e) {
       throw new Error(`Le contenu de "${nomAffiche}" n'a pas pu être décodé (encodage invalide).`);
     }
-  } else if (data.download_url) {
-    const reponseBrute = await fetch(data.download_url);
-    if (!reponseBrute.ok) {
+  } else if (data.sha) {
+    // Fichier trop volumineux pour l'API Contents (plus de 1 Mo) : son contenu
+    // n'accompagne plus les métadonnées. On le lit alors par l'API des blobs,
+    // en demandant le format brut — authentifiée, elle marche sur un dépôt
+    // privé, là où l'URL de téléchargement directe se fait refuser.
+    const reponseBlob = await fetch(
+      `https://api.github.com/repos/${PROPRIETAIRE}/${DEPOT_BDD}/git/blobs/${data.sha}`,
+      { headers: { "Authorization": `Bearer ${token}`, "Accept": "application/vnd.github.raw" } });
+
+    if (reponseBlob.ok) {
+      contenuDecode = await reponseBlob.text();
+    } else if (data.download_url) {
+      // Dernier recours : l'URL directe, qui porte son propre jeton temporaire.
+      const reponseBrute = await fetch(data.download_url);
+      if (!reponseBrute.ok) {
+        throw new Error(`Le fichier "${nomAffiche}" est trop volumineux et sa version brute n'a pas pu être récupérée.`);
+      }
+      contenuDecode = await reponseBrute.text();
+    } else {
       throw new Error(`Le fichier "${nomAffiche}" est trop volumineux et sa version brute n'a pas pu être récupérée.`);
     }
-    contenuDecode = await reponseBrute.text();
   } else {
     throw new Error(`Le fichier "${nomAffiche}" est trop volumineux pour être lu (aucune URL brute disponible).`);
   }
@@ -244,6 +268,121 @@ async function chargerSites(token) {
   return DEFAULT_SITES;
 }
 
+// Primitives sur le dépôt entier, utilisées par la purge. Le portail travaille
+// déjà en chemins absolus : ce ne sont que des noms communs aux deux copies.
+function lireFichierDepot(chemin, token) { return lireFichierJSONAbsolu(chemin.replace(/^\//, ""), token); }
+function ecrireFichierDepot(chemin, contenu, sha, token, message) {
+  return ecrireFichierJSONAbsolu(chemin.replace(/^\//, ""), contenu, sha, token, message);
+}
+async function supprimerFichierDepot(chemin, token, message) {
+  const propre = chemin.replace(/^\//, "");
+  const sha = await obtenirShaFichierAbsolu(propre, token);
+  if (!sha) return false;
+  await supprimerFichierAbsolu(propre, token, message);
+  return true;
+}
+async function listerDossierDepot(chemin, token) {
+  const reponse = await fetch(urlContenuAbsolu(chemin.replace(/^\//, "")), {
+    headers: { "Authorization": `Bearer ${token}`, "Accept": "application/vnd.github+json" }
+  });
+  if (reponse.status === 404) return [];
+  if (!reponse.ok) { const e = new Error("Dossier illisible."); e.status = reponse.status; throw e; }
+  const data = await reponse.json();
+  return Array.isArray(data) ? data : [];
+}
+
+// ===== Purge des données d'un compte =====
+//
+// Supprimer un compte n'efface rien de ce qu'il possédait : ses fichiers sont
+// rangés sous un nom dérivé de son login, et recréer le même identifiant les
+// retrouve. C'est voulu — une suppression par erreur reste réparable.
+//
+// Quand on veut vraiment tout effacer, cette fonction s'en charge : les trois
+// bibliothèques, les images de couverture, et les publications retirées de
+// l'index commun. Best-effort fichier par fichier : ce qui résiste est nommé
+// dans le compte rendu plutôt que d'interrompre le reste, sans quoi une image
+// verrouillée laisserait la moitié du ménage en plan sans le dire.
+//
+// (Même code côté portail et côté éditeur : les deux pages qui suppriment un
+// compte doivent effacer exactement la même chose.)
+
+// Le nom de dossier d'un compte. On réutilise la fonction de slug déjà
+// présente — celle du portail ou celle du site — plutôt que d'en écrire une
+// troisième : une règle qui changerait d'un côté ferait chercher la purge au
+// mauvais endroit, et elle effacerait alors les fichiers de personne.
+function slugPurge(login) {
+  if (typeof slugifierLoginPortail === "function") return slugifierLoginPortail(login);
+  if (typeof slugifierLogin === "function") return slugifierLogin(login);
+  return (login || "").toLowerCase().trim().replace(/[^a-z0-9_-]+/g, "_");
+}
+
+async function supprimerDonneesUtilisateur(login, token) {
+  const slug = slugPurge(login);
+  const rapport = { bibliotheques: 0, images: 0, publications: 0, echecs: [] };
+  if (!slug) return rapport;
+
+  const effacer = async (chemin, quoi) => {
+    try {
+      const supprime = await supprimerFichierDepot(chemin, token,
+        `Suppression des données de ${login}`);
+      if (supprime) rapport[quoi]++;
+    } catch (e) {
+      rapport.echecs.push(chemin);
+    }
+  };
+
+  // 1) Une bibliothèque par site — le fichier personnel de chacun.
+  await effacer(`/EditeurLivre/bibliotheques/${slug}.json`, "bibliotheques");
+  await effacer(`/MaBibliotheque/bibliotheques/${slug}.json`, "bibliotheques");
+  await effacer(`/DroidFortnite/bibliotheques/${slug}.json`, "bibliotheques");
+
+  // 2) Les images, rangées dans un dossier par compte : on liste avant, le
+  //    nombre de couvertures n'étant connu de personne.
+  for (const dossier of [`/EditeurLivre/images/${slug}`, `/MaBibliotheque/images/${slug}`]) {
+    let entrees = [];
+    try {
+      entrees = await listerDossierDepot(dossier, token);
+    } catch (e) {
+      rapport.echecs.push(dossier);
+      continue;
+    }
+    for (const entree of entrees) {
+      if (entree && entree.type === "file") await effacer("/" + entree.path, "images");
+    }
+  }
+
+  // 3) L'index des livres publiés est commun : ses entrées survivraient à la
+  //    suppression et resteraient lisibles par tout le monde.
+  try {
+    const { contenu, sha } = await lireFichierDepot("/EditeurLivre/publies.json", token);
+    const liste = Array.isArray(contenu) ? contenu : [];
+    const restantes = liste.filter((e) => e && e.proprietaire !== login);
+    rapport.publications = liste.length - restantes.length;
+    if (rapport.publications > 0) {
+      await ecrireFichierDepot("/EditeurLivre/publies.json", restantes, sha, token,
+        `Retrait des publications de ${login}`);
+    }
+  } catch (e) {
+    // 404 : personne n'a jamais rien publié — rien à retirer.
+    if (e.status !== 404) rapport.echecs.push("EditeurLivre/publies.json");
+  }
+
+  return rapport;
+}
+
+// Compte rendu lisible, pour la ligne de message du panneau.
+function resumePurge(rapport) {
+  const morceaux = [];
+  if (rapport.bibliotheques) morceaux.push(rapport.bibliotheques + " bibliothèque(s)");
+  if (rapport.images) morceaux.push(rapport.images + " image(s)");
+  if (rapport.publications) morceaux.push(rapport.publications + " publication(s)");
+  let texte = morceaux.length ? "Données supprimées : " + morceaux.join(", ") + "." : "Aucune donnée à supprimer.";
+  if (rapport.echecs.length) {
+    texte += " Non supprimé : " + rapport.echecs.join(", ") + ".";
+  }
+  return texte;
+}
+
 // ===== Connexion centrale =====
 // Les comptes centraux vivent dans Web/utilisateurs.json sur le dépôt BDD :
 //   [{ login, password, role: "admin"|"user", nomAffichage, acces: [siteId,...], derniereConnexion }]
@@ -318,20 +457,51 @@ function ouvrirSessionCentrale(utilisateur, token) {
   localStorage.setItem("team53_acces", JSON.stringify(Array.isArray(utilisateur.acces) ? utilisateur.acces : []));
 }
 
+// La synchronisation d'un compte vers chaque site a disparu avec la
+// centralisation : les sites lisent maintenant Web/utilisateurs.json
+// directement, il n'y a plus de copie à tenir à jour.
+
+// Remet la session d'aplomb à partir du fichier des comptes.
+//
+// Le rôle, le pseudo et la liste des accès sont recopiés sur l'appareil à la
+// connexion, pour ne pas relire les comptes à chaque page. Mais cette copie ne
+// bougeait plus ensuite : un accès accordé par un administrateur n'apparaissait
+// qu'à la connexion suivante, et l'intéressé ne comprenait pas pourquoi son
+// nouveau site restait invisible.
+//
+// Renvoie « false » si le compte a disparu du fichier — la session ne vaut
+// alors plus rien. Une lecture qui échoue, elle, laisse la copie en place :
+// mieux vaut un tableau de bord un peu daté que pas de tableau de bord.
+async function rafraichirSessionCentrale(token) {
+  const login = localStorage.getItem("team53_login");
+  if (!token || !login) return true;
+  let utilisateurs;
+  try {
+    const { contenu } = await lireFichierJSON("utilisateurs.json", token);
+    utilisateurs = Array.isArray(contenu) ? contenu : [];
+  } catch (e) {
+    return true;
+  }
+  const moi = utilisateurs.find((u) => u.login === login);
+  if (!moi) return false;
+  ouvrirSessionCentrale(moi, token);
+  return true;
+}
+
 function seDeconnecter() {
   localStorage.removeItem("team53_token");
   localStorage.removeItem("team53_login");
   localStorage.removeItem("team53_role");
   localStorage.removeItem("team53_nom");
   localStorage.removeItem("team53_acces");
-  window.location.href = "connexion.html";
+  window.location.replace("connexion.html");
 }
 
 // Redirige vers la connexion si aucune session centrale n'est mémorisée.
 function exigerConnexionCentrale() {
   const token = localStorage.getItem("team53_token");
   if (!token) {
-    window.location.href = "connexion.html";
+    window.location.replace("connexion.html");
     return null;
   }
   return token;
@@ -374,147 +544,8 @@ function relayerVersSite(site) {
   window.location.href = site.pageArrivee;
 }
 
-// ===== Migration des comptes existants =====
-// Fusionne EditeurLivre/users.json et MaBibliotheque/users.json dans
-// Web/utilisateurs.json. Ré-exécutable sans jamais créer de doublon ni
-// écraser un compte central déjà présent : les comptes déjà migrés ne sont
-// que complétés (union des accès), jamais recréés.
-// Note : MaBibliotheque/users.json n'existe que si
-// migrerMaBibliothequeVersMultiCompte() a déjà tourné (voir plus bas) —
-// avant ça, ce site n'a qu'un compte.json unique, non repris ici.
-async function importerComptesExistants(token) {
-  let utilisateurs = [];
-  let sha = null;
-  try {
-    const resultat = await lireFichierJSON("utilisateurs.json", token);
-    utilisateurs = Array.isArray(resultat.contenu) ? resultat.contenu : [];
-    sha = resultat.sha;
-  } catch (e) {
-    if (e.status !== 404) throw e;
-  }
-
-  const normaliser = s => (s || "").trim().toLowerCase();
-  const index = new Map(utilisateurs.map(u => [normaliser(u.login), u]));
-  let ajoutes = 0, accesAjoutes = 0;
-
-  function fusionner(login, password, nomAffichage, siteId) {
-    const cle = normaliser(login);
-    if (!cle) return;
-    let central = index.get(cle);
-    if (!central) {
-      central = { login, password, role: "user", nomAffichage: nomAffichage || "", acces: [] };
-      index.set(cle, central);
-      utilisateurs.push(central);
-      ajoutes++;
-    }
-    if (!Array.isArray(central.acces)) central.acces = [];
-    if (!central.acces.includes(siteId)) {
-      central.acces.push(siteId);
-      accesAjoutes++;
-    }
-  }
-
-  try {
-    const { contenu } = await lireFichierJSONAbsolu("EditeurLivre/users.json", token);
-    (Array.isArray(contenu) ? contenu : []).forEach(u =>
-      fusionner(u.login, u.password, u.nomAffichage, "editeur-livre"));
-  } catch (e) {
-    if (e.status !== 404) throw e;
-  }
-
-  try {
-    const { contenu } = await lireFichierJSONAbsolu("MaBibliotheque/users.json", token);
-    (Array.isArray(contenu) ? contenu : []).forEach(u =>
-      fusionner(u.login, u.password, u.nomAffichage, "ma-bibliotheque"));
-  } catch (e) {
-    // 404 : soit rien n'a encore été migré (voir migrerMaBibliothequeVersMultiCompte),
-    // soit le site n'a pas encore de compte du tout — dans les deux cas, rien à fusionner.
-    if (e.status !== 404) throw e;
-  }
-
-  await ecrireFichierJSON("utilisateurs.json", utilisateurs, sha, token,
-    "Import des comptes existants (editeur-livre, ma-bibliotheque)");
-
-  return { ajoutes, accesAjoutes, total: utilisateurs.length };
-}
-
-// ===== Migration structurelle de Ma Bibliothèque vers un compte par personne =====
-// Avant : MaBibliotheque/compte.json (un seul compte) + livres.json (une
-// seule collection partagée) + images/<id>.jpg (chemin plat).
-// Après : MaBibliotheque/users.json (comptes multiples) +
-// bibliotheques/<slug>.json (une collection par compte) +
-// images/<slug>/<id>.jpg — même pattern qu'editeur-livre. Ne supprime jamais
-// les anciens fichiers, qui restent en place par sécurité une fois la
-// migration faite.
-//
-// Idempotence : on vérifie l'existence de bibliotheques/<slug>.json pour LE
-// COMPTE DE compte.json précisément (pas juste "users.json existe") — sinon,
-// si un admin donne accès à Ma Bibliothèque à un second compte central AVANT
-// d'avoir cliqué ce bouton, synchroniserMaBibliotheque() aura déjà créé
-// users.json avec ce second compte, et ce bouton se croirait "déjà fait" en
-// laissant la vraie collection historique orpheline dans l'ancien
-// livres.json. On fusionne donc dans users.json plutôt que de l'écraser.
-async function migrerMaBibliothequeVersMultiCompte(token) {
-  let compte;
-  try {
-    const r = await lireFichierJSONAbsolu("MaBibliotheque/compte.json", token);
-    compte = r.contenu;
-  } catch (e) {
-    if (e.status === 404) return { rienAMigrer: true };
-    throw e;
-  }
-  if (!compte || !compte.login) return { rienAMigrer: true };
-
-  const slug = slugifierLoginPortail(compte.login);
-
-  const dejaMigre = await obtenirShaFichierAbsolu(`MaBibliotheque/bibliotheques/${slug}.json`, token);
-  if (dejaMigre) return { dejaMigre: true };
-
-  let livres = [];
-  try {
-    const r = await lireFichierJSONAbsolu("MaBibliotheque/livres.json", token);
-    livres = Array.isArray(r.contenu) ? r.contenu : [];
-  } catch (e) {
-    if (e.status !== 404) throw e;
-  }
-
-  let imagesDeplacees = 0;
-  for (const item of livres) {
-    if (item && item.image) {
-      const ancienChemin = "MaBibliotheque/" + item.image;
-      const nouveauCheminRelatif = `images/${slug}/${item.image.split("/").pop()}`;
-      try {
-        const base64 = await telechargerImageBrute(ancienChemin, token);
-        await uploaderImageAbsolu("MaBibliotheque/" + nouveauCheminRelatif, base64, token,
-          `Migration de l'image de ${compte.login} vers un compte séparé`);
-        item.image = nouveauCheminRelatif;
-        imagesDeplacees++;
-      } catch (e) {
-        // Best-effort : une image en échec ne doit pas bloquer toute la migration ;
-        // l'item garde son ancien chemin (toujours valide, rien n'est supprimé).
-      }
-    }
-  }
-
-  await ecrireFichierJSONAbsolu(`MaBibliotheque/bibliotheques/${slug}.json`, livres, null, token,
-    `Bibliothèque séparée pour ${compte.login}`);
-
-  // Fusion dans users.json (jamais d'écrasement : un autre compte a pu y être
-  // ajouté entre-temps par synchroniserMaBibliotheque()).
-  let utilisateursMB = [];
-  let shaUsersMB = null;
-  try {
-    const r = await lireFichierJSONAbsolu("MaBibliotheque/users.json", token);
-    utilisateursMB = Array.isArray(r.contenu) ? r.contenu : [];
-    shaUsersMB = r.sha;
-  } catch (e) {
-    if (e.status !== 404) throw e;
-  }
-  if (!utilisateursMB.some(u => u.login === compte.login)) {
-    utilisateursMB.push({ login: compte.login, password: compte.password, nomAffichage: "" });
-  }
-  await ecrireFichierJSONAbsolu("MaBibliotheque/users.json", utilisateursMB, shaUsersMB, token,
-    "Passage de Ma Bibliothèque à des comptes séparés");
-
-  return { migre: true, login: compte.login, livres: livres.length, imagesDeplacees };
-}
+// Les deux migrations d'autrefois — import des users.json des sites, passage
+// de Ma Bibliothèque à un compte par personne — ont été jouées et retirées.
+// Elles ne servaient qu'une fois, et un bouton qui ne peut plus rien faire
+// n'est qu'un piège de plus dans un panneau d'administration. Leur code reste
+// dans l'historique si un jour un dépôt neuf en avait besoin.

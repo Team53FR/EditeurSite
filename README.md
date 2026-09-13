@@ -12,6 +12,8 @@ EditeurSite/
 ├── tableau-de-bord.html    # liste les sites accessibles au compte connecté
 ├── admin-comptes.html      # gestion des comptes centraux (réservé aux admins)
 ├── script.js / admin.js / style.css   # logique + style du portail central
+├── manifest.json / sw.js   # app installable (portée = tout le dépôt)
+├── icone-192.png / icone-512.png
 ├── sites/
 │   ├── editeur-livre/    # site "Éditeur de livre en ligne" (ex-racine du dépôt)
 │   │   ├── index.html
@@ -41,6 +43,10 @@ indépendamment sans rien casser.
    dans `Web/sites.json` (voir « Connexion centrale » ci-dessous). Si le site
    se contente de vérifier la présence d'un token (comme `ma-bibliotheque`),
    c'est une pure modification de données, sans toucher au code du portail.
+4. Pour qu'il n'exige pas une nouvelle saisie du token quand on l'ouvre
+   directement, recopier `adopterSessionCentrale()` en tête de son `script.js`
+   (voir « Connexion centrale »), et faire pointer sa déconnexion vers
+   `../../connexion.html` après avoir effacé les clés `team53_*`.
 
 ## Hébergement
 
@@ -53,20 +59,35 @@ et le portail racine sous `https://<utilisateur>.github.io/EditeurSite/`.
 Ces sites n'ont pas de backend : ils lisent/écrivent directement, depuis le
 navigateur, des fichiers JSON (et images) dans le dépôt privé **`Team53FR/BDD`**
 via l'API Contents de GitHub, authentifiés par un token personnel saisi à la
-connexion. Persistance du token selon le site : `editeur-livre` le garde
-uniquement en `sessionStorage` (jamais persisté, à retaper à chaque
-ouverture) ; `ma-bibliotheque`, à usage personnel sur un seul appareil, le
-mémorise en `localStorage` (persiste jusqu'à déconnexion manuelle).
+connexion.
+
+**Le token n'est saisi qu'une fois par appareil.** Il est mémorisé en
+`localStorage` par tous les sites, et la session du portail est adoptée par
+les sites qui n'en ont pas encore (voir « Connexion centrale »). Ouvrir un
+site depuis un signet, ou rouvrir le navigateur, ne redemande donc rien.
+
+> **Portée du token.** Le contenu de la BDD n'a rien de sensible, mais le
+> token, lui, l'est : un PAT classique `ghp_…` avec le scope `repo` ouvre
+> **tous** les dépôts privés du compte, et il est désormais stocké en clair
+> sur chaque appareil utilisé. Préférer un **fine-grained token** limité au
+> seul dépôt `BDD`, permission *Contents: Read and write* — ce qui fuiterait
+> en cas d'appareil perdu se limite alors à ce dépôt.
 
 Chaque site utilise son **propre dossier** dans ce dépôt BDD, pour ne jamais
 mélanger ses données avec celles d'un autre site :
 
 | Site              | Dossier dans `Team53FR/BDD` | Fichiers                                  |
 |-------------------|------------------------------|--------------------------------------------|
-| editeur-livre      | `EditeurLivre/`             | `users.json`, `bibliotheques/<login>.json`, `images/<login>/…` |
-| ma-bibliotheque    | `MaBibliotheque/`           | `users.json`, `bibliotheques/<login>.json`, `images/<login>/…` |
-| droid-fortnite     | `DroidFortnite/`            | `users.json`, `catalogue.json`, `renaissance.json`, `paliers.json`, `classes.json` (partagés), `bibliotheques/<login>.json` (personnel) |
-| portail central    | `Web/`                      | `utilisateurs.json`, `sites.json`         |
+| editeur-livre      | `EditeurLivre/`             | `bibliotheques/<login>.json`, `images/<login>/…`, `publies.json` |
+| ma-bibliotheque    | `MaBibliotheque/`           | `bibliotheques/<login>.json`, `images/<login>/…` |
+| droid-fortnite     | `DroidFortnite/`            | `catalogue.json`, `renaissance.json`, `paliers.json`, `unites.json`, `raretes.json` (partagés), `bibliotheques/<login>.json` (personnel) |
+| portail central    | `Web/`                      | `utilisateurs.json` (**tous les comptes**), `sites.json` |
+
+Les comptes ne figurent plus dans le dossier des sites : ils sont **tous** dans
+`Web/utilisateurs.json`, seul fichier consulté pour se connecter, où que l'on
+entre. Les anciens `users.json` de chaque site ont été versés dans ce fichier
+puis supprimés du dépôt ; l'outil d'import qui servait à cette bascule a été
+retiré du panneau, sa tâche accomplie.
 
 Les trois sites suivent donc le **même modèle par compte** pour leurs données
 personnelles : chaque personne a sa propre bibliothèque (et, pour
@@ -80,17 +101,13 @@ seule la progression personnelle (`bibliotheques/<login>.json` : droïdes
 possédés + palier, renaissances atteintes) est propre à chaque compte. Voir
 « Droid Fortnite » ci-dessous.
 
-Pour qu'un site fonctionne, son fichier de comptes doit exister dans son
-dossier BDD. Pour **ma-bibliotheque**, créer `MaBibliotheque/users.json`
-dans `Team53FR/BDD` :
-
-```json
-[{ "login": "ton_identifiant", "password": "ton_mot_de_passe", "nomAffichage": "" }]
-```
+Pour qu'un site fonctionne, il suffit qu'un compte de `Web/utilisateurs.json`
+porte son identifiant dans sa liste `acces` — ce que fait le panneau admin du
+portail. Aucun fichier à créer dans le dossier du site.
 
 (Historique : avant la migration multi-compte, ma-bibliotheque n'avait qu'un
 `compte.json` unique et une collection `livres.json` partagée par tout le
-monde — voir « Migration de Ma Bibliothèque » ci-dessous si ces fichiers
+monde — voir « Migrations retirées » ci-dessous si ces fichiers
 existent encore dans ton dépôt.)
 
 À l'ajout d'un nouveau site suivant ce modèle : choisir un nouveau nom de
@@ -108,8 +125,16 @@ Les comptes centraux vivent dans `Web/utilisateurs.json` :
 
 ```json
 [{ "login": "...", "password": "...", "role": "admin", "nomAffichage": "...",
-   "acces": ["editeur-livre", "ma-bibliotheque"], "derniereConnexion": "..." }]
+   "acces": ["editeur-livre", "ma-bibliotheque"], "derniereConnexion": "...",
+   "connexions": { "editeur-livre": "...", "droid-fortnite": "..." } }]
 ```
+
+`acces` décide de ce qu'on voit sur le tableau de bord **et** de ce à quoi on
+peut se connecter en direct : chaque site vérifie que son identifiant y figure
+(`aAccesAuSite()` dans son `script.js`). Une entrée sans champ `acces` date
+d'avant la centralisation et vaut « accès à tout », plutôt que d'enfermer
+quelqu'un dehors. `connexions` garde une date par site, en plus de la date
+globale `derniereConnexion`.
 
 Le registre des sites affichables vit dans `Web/sites.json` (repli automatique
 sur une constante `DEFAULT_SITES` dans `script.js` tant que ce fichier
@@ -118,63 +143,110 @@ n'existe pas) :
 ```json
 [{ "id": "mon-site", "nom": "Mon site", "description": "...", "icone": "🌐",
    "pageArrivee": "sites/mon-site/apres-connexion.html",
-   "relais": { "stockage": "sessionStorage" | "localStorage",
+   "relais": { "stockage": "localStorage",
                "cles": { "token": "clé_attendue_par_le_site", "...": "..." } } }]
 ```
 
 **Relais d'identifiants** : au clic sur une carte du tableau de bord, le
-portail préremplit directement les clés `sessionStorage`/`localStorage` que le
-site cible lit déjà lui-même (selon `relais`), puis navigue vers
-`pageArrivee`. Le site n'est jamais modifié — il ne voit pas la différence
-entre un relais et sa propre page de connexion.
+portail préremplit directement les clés de stockage que le site cible lit
+déjà lui-même (selon `relais`), puis navigue vers `pageArrivee`. Le site ne
+voit pas la différence entre un relais et sa propre page de connexion.
+
+**Fraîcheur de la session** : le rôle, le pseudo et la liste des accès sont
+recopiés sur l'appareil à la connexion, pour ne pas relire les comptes à chaque
+page. Le tableau de bord les **relit à chaque ouverture**
+(`rafraichirSessionCentrale()`), sans quoi un accès accordé à l'instant
+n'apparaîtrait qu'à la connexion suivante. Un compte disparu du fichier ferme
+la session ; une lecture qui échoue laisse la copie en place, plutôt que de
+priver quelqu'un de son tableau de bord pour une coupure réseau.
+
+**Adoption de la session centrale** : le relais ne joue que si l'on passe par
+le tableau de bord. Chaque site appelle donc aussi `adopterSessionCentrale()`
+au chargement (en tête de son `script.js`) : si sa propre session manque mais
+que `team53_token` existe, il la recopie sous ses propres clés. Ouvrir un site
+depuis un signet, ou après avoir fermé le navigateur, ne redemande donc plus
+rien. La session propre au site garde la priorité — elle peut être plus
+récente, si l'on s'est connecté directement sur ce site.
+
+**Déconnexion** : elle ferme la session **partout** (clés du site + clés
+`team53_*`) et renvoie vers `connexion.html` du portail. Sans cela, la session
+centrale serait ré-adoptée au rechargement suivant et la déconnexion n'aurait
+aucun effet.
 
 **Premier lancement** : `Web/utilisateurs.json` n'existe pas encore, donc
 `seConnecter()` du portail traite un 404 comme une première installation et
 crée automatiquement un compte administrateur fondateur à partir de ce qui
-vient d'être saisi. Ensuite, le bouton « Importer les comptes existants » du
-panneau admin fusionne les comptes déjà présents dans
-`EditeurLivre/users.json` et `MaBibliotheque/users.json` (sans jamais créer
-de doublon, relançable autant de fois que nécessaire).
+vient d'être saisi. Les comptes suivants se créent depuis le panneau admin.
 
-**Sites « identité-dépendants »** : les deux sites vérifient que le login
-relayé correspond à une entrée réelle de leur propre fichier de comptes
-(`EditeurLivre/users.json` / `MaBibliotheque/users.json`), puisque chacun a
-sa bibliothèque propre. Pour rester cohérent sans jamais modifier le code de
-ces sites, le panneau admin central fait un *upsert* silencieux dans le
-fichier de comptes du site concerné (`synchroniserEditeurLivre()` /
-`synchroniserMaBibliotheque()` dans `admin.js` racine, même logique dupliquée
-pour chaque site) chaque fois qu'un compte central se voit accorder l'accès à
-ce site. Un futur site purement « token », sans notion d'identité, s'ajoute
-en pure donnée (`Web/sites.json`) ; un futur site « identité » demandera une
-petite synchro dédiée du même genre.
+**Un seul fichier de comptes** : les sites n'ont plus le leur. Chacun lit
+`Web/utilisateurs.json` (chemin absolu obtenu en préfixant par `/`, ce qui
+court-circuite son `DOSSIER_BDD`), vérifie le mot de passe puis l'accès. Un
+mot de passe changé depuis « Mon compte » vaut donc immédiatement partout : il
+n'y a plus de copie à synchroniser, ni de risque que deux fichiers divergent.
 
 Révoquer un accès dans le panneau admin retire la carte du tableau de bord
-mais **ne bloque pas** une connexion directe sur le site concerné (son propre
-mot de passe existe toujours dans son propre fichier BDD) — cohérent avec le
-fait qu'aucun site de ce dépôt n'a d'autorisation côté serveur, puisqu'il n'y
-a pas de serveur.
+**et** ferme la connexion directe au site : il n'y a plus de mot de passe
+ailleurs pour contourner. La vérification reste côté client, puisqu'il n'y a
+pas de serveur — mais elle porte enfin sur une seule vérité.
 
-## Migration de Ma Bibliothèque (compte unique → comptes séparés)
+## Mon compte
 
-Ma Bibliothèque a été créée avec un seul compte partagé
-(`MaBibliotheque/compte.json` + une collection unique `livres.json`). Le
-bouton « Migrer Ma Bibliothèque vers des comptes séparés » du panneau admin
-(`migrerMaBibliothequeVersMultiCompte()` dans `script.js` racine) fait passer
-ce site au même modèle par compte qu'editeur-livre :
+`compte.html` — accessible depuis le tableau de bord, sans droit particulier :
+chacun y change son **pseudo** et son **mot de passe**, et consulte ses
+**statistiques** (rôle, dernière connexion, puis un bloc par site : livres,
+pages et mots écrits ; entrées de la bibliothèque ; droïdes possédés et
+escouade).
 
-1. Lit l'ancien `compte.json`, en déduit le login et son « slug ».
-2. Recopie chaque image de couverture référencée dans `livres.json` vers
-   `images/<slug>/…` (l'API Contents de GitHub n'a pas de copie serveur : il
-   faut télécharger puis ré-uploader chaque fichier).
-3. Écrit la collection dans `bibliotheques/<slug>.json` et crée/complète
-   `MaBibliotheque/users.json`.
+Deux précautions :
 
-Ne supprime **jamais** `compte.json`/`livres.json`/les anciennes images — ils
-restent en place, orphelins mais inoffensifs, à supprimer à la main une fois
-vérifié que tout fonctionne. Sans danger à relancer : la vérification se fait
-sur l'existence de `bibliotheques/<slug>.json` pour ce compte précis (pas
-juste "`users.json` existe"), pour rester correct même si un second compte a
-été créé côté portail avant que ce bouton n'ait été cliqué.
+- L'écriture **relit `Web/utilisateurs.json` juste avant d'écrire** et ne
+  modifie que sa propre entrée, pour ne pas écraser ce qu'un administrateur
+  aurait changé sur d'autres comptes entre-temps.
+- Un changement de mot de passe ou de pseudo vaut **immédiatement partout** :
+  les sites lisent ce fichier. La synchronisation vers chaque site, qui
+  existait tant que les comptes étaient dupliqués, a disparu avec elle.
+
+L'identifiant de connexion, lui, ne se change pas : il sert de clé aux
+fichiers personnels de chaque site (`bibliotheques/<slug>.json`).
+
+### Fichiers de plus de 1 Mo
+
+L'API Contents cesse de renvoyer le contenu au-delà de 1 Mo — un livre de
+quelques centaines de pages y arrive. La lecture bascule alors sur l'**API des
+blobs** (`git/blobs/<sha>` en `Accept: application/vnd.github.raw`), qui est
+authentifiée et tient jusqu'à 100 Mo. L'URL de téléchargement directe ne sert
+plus que de dernier recours : sur un dépôt privé, son jeton temporaire se fait
+refuser dès qu'il expire, et c'était la cause du message « trop volumineux et
+sa version brute n'a pas pu être récupérée ».
+
+Les métadonnées (dont le `sha`) viennent toujours du premier appel : la
+réécriture du fichier n'est pas affectée.
+
+### Supprimer un compte
+
+Supprimer un compte n'efface que sa ligne de `Web/utilisateurs.json` : ses
+fichiers restent en place, et recréer le même identifiant les retrouve — une
+suppression par erreur reste donc réparable.
+
+Une **seconde question** propose ensuite d'effacer aussi tout ce qu'il
+possédait : les trois `bibliotheques/<slug>.json`, ses dossiers d'images, et
+ses entrées dans `EditeurLivre/publies.json` — sans quoi ses livres publiés
+resteraient listés pour tout le monde. Elle n'est jamais cochée d'avance, et
+ce ménage-là ne se répare pas.
+
+Le compte part **avant** ses données : si la purge échoue en cours de route,
+on ne se retrouve pas avec des fichiers effacés et un compte toujours debout.
+Chaque fichier est traité pour lui-même, et ce qui résiste est nommé dans le
+message plutôt que d'interrompre le reste.
+
+## Migrations retirées
+
+Deux outils à usage unique ont vécu dans le panneau admin, puis en ont été
+retirés une fois leur travail fait : l'**import des `users.json`** des sites
+vers le fichier central, et le passage de **Ma Bibliothèque** d'un compte
+unique partagé à un compte par personne. Un bouton qui ne peut plus rien
+faire n'est qu'un piège de plus dans une page d'administration ; leur code
+reste dans l'historique Git si un dépôt neuf en avait besoin.
 
 ## Transfert de données entre comptes
 
@@ -201,6 +273,58 @@ cas d'erreur, l'historique Git permet de revenir en arrière.
 est un ensemble de clés composites, pas des objets avec un `.id` comme le
 suppose `CONFIG_TRANSFERT`. Pourrait être ajouté plus tard avec une
 sémantique dédiée si besoin.
+
+## Éditeur de livre
+
+**Modèle de texte** : la source de vérité est `livre.spreads[]` — une entrée
+par double-page, le texte continu tel qu'il est saisi. `livre.pages[]` en est
+**dérivé** (`calculerDeuxPages()` découpe chaque double-page en deux) et sert
+au sommaire, à l'aperçu, à l'impression et à `lecture.js`. Ne jamais écrire
+dans `pages[]` en pensant modifier le livre : `remplacerTout()` l'a fait une
+fois, et la fonction « Remplacer tout » n'avait aucun effet visible.
+
+La session (`gh_token`, `gh_login`, `gh_role`, `gh_nom`) vit en `localStorage`
+comme sur les autres sites. Seul `livre_id` — quel livre est ouvert — reste en
+`sessionStorage` : c'est l'état d'un onglet, pas une session, et le déplacer
+ferait que deux onglets sur deux livres différents se marcheraient dessus.
+
+Le découpage passe par un élément de mesure caché (`#mesureCachee`) dimensionné
+comme une page réelle. `repaginerTout()` recolle tout le livre puis le redécoupe
+— coûteux (~1,7 s pour 143 pages), donc réservé aux moments qui l'exigent ;
+la frappe courante passe par `gererFlux()`, qui ne recoupe que la double-page
+touchée et cascade tant qu'il y a débordement.
+
+**Impression** : le bouton imprimante ouvre un panneau de catégories (livret à
+agrafer, page à page, fichier pour l'imprimeur), chacune avec un bouton « ? »
+dépliant un mode d'emploi. Deux guides publics complètent le sujet —
+`montage.html` (relier soi-même : livret agrafé, dos collé, cahiers cousus,
+anneaux) et `imprimeur.html` (préparer les fichiers pour un imprimeur
+professionnel).
+
+**Export « fichier pour l'imprimeur »** : produit deux PDF conformes aux
+critères géométriques d'un cahier des charges d'imprimerie — l'intérieur en
+pages simples, la couverture ouverte à plat (4ᵉ + dos + 1ʳᵉ). Fond perdu de
+5 mm, traits de coupe et de pli décalés de 5 mm en filet de 0,25 pt, pages
+centrées dans la zone de support, marges paires/impaires symétriques pour le
+registre, blanc tournant de 8 mm folio compris.
+
+Ce dernier point a une conséquence : le folio habituel est à 6 mm du bord, sous
+le minimum exigé. Le remonter oblige à repaginer, d'où `PIED_PAGE_PX` (variable
+et non constante, dans `editeur.js`) que `avecPaginationImprimeur()` relève le
+temps de l'export. Celui-ci repagine **une seule fois**, prend un instantané du
+contenu des pages, rend au livre sa pagination d'écran, puis construit le
+fichier depuis l'instantané — le fichier compte donc quelques pages de plus que
+l'aperçu, ce que le panneau de contrôle annonce.
+
+Pendant cette passe, le mesureur reçoit la classe `mesure-pro` : il compose
+alors comme le PDF (justifié, avec césure) au lieu du drapeau sans césure du
+mode écran. Sans cet accord, les lignes ne tombent pas au même endroit et le
+bas des pages est silencieusement rogné par l'`overflow: hidden`.
+
+**Ce qu'un navigateur ne sait pas faire** : convertir en CMJN, produire du
+PDF/X-1a, appliquer un profil de sortie. Le panneau de contrôle affiché avant
+génération le dit explicitement, plutôt que de laisser croire que le fichier
+part tel quel chez l'imprimeur.
 
 ## Droid Fortnite (suivi de Star Wars: Droid Tycoon)
 
@@ -243,6 +367,13 @@ pouvant être possédé **indépendamment à chaque palier**, comme dans le jeu,
 pas juste à un seul palier « actuel ») et une liste des paliers de
 « renaissance » (crédits + droïdes requis pour chaque niveau).
 
+L'onglet **Tous**, en tête des paliers, affiche chaque droïde à chacun de ses
+paliers — une carte par couple, avec son étiquette de palier et la couleur de
+contour correspondante. Le Droidex raisonne donc sur des couples
+(`combinaisonsDroidex()`) et non sur des droïdes : `basculerPossession()` reçoit
+le palier en paramètre, puisque `palierActif` vaut alors une sentinelle
+(`TOUS_PALIERS`) qui ne désigne aucun palier réel.
+
 La progression personnelle stocke donc des clés composites
 `"<idDroide>::<palier>"` dans `droidesPossedes` (un tableau, une clé par
 combinaison droïde+palier réellement possédée) plutôt qu'un simple palier
@@ -251,37 +382,167 @@ ex. BB-8, R2-D2, C-3PO) n'existent qu'au palier Défaut dans le jeu — ils sont
 automatiquement masqués des autres onglets de palier (`estDisponibleAuPalier()`
 dans `suivi.js`).
 
-**Visuel par droïde** : par défaut, chaque carte affiche une couleur générée
-à partir du nom du droïde (`couleurDroide()` dans `suivi.js`, un hash simple
-→ teinte HSL) pour que chaque droïde reste visuellement distinct sans travail
-manuel. Ce n'est délibérément **pas un visuel officiel du jeu** : je n'ai
-trouvé aucune source d'images de droïdes qu'Epic Games mettrait à disposition
-publiquement, et la seule alternative concrète (un dépôt communautaire
-hébergeant des images extraites du jeu, sans mention de licence) n'est pas
-plus autorisée à être redistribuée que si je les hébergeais moi-même — donc
-pas utilisée.
+**Carte de droïde** : vignette au format portrait sur panneau sombre, reprenant
+la présentation du tracker communautaire *Droidex* — nom en médaillon en haut à
+gauche, case à cocher en face, classe et rareté en pied, contour teinté par le
+palier, ligne de balayage au survol. Le panneau reste sombre dans les deux
+thèmes du site : c'est un écran, pas un élément d'interface.
 
-Chaque entrée du catalogue peut en revanche recevoir une **vraie photo perso**
-(depuis `admin.html`, voir plus bas — remplace le visuel généré), stockée dans
-`DroidFortnite/images/<id>.<ext>`, avec le même mécanisme que les couvertures
-de livres de ma-bibliotheque (compression côté client, upload via l'API
-Contents de GitHub).
+`construireCarteDroide()` (dans `script.js`) est **partagé** par le Droidex et
+le panneau admin, qui n'affichent qu'une variante l'un de l'autre (case à
+cocher vs corbeille). Un droïde non possédé n'estompe pas la carte entière mais
+seulement son contenu : baisser l'opacité du tout délavait la vignette vers le
+fond de page et rendait le nom illisible en thème clair.
 
-**Données partagées, éditables dans l'outil** : `DroidFortnite/catalogue.json`
-et `DroidFortnite/renaissance.json` sont communs à tous les comptes du site
-(contrairement à `bibliotheques/<login>.json`, personnel). N'importe quel
-compte peut ajouter un droïde ou un palier manquant depuis `suivi.html` — pas
-de notion d'administrateur propre à ce site. Ces deux fichiers sont amorcés
+**Visuel**, choisi dans cet ordre par `appliquerVisuelDroide()` :
+
+1. la **photo perso** ajoutée au droïde depuis `admin.html`, stockée dans
+   `DroidFortnite/images/<id>.<ext>` (même mécanisme que les couvertures de
+   ma-bibliotheque : compression côté client, upload via l'API Contents) ;
+2. une **source d'images externe**, si `BASE_IMAGES_EXTERNES` est renseignée
+   dans `script.js` — l'URL est alors `{base}/droids/{NOM}_{PALIER}.webp`,
+   `slugImageDroide()` mettant le nom en majuscules et les espaces en tirets
+   bas (« DRK-1 Probe » → `DRK-1_PROBE`). La correspondance des paliers vers
+   les suffixes est dans `PALIERS_IMAGE_EXTERNE` ;
+3. sinon la **teinte générée** à partir du nom (`couleurDroide()` dans
+   `script.js`, un hash → teinte HSL) et l'icône de classe.
+
+Le chargement **réessaie** deux fois avant de renoncer : sur l'onglet « Tous »,
+une centaine de vignettes partent d'un coup et quelques requêtes échouent sous
+cette rafale, sans que le fichier soit en cause. Abandonner au premier échec
+laissait ces droïdes sur leur teinte générée jusqu'au rechargement complet de
+la page — des images « disparues » qui existaient pourtant. Les réessais sont
+espacés et légèrement décalés, et abandonnés si la carte a été remplacée
+entre-temps (changement d'onglet, filtre).
+
+`BASE_IMAGES_EXTERNES` est **vide par défaut, et c'est délibéré** : la
+renseigner ferait charger les visuels depuis un site tiers qui n'a rien
+demandé (son trafic, ses fichiers, des extractions du jeu). Le mécanisme et la
+correspondance des noms sont prêts et vérifiés ; la décision revient à
+l'utilisateur. Le nom du droïde sert de clé, pas son identifiant : les tirets
+de l'identifiant confondent espaces et vrais traits d'union
+(`drk-1-probe` ne dit pas lequel est lequel).
+
+**Prix et rendement, par palier** : le rendement d'un droïde monte à chaque
+amélioration, il a donc autant de valeurs que de paliers. Deux tables indexées
+par **nom de palier**, comme l'est déjà la possession :
+
+```json
+{ "id": "mouse", "prix": { "Défaut": 950, "Or": 4000 },
+                 "rendements": { "Défaut": 2, "Or": 4 } }
+```
+
+Le formulaire admin affiche une ligne par palier et se reconstruit à chaque
+ouverture : il suit donc les paliers ajoutés ou réordonnés sans rien à changer.
+Les cases vides ne sont pas enregistrées. Les cartes affichent le prix (ambre)
+et le rendement (émeraude) du palier affiché, et la ligne disparaît entièrement
+tant qu'aucune valeur n'est connue.
+
+**Chaque montant se saisit en deux morceaux — un nombre et une unité — mais
+s'enregistre comme un seul nombre en crédits.** C'est la correction d'un bug
+silencieux : saisir « 4K » d'une traite donnait une chaîne, et `parseFloat("4K")`
+vaut **4**. Le total de l'escouade sous-comptait donc d'un facteur mille sans
+rien signaler. Un seul nombre canonique en base, l'unité n'étant qu'une
+commodité de saisie, redéduite à l'ouverture du formulaire
+(`decomposerValeur()` / `composerValeur()` dans `script.js`).
+
+La liste des unités vit dans **`DroidFortnite/unites.json`** (K, M, B, T au
+départ) et s'édite depuis l'onglet **Unités** du panneau admin, pour le jour où
+les montants du jeu dépasseront le billion. Supprimer une unité ne perd aucune
+donnée : les montants sont en crédits, seule leur présentation change.
+`formaterCredits()` s'appuie sur cette liste — d'où « 1.2 B » et non plus
+« 1.2 Md ».
+
+**Les droïdes Iconiques ne fonctionnent pas comme les autres** : ils n'existent
+qu'au premier palier et leur rendement est un **pourcentage du revenu total**,
+pas des crédits par seconde. Le formulaire ne leur propose donc qu'une seule
+ligne, avec l'unité `%` sélectionnée d'office ; la valeur est alors stockée
+telle quelle (« 25% »). Le `%` n'est jamais proposé pour un prix, ni ajoutable
+dans `unites.json` : ce n'est pas un facteur, c'est une autre nature de valeur.
+
+Ce pourcentage est **appliqué** au rendement total de l'escouade :
+`effectif = crédits × (1 + %/100)`. Ce total, et lui seul, est mis en avant
+**par heure** — l'échelle à laquelle on compare des escouades — avec la valeur
+par seconde à côté pour recouper avec le jeu. Les sections et les cartes
+restent par seconde, comme le jeu les affiche et comme on les saisit. Le détail du calcul reste affiché sous le
+résultat (« 185.6 K/s + 50 % ») — sans quoi on ne saurait pas d'où sort le
+chiffre. Il ne majore que le **total**, jamais le sous-total d'une classe :
+il porte sur le revenu global, pas sur celui d'une section, qui indique donc
+seulement ce qu'elle apporte et ce qu'elle contribue en pourcentage.
+
+> À noter : la rareté d'un droïde **ne change pas** d'un palier à l'autre
+> (vérifié sur les 379 entrées du tracker communautaire : Mouse reste Common
+> partout). Seul le rendement varie — d'où l'indexation par palier et non par
+> rareté.
+
+**Données partagées** : `DroidFortnite/catalogue.json` et
+`DroidFortnite/renaissance.json` sont communs à tous les comptes du site
+(contrairement à `bibliotheques/<login>.json`, personnel). Elles se gèrent
+**uniquement depuis `admin.html`** : `suivi.html` ne fait que suivre la
+progression, et n'a plus de bouton d'ajout. Ces deux fichiers sont amorcés
 automatiquement (créés avec des données de départ) au premier chargement
 authentifié si absents — je ne peux pas les créer moi-même directement dans
 `Team53FR/BDD` (pas de token).
 
 **Provenance des données de départ** : sourcées du tracker communautaire
-open-source *Droidex* (github.com/erikpeik/droidex) — **pas des données
-officielles Epic Games**, potentiellement incomplètes ou datées (le jeu est
-mis à jour régulièrement ; par exemple les paliers Galactique/Stellar,
-confirmés en jeu, n'étaient pas encore dans ce tracker au moment de
-l'écriture). À corriger/compléter librement dans l'outil.
+*Droidex* (droidex.web.app, github.com/erikpeik/droidex) — **pas des données
+officielles Epic Games**, potentiellement incomplètes ou datées, le jeu étant
+mis à jour régulièrement. À corriger/compléter librement dans l'outil. Ce
+tracker couvrait 69 droïdes de base × 6 paliers (Défaut → Galactique) à la
+dernière vérification ; le palier **Stellar**, confirmé en jeu, n'y figurait
+pas encore — un droïde à ce palier retombe donc sur la teinte générée si la
+source d'images externe est utilisée.
+
+**Super renaissance : les mêmes paliers, d'autres droïdes.** À chaque super
+renaissance, les paliers de renaissance réclament des droïdes différents ;
+niveaux et crédits, eux, ne bougent pas. Le champ `elements` est donc une table
+indexée par numéro de super renaissance :
+
+```json
+{ "id": "niveau-1", "niveau": 1, "credits": 10000,
+  "elements": { "0": "CB (Défaut), Pit (Défaut)", "1": "Mouse (Or), Gonk (Diamant)" } }
+```
+
+L'ancienne forme — une simple chaîne — vaut pour la super renaissance 0 : les
+données déjà saisies restent valables sans migration
+(`elementsParSuper()` dans `script.js`). La progression personnelle suit la
+même dimension (`renaissanceAtteinte` devient une table par super
+renaissance) : atteindre le palier 5 avant une super renaissance ne doit pas
+le laisser coché après, puisqu'on recommence — là encore, un simple tableau
+est relu comme la progression de la super renaissance 0.
+
+Le sélecteur de super renaissance n'apparaît dans le suivi que si les données
+en décrivent plus d'une. Côté gestionnaire, il sert à choisir celle qu'on
+modifie, et un bouton ajoute la suivante en reprenant les droïdes de la
+précédente — on n'ajuste ensuite que ce qui diffère.
+
+**Renaissance : les droïdes requis en visuel.** Le champ `elements` d'un palier
+de renaissance est du texte libre, saisi à la main
+(« CB (Défaut), Pit (Or), … »). `analyserElementsRenaissance()` le relit pour
+retrouver les droïdes du catalogue et afficher leurs cartes, avec la couleur du
+palier demandé. Les cartes y sont montrées telles quelles, sans marquer ce
+qu'on possède déjà : ce qui compte est **ce qu'il faut**, et la case à cocher
+d'une carte n'aurait donc rien à dire ici — elle est masquée. Ce qui ne se laisse pas
+reconnaître (nom absent du catalogue) reste affiché comme étiquette texte
+plutôt que de disparaître de la liste ; un palier omis ou inconnu retombe sur
+le premier.
+
+**Écriture de la progression — regroupée, jamais à chaque clic.** Chaque
+écriture est un *commit* sur le dépôt BDD. Enregistrer à chaque changement
+faisait un commit par droïde coché : cocher un palier entier en produisait
+soixante-dix, et l'historique grossissait au point que l'interface de GitHub
+finissait par afficher « Cannot retrieve latest commit at this time ».
+
+`marquerProgressionModifiee()` ne fait donc que programmer l'écriture, qui a
+lieu après deux secondes sans nouveau changement — cinquante clics d'affilée ne
+font plus qu'un commit. Trois filets : masquer l'onglet ou quitter la page
+écrit tout de suite ce qui attend, `beforeunload` prévient si l'écriture n'a
+pas abouti, et deux écritures ne peuvent pas partir en même temps (elles se
+disputeraient le même sha).
+
+À noter : `ma-bibliotheque` n'a jamais eu ce défaut — y cocher un tome ou un
+épisode ne modifie que l'état local, l'écriture n'ayant lieu qu'à la validation
+du formulaire.
 
 **Écriture des fichiers partagés — fusion, pas simple retry** : comme
 plusieurs comptes peuvent ajouter une entrée à `catalogue.json`/
@@ -293,6 +554,45 @@ uniquement quand un seul compte écrit jamais un fichier donné, comme
 fusionne les entrées locales absentes (par `id`), pour ne jamais perdre
 silencieusement l'ajout fait par quelqu'un d'autre entre-temps.
 
+**Raretés** : `DroidFortnite/raretes.json` porte la liste complète, éditable
+depuis l'onglet **Raretés** du panneau admin — ajout, suppression,
+réordonnancement et couleurs (fond + texte).
+
+- **L'ordre fait le tri** : du plus faible au plus fort, il sert au classement
+  du catalogue (`ordreRarete()`, qui a remplacé la constante `ORDRE_RARETE`) et
+  à l'ordre des listes déroulantes, remplies au chargement
+  (`remplirSelectRaretes()`) plutôt qu'écrites en dur dans le HTML.
+- **Pas de renommage**, comme pour les paliers et pour la même raison : chaque
+  droïde stocke le *nom* de sa rareté. Supprimer une rareté encore portée est
+  possible mais averti, avec le nombre de droïdes concernés ; ils la gardent,
+  simplement sans couleur et en dernier au tri (`ordreRarete()` renvoie alors
+  un rang au-delà de la liste, plutôt que -1 qui les aurait remontés en tête).
+- **`premierPalierSeulement`** est une propriété de la rareté, pas un test sur
+  le nom « Iconique » : une rareté ajoutée plus tard peut recevoir le même
+  comportement (bouton ⭑) sans toucher au code.
+- Les couleurs sont injectées dans un `<style>` au chargement
+  (`appliquerCouleursRaretes()`) plutôt qu'appliquées badge par badge : elles
+  valent ainsi partout — cartes, panneau admin, feuille de choix de l'escouade,
+  où les badges n'avaient d'ailleurs aucune couleur avant. La feuille de style
+  ne doit donc plus porter de règle `.badge-rarete.<rareté>`, qui l'emporterait
+  en spécificité.
+
+**Un palier peut porter plusieurs couleurs.** `couleur` est soit une chaîne,
+soit un tableau ; à partir de deux, le contour des cartes devient un dégradé —
+c'est ainsi qu'« Arc-en-ciel » en est un vrai. Une bordure CSS ne pouvant pas
+être un dégradé, et `border-image` ignorant `border-radius` (coins carrés),
+`appliquerContourPalier()` superpose deux fonds : l'intérieur opaque rogné sur
+la boîte de padding, le dégradé rogné sur la boîte de bordure. Les coins
+restent ronds.
+
+**Le gestionnaire sur mobile.** Ses grilles à colonnes (prix/rendement par
+palier, paliers de renaissance) sont pensées pour un écran large : en dessous
+de 620 px, la colonne de saisie tombait à une vingtaine de pixels — un champ
+où l'on ne voyait pas ce qu'on tapait. Elles s'empilent donc, chaque valeur
+précédée de son intitulé puisque les en-têtes de colonnes sont masqués. Et la
+barre d'onglets défile horizontalement au lieu de s'étirer : à six onglets,
+`flex: 1` les comprimait jusqu'à pousser toute la page hors de l'écran.
+
 **Panneau admin (`admin.html`)**, réservé aux admins du portail central : pas
 de rôle propre à Droid Fortnite, `estAdminCentral()`/`exigerAdminDroidFortnite()`
 dans `script.js` lisent directement `team53_role` en `localStorage` (même
@@ -300,34 +600,35 @@ origine que le portail, aucun changement du relais nécessaire). Le bouton
 flottant d'ajout et le lien ⚙ vers `admin.html` sont masqués pour les
 comptes non-admin dans `suivi.html`.
 
-Organisé en **quatre onglets** (même pattern `.onglet-type` que Droidex/
+Organisé en **six onglets** (même pattern `.onglet-type` que Droidex/
 Renaissance de `suivi.html`) :
-- **Droïdes** : catalogue en petites cartes (comme le Droidex, classes
-  `.grille-droides`/`.carte-droide` réutilisées telles quelles — une liste
-  verticale devient vite illisible avec ~70 entrées), **triées par rareté**
-  (Typique en premier, `ORDRE_RARETE` dans `script.js`) puis par nom. Une
-  carte cliquée bascule sur l'onglet Ajouter avec le formulaire pré-rempli
-  (`editerDroide()`) ; le bouton 🗑 dans son coin supprime directement
-  (confirmation, `stopPropagation()` pour ne pas aussi ouvrir la
-  modification).
-- **Ajouter** : formulaire nom/classe/rareté + icône (photo perso,
-  compression via `comprimerImage()` dans `script.js`, partagée avec
-  `suivi.js` — toujours pas de visuel officiel du jeu). Cliquer l'onglet
-  directement repart d'un formulaire vide (`ouvrirOngletAjout()`) ;
-  Enregistrer ou Annuler ramène à l'onglet Droïdes.
+- **Droïdes** : catalogue en petites cartes (même `construireCarteDroide()`
+  que le Droidex — une liste verticale devient vite illisible avec ~70
+  entrées), **dans l'ordre du catalogue**, qui est celui du jeu et donc celui
+  du Droidex. Le retrier par rareté puis par nom donnait une grille sans
+  rapport avec ce qu'on voit en jouant. L'ordre des raretés ne sert donc plus
+  qu'à celui des listes déroulantes. Une carte cliquée bascule sur l'onglet Ajouter
+  avec le formulaire pré-rempli (`editerDroide()`) ; le bouton 🗑 dans son
+  coin supprime directement (confirmation, `stopPropagation()` pour ne pas
+  aussi ouvrir la modification).
+- **Ajouter** : formulaire nom/classe/rareté, icône (photo perso, compression
+  via `comprimerImage()` dans `script.js`, partagée avec `suivi.js` — toujours
+  pas de visuel officiel du jeu) et **grille prix/rendement par palier**.
+  Cliquer l'onglet directement repart d'un formulaire vide
+  (`ouvrirOngletAjout()`) ; Enregistrer ou Annuler ramène à l'onglet Droïdes.
+- **Renaissance** : un palier par ligne — niveau, crédits (valeur + unité) et
+  droïdes requis. Les modifications s'enregistrent au changement de champ.
+  C'est ici qu'on ajoute un niveau, le bouton flottant de `suivi.html` ayant
+  été retiré. Les droïdes requis se choisissent dans deux listes (droïde puis
+  palier, celui-ci limité aux paliers où le droïde existe) et s'affichent en
+  pastilles retirables : les saisir à la main rendait une faute de frappe
+  invisible, le droïde devenant introuvable et perdant son visuel. Le format
+  **enregistré** ne change pas (« CB (Défaut), Pit (Or) ») — les données déjà
+  saisies restent valables, et un nom qui ne correspond à rien est conservé en
+  pastille marquée plutôt que jeté.
 - **Paliers** : liste ordonnée avec ↑/↓/Supprimer **et un sélecteur de
   couleur par palier** (`<input type="color">`, change immédiatement à
   l'enregistrement).
-- **Types** : liste des classes de droïde (`DroidFortnite/classes.json`,
-  `{ nom, icone }`, amorcé avec Ouvrier/Astromec/Combat) avec un champ texte
-  pour l'icône (emoji) et Supprimer, plus un formulaire d'ajout. Remplit
-  dynamiquement les `<select>` de classe de `admin.html` et `suivi.html`
-  (`remplirSelectClasseAdmin()`/`remplirSelectsClasses()`) — un type ajouté
-  ici apparaît aussitôt comme option, sans rien coder en dur. Pas de
-  réordonnancement (l'ordre n'a pas d'effet côté jeu) ; au moins un type doit
-  toujours rester. `iconeClasse(classe, classes)` (dans `script.js`) cherche
-  l'icône du type dans la liste chargée, avec un repli générique (🤖) si le
-  type n'y figure plus.
 
 **La couleur du contour d'une carte de droïde est celle du palier actif**
 (pas une couleur propre à chaque droïde) : dans `suivi.js`,
@@ -341,33 +642,95 @@ possible (seulement ajout/suppression/réordonnancement) : renommer
 casserait silencieusement les clés `"<idDroide>::<ancienNom>"` déjà
 enregistrées dans les progressions personnelles.
 
-**Onglet Renaissance — « puis-je le vendre ? »** (`verifierVenteDroide()`
-dans `suivi.js`) : un champ de recherche compare le nom saisi au texte libre
-`elements` de chaque palier de renaissance pas encore atteint (format
-`"Nom (Palier)"`, ex. `"CB (Défaut), Pit (Or)"`), au palier actuellement
-sélectionné dans l'onglet Droidex (`palierActif`, partagé entre les deux
-onglets — affiché en toutes lettres au-dessus du résultat pour éviter toute
-ambiguïté). Trouvé → message rouge (encore nécessaire) ; sinon → message
-vert (peut être vendu). Recherche texte libre volontairement simple (pas de
-lien structuré vers `catalogue.json`), cohérente avec le champ `elements`
-lui-même qui est du texte libre.
-
 `comprimerImage()` préserve la transparence de la source : elle exporte en
 PNG si l'image redimensionnée contient un pixel non totalement opaque,
 sinon en JPEG (plus léger) — un fond transparent (icône détourée) n'est
 donc pas aplati en noir comme avec un export JPEG systématique.
 
+## Favicon
+
+Sans `<link rel="icon">`, un navigateur réclame `/favicon.ico` **à la racine du
+domaine** — donc `team53fr.github.io/favicon.ico`, qui n'appartient pas à ce
+dépôt (les pages, elles, vivent sous `/EditeurSite/`). D'où un 404 sur chaque
+page. Chaque page déclare donc son icône, et chaque site a la sienne dans son
+propre dossier :
+
+| Site | Icône |
+|------|-------|
+| portail | boussole blanche sur indigo |
+| editeur-livre | livre ouvert sur terracotta |
+| droid-fortnite | tête de droïde sur bleu nuit |
+| ma-bibliotheque | la sienne, antérieure |
+
+Toutes sont générées par script plutôt que dessinées à la main — voir
+l'historique Git si elles doivent être refaites.
+
 ## App installable (PWA)
 
-**ma-bibliotheque** est installable comme une app sur téléphone (icône sur
-l'écran d'accueil, plein écran sans barre d'adresse), via `manifest.json` +
-`sw.js` (service worker qui met en cache uniquement la coquille de l'appli —
-jamais les données, toujours lues en direct). Aucune réécriture native :
-c'est le même site, juste rendu installable. Ne fonctionne qu'une fois servi
-en HTTPS (GitHub Pages) — pas en ouvrant le fichier en local.
+Un site web ne peut pas livrer un fichier d'app (`.apk` / `.ipa`) : cela
+demanderait un build natif et une signature. Il peut en revanche
+**s'installer** — le téléphone crée une icône sur l'écran d'accueil et l'app
+s'ouvre en plein écran, sans barre d'adresse. C'est le même site, juste rendu
+installable. Ne fonctionne qu'en HTTPS (GitHub Pages), pas en ouvrant le
+fichier en local.
 
-Pour rendre un autre site du dépôt installable de la même façon : dupliquer
-`manifest.json` (adapter `name`/`theme_color`/icônes) et `sw.js` (adapter
-`CACHE_NOM` et `FICHIERS_COQUILLE`) dans son dossier, puis ajouter les
-balises `<link rel="manifest">` et le script d'enregistrement du service
-worker dans le `<head>` de chaque page HTML du site.
+**Le portail** (`manifest.json` + `sw.js` + `icone-192/512.png` à la racine)
+est installable sous le nom **« Site Guide »**, avec une portée à la racine :
+**une seule icône couvre les trois sites**, qui vivent sur la même origine.
+Le nom vient du manifeste (`name`/`short_name`) et, sur iOS, du meta
+`apple-mobile-web-app-title` présent sur chaque page du portail. Le tableau de
+bord affiche un encart au-dessus de la liste des sites :
+
+- Sur Android, il retient l'événement `beforeinstallprompt` du navigateur
+  (`preventDefault()`) pour déclencher l'installation depuis son propre
+  bouton, plutôt que de laisser le navigateur choisir son moment.
+- Sur iPhone, Safari n'expose rien de tel : l'encart y explique le geste
+  (*Partager* → *Sur l'écran d'accueil*) et masque le bouton.
+- Il disparaît une fois l'app installée (`appinstalled`, ou `display-mode:
+  standalone` au chargement) ; la croix le masque définitivement
+  (`team53_encart_app` en `localStorage`).
+
+**ma-bibliotheque** garde en plus son propre `manifest.json`/`sw.js`, et reste
+donc installable séparément — utile pour n'avoir que ce site sur l'écran
+d'accueil.
+
+**Stratégie de cache : « réseau d'abord »**, dans les deux service workers, et
+pour une raison apprise à ses dépens : en « cache d'abord », la coquille ne se
+rafraîchit QUE lorsque le fichier `sw.js` change d'octets. Une page modifiée
+restait donc périmée indéfiniment sur les appareils ayant déjà installé l'app
+— une fonctionnalité pourtant retirée du code restait visible. Ces sites ont
+de toute façon besoin du réseau en permanence (API GitHub) : autant s'en
+servir pour rester à jour, et ne retomber sur le cache qu'hors connexion.
+
+**Jamais de données en cache** : tout appel vers un autre domaine
+(`api.github.com` en tête) n'est pas intercepté du tout. Un livre servi depuis
+un cache périmé pourrait être réécrit par-dessus la version fraîche et perdre
+du texte.
+
+Le service worker racine ne précharge que la coquille du portail ; les pages
+des sites se mettent en cache **à la visite**. Y lister les quarante fichiers
+du dépôt les aurait fait rouiller au premier renommage. Conséquence : il faut
+avoir visité un site **une fois en ligne** pour qu'il s'ouvre hors connexion.
+
+Les icônes sont générées par script (boussole blanche sur fond indigo) plutôt
+que dessinées à la main — voir l'historique Git si elles doivent être refaites.
+
+**Renommer ou changer l'icône** oblige à incrémenter `CACHE_NOM` dans `sw.js` :
+sans ce renommage, l'ancien manifeste et l'ancienne icône continueraient d'être
+servis depuis le cache déjà installé sur les appareils. Et sur le téléphone,
+le nom et l'icône affichés sous l'app ne se rafraîchissent souvent qu'après
+l'avoir désinstallée puis réinstallée.
+
+**Pages de connexion et bouton « retour »** : chaque `connexion.html` (portail
+et sites) commence par une garde qui renvoie vers la page d'arrivée si une
+session existe déjà. Toutes les redirections de garde et de déconnexion
+utilisent `location.replace()` et non `location.href` : pousser une entrée
+d'historique ferait que « retour », dans l'app installée, promène l'utilisateur
+à travers des pages de connexion qu'il a déjà traversées — c'était le cas avant
+correction.
+
+> **Non vérifiable dans l'environnement de développement** : le navigateur
+> intégré refuse toute inscription de service worker (le `sw.js` de
+> ma-bibliotheque, en production, échoue exactement pareil). Le manifeste, les
+> icônes et la logique du bouton sont testés ; le comportement du service
+> worker ne l'est qu'une fois déployé.

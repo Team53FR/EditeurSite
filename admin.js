@@ -1,3 +1,15 @@
+// ----- Ces actions passent par le reseau : on le dit, et on empeche d'y toucher -----
+// Voir attente.js. Les actions de FOND (sauvegarde differee, chargement d'une
+// vignette, migration silencieuse) n'y figurent surtout pas : les voiler
+// bloquerait la page pour un travail que l'on a justement choisi de rendre
+// invisible.
+envelopperAttente({
+  chargerDonnees: "Chargement des comptes…",
+  enregistrerUtilisateur: "Enregistrement du compte…",
+  supprimerUtilisateur: ["Suppression du compte…", "Selon le choix, ses données sont aussi effacées : cela peut prendre un moment."],
+  confirmerTransfert: "Transfert en cours…",
+});
+
 // Panneau d'administration central (réservé aux comptes team53_role === "admin").
 // Comptes stockés dans Web/utilisateurs.json :
 //   [{ login, password, role: "admin"|"user", nomAffichage, acces: [siteId,...], derniereConnexion }]
@@ -48,7 +60,10 @@ async function chargerDonnees() {
 }
 
 function construireCasesAcces(accesActuels) {
+  // Les cases ne vivent que dans la fenêtre : au chargement de la page, elles
+  // n'existent pas encore.
   const zone = document.getElementById("casesAcces");
+  if (!zone) return;
   zone.innerHTML = "";
   sitesDisponibles.forEach(site => {
     const label = document.createElement("label");
@@ -173,125 +188,102 @@ function construireFormulaireTransfert(loginSource) {
   return li;
 }
 
-function editerUtilisateur(login) {
-  const u = utilisateurs.find(x => x.login === login);
-  if (!u) return;
+// ===== La fiche d'un compte, en fenêtre =====
+//
+// Le formulaire vivait en bas de page, sous la liste : pour modifier
+// quelqu'un il fallait descendre, et l'on ne voyait plus de qui il
+// s'agissait. Ajouter et modifier passent donc par une fenêtre, qui se
+// referme sur la liste — et qui porte le nom du compte concerné.
 
+function ouvrirFenetreCompte(login) {
+  fermerFenetreCompte();
   modeEditionLogin = login;
-  document.getElementById("champLogin").value = u.login;
-  document.getElementById("champLogin").disabled = true; // le login est la clé : non modifiable
-  document.getElementById("champPassword").value = u.password || "";
-  document.getElementById("champNom").value = u.nomAffichage || "";
-  document.getElementById("champRole").value = u.role === "admin" ? "admin" : "user";
-  construireCasesAcces(Array.isArray(u.acces) ? u.acces : []);
-  document.getElementById("formTitre").textContent = "Modifier « " + u.login + " »";
-  document.getElementById("formNote").textContent = "L'identifiant ne peut pas être changé.";
-  document.getElementById("btnEnregistrer").textContent = "Enregistrer les modifications";
-  document.getElementById("btnAnnuler").style.display = "";
-  document.getElementById("message").textContent = "";
 
+  const u = login ? utilisateurs.find((x) => x.login === login) : null;
+  if (login && !u) return;
+  const acces = u && Array.isArray(u.acces) ? u.acces : [];
+
+  const fond = document.createElement("div");
+  fond.id = "fenetreCompte";
+  fond.className = "fenetre";
+  fond.addEventListener("click", (e) => { if (e.target === fond) fermerFenetreCompte(); });
+
+  fond.innerHTML =
+    '<div class="fenetre-carte" role="dialog" aria-modal="true" aria-label="' +
+      (u ? "Modifier un compte" : "Ajouter un compte") + '">' +
+      '<button class="fenetre-fermer" aria-label="Fermer">&#10005;</button>' +
+      "<h2>" + (u ? "Modifier « " + echapper(u.login) + " »" : "Ajouter un compte") + "</h2>" +
+      '<p class="sous-titre">' + (u
+        ? "L'identifiant ne peut pas être changé : il sert de clé aux fichiers personnels de chaque site."
+        : "Le compte sera créé dans le fichier central du portail, avec les accès cochés.") + "</p>" +
+
+      '<div class="champ">' +
+        '<label for="champLogin">Identifiant</label>' +
+        '<input type="text" id="champLogin" placeholder="identifiant" autocomplete="off"' +
+          (u ? ' value="' + echapper(u.login) + '" disabled' : "") + ">" +
+      "</div>" +
+      '<div class="champ">' +
+        '<label for="champPassword">Mot de passe</label>' +
+        '<input type="text" id="champPassword" placeholder="mot de passe" autocomplete="off" value="' +
+          (u ? echapper(u.password || "") : "") + '">' +
+      "</div>" +
+      '<div class="champ">' +
+        '<label for="champNom">Pseudo (optionnel)</label>' +
+        '<input type="text" id="champNom" placeholder="ex. Robin" autocomplete="off" value="' +
+          (u ? echapper(u.nomAffichage || "") : "") + '">' +
+      "</div>" +
+      '<div class="champ">' +
+        '<label for="champRole">Rôle</label>' +
+        '<select id="champRole">' +
+          '<option value="user">Utilisateur</option>' +
+          '<option value="admin">Administrateur (gère les comptes)</option>' +
+        "</select>" +
+      "</div>" +
+      '<div class="champ">' +
+        "<label>Accès aux sites</label>" +
+        '<div class="case-acces-sites" id="casesAcces"></div>' +
+      "</div>" +
+
+      '<p id="messageFenetre" class="message"></p>' +
+      '<div class="fenetre-actions">' +
+        '<button class="btn btn-fantome" id="btnAnnuler">Annuler</button>' +
+        '<button class="btn btn-primaire" id="btnEnregistrer">' +
+          (u ? "Enregistrer" : "Créer le compte") + "</button>" +
+      "</div>" +
+    "</div>";
+
+  document.body.appendChild(fond);
+
+  if (u) document.getElementById("champRole").value = u.role === "admin" ? "admin" : "user";
+  construireCasesAcces(acces);
+
+  fond.querySelector(".fenetre-fermer").onclick = fermerFenetreCompte;
+  fond.querySelector("#btnAnnuler").onclick = fermerFenetreCompte;
+  fond.querySelector("#btnEnregistrer").onclick = enregistrerUtilisateur;
+
+  document.getElementById(u ? "champPassword" : "champLogin").focus();
   afficherUtilisateurs();
-  document.getElementById("champPassword").focus();
 }
 
-function annulerEdition() {
+function fermerFenetreCompte() {
+  const f = document.getElementById("fenetreCompte");
+  if (f) f.remove();
   modeEditionLogin = null;
-  document.getElementById("champLogin").value = "";
-  document.getElementById("champLogin").disabled = false;
-  document.getElementById("champPassword").value = "";
-  document.getElementById("champNom").value = "";
-  document.getElementById("champRole").value = "user";
-  construireCasesAcces([]);
-  document.getElementById("formTitre").textContent = "Ajouter un utilisateur";
-  document.getElementById("formNote").textContent = "Le mot de passe est stocké tel quel dans Web/utilisateurs.json.";
-  document.getElementById("btnEnregistrer").textContent = "Ajouter";
-  document.getElementById("btnAnnuler").style.display = "none";
-  document.getElementById("message").textContent = "";
   afficherUtilisateurs();
 }
 
-// Upsert silencieux dans EditeurLivre/users.json pour qu'un compte auquel on
-// vient de donner accès à editeur-livre puisse aussi s'y connecter en direct
-// (ce site vérifie que gh_login correspond à une entrée réelle de son propre
-// users.json — voir README.md). N'écrit jamais dans les fichiers du site sauf
-// pour ce seul besoin de synchronisation.
-async function synchroniserEditeurLivre(loginCentral, passwordCentral, nomAffichage) {
-  let liste = [];
-  let sha = null;
-  try {
-    const r = await lireFichierJSONAbsolu("EditeurLivre/users.json", token);
-    liste = Array.isArray(r.contenu) ? r.contenu : [];
-    sha = r.sha;
-  } catch (e) {
-    if (e.status !== 404) throw e;
-  }
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") fermerFenetreCompte();
+});
 
-  const existant = liste.find(u => u.login === loginCentral);
-  if (existant) {
-    existant.password = passwordCentral;
-    if (nomAffichage) existant.nomAffichage = nomAffichage;
-  } else {
-    liste.push({ login: loginCentral, password: passwordCentral, role: "user", nomAffichage: nomAffichage || "" });
-  }
-
-  await ecrireFichierJSONAbsolu("EditeurLivre/users.json", liste, sha, token,
-    `Synchronisation du compte ${loginCentral} depuis le portail central`);
-}
-
-// Même principe que synchroniserEditeurLivre(), pour Ma Bibliothèque (qui est
-// maintenant, elle aussi, un site à comptes séparés — voir
-// migrerMaBibliothequeVersMultiCompte()). Pas de champ "role" ici : ce site
-// n'a pas de notion d'administrateur propre.
-async function synchroniserMaBibliotheque(loginCentral, passwordCentral, nomAffichage) {
-  let liste = [];
-  let sha = null;
-  try {
-    const r = await lireFichierJSONAbsolu("MaBibliotheque/users.json", token);
-    liste = Array.isArray(r.contenu) ? r.contenu : [];
-    sha = r.sha;
-  } catch (e) {
-    if (e.status !== 404) throw e;
-  }
-
-  const existant = liste.find(u => u.login === loginCentral);
-  if (existant) {
-    existant.password = passwordCentral;
-    if (nomAffichage) existant.nomAffichage = nomAffichage;
-  } else {
-    liste.push({ login: loginCentral, password: passwordCentral, nomAffichage: nomAffichage || "" });
-  }
-
-  await ecrireFichierJSONAbsolu("MaBibliotheque/users.json", liste, sha, token,
-    `Synchronisation du compte ${loginCentral} depuis le portail central`);
-}
-
-// Même principe, pour Droid Fortnite (également à comptes séparés dès sa
-// création). Pas de champ "role" ici non plus.
-async function synchroniserDroidFortnite(loginCentral, passwordCentral, nomAffichage) {
-  let liste = [];
-  let sha = null;
-  try {
-    const r = await lireFichierJSONAbsolu("DroidFortnite/users.json", token);
-    liste = Array.isArray(r.contenu) ? r.contenu : [];
-    sha = r.sha;
-  } catch (e) {
-    if (e.status !== 404) throw e;
-  }
-
-  const existant = liste.find(u => u.login === loginCentral);
-  if (existant) {
-    existant.password = passwordCentral;
-    if (nomAffichage) existant.nomAffichage = nomAffichage;
-  } else {
-    liste.push({ login: loginCentral, password: passwordCentral, nomAffichage: nomAffichage || "" });
-  }
-
-  await ecrireFichierJSONAbsolu("DroidFortnite/users.json", liste, sha, token,
-    `Synchronisation du compte ${loginCentral} depuis le portail central`);
+// L'ancien bouton « Modifier » de chaque ligne ouvre la même fenêtre.
+function editerUtilisateur(login) {
+  ouvrirFenetreCompte(login);
 }
 
 async function enregistrerUtilisateur() {
-  const message = document.getElementById("message");
+  // Les messages restent dans la fenêtre : sous la liste, on ne les voyait pas.
+  const message = document.getElementById("messageFenetre") || document.getElementById("message");
   const moi = localStorage.getItem("team53_login");
 
   const login = document.getElementById("champLogin").value.trim();
@@ -332,23 +324,17 @@ async function enregistrerUtilisateur() {
     shaUtilisateurs = await ecrireFichierJSON("utilisateurs.json", copie, shaUtilisateurs, token, commit);
     utilisateurs = copie;
 
-    // Best-effort : ne doit jamais bloquer l'enregistrement du compte central.
-    if (acces.includes("editeur-livre")) {
-      try { await synchroniserEditeurLivre(login, password, nomAffichage); }
-      catch (e) { /* ignoré : la synchro pourra être retentée en réenregistrant */ }
+    // Rien à recopier ailleurs : les sites lisent ce fichier-ci. C'est tout
+    // l'intérêt de la centralisation — un mot de passe changé l'est partout,
+    // et deux fichiers ne peuvent plus diverger en silence.
+    fermerFenetreCompte();
+    const messageListe = document.getElementById("message");
+    if (messageListe) {
+      messageListe.textContent = "Enregistré avec succès.";
+      setTimeout(() => {
+        if (messageListe.textContent === "Enregistré avec succès.") messageListe.textContent = "";
+      }, 2500);
     }
-    if (acces.includes("ma-bibliotheque")) {
-      try { await synchroniserMaBibliotheque(login, password, nomAffichage); }
-      catch (e) { /* ignoré : la synchro pourra être retentée en réenregistrant */ }
-    }
-    if (acces.includes("droid-fortnite")) {
-      try { await synchroniserDroidFortnite(login, password, nomAffichage); }
-      catch (e) { /* ignoré : la synchro pourra être retentée en réenregistrant */ }
-    }
-
-    annulerEdition();
-    message.textContent = "Enregistré avec succès.";
-    setTimeout(() => { if (message.textContent === "Enregistré avec succès.") message.textContent = ""; }, 2500);
   } catch (erreur) {
     message.textContent = erreur.conflit
       ? "La liste des comptes a été modifiée ailleurs. Rechargez la page avant de réessayer."
@@ -360,17 +346,30 @@ async function supprimerUtilisateur(login) {
   const moi = localStorage.getItem("team53_login");
   if (login === moi) return; // garde-fou : pas d'auto-suppression
 
-  if (!confirm(`Supprimer le compte « ${login} » ? Cette action est irréversible.\n\n(Ses comptes propres à chaque site, s'ils existent, ne sont pas supprimés.)`)) return;
+  if (!confirm(`Supprimer le compte « ${login} » ? Cette action est irréversible.\n\nIl perd l'accès à tous les sites du portail. Ses données (bibliothèque, livres, droïdes) ne sont pas supprimées.`)) return;
 
   const message = document.getElementById("message");
   const copie = utilisateurs.filter(u => u.login !== login);
 
+  // Le compte d'abord : si la purge échoue ensuite, on ne se retrouve pas
+  // avec des données effacées et un compte toujours debout.
   try {
     shaUtilisateurs = await ecrireFichierJSON("utilisateurs.json", copie, shaUtilisateurs, token, `Suppression de l'utilisateur ${login}`);
     utilisateurs = copie;
-    if (modeEditionLogin === login) annulerEdition();
+    // Si sa fiche était ouverte, elle n'a plus d'objet.
+    if (modeEditionLogin === login) fermerFenetreCompte();
     else afficherUtilisateurs();
     message.textContent = "Compte supprimé.";
+
+    // Seconde question, posée après coup et jamais cochée d'avance : effacer
+    // ses données est irréversible et ne se répare pas en recréant le compte.
+    if (confirm(`Supprimer aussi TOUT ce que « ${login} » possédait ?\n\nSes livres, sa bibliothèque, ses images et sa progression Droid Fortnite ` +
+      `seront effacés du dépôt, et ses livres publiés retirés de la liste commune.\n\nSans cela, ces fichiers restent en place : recréer le même identifiant les retrouve.`)) {
+      message.textContent = "Suppression des données...";
+      const rapport = await supprimerDonneesUtilisateur(login, token);
+      message.textContent = "Compte supprimé. " + resumePurge(rapport);
+      return;
+    }
     setTimeout(() => { if (message.textContent === "Compte supprimé.") message.textContent = ""; }, 2500);
   } catch (erreur) {
     message.textContent = erreur.conflit
@@ -510,41 +509,6 @@ async function confirmerTransfert(loginSource) {
   } catch (erreur) {
     message.className = "message";
     message.textContent = "Erreur pendant le transfert : " + erreur.message;
-  }
-}
-
-async function lancerMigrationMaBibliotheque() {
-  const message = document.getElementById("messageMigrationMB");
-  message.className = "message";
-  message.textContent = "Migration en cours (peut prendre un moment si beaucoup de couvertures)...";
-  try {
-    const resultat = await migrerMaBibliothequeVersMultiCompte(token);
-    message.className = "message ok";
-    if (resultat.dejaMigre) {
-      message.textContent = "Déjà migré : rien à refaire.";
-    } else if (resultat.rienAMigrer) {
-      message.textContent = "Aucun compte Ma Bibliothèque trouvé (MaBibliotheque/compte.json absent) : rien à migrer.";
-    } else {
-      message.textContent = `Migration terminée pour « ${resultat.login} » : ${resultat.livres} livre(s)/série(s), ${resultat.imagesDeplacees} image(s) déplacée(s) vers un dossier séparé.`;
-    }
-  } catch (erreur) {
-    message.className = "message";
-    message.textContent = erreur.message;
-  }
-}
-
-async function lancerImport() {
-  const message = document.getElementById("messageImport");
-  message.className = "message";
-  message.textContent = "Import en cours...";
-  try {
-    const resultat = await importerComptesExistants(token);
-    message.className = "message ok";
-    message.textContent = `Import terminé : ${resultat.ajoutes} compte(s) créé(s), ${resultat.accesAjoutes} accès ajouté(s) (total ${resultat.total} compte(s)).`;
-    await chargerDonnees();
-  } catch (erreur) {
-    message.className = "message";
-    message.textContent = erreur.message;
   }
 }
 

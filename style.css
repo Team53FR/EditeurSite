@@ -278,3 +278,603 @@ a { color: var(--primaire); }
 .bloc-carte .sous-titre { margin: 0 0 1.1rem; color: var(--texte-att); font-size: 0.85rem; }
 
 .separateur-form { height: 1px; background: var(--bordure); margin: 1.3rem 0; }
+
+/* ===== Encart « Installer l'application » (tableau de bord) ===== */
+.encart-app {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  background: var(--carte);
+  border: 1px solid var(--bordure);
+  border-radius: var(--rayon);
+  padding: 0.9rem 1rem;
+  margin-bottom: 1.1rem;
+  box-shadow: var(--ombre);
+}
+.encart-app[hidden] { display: none; }
+.encart-app img { border-radius: 12px; flex-shrink: 0; }
+.encart-app-texte { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.15rem; }
+.encart-app-texte strong { font-size: 0.95rem; }
+.encart-app-texte span { font-size: 0.82rem; color: var(--texte-att); line-height: 1.4; }
+.encart-app .btn { padding: 0.6rem 1rem; font-size: 0.9rem; flex-shrink: 0; }
+.encart-app #btn-fermer-encart { padding: 0.6rem 0.7rem; }
+
+@media (max-width: 560px) {
+  .encart-app { flex-wrap: wrap; }
+  .encart-app-texte { flex-basis: calc(100% - 4rem); }
+  .encart-app .btn-primaire { flex: 1; }
+}
+
+/* Fiche de compte : trois boutons, un badge, un avatar et une date ne tiennent
+   pas sur une rangée avant 780 px — le texte s'y coupait en escalier. En
+   dessous, on empile : identité en haut, rôle sous le nom, accès, puis les
+   actions en grille sur toute la largeur. */
+@media (max-width: 780px) {
+  .user-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    gap: 0.5rem 0.8rem;
+    padding: 0.9rem;
+  }
+  .user-ava { grid-row: 1; grid-column: 1; }
+  .user-nom { grid-row: 1; grid-column: 2; }
+  .user-date { white-space: normal; }
+  /* Le rôle se range sous le nom, dans la même colonne : seul sur sa ligne,
+     il flottait entre l'identité et les boutons sans se rattacher à rien. */
+  .role-badge { grid-column: 2; justify-self: start; }
+  .user-actions {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+    gap: 0.4rem;
+  }
+  .user-actions .btn-mini { padding: 0.6rem 0.5rem; text-align: center; }
+}
+
+/* ===== Mon compte : statistiques ===== */
+.stat-groupe { margin-bottom: 1.1rem; }
+.stat-groupe:last-child { margin-bottom: 0; }
+.stat-groupe h3 {
+  margin: 0 0 0.5rem; font-size: 0.9rem;
+  letter-spacing: 0.03em; text-transform: uppercase; color: var(--texte-att);
+}
+.stat-lignes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.5rem;
+}
+.stat-ligne {
+  display: flex; flex-direction: column; gap: 0.15rem;
+  background: var(--fond);
+  border: 1px solid var(--bordure);
+  border-radius: 10px;
+  padding: 0.6rem 0.75rem;
+}
+.stat-ligne span { font-size: 0.75rem; color: var(--texte-att); }
+.stat-ligne strong { font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+
+/* =====================================================================
+   Tableau de bord — « le cabinet »
+   =====================================================================
+   Le portail ressemblait à n'importe quel gabarit : fond gris-bleu, accent
+   violet, trois cartes arrondies identiques, une icône emoji au milieu de
+   chacune. Rien n'y disait de quoi il s'agissait.
+
+   On lui donne donc un parti pris : celui d'un cabinet de travail. Papier
+   chaud le jour, encre chaude la nuit, un titrage en Garamond — la même
+   police que les livres composés dans l'éditeur —, et les sites présentés
+   comme les entrées d'un sommaire plutôt qu'en tuiles. Chacun porte sa
+   couleur, qui devient sa marque : terre cuite pour l'éditeur, vert pour la
+   bibliothèque, bleu d'encre pour le suivi de jeu.
+   ===================================================================== */
+
+.page-tdb {
+  --tdb-fond: #f4efe4;
+  --tdb-fond-creux: #ece5d6;
+  --tdb-encre: #241d15;
+  --tdb-encre-douce: #6d6152;
+  --tdb-filet: #d9cdb8;
+  --tdb-relief: #fffdf8;
+  --tdb-grain: 0.04;
+  background: var(--tdb-fond);
+  color: var(--tdb-encre);
+  min-height: 100%;
+}
+
+@media (prefers-color-scheme: dark) {
+  .page-tdb {
+    --tdb-fond: #14110c;
+    --tdb-fond-creux: #1c1811;
+    --tdb-encre: #f2ebdd;
+    --tdb-encre-douce: #a2967f;
+    --tdb-filet: #322b20;
+    --tdb-relief: #201b13;
+    --tdb-grain: 0.05;
+  }
+}
+
+/* Un grain très léger, en SVG : sans lui, les aplats sonnent « écran »,
+   avec lui ils sonnent « papier ». */
+.page-tdb::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: var(--tdb-grain);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.page-tdb > * { position: relative; z-index: 1; }
+
+/* ----- Bandeau : une ligne, discrète, qui ne vole pas la vedette ----- */
+.tdb-barre {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  max-width: 62rem;
+  margin: 0 auto;
+  padding: calc(1.1rem + var(--safe-top)) 1.5rem 0;
+}
+.tdb-marque {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-family: "EB Garamond", Georgia, serif;
+  font-size: 1.05rem;
+  letter-spacing: 0.02em;
+}
+.tdb-marque b { font-weight: 600; }
+.tdb-marque span {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 0.68rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--tdb-encre-douce);
+}
+.tdb-outils { display: flex; align-items: center; gap: 0.15rem; }
+.tdb-outils a, .tdb-outils button {
+  display: flex; padding: 0.55rem;
+  border: none; background: none; cursor: pointer;
+  color: var(--tdb-encre-douce);
+  border-radius: 9px;
+  text-decoration: none;
+}
+.tdb-outils a:hover, .tdb-outils button:hover {
+  color: var(--tdb-encre);
+  background: var(--tdb-fond-creux);
+}
+.tdb-outils .deconnexion:hover { color: #b4552c; }
+
+/* ----- Titre ----- */
+.tdb-hero {
+  max-width: 62rem;
+  margin: 0 auto;
+  padding: 2.6rem 1.5rem 1.4rem;
+}
+.tdb-date {
+  margin: 0 0 0.5rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--tdb-encre-douce);
+}
+.tdb-titre {
+  margin: 0;
+  font-family: "EB Garamond", Georgia, serif;
+  font-weight: 500;
+  font-size: clamp(2.1rem, 6vw, 3.4rem);
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+}
+.tdb-titre em { font-style: italic; }
+.tdb-sous {
+  margin: 0.7rem 0 0;
+  max-width: 34rem;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: var(--tdb-encre-douce);
+}
+
+/* ----- Le sommaire des sites ----- */
+.tdb-sommaire {
+  max-width: 62rem;
+  margin: 0 auto;
+  padding: 0.6rem 1.5rem calc(3rem + var(--safe-bottom));
+}
+.tdb-entete-liste {
+  display: flex; align-items: center; gap: 1rem;
+  margin: 0 0 0.2rem;
+  font-size: 0.68rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--tdb-encre-douce);
+}
+.tdb-entete-liste::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--tdb-filet);
+}
+
+.tdb-liste { display: flex; flex-direction: column; }
+
+/* Une entrée = un filet, un numéro, une vignette, un titre. Le survol fait
+   avancer la ligne et allume la couleur du site : c'est le seul mouvement,
+   et il suffit. */
+.tdb-entree {
+  /* La couleur du site, dans ses deux versions : la feuille de style tranche
+     selon le thème, et suit donc un basculement à chaud. */
+  --accent: var(--accent-clair, #8a5a3b);
+  position: relative;
+  display: grid;
+  grid-template-columns: 2.6rem 3.4rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0 1.2rem;
+  width: 100%;
+  padding: 1.5rem 0.4rem 1.5rem 0;
+  border: none;
+  border-top: 1px solid var(--tdb-filet);
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: padding-left 0.22s ease, background-color 0.22s ease;
+}
+@media (prefers-color-scheme: dark) {
+  .tdb-entree { --accent: var(--accent-sombre, #c08e63); }
+}
+.tdb-entree:last-child { border-bottom: 1px solid var(--tdb-filet); }
+.tdb-entree::before {
+  content: "";
+  position: absolute;
+  left: 0; top: -1px; bottom: -1px;
+  width: 3px;
+  background: var(--accent);
+  transform: scaleY(0);
+  transform-origin: center;
+  transition: transform 0.22s ease;
+}
+.tdb-entree:hover, .tdb-entree:focus-visible {
+  padding-left: 1rem;
+  background: var(--tdb-relief);
+  outline: none;
+}
+.tdb-entree:hover::before, .tdb-entree:focus-visible::before { transform: scaleY(1); }
+
+.tdb-num {
+  font-family: "EB Garamond", Georgia, serif;
+  font-size: 0.95rem;
+  color: var(--tdb-encre-douce);
+  font-variant-numeric: tabular-nums;
+}
+.tdb-vignette {
+  width: 3.4rem; height: 3.4rem;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--tdb-filet);
+  background: var(--tdb-fond-creux);
+  color: var(--accent);
+  transition: border-color 0.22s ease, background-color 0.22s ease;
+}
+.tdb-entree:hover .tdb-vignette { border-color: var(--accent); }
+.tdb-vignette svg { width: 26px; height: 26px; }
+
+.tdb-texte { min-width: 0; }
+.tdb-nom {
+  margin: 0;
+  font-family: "EB Garamond", Georgia, serif;
+  font-size: 1.4rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+.tdb-desc {
+  margin: 0.25rem 0 0;
+  font-size: 0.87rem;
+  line-height: 1.5;
+  color: var(--tdb-encre-douce);
+}
+.tdb-fleche {
+  color: var(--tdb-encre-douce);
+  opacity: 0;
+  transform: translateX(-6px);
+  transition: opacity 0.22s ease, transform 0.22s ease;
+}
+.tdb-entree:hover .tdb-fleche, .tdb-entree:focus-visible .tdb-fleche {
+  opacity: 1; transform: translateX(0); color: var(--accent);
+}
+
+@media (max-width: 600px) {
+  .tdb-entree {
+    grid-template-columns: 2.6rem minmax(0, 1fr);
+    gap: 0.2rem 0.9rem;
+    padding: 1.2rem 0.2rem;
+  }
+  /* Sur téléphone, la vignette passe au-dessus du texte plutôt que de lui
+     manger la moitié de la largeur. */
+  .tdb-vignette { grid-row: 1; grid-column: 2; margin-bottom: 0.6rem; }
+  .tdb-num { grid-row: 1; grid-column: 1; align-self: start; padding-top: 1.1rem; }
+  .tdb-texte { grid-column: 2; }
+  .tdb-fleche { display: none; }
+}
+
+/* ----- L'invitation à installer : une note en bas de page, pas une bannière ----- */
+.tdb-note-app {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  max-width: 62rem;
+  margin: 2rem auto 0;
+  padding: 0 1.5rem;
+  font-size: 0.85rem;
+  color: var(--tdb-encre-douce);
+}
+.tdb-note-app p { margin: 0; flex: 1; }
+.tdb-note-app button {
+  border: 1px solid var(--tdb-filet);
+  background: var(--tdb-relief);
+  color: var(--tdb-encre);
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+.tdb-note-app button:hover { border-color: var(--tdb-encre-douce); }
+.tdb-note-app .tdb-fermer-note {
+  border: none; background: none; padding: 0.4rem;
+  color: var(--tdb-encre-douce); border-radius: 8px;
+}
+
+/* ----- Aucun accès ----- */
+.tdb-vide {
+  border: 1px dashed var(--tdb-filet);
+  border-radius: 14px;
+  padding: 2.6rem 1.5rem;
+  text-align: center;
+  color: var(--tdb-encre-douce);
+}
+.tdb-vide h2 {
+  margin: 0 0 0.4rem;
+  font-family: "EB Garamond", Georgia, serif;
+  font-size: 1.3rem;
+  color: var(--tdb-encre);
+}
+.tdb-vide p { margin: 0; font-size: 0.9rem; }
+
+/* ===== Le cabinet, appliqué aux pages de comptes =====
+   Plutôt que de réécrire chaque composant, la classe de page redéfinit les
+   variables dont ils se servent déjà : cartes, champs, boutons et listes
+   prennent la palette du portail sans qu'on touche à leur balisage. Seuls
+   les titres et quelques bordures méritent un mot de plus. */
+.page-tdb {
+  --fond: var(--tdb-fond);
+  --carte: var(--tdb-relief);
+  --texte: var(--tdb-encre);
+  --texte-att: var(--tdb-encre-douce);
+  --bordure: var(--tdb-filet);
+  --primaire: #b4552c;
+  --primaire-fonce: #8f3f1d;
+  --primaire-clair: rgba(180, 85, 44, 0.12);
+  --ombre: none;
+  --rayon: 14px;
+}
+@media (prefers-color-scheme: dark) {
+  .page-tdb {
+    --primaire: #d87a4e;
+    --primaire-fonce: #e79668;
+    --primaire-clair: rgba(216, 122, 78, 0.16);
+  }
+}
+
+/* Le lien de retour tient lieu de marque sur les pages secondaires. */
+.tdb-retour {
+  display: inline-flex; align-items: center; gap: 0.55rem;
+  text-decoration: none;
+  color: var(--tdb-encre-douce);
+  font-family: "EB Garamond", Georgia, serif;
+  font-size: 1.05rem;
+}
+.tdb-retour span { letter-spacing: 0.02em; }
+.tdb-retour:hover { color: var(--tdb-encre); }
+
+/* Le titre de page est plus mesuré que celui du tableau de bord : c'est une
+   page de travail, pas un seuil. */
+.page-tdb .tdb-hero { padding-bottom: 0.6rem; }
+.page-tdb .tdb-titre { font-size: clamp(1.8rem, 4.5vw, 2.5rem); }
+
+.page-tdb .contenu {
+  max-width: 62rem;
+  padding: 0.4rem 1.5rem calc(3.5rem + var(--safe-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 1.4rem;
+}
+
+/* Les blocs deviennent des sections séparées par un filet : moins de boîtes
+   empilées, plus de page. */
+.page-tdb .bloc-carte {
+  background: none;
+  border: none;
+  border-top: 1px solid var(--tdb-filet);
+  border-radius: 0;
+  box-shadow: none;
+  padding: 1.5rem 0 0;
+  margin: 0;
+}
+.page-tdb .bloc-carte:first-child { border-top: none; padding-top: 0.4rem; }
+.page-tdb .bloc-carte h2 {
+  font-family: "EB Garamond", Georgia, serif;
+  font-weight: 600;
+  font-size: 1.35rem;
+  margin: 0 0 0.3rem;
+}
+.page-tdb .sous-titre { font-size: 0.87rem; line-height: 1.55; color: var(--tdb-encre-douce); }
+
+.page-tdb .champ label,
+.page-tdb .label-couv { font-size: 0.78rem; letter-spacing: 0.04em; color: var(--tdb-encre-douce); }
+.page-tdb input, .page-tdb select, .page-tdb textarea {
+  background: var(--tdb-fond-creux);
+  border: 1px solid var(--tdb-filet);
+  border-radius: 10px;
+  color: var(--tdb-encre);
+}
+.page-tdb input:focus, .page-tdb select:focus, .page-tdb textarea:focus {
+  outline: 2px solid var(--primaire);
+  outline-offset: 1px;
+  border-color: transparent;
+}
+
+.page-tdb .btn-primaire {
+  background: var(--primaire);
+  border-color: var(--primaire);
+  color: #fffdf8;
+}
+.page-tdb .btn-primaire:hover { background: var(--primaire-fonce); border-color: var(--primaire-fonce); }
+.page-tdb .btn-secondaire, .page-tdb .btn-fantome {
+  background: var(--tdb-relief);
+  border: 1px solid var(--tdb-filet);
+  color: var(--tdb-encre);
+}
+.page-tdb .btn-secondaire:hover, .page-tdb .btn-fantome:hover { border-color: var(--tdb-encre-douce); }
+
+/* La fiche d'un compte reprend le trait du sommaire : filet plutôt que carte,
+   et l'initiale en serif comme une lettrine. */
+.page-tdb .user-row {
+  background: none;
+  border: none;
+  border-top: 1px solid var(--tdb-filet);
+  border-radius: 0;
+  box-shadow: none;
+  padding: 1.1rem 0.2rem;
+}
+.page-tdb .user-liste { gap: 0; }
+.page-tdb .user-liste .user-row:first-child { border-top: none; }
+.page-tdb .user-row.en-edition {
+  box-shadow: none;
+  border-left: 3px solid var(--primaire);
+  padding-left: 0.9rem;
+}
+.page-tdb .user-ava {
+  background: var(--tdb-fond-creux);
+  border: 1px solid var(--tdb-filet);
+  color: var(--primaire);
+  font-family: "EB Garamond", Georgia, serif;
+  font-size: 1.05rem;
+}
+.page-tdb .user-nom > div:first-child {
+  font-family: "EB Garamond", Georgia, serif;
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+.page-tdb .chip-site, .page-tdb .role-badge { background: var(--tdb-fond-creux); }
+.page-tdb .role-badge.admin {
+  background: var(--primaire-clair);
+  color: var(--primaire);
+  border-color: var(--primaire);
+}
+.page-tdb .btn-mini {
+  background: var(--tdb-relief);
+  border-color: var(--tdb-filet);
+}
+.page-tdb .btn-mini:hover { border-color: var(--primaire); color: var(--primaire); }
+
+.page-tdb .case-acces {
+  background: var(--tdb-fond-creux);
+  border-color: var(--tdb-filet);
+}
+.page-tdb .stat-ligne {
+  background: var(--tdb-fond-creux);
+  border-color: var(--tdb-filet);
+}
+.page-tdb .stat-groupe h3 { color: var(--tdb-encre-douce); }
+.page-tdb .stat-ligne strong { font-family: "EB Garamond", Georgia, serif; }
+
+/* ===== Gestion des comptes : en-tête de section et fiches détachées ===== */
+.cp-entete {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.2rem;
+}
+.cp-entete > div { min-width: 0; }
+.cp-entete .sous-titre { margin-bottom: 0; }
+.cp-ajouter { flex-shrink: 0; padding: 0.7rem 1.1rem; }
+
+/* Chaque compte devient une fiche à part entière : filets partagés et lignes
+   collées, on ne savait plus où finissait l'un et où commençait l'autre. */
+.page-tdb .user-liste { gap: 0.9rem; }
+.page-tdb .user-row {
+  border: 1px solid var(--tdb-filet);
+  border-radius: 14px;
+  background: var(--tdb-relief);
+  padding: 1.1rem 1.2rem;
+}
+.page-tdb .user-liste .user-row:first-child { border-top: 1px solid var(--tdb-filet); }
+.page-tdb .user-row.en-edition {
+  border-color: var(--primaire);
+  box-shadow: inset 3px 0 0 var(--primaire);
+  padding-left: 1.2rem;
+}
+
+/* ===== Fenêtre modale du portail ===== */
+.fenetre {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  background: rgba(20, 17, 12, 0.55);
+  backdrop-filter: blur(3px);
+  display: flex;
+  /* Jamais « center » : une carte plus haute que l'écran déborderait des deux
+     côtés et son haut deviendrait inatteignable. Le centrage vient du
+     « margin: auto » de la carte. */
+  align-items: flex-start;
+  justify-content: center;
+  padding: 1.5rem;
+  overflow-y: auto;
+}
+.fenetre-carte {
+  position: relative;
+  margin: auto;
+  width: 100%;
+  max-width: 30rem;
+  background: var(--tdb-fond);
+  border: 1px solid var(--tdb-filet);
+  border-radius: 16px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.4);
+  padding: 1.6rem 1.6rem 1.4rem;
+}
+.fenetre-carte h2 {
+  font-family: "EB Garamond", Georgia, serif;
+  font-weight: 600;
+  font-size: 1.4rem;
+  margin: 0 0 0.3rem;
+}
+.fenetre-fermer {
+  position: absolute;
+  top: 0.8rem; right: 0.8rem;
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  border: none; border-radius: 9px;
+  background: none;
+  color: var(--tdb-encre-douce);
+  cursor: pointer;
+}
+.fenetre-fermer:hover { background: var(--tdb-fond-creux); color: var(--tdb-encre); }
+.fenetre-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  margin-top: 1.2rem;
+}
+.fenetre-carte .champ { margin-bottom: 0.9rem; }
+.fenetre-carte .case-acces-sites { margin-bottom: 0; }
+
+@media (max-width: 520px) {
+  .fenetre { padding: 0.8rem; }
+  .fenetre-actions { flex-direction: column-reverse; }
+  .fenetre-actions .btn { width: 100%; }
+}

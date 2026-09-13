@@ -11,36 +11,57 @@ const AIDE_IMPRESSION = {
     principe: "Chaque feuille reçoit DEUX pages côte à côte, et porte quatre pages une fois " +
               "imprimée des deux côtés. Les pages ne sont pas imprimées dans l'ordre : elles " +
               "sont réparties pour retomber dans le bon ordre une fois la pile pliée. C'est " +
-              "pour cela que la première feuille montre la fin du livre à gauche.",
+              "pour cela que la première feuille montre la fin du livre à gauche. " +
+              "Seul le texte est imprimé : la couverture se sort à part.",
     etapes: [
       "Imprimez en recto-verso. Si votre imprimante ne le fait pas seule, choisissez « En deux fois » : les rectos sortent d'abord, puis vous remettez la pile dans le bac pour les versos.",
       "Ne changez surtout pas l'ordre des feuilles en les récupérant.",
       "Pliez toute la pile en deux d'un seul geste, bien au milieu.",
+      "Imprimez la couverture avec « Couverture du livret », pliez-la en deux et glissez le cahier dedans avant d'agrafer.",
       "Agrafez sur le pli, avec deux agrafes réparties (une agrafeuse à long bras aide beaucoup ; sinon, agrafez à plat puis pliez).",
       "Facultatif : égalisez le bord extérieur au massicot, les feuilles intérieures dépassant toujours un peu."
     ],
     bon: ["Rapide, sans colle ni matériel particulier.", "Les pages tombent dans l'ordre toutes seules.", "Idéal pour une nouvelle, un carnet, un tirage d'essai."],
-    limites: ["Le nombre de pages est complété à un multiple de 4 (des pages blanches sont ajoutées si besoin).",
+    limites: ["La couverture s'imprime à part, avec « Couverture du livret » : elle se plie autour du cahier au lieu d'y être intercalée.",
+              "Le nombre de pages est complété à un multiple de 4 (des pages blanches sont ajoutées si besoin).",
               "Au-delà d'une quarantaine de pages, le pli gonfle et les pages centrales ressortent nettement.",
               "Le dos est agrafé, pas plat : le livre ne tient pas debout comme un roman."],
     reglages: "Dans la fenêtre d'impression : format paysage, échelle 100 % (surtout pas « ajuster à la page »), et recto-verso « retourner sur les bords courts »."
   },
   doscolle: {
     titre: "Le dos collé, comment ça marche",
-    principe: "Une seule page par feuille, imprimée recto-verso, dans l'ordre de lecture. " +
-              "Les feuilles sont ensuite encollées sur la tranche, comme un vrai roman de poche.",
+    schema: true,
+    principe: "Seul le texte sort ici : la couverture s'imprime à part, avec « Couverture seule ». " +
+              "Les feuilles sont encollées sur la tranche, comme un vrai roman de poche. Deux façons " +
+              "de les imprimer : UNE PAGE par feuille, dans l'ordre de lecture, rien à découper ; ou DEUX " +
+              "PAGES par feuille, à couper au milieu — moitié moins de papier. Dans ce second cas les " +
+              "pages ne sont pas côte à côte dans l'ordre : la colonne de gauche porte la première moitié " +
+              "du livre, celle de droite la seconde, pour qu'après la coupe chaque tas reste continu et " +
+              "que l'un se pose sous l'autre.",
     etapes: [
       "Imprimez en recto-verso, dans l'ordre. Si votre imprimante ne le fait pas seule, choisissez « En deux fois ».",
+      "Deux pages par feuille : coupez la feuille en son milieu. Quand le papier le permet — un poche sur A4, un grand roman sur A3 —, une bande blanche de 6 mm sépare les deux pages : c'est votre marge d'erreur, elle absorbe le décalage recto-verso de l'imprimante et l'on coupe n'importe où dedans. Un roman sur A4 fait 298 mm de large à lui seul : les deux pages s'y touchent, et la coupe demande alors d'être soignée.",
+      "Repères : avec « L'autre sens », des traits fins marquent l'endroit exact où couper. Avec « Comme le livret », la feuille sort nue — à vous de viser le milieu.",
+      "Posez ensuite le tas de DROITE sous celui de GAUCHE. Ne mélangez pas les deux moitiés.",
+      "Si les deux faces d'une même page ne se correspondent pas, c'est le sens de retournement qui est en cause : reprenez avec l'autre réponse à « Comment vos feuilles se retournent-elles ? ». La feuille d'essai tranche la question en une feuille.",
+      "Coupez les feuilles en suivant les repères qui entourent la zone imprimée. Ils s'arrêtent avant la page et reprennent de l'autre côté : posez la règle sur deux repères opposés, elle enjambe la page, et vous coupez le long. Rien n'étant imprimé à l'intérieur du format fini, aucun trait ne peut rester sur la page — même si la coupe dévie d'un millimètre.",
       "Empilez les feuilles dans l'ordre, puis tapotez la pile sur une table pour aligner parfaitement le bord de reliure.",
       "Serrez la pile entre deux planchettes, en laissant dépasser 2 à 3 mm du bord à encoller.",
       "Encollez la tranche (colle vinylique blanche, ou colle thermofusible), en croisant les passages. Laissez sécher sous presse au moins une heure.",
-      "Collez la couverture par-dessus, puis marquez le pli du dos avec un plioir."
+      "Imprimez la couverture avec « Couverture seule » : 4e de couverture, dos et 1re viennent sur une seule feuille, les traits de pli marquant la tranche.",
+      "Collez la couverture par-dessus, puis marquez les deux plis du dos avec un plioir."
     ],
-    bon: ["Aucune limite de pages : c'est le procédé des vrais livres.", "Dos plat, le livre tient debout sur une étagère.", "Rendu le plus proche d'un ouvrage édité."],
-    limites: ["Demande de la colle, une presse improvisée et du temps de séchage.",
+    bon: ["Aucune limite de pages : c'est le procédé des vrais livres.", "Dos plat, le livre tient debout sur une étagère.",
+          "Rendu le plus proche d'un ouvrage édité.", "Deux pages par feuille : deux fois moins de papier et d'encre."],
+    limites: ["La couverture à plat est plus large qu'une A4 : il faut du A3, ou une impression chez un copiste.",
+              "Demande de la colle, une presse improvisée et du temps de séchage.",
               "Le collage doit être régulier, sous peine de pages qui se détachent.",
               "Une marge intérieure est réservée à la reliure : ne réduisez pas les marges."],
-    reglages: "Dans la fenêtre d'impression : échelle 100 % (surtout pas « ajuster à la page »), et recto-verso « retourner sur les bords longs »."
+    reglages: "Les pages et la couverture sont posées sur un format de papier réel, à leur taille exacte, " +
+              "entourés des lignes de coupe qui disent où passer la lame : " +
+              "choisissez la même feuille dans la fenêtre d'impression, marges « aucune », échelle 100 % " +
+              "(surtout pas « ajuster à la page »), et recto-verso « retourner sur les bords longs » — " +
+              "à deux pages par feuille, c'est ce réglage qui garde la moitié gauche à gauche au verso."
   },
   imprimeur: {
     titre: "Le fichier pour un imprimeur professionnel",
@@ -70,52 +91,115 @@ const AIDE_IMPRESSION = {
   }
 };
 
-const MODES_IMPRESSION = [
-  {
-    categorie: "Livret à agrafer", aideCle: "livret",
-    aide: "Deux pages par feuille. On plie la pile en deux et on agrafe au centre.",
-    choix: [
-      { libelle: "Recto-verso automatique", detail: "Votre imprimante retourne les feuilles toute seule.",
-        action: "exporterLivret", mode: "auto" },
-      { libelle: "En deux fois", detail: "Sans recto-verso : les rectos d'abord, puis les versos.",
-        action: "exporterLivret", mode: "passes" }
-    ]
-  },
-  {
-    categorie: "Page à page (dos collé)", aideCle: "doscolle",
-    aide: "Une page par feuille, à relier ou à faire relier.",
-    choix: [
-      { libelle: "Recto-verso automatique", detail: "Votre imprimante retourne les feuilles toute seule.",
-        action: "exporterImpression", mode: "auto" },
-      { libelle: "En deux fois", detail: "Sans recto-verso : les rectos d'abord, puis les versos.",
-        action: "exporterImpression", mode: "passes" }
-    ]
-  },
-  {
-    categorie: "Fichier pour l'imprimeur", aideCle: "imprimeur",
-    aide: "Deux PDF conformes à un cahier des charges d'imprimeur : fond perdu, repères de coupe, pages simples.",
-    choix: [
-      { libelle: "Intérieur", detail: "Les pages de texte seules, en pages simples numérotées.",
-        action: "exporterImprimeur", mode: "interieur" },
-      { libelle: "Couverture à plat", detail: "4e de couverture, dos et 1re réunis, avec repères de pli.",
-        action: "exporterImprimeur", mode: "couverture" }
-    ]
-  }
-];
+// Le panneau d'impression ne lit plus de table de boutons : il pose ses
+// questions dans l'ordre et traduit les réponses en appel d'export (voir
+// actionImpression()). Les modes d'emploi détaillés, eux, restent dans
+// AIDE_IMPRESSION ci-dessus.
+
+// SchÃ©ma Â« bords longs / bords courts Â».
+//
+// La feuille du mode Â« deux pages Â» est en PAYSAGE : ses grands bords sont
+// donc le haut et le bas. Un retournement sur les grands bords fait pivoter
+// la feuille autour d'un axe horizontal, et la moitiÃ© gauche revient Ã 
+// gauche ; sur les petits bords, l'axe est vertical et les deux moitiÃ©s
+// s'Ã©changent. Un schÃ©ma dessinÃ© sur une feuille portrait dirait l'inverse :
+// celui-ci reprend la feuille telle qu'elle sort de l'imprimante.
+function schemaBordsHtml() {
+  const feuille = (x, gauche, droite, etiquette, couleur, fond) =>
+    '<g>' +
+      '<rect x="' + x + '" y="24" width="118" height="84" rx="5" fill="' + fond +
+        '" stroke="' + couleur + '" stroke-width="2"/>' +
+      '<line x1="' + (x + 59) + '" y1="24" x2="' + (x + 59) + '" y2="108" ' +
+        'stroke="#b9b0a2" stroke-width="1.4" stroke-dasharray="4 3"/>' +
+      '<text x="' + (x + 30) + '" y="72" font-size="17" font-weight="700" ' +
+        'fill="' + couleur + '" text-anchor="middle">' + gauche + "</text>" +
+      '<text x="' + (x + 89) + '" y="72" font-size="17" font-weight="700" ' +
+        'fill="' + couleur + '" text-anchor="middle">' + droite + "</text>" +
+      '<text x="' + (x + 59) + '" y="123" font-size="10" font-weight="600" ' +
+        'fill="#6b6255" text-anchor="middle">' + etiquette + "</text>" +
+    "</g>";
+
+  const fleche = (x, couleur, id) =>
+    '<path d="M ' + x + ' 50 q 14 16 0 32" fill="none" stroke="' + couleur +
+      '" stroke-width="1.8" marker-end="url(#' + id + ')"/>';
+
+  // Variante Â« grands bords Â» : axe horizontal, marquÃ© en haut et en bas.
+  const longs =
+    '<svg viewBox="0 0 300 140" class="mi-schema-svg" role="img" ' +
+      'aria-label="Retournement sur les grands bords : la moitiÃ© gauche reste Ã  gauche">' +
+      '<defs><marker id="flLong" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto">' +
+        '<path d="M0,0 L7,3.5 L0,7 z" fill="#b5401e"/></marker></defs>' +
+      // les grands bords, Ã©pais : c'est autour d'eux que la feuille bascule
+      '<line x1="10" y1="20" x2="128" y2="20" stroke="#b5401e" stroke-width="3.5"/>' +
+      '<line x1="10" y1="112" x2="128" y2="112" stroke="#b5401e" stroke-width="3.5"/>' +
+      '<line x1="172" y1="20" x2="290" y2="20" stroke="#b5401e" stroke-width="3.5"/>' +
+      '<line x1="172" y1="112" x2="290" y2="112" stroke="#b5401e" stroke-width="3.5"/>' +
+      feuille(10, "A", "B", "RECTO", "#b5401e", "#ffffff") +
+      fleche(140, "#b5401e", "flLong") +
+      feuille(172, "A", "B", "VERSO", "#b5401e", "#fdf4ef") +
+    "</svg>";
+
+  // Variante Â« petits bords Â» : axe vertical, marquÃ© Ã  gauche et Ã  droite.
+  const courts =
+    '<svg viewBox="0 0 300 140" class="mi-schema-svg" role="img" ' +
+      'aria-label="Retournement sur les petits bords : la moitiÃ© gauche passe Ã  droite">' +
+      '<defs><marker id="flCourt" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto">' +
+        '<path d="M0,0 L7,3.5 L0,7 z" fill="#2e6f6b"/></marker></defs>' +
+      '<line x1="6" y1="24" x2="6" y2="108" stroke="#2e6f6b" stroke-width="3.5"/>' +
+      '<line x1="132" y1="24" x2="132" y2="108" stroke="#2e6f6b" stroke-width="3.5"/>' +
+      '<line x1="168" y1="24" x2="168" y2="108" stroke="#2e6f6b" stroke-width="3.5"/>' +
+      '<line x1="294" y1="24" x2="294" y2="108" stroke="#2e6f6b" stroke-width="3.5"/>' +
+      feuille(10, "A", "B", "RECTO", "#2e6f6b", "#ffffff") +
+      fleche(140, "#2e6f6b", "flCourt") +
+      feuille(172, "B", "A", "VERSO", "#2e6f6b", "#f1f7f6") +
+    "</svg>";
+
+  return '<div class="mi-detail-bloc mi-schema">' +
+    "<h5>Bords longs ou bords courts ?</h5>" +
+    "<p>La feuille sort en PAYSAGE : ses grands bords sont le haut et le bas, " +
+    "ses petits bords la gauche et la droite. <b>A</b> et <b>B</b> sont les deux " +
+    "moitiÃ©s que vous allez sÃ©parer d'un coup de massicot. Le <b>trait Ã©pais</b> " +
+    "montre les bords autour desquels la feuille bascule â€” c'est lÃ  toute la " +
+    "diffÃ©rence entre les deux rÃ©glages.</p>" +
+    '<div class="mi-schema-paire">' +
+      '<div class="mi-schema-carte">' +
+        '<span class="mi-schema-etiquette longs">Bords longs</span>' + longs +
+        '<p class="mi-schema-legende"><span class="mi-schema-trait longs"></span> ' +
+        "les grands bords : le haut et le bas</p>" +
+        "<p>La feuille bascule autour d'un axe horizontal, comme on tourne " +
+        "la page d'un calendrier mural. <b>La moitiÃ© gauche reste Ã  gauche</b> : " +
+        "le dos de A tombe bien derriÃ¨re A.</p>" +
+      "</div>" +
+      '<div class="mi-schema-carte">' +
+        '<span class="mi-schema-etiquette courts">Bords courts</span>' + courts +
+        '<p class="mi-schema-legende"><span class="mi-schema-trait courts"></span> ' +
+        "les petits bords : la gauche et la droite</p>" +
+        "<p>La feuille pivote autour d'un axe vertical, comme on tourne la page " +
+        "d'un livre. <b>Les deux moitiÃ©s s'Ã©changent</b> : le dos de A se retrouve " +
+        "Ã  droite, et l'imposition doit en tenir compte.</p>" +
+      "</div>" +
+    "</div>" +
+    "<p class=\"mi-schema-astuce\">Le rÃ©glage se trouve dans les options recto-verso de " +
+    "votre imprimante. Vous n'avez qu'Ã  prendre le bouton du mÃªme nom. En cas de doute, " +
+    "imprimez deux feuilles d'essai : si le dos d'une page appartient Ã  une autre partie " +
+    "du livre, reprenez avec l'autre bouton.</p>" +
+  "</div>";
+}
 
 // Construit le mode d'emploi dépliable d'une catégorie.
-function construireAideHtml(aide, index) {
+function construireAideHtml(aide) {
   if (!aide) return "";
   const liste = (titre, items, classe) =>
     '<div class="mi-detail-bloc"><h5 class="' + (classe || "") + '">' + titre + "</h5><ul>" +
     items.map(x => "<li>" + x + "</li>").join("") + "</ul></div>";
 
-  return '<div class="mi-detail" data-aide="' + index + '">' +
+  return '<div class="mi-detail ouvert">' +
     "<h5>" + aide.titre + "</h5>" +
     "<p>" + aide.principe + "</p>" +
     '<div class="mi-detail-bloc"><h5>Assemblage, pas à pas</h5><ol>' +
       aide.etapes.map(e => "<li>" + e + "</li>").join("") +
     "</ol></div>" +
+    (aide.schema ? schemaBordsHtml() : "") +
     '<div class="mi-detail-colonnes">' +
       liste("Ce que ça apporte", aide.bon, "vert") +
       liste("À savoir", aide.limites, "orange") +
@@ -124,64 +208,66 @@ function construireAideHtml(aide, index) {
   "</div>";
 }
 
+// =====================================================================
+//  Panneau d'impression, en deux temps
+//
+//  Il présentait huit boutons d'un coup, tous de la même taille, dont les
+//  libellés ne se distinguaient que par un détail (« bords longs », « en deux
+//  fois »). Impossible de savoir lequel prendre sans lire les huit.
+//
+//  On pose donc les questions dans l'ordre où elles se décident vraiment :
+//  d'abord LA RELIURE — le seul choix qui engage vraiment, et dont dépend tout
+//  le reste —, puis ce qu'on imprime et comment, sur un formulaire où chaque
+//  réponse s'explique. Un seul bouton pour lancer, et un résumé qui dit ce
+//  qu'on va obtenir avant de cliquer.
+// =====================================================================
+
+const RELIURES = {
+  livret: {
+    nom: "Livret à agrafer",
+    resume: "On plie la pile en deux et on agrafe au centre.",
+    detail: "Rapide, sans colle ni matériel. Idéal jusqu'à une quarantaine de pages.",
+    aideCle: "livret"
+  },
+  doscolle: {
+    nom: "Dos collé",
+    resume: "On encolle la tranche, comme un vrai roman de poche.",
+    detail: "Aucune limite de pages, dos plat qui tient debout sur une étagère.",
+    aideCle: "doscolle"
+  }
+};
+
+// L'état du formulaire, conservé tant que le panneau reste ouvert.
+let choixImpression = {
+  reliure: null,        // "livret" | "doscolle"
+  quoi: "texte",        // "texte" | "couverture"
+  disposition: "une",   // dos collé : "une" | "deux" pages par feuille
+  imprimante: "auto",   // "auto" | "passes"
+  // « court » par défaut, et non « long » : c'est l'hypothèse que fait déjà,
+  // sans le dire, l'imposition du livret — une feuille pliée met forcément le
+  // dos de sa moitié droite à gauche du verso. Le livret marchant sur la
+  // plupart des imprimantes, partir de la même hypothèse pour la coupe donne
+  // le bon ordre du premier coup, au lieu de sortir un livre mélangé.
+  retournement: "court" // deux pages : "long" | "court"
+};
+
 function ouvrirPanneauImpression() {
   fermerPanneauImpression();
+  // On repart du cas courant : le texte du livre, une page par feuille. Ce
+  // qu'on imprime change à chaque fois, alors que le comportement de
+  // l'imprimante — recto-verso, sens de retournement — reste le même d'une
+  // séance à l'autre : ces deux réponses-là sont conservées.
+  choixImpression.reliure = null;
+  choixImpression.quoi = "texte";
+  choixImpression.disposition = "une";
 
   const fond = document.createElement("div");
   fond.id = "panneauImpression";
   fond.className = "modal-impression";
   fond.addEventListener("click", (e) => { if (e.target === fond) fermerPanneauImpression(); });
-
-  let html = '<div class="modal-impression-carte" role="dialog" aria-modal="true">' +
-    '<button class="mi-fermer" aria-label="Fermer">&#10005;</button>' +
-    "<h3>Imprimer votre livre</h3>" +
-    '<p class="mi-intro">Choisissez la reliure, puis le type de votre imprimante. ' +
-    "Pour obtenir un PDF, sélectionnez « Enregistrer au format PDF » dans la fenêtre d'impression. " +
-    '<a href="montage.html" target="_blank" rel="noopener">Guide complet du montage</a>.</p>';
-
-  MODES_IMPRESSION.forEach((cat, i) => {
-    html += '<div class="mi-categorie">' +
-      '<div class="mi-titre-ligne">' +
-        "<h4>" + cat.categorie + "</h4>" +
-        '<button class="mi-aide-btn" data-aide="' + i + '" title="Comment ça marche et comment assembler" ' +
-          'aria-label="Aide sur ' + cat.categorie + '">?</button>' +
-      "</div>" +
-      '<p class="mi-aide">' + cat.aide + "</p>" +
-      construireAideHtml(AIDE_IMPRESSION[cat.aideCle], i) +
-      '<div class="mi-choix">';
-    cat.choix.forEach((c, j) => {
-      html += '<button class="mi-bouton" data-cat="' + i + '" data-choix="' + j + '">' +
-        "<span>" + c.libelle + "</span>" +
-        '<small>' + c.detail + "</small>" +
-      "</button>";
-    });
-    html += "</div></div>";
-  });
-
-  html += "</div>";
-  fond.innerHTML = html;
   document.body.appendChild(fond);
 
-  fond.querySelector(".mi-fermer").onclick = fermerPanneauImpression;
-
-  // Boutons « ? » : déplient le mode d'emploi de leur catégorie
-  fond.querySelectorAll(".mi-aide-btn").forEach(btn => {
-    btn.onclick = () => {
-      const bloc = fond.querySelector('.mi-detail[data-aide="' + btn.dataset.aide + '"]');
-      if (!bloc) return;
-      const ouvert = bloc.classList.toggle("ouvert");
-      btn.classList.toggle("actif", ouvert);
-      btn.setAttribute("aria-expanded", ouvert ? "true" : "false");
-    };
-  });
-  fond.querySelectorAll(".mi-bouton").forEach(btn => {
-    btn.onclick = () => {
-      const c = MODES_IMPRESSION[+btn.dataset.cat].choix[+btn.dataset.choix];
-      fermerPanneauImpression();
-      // Laisser la fenêtre se fermer avant d'ouvrir celle du navigateur
-      setTimeout(() => { window[c.action](c.mode); }, 50);
-    };
-  });
+  dessinerPanneauImpression();
 }
 
 function fermerPanneauImpression() {
@@ -192,6 +278,279 @@ function fermerPanneauImpression() {
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") fermerPanneauImpression();
 });
+
+function dessinerPanneauImpression() {
+  const fond = document.getElementById("panneauImpression");
+  if (!fond) return;
+  fond.innerHTML = '<div class="modal-impression-carte mi-carte" role="dialog" aria-modal="true">' +
+    '<button class="mi-fermer" aria-label="Fermer">&#10005;</button>' +
+    (choixImpression.reliure ? etapeReglages() : etapeReliure()) +
+    "</div>";
+  fond.querySelector(".mi-fermer").onclick = fermerPanneauImpression;
+  if (choixImpression.reliure) brancherReglages(fond);
+  else brancherChoixReliure(fond);
+}
+
+// ----- Étape 1 : la reliure -----
+
+function etapeReliure() {
+  const carte = (cle, r) =>
+    '<button class="mi-reliure" data-reliure="' + cle + '">' +
+      illustrationReliure(cle) +
+      "<span class='mi-reliure-nom'>" + r.nom + "</span>" +
+      "<span class='mi-reliure-resume'>" + r.resume + "</span>" +
+      "<span class='mi-reliure-detail'>" + r.detail + "</span>" +
+    "</button>";
+
+  return "<h3>Imprimer votre livre</h3>" +
+    '<p class="mi-intro">Comment voulez-vous relier votre livre ? Le reste des ' +
+    "réglages en découle — vous n'aurez plus qu'à répondre à deux ou trois questions.</p>" +
+    '<div class="mi-reliures">' +
+      carte("livret", RELIURES.livret) +
+      carte("doscolle", RELIURES.doscolle) +
+    "</div>" +
+    '<p class="mi-pied-lien">Pas sûr ? <a href="montage.html" target="_blank" rel="noopener">' +
+    "Le guide du montage</a> compare les deux, photos à l'appui.</p>";
+}
+
+// Deux petits dessins valent mieux qu'un paragraphe : l'un montre le pli
+// agrafé, l'autre la pile encollée.
+function illustrationReliure(cle) {
+  if (cle === "livret") {
+    return '<svg class="mi-reliure-dessin" viewBox="0 0 80 56" aria-hidden="true">' +
+      '<path d="M40 8 L14 14 L14 46 L40 40 Z" fill="#fff" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>' +
+      '<path d="M40 8 L66 14 L66 46 L40 40 Z" fill="#faf6ec" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>' +
+      '<line x1="40" y1="8" x2="40" y2="40" stroke="currentColor" stroke-width="2"/>' +
+      '<rect x="37" y="14" width="6" height="3" rx="1" fill="currentColor"/>' +
+      '<rect x="37" y="30" width="6" height="3" rx="1" fill="currentColor"/>' +
+    "</svg>";
+  }
+  return '<svg class="mi-reliure-dessin" viewBox="0 0 80 56" aria-hidden="true">' +
+    '<rect x="18" y="10" width="44" height="36" rx="2" fill="#fff" stroke="currentColor" stroke-width="2"/>' +
+    '<line x1="26" y1="10" x2="26" y2="46" stroke="currentColor" stroke-width="2"/>' +
+    '<line x1="34" y1="14" x2="54" y2="14" stroke="currentColor" stroke-width="1.4" opacity=".5"/>' +
+    '<line x1="34" y1="22" x2="54" y2="22" stroke="currentColor" stroke-width="1.4" opacity=".5"/>' +
+    '<line x1="34" y1="30" x2="48" y2="30" stroke="currentColor" stroke-width="1.4" opacity=".5"/>' +
+    '<rect x="18" y="10" width="8" height="36" rx="2" fill="currentColor" opacity=".18"/>' +
+  "</svg>";
+}
+
+function brancherChoixReliure(fond) {
+  fond.querySelectorAll(".mi-reliure").forEach((b) => {
+    b.onclick = () => {
+      choixImpression.reliure = b.dataset.reliure;
+      // Un livret n'a qu'une disposition possible : deux pages pliées.
+      if (choixImpression.reliure === "livret") choixImpression.disposition = "une";
+      dessinerPanneauImpression();
+    };
+  });
+}
+
+// ----- Étape 2 : les réglages -----
+
+function etapeReglages() {
+  const c = choixImpression;
+  const r = RELIURES[c.reliure];
+  const texte = c.quoi === "texte";
+  const deux = texte && c.reliure === "doscolle" && c.disposition === "deux";
+
+  const groupe = (titre, aide, options, nomChamp) =>
+    '<div class="mi-groupe"><h4>' + titre + "</h4>" +
+    (aide ? '<p class="mi-groupe-aide">' + aide + "</p>" : "") +
+    '<div class="mi-options">' +
+      options.map((o) =>
+        '<label class="mi-option' + (o.valeur === c[nomChamp] ? " actif" : "") + '">' +
+          '<input type="radio" name="' + nomChamp + '" value="' + o.valeur + '"' +
+            (o.valeur === c[nomChamp] ? " checked" : "") + ">" +
+          "<span class='mi-option-nom'>" + o.nom + "</span>" +
+          "<span class='mi-option-detail'>" + o.detail + "</span>" +
+        "</label>").join("") +
+    "</div></div>";
+
+  let html = '<button class="mi-retour" type="button">← Changer de reliure</button>' +
+    "<h3>" + r.nom + "</h3>" +
+    '<p class="mi-intro">' + r.resume + "</p>";
+
+  html += groupe("Que voulez-vous imprimer ?", "", [
+    { valeur: "texte", nom: "Le texte du livre",
+      detail: "Toutes les pages, dans l'ordre voulu par la reliure." },
+    { valeur: "couverture", nom: "La couverture",
+      detail: c.reliure === "livret"
+        ? "4e et 1re sur une feuille, à plier autour du cahier."
+        : "4e, dos et 1re à plat, avec les traits de pli." }
+  ], "quoi");
+
+  if (texte && c.reliure === "doscolle") {
+    html += groupe("Combien de pages par feuille ?", "", [
+      { valeur: "une", nom: "Une page par feuille", detail: "Rien à découper. Le plus simple." },
+      { valeur: "deux", nom: "Deux pages par feuille",
+        detail: "Deux fois moins de papier, mais il faut couper la pile au milieu." }
+    ], "disposition");
+  }
+
+  if (texte) {
+    html += groupe("Votre imprimante fait-elle le recto-verso ?", "", [
+      { valeur: "auto", nom: "Oui, toute seule", detail: "Elle retourne les feuilles d'elle-même." },
+      { valeur: "passes", nom: "Non, en deux fois",
+        detail: "Les rectos d'abord ; on remet la pile dans le bac pour les versos." }
+    ], "imprimante");
+  }
+
+  if (texte) {
+    const dx = decalageVersoMm("x");
+    const dy = decalageVersoMm("y");
+    const mm = (v) => String(v).replace(".", ",") + " mm";
+    const corriges = [];
+    if (dx) corriges.push(mm(dx) + " en largeur");
+    if (dy) corriges.push(mm(dy) + " en hauteur");
+
+    const champ = (id, axe, valeur, libelle, sens) =>
+      '<label class="tr-champ tr-court"><span>' + libelle + "</span>" +
+        '<input type="number" id="' + id + '" data-axe="' + axe + '" value="' + valeur +
+        '" min="-' + DECALAGE_MAX_MM + '" max="' + DECALAGE_MAX_MM +
+        '" step="0.5"> <small>mm</small></label>' +
+      '<p class="mi-groupe-aide">Une valeur négative pour un décalage vers ' + sens + ".</p>";
+
+    html += '<details class="mi-details-schema"' + (corriges.length ? " open" : "") + ">" +
+      "<summary>Le verso ne tombe pas juste en face du recto ?" +
+      (corriges.length ? " <b>(" + corriges.join(", ") + " corrigés)</b>" : "") + "</summary>" +
+      "<p>Aucune imprimante familiale ne repose la feuille exactement au même " +
+      "endroit pour son second passage : le verso sort décalé d'un ou deux " +
+      "millimètres. Ce décalage n'a rien d'aléatoire — c'est une propriété de " +
+      "votre machine —, alors il se mesure une fois et se corrige pour toujours.</p>" +
+      "<p><b>Pour le mesurer :</b> imprimez deux pages en recto-verso, tenez la " +
+      "feuille devant une lampe et regardez les lignes de coupe du recto et du " +
+      "verso se superposer. L'écart entre les deux, c'est la valeur à saisir — " +
+      "en largeur et en hauteur, les deux sont indépendants.</p>" +
+      champ("miDecalage", "x", dx, "Le verso sort décalé vers la droite de", "la gauche") +
+      champ("miDecalageY", "y", dy, "…et vers le bas de", "le haut") +
+      "<p>Les deux réglages sont retenus d'une fois sur l'autre : ils " +
+      "appartiennent à l'imprimante, pas au livre.</p>" +
+    "</details>";
+  }
+
+  if (deux) {
+    html += groupe("Comment vos feuilles se retournent-elles ?",
+      "C'est la seule chose que ce panneau ne peut pas deviner, et elle décide " +
+      "de l'ordre des pages une fois la pile coupée. Le plus sûr n'est pas de " +
+      "chercher le réglage dans le pilote : <b>si le mode livret vous donne un " +
+      "cahier dans le bon ordre, gardez « comme le livret »</b> — les deux " +
+      "reliures dépendent exactement du même comportement.", [
+      { valeur: "court", nom: "Comme le livret",
+        detail: "Les deux moitiés s'échangent au verso (retournement sur les petits bords). " +
+                "À garder si vos livrets sortent bien." },
+      { valeur: "long", nom: "L'autre sens",
+        detail: "La moitié gauche reste à gauche (retournement sur les grands bords)." }
+    ], "retournement");
+    html += '<p class="mi-groupe-aide">Dans le doute, imprimez d\'abord la ' +
+      '<b>feuille d\'essai</b> : une seule feuille qui vous dit lequel des deux ' +
+      "choisir, sans y laisser tout un livre.</p>" +
+      '<div class="mi-essai"><button class="mi-feuille-essai" type="button">' +
+      "Imprimer la feuille d'essai</button></div>";
+    html += '<details class="mi-details-schema"><summary>Voir la différence en image</summary>' +
+      schemaBordsHtml() + "</details>";
+  }
+
+  html += '<p class="mi-resume">' + resumeImpression() + "</p>";
+
+  html += '<details class="mi-details-guide"><summary>Comment assembler le livre ensuite ?</summary>' +
+    construireAideHtml(AIDE_IMPRESSION[r.aideCle]) + "</details>";
+
+  html += '<div class="mi-actions">' +
+    '<button class="mi-lancer" type="button">Imprimer</button>' +
+  "</div>";
+
+  return html;
+}
+
+// Ce qu'on va obtenir, en une phrase, avant de cliquer.
+function resumeImpression() {
+  const c = choixImpression;
+  if (c.quoi === "couverture") {
+    return c.reliure === "livret"
+      ? "Une seule feuille : 4e de couverture et 1re, à plier en deux autour du cahier."
+      : "Une seule feuille : 4e de couverture, dos et 1re, avec les traits de pli et de coupe.";
+  }
+  const morceaux = [];
+  if (c.reliure === "livret") {
+    morceaux.push("Deux pages par feuille, dans l'ordre du pliage");
+    morceaux.push("on plie toute la pile en deux et on agrafe sur le pli");
+  } else if (c.disposition === "deux") {
+    // « Séparées par une bande blanche » n'était vrai que sur les formats où
+    // la gouttière tient : un roman fait déjà 298 mm de large sur une A4.
+    morceaux.push("Deux pages par feuille");
+    morceaux.push(c.retournement === "court"
+      ? "la feuille sort sans repère, on la coupe en son milieu, puis on pose le tas de droite sous celui de gauche"
+      : "on coupe sur les traits du milieu, puis on pose le tas de droite sous celui de gauche");
+  } else {
+    morceaux.push("Une page par feuille, dans l'ordre de lecture");
+    morceaux.push("il n'y a rien à découper");
+  }
+  if (c.imprimante === "passes") {
+    morceaux.push("les rectos sortent d'abord, une fenêtre vous guidera pour les versos");
+  }
+  return morceaux.join(" ; ") + ".";
+}
+
+function brancherReglages(fond) {
+  fond.querySelector(".mi-retour").onclick = () => {
+    choixImpression.reliure = null;
+    dessinerPanneauImpression();
+  };
+
+  fond.querySelectorAll(".mi-option input").forEach((input) => {
+    input.onchange = () => {
+      choixImpression[input.name] = input.value;
+      dessinerPanneauImpression();   // les questions suivantes en dépendent
+    };
+  });
+
+  // La feuille d'essai ne ferme pas le panneau : on la lance, on va la
+  // chercher, et l'on répond à la question sans avoir tout à refaire.
+  const essai = fond.querySelector(".mi-feuille-essai");
+  if (essai) essai.onclick = () => imprimerFeuilleEssai();
+
+  // Les décalages se rangent à part, dans localStorage : pas de redessin du
+  // panneau, qui ferait perdre le focus à chaque frappe.
+  fond.querySelectorAll("input[data-axe]").forEach((champ) => {
+    champ.onchange = () => {
+      champ.value = definirDecalageVerso(champ.dataset.axe, champ.value);
+    };
+  });
+
+  fond.querySelector(".mi-lancer").onclick = () => {
+    const action = actionImpression();
+    fermerPanneauImpression();
+    // Laisser la fenêtre se fermer avant d'ouvrir celle du navigateur.
+    setTimeout(() => { window[action.fonction](action.mode); }, 50);
+  };
+}
+
+// Traduit les réponses en appel d'export. Les fonctions d'export, elles, n'ont
+// pas changé : ce panneau ne fait que choisir la bonne.
+function actionImpression() {
+  const c = choixImpression;
+  if (c.quoi === "couverture") {
+    return c.reliure === "livret"
+      ? { fonction: "exporterCouvertureLivret", mode: "" }
+      : { fonction: "exporterCouvertureSeule", mode: "" };
+  }
+  if (c.reliure === "livret") {
+    return { fonction: "exporterLivret", mode: c.imprimante };
+  }
+  if (c.disposition === "deux") {
+    // Le sens de retournement compte AUSSI en deux passes : c'est alors la
+    // main qui retourne la pile, mais la question posée est la même — quelle
+    // moitié du verso se retrouve derrière quelle moitié du recto. Le laisser
+    // tomber ici, comme on le faisait, imposait en silence « grands bords » à
+    // qui avait répondu « petits bords », et le livre sortait mélangé
+    // (1, 8, 3, 10, 5, 12, 7, 2… au lieu de 1, 2, 3, 4…).
+    const mode = (c.imprimante === "passes" ? "passes" : "auto") +
+                 (c.retournement === "court" ? "-court" : "");
+    return { fonction: "exporterDeuxPages", mode };
+  }
+  return { fonction: "exporterImpression", mode: c.imprimante };
+}
 
 // ----- Export impression (PDF / imprimante au format réel) -----
 //
@@ -207,13 +566,187 @@ document.addEventListener("keydown", (e) => {
 const MM_EN_PX = 96 / 25.4; // conversion CSS : 1mm = 96/25.4 px
 const DELTA_RELIURE_MM = 4; // ajouté côté reliure, retiré côté extérieur
 // Zone réservée au numéro de page. DOIT correspondre au « numPageH » de
-// l'éditeur (32 px logiques), sinon la hauteur utile diffère de celle qui a
+// l'éditeur (64 px logiques), sinon la hauteur utile diffère de celle qui a
 // servi à découper les pages et le texte se retrouve coupé à l'impression.
 // On retire une petite tolérance (2 mm) pour absorber les écarts d'arrondi
 // mm/px entre le rendu écran et le rendu imprimé ; le numéro de page reste
 // à sa place (il est positionné à 6 mm du bas, indépendamment).
 const TOLERANCE_MM = 2;
-const PIED_PAGE_MM = 32 * 25.4 / 96 - TOLERANCE_MM; // ≈ 6,47 mm
+const PIED_PAGE_MM = 64 * 25.4 / 96 - TOLERANCE_MM; // ≈ 14,9 mm
+
+// ----- Poser le travail sur une VRAIE feuille -----
+//
+// Un navigateur ne demande pas au pilote d'imprimante de respecter la taille
+// déclarée par @page : si elle ne correspond pas au papier chargé, il met le
+// tout à l'échelle du papier. Deux exports de tailles différentes — les pages
+// (173 × 234 mm) et la couverture à plat (322 × 234 mm) — ressortent alors à
+// deux échelles différentes sur la même A4, et la couverture ne tombe plus
+// autour des pages.
+//
+// La parade est de ne plus jamais déclarer autre chose qu'un format de papier
+// réel : le travail est CENTRÉ dessus, à sa taille exacte, et la mise à
+// l'échelle du navigateur n'a plus rien à faire.
+const PAPIERS = [
+  { cle: "a4p", nom: "A4 portrait",  larg: 210, haut: 297 },
+  { cle: "a4l", nom: "A4 paysage",   larg: 297, haut: 210 },
+  { cle: "a3p", nom: "A3 portrait",  larg: 297, haut: 420 },
+  { cle: "a3l", nom: "A3 paysage",   larg: 420, haut: 297 }
+];
+
+function papierParCle(cle) {
+  return PAPIERS.find((p) => p.cle === cle) || null;
+}
+
+// Le plus petit papier où le travail entre sans être réduit — et, à taille de
+// feuille égale, celui qui laisse le plus de blanc sur son côté le plus juste.
+//
+// L'orientation compte : une imposition de poche (210 × 148 mm) entre dans une
+// A4 portrait, mais bord à bord en largeur — impossible d'y tracer la ligne de
+// coupe. La même A4 en paysage lui laisse 43 mm de chaque côté et 31 en haut
+// et en bas, donc les quatre lignes au complet. Même feuille, même imprimante,
+// juste tournée.
+//
+// La tolérance sert au livret de roman : deux pages font 298 mm pour une A4
+// paysage de 297. Refuser ce millimètre l'enverrait sur de l'A3 alors qu'il
+// tient sur une A4 depuis toujours.
+function papierMinimal(largMm, hautMm, toleranceMm) {
+  const t = toleranceMm || 0;
+  const possibles = PAPIERS.filter((p) => p.larg + t >= largMm && p.haut + t >= hautMm);
+  if (!possibles.length) return null;
+
+  const aire = (p) => p.larg * p.haut;
+  const pluspetite = Math.min(...possibles.map(aire));
+  // La plus petite marge décide : c'est elle qui manque quand il n'y a pas la
+  // place d'imprimer un trait.
+  const margeMini = (p) => Math.min(p.larg - largMm, p.haut - hautMm);
+  return possibles
+    .filter((p) => aire(p) === pluspetite)
+    .sort((a, b) => margeMini(b) - margeMini(a))[0];
+}
+
+// Enveloppe un élément dans une feuille de papier, où il est centré.
+// L'enveloppe porte le saut de page ; l'élément garde sa taille exacte.
+//
+// Le blanc autour n'est pas perdu : il reçoit les traits de coupe, sans quoi
+// il faut deviner au réglet où s'arrête la page une fois imprimée.
+function poserSurPapier(element, papier, largMm, hautMm) {
+  const feuille = document.createElement("div");
+  feuille.className = "feuille-papier";
+  feuille.style.width  = papier.larg + "mm";
+  feuille.style.height = papier.haut + "mm";
+  feuille.appendChild(element);
+  if (largMm && hautMm) ajouterTraitsDecoupe(feuille, largMm, hautMm, papier);
+  return feuille;
+}
+
+// Lignes de coupe tout autour de la zone imprimée — mais INTERROMPUES au
+// droit de la page.
+//
+// Trois états successifs, et la raison de chacun :
+//
+//  1. Des repères d'angle, à la manière des imprimeurs. Un massicot se cale
+//     dessus ; à la règle, il faut d'abord relier les repères à l'œil.
+//  2. Des lignes pleines traversant la feuille, posées PILE sur le bord du
+//     livre. On pose la règle dessus et l'on coupe d'un trait — mais je
+//     tenais que « la coupe emporte la ligne ». C'est vrai au massicot, faux
+//     à la main : une coupe à trois dixièmes près laisse la moitié du trait
+//     sur la page, et cela se voit.
+//  3. Les mêmes lignes, mais qui s'arrêtent avant la page et reprennent de
+//     l'autre côté. La règle se pose toujours sur deux repères opposés — elle
+//     enjambe la page —, et plus rien n'est imprimé à l'intérieur du format
+//     fini : quelle que soit la précision de la coupe, il ne peut rien rester.
+//
+// L'écart laissé de chaque côté du bord absorbe l'erreur de coupe : tant
+// qu'on ne s'écarte pas de plus de ça, l'encre part avec la chute.
+const BORD_MINI_MM = 1;    // blanc conservé au bord de la feuille
+const ECART_TRAIT_MM = 1.5; // blanc conservé entre la page et le trait
+
+function ajouterTraitsDecoupe(feuille, largMm, hautMm, papier) {
+  const x0 = (papier.larg - largMm) / 2, x1 = x0 + largMm;
+  const y0 = (papier.haut - hautMm) / 2, y1 = y0 + hautMm;
+
+  const trait = (classe, gauche, haut, largeur, hauteur) => {
+    const t = document.createElement("div");
+    t.className = "trait-coupe " + classe;
+    t.style.left = gauche + "mm";
+    t.style.top = haut + "mm";
+    if (largeur) t.style.width = largeur + "mm";
+    if (hauteur) t.style.height = hauteur + "mm";
+    feuille.appendChild(t);
+  };
+
+  const tientDans = (v, taille) => v >= BORD_MINI_MM && v <= taille - BORD_MINI_MM;
+
+  // Longueur utile de chaque marge, une fois retirés l'écart à la page et le
+  // blanc du bord. En dessous de 2 mm le trait ne se verrait plus : on
+  // s'abstient plutôt que de poser une poussière d'encre.
+  const brin = {
+    haut:   y0 - ECART_TRAIT_MM - BORD_MINI_MM,
+    bas:    papier.haut - y1 - ECART_TRAIT_MM - BORD_MINI_MM,
+    gauche: x0 - ECART_TRAIT_MM - BORD_MINI_MM,
+    droite: papier.larg - x1 - ECART_TRAIT_MM - BORD_MINI_MM
+  };
+
+  // Verticales : les bords gauche et droit du livre, prolongés dans les
+  // marges du haut et du bas.
+  [x0, x1].forEach((x) => {
+    if (!tientDans(x, papier.larg)) return;
+    if (brin.haut >= 2) trait("trait-v", x, BORD_MINI_MM, 0, brin.haut);
+    if (brin.bas >= 2) trait("trait-v", x, y1 + ECART_TRAIT_MM, 0, brin.bas);
+  });
+
+  // Horizontales : les bords haut et bas, prolongés à gauche et à droite.
+  [y0, y1].forEach((y) => {
+    if (!tientDans(y, papier.haut)) return;
+    if (brin.gauche >= 2) trait("trait-h", BORD_MINI_MM, y, brin.gauche, 0);
+    if (brin.droite >= 2) trait("trait-h", x1 + ECART_TRAIT_MM, y, brin.droite, 0);
+  });
+}
+
+// ----- Registre recto-verso -----
+//
+// Une imprimante familiale ne repose pas la feuille exactement au même
+// endroit pour son second passage : le verso sort décalé d'un ou deux
+// millimètres. Le décalage n'a rien d'aléatoire — c'est une propriété de la
+// machine, toujours du même côté et de la même quantité —, donc il se mesure
+// une fois et se corrige pour toujours.
+//
+// On garde la valeur à part de choixImpression : elle appartient à
+// l'imprimante, pas au livre, et doit survivre à la fermeture de l'onglet.
+//
+// Deux axes, deux réglages : le chemin papier décale le verso latéralement
+// (le guide du bac) ET dans le sens de l'avance (le moment où les galets
+// reprennent la feuille). Rien n'oblige les deux à aller de pair, et corriger
+// l'un en laissant l'autre ne donne qu'un demi-résultat.
+const CLES_DECALAGE = { x: "gh_decalage_verso", y: "gh_decalage_verso_y" };
+const DECALAGE_MAX_MM = 5;
+
+function decalageVersoMm(axe) {
+  const v = parseFloat(localStorage.getItem(CLES_DECALAGE[axe] || CLES_DECALAGE.x));
+  if (!isFinite(v)) return 0;
+  return Math.max(-DECALAGE_MAX_MM, Math.min(DECALAGE_MAX_MM, v));
+}
+
+function definirDecalageVerso(axe, mm) {
+  const cle = CLES_DECALAGE[axe] || CLES_DECALAGE.x;
+  const v = parseFloat(mm);
+  if (!isFinite(v)) { localStorage.removeItem(cle); return 0; }
+  const borne = Math.max(-DECALAGE_MAX_MM, Math.min(DECALAGE_MAX_MM, v));
+  localStorage.setItem(cle, String(borne));
+  return borne;
+}
+
+// Le verso est dessiné à CONTRE-SENS du décalage constaté : si la machine le
+// pose 1 mm trop à droite et 2 mm trop bas, on le dessine 1 mm plus à gauche
+// et 2 mm plus haut.
+function appliquerDecalageVerso(zone) {
+  zone.style.setProperty("--decalage-verso", (-decalageVersoMm("x")) + "mm");
+  zone.style.setProperty("--decalage-verso-y", (-decalageVersoMm("y")) + "mm");
+}
+
+function reglerPagePapier(stylePage, papier) {
+  stylePage.textContent = "@page { size: " + papier.larg + "mm " + papier.haut + "mm; margin: 0; }";
+}
 
 function exporterImpression(modeRectoVerso) {
   flushSpread();
@@ -228,13 +761,24 @@ function exporterImpression(modeRectoVerso) {
     stylePage.id = "stylePageImpression";
     document.head.appendChild(stylePage);
   }
-  stylePage.textContent = `@page { size: ${f.larg}mm ${f.haut}mm; margin: 0; }`;
+  // Le papier est choisi pour contenir le format du livre sans réduction ;
+  // à défaut (format plus grand qu'une A3), on garde la taille exacte et
+  // l'impression sera mise à l'échelle comme avant.
+  const papier = papierMinimal(f.larg, f.haut);
+  if (papier) reglerPagePapier(stylePage, papier);
+  else stylePage.textContent = `@page { size: ${f.larg}mm ${f.haut}mm; margin: 0; }`;
 
   let zone = document.getElementById("zoneImpression");
   if (zone) zone.remove();
   zone = document.createElement("div");
   zone.id = "zoneImpression";
+  appliquerDecalageVerso(zone);
   document.body.appendChild(zone);
+
+  // Chaque page part sur sa feuille : le recto-verso en deux passes compte
+  // les enfants directs de la zone, il faut donc un enfant par page.
+  const ajouterPage = (el) =>
+    zone.appendChild(papier ? poserSurPapier(el, papier, f.larg, f.haut) : el);
 
   // La somme des deux marges reste identique à l'éditeur pour que le bloc
   // de texte garde exactement la même largeur (pas de re-débordement).
@@ -243,26 +787,27 @@ function exporterImpression(modeRectoVerso) {
 
   const promessesImages = [];
 
-  // Feuille 1 : couverture (recto) + intérieur de couverture blanc (verso)
-  zone.appendChild(creerCouvertureImpression(livre, "couverture", f, promessesImages));
-  zone.appendChild(creerPageBlancheImpression(f));
-
-  // Corps du livre : page impaire = recto (droite), page paire = verso (gauche)
+  // Le texte seul. Les couvertures s'impriment à part — sur un autre papier,
+  // souvent chez un copiste — et « Couverture seule » les sort ouvertes à
+  // plat : les intercaler ici gâchait deux feuilles et forçait à les extraire
+  // de la pile avant l'encollage.
   const pages = livre.pages || [];
   pages.forEach((page, i) => {
-    zone.appendChild(creerPageTexteImpression(page, i + 1, f, margeInt, margeExt));
+    ajouterPage(creerPageTexteImpression(page, i + 1, f, margeInt, margeExt));
   });
 
-  // Compléter pour que la 4e de couverture tombe au verso de la dernière feuille
-  if (pages.length % 2 === 1) zone.appendChild(creerPageBlancheImpression(f));
-  zone.appendChild(creerPageBlancheImpression(f));
-  zone.appendChild(creerCouvertureImpression(livre, "quatrieme", f, promessesImages));
+  // Un nombre impair laisserait le dernier verso à imprimer dans le vide :
+  // la feuille blanche ferme la pile proprement.
+  if (pages.length % 2 === 1) ajouterPage(creerPageBlancheImpression(f));
 
   const message = document.getElementById("message");
   if (message) message.textContent = "Préparation de l'impression...";
+  ouvrirAttente("Préparation de l'impression…",
+    "Les pages et leurs images sont assemblées ; la fenêtre d'impression s'ouvrira toute seule.");
 
   Promise.all(promessesImages).finally(() => {
     if (message) message.textContent = "";
+    fermerAttente();
     lancerImpression(modeRectoVerso);
   });
 }
@@ -285,13 +830,26 @@ function exporterLivret(modeRectoVerso) {
     stylePage.id = "stylePageImpression";
     document.head.appendChild(stylePage);
   }
-  stylePage.textContent = `@page { size: ${f.larg * 2}mm ${f.haut}mm; margin: 0; }`;
+  // Une imposition de poche fait 210 × 148 mm : posée sur une A4, elle laisse
+  // 74 mm de blanc en haut et en bas, qu'il faudra massicoter. Comme les
+  // autres exports, elle se pose donc sur un papier réel, à sa taille exacte,
+  // entourée de ses lignes de coupe.
+  const largFeuille = f.larg * 2;
+  const papier = papierMinimal(largFeuille, f.haut, 2);
+  if (papier) reglerPagePapier(stylePage, papier);
+  else stylePage.textContent = `@page { size: ${largFeuille}mm ${f.haut}mm; margin: 0; }`;
 
   let zone = document.getElementById("zoneImpression");
   if (zone) zone.remove();
   zone = document.createElement("div");
   zone.id = "zoneImpression";
+  appliquerDecalageVerso(zone);
   document.body.appendChild(zone);
+
+  // Une face de feuille par enfant direct : l'impression en deux passes
+  // compte les enfants de la zone pour séparer rectos et versos.
+  const ajouterFace = (el) =>
+    zone.appendChild(papier ? poserSurPapier(el, papier, largFeuille, f.haut) : el);
 
   const margeInt = f.margeH + DELTA_RELIURE_MM;
   const margeExt = Math.max(6, f.margeH - DELTA_RELIURE_MM);
@@ -301,26 +859,27 @@ function exporterLivret(modeRectoVerso) {
   // Position 1 = couverture, position 2 = son verso blanc, puis le texte,
   // des blanches de complément (total multiple de 4), et la 4e en dernier.
   const suite = [];
-  suite.push({ type: "couverture" });
-  suite.push({ type: "blanche" });
   (livre.pages || []).forEach((page, i) => suite.push({ type: "texte", page, numero: i + 1 }));
-  while ((suite.length + 2) % 4 !== 0) suite.push({ type: "blanche" });
-  suite.push({ type: "blanche" });
-  suite.push({ type: "quatrieme" });
+  // Un cahier plié se compte par quatre : on complète par des blanches, qui
+  // se retrouvent à la fin du livret.
+  while (suite.length % 4 !== 0) suite.push({ type: "blanche" });
 
   const total = suite.length;
 
   // Imposition : feuille k, recto = [dernière-2k | 2k+1], verso = [2k+2 | dernière-2k-1]
   for (let k = 0; k < total / 4; k++) {
-    zone.appendChild(creerFaceLivret(suite[total - 2 * k - 1], suite[2 * k], livre, f, margeInt, margeExt, promessesImages));
-    zone.appendChild(creerFaceLivret(suite[2 * k + 1], suite[total - 2 * k - 2], livre, f, margeInt, margeExt, promessesImages));
+    ajouterFace(creerFaceLivret(suite[total - 2 * k - 1], suite[2 * k], f, margeInt, margeExt));
+    ajouterFace(creerFaceLivret(suite[2 * k + 1], suite[total - 2 * k - 2], f, margeInt, margeExt));
   }
 
   const message = document.getElementById("message");
   if (message) message.textContent = "Préparation de l'impression...";
+  ouvrirAttente("Préparation de l'impression…",
+    "Les pages et leurs images sont assemblées ; la fenêtre d'impression s'ouvrira toute seule.");
 
   Promise.all(promessesImages).finally(() => {
     if (message) message.textContent = "";
+    fermerAttente();
     lancerImpression(modeRectoVerso);
   });
 }
@@ -381,21 +940,37 @@ function afficherPanneauVersos() {
   };
 }
 
-function creerFaceLivret(demiGauche, demiDroite, livre, f, margeInt, margeExt, promessesImages) {
+function creerFaceLivret(demiGauche, demiDroite, f, margeInt, margeExt) {
   const feuille = document.createElement("div");
   feuille.className = "feuille-impression";
   feuille.style.width = (f.larg * 2) + "mm";
   feuille.style.height = f.haut + "mm";
-  feuille.appendChild(creerDemiPageLivret(demiGauche, livre, f, margeInt, margeExt, promessesImages));
-  feuille.appendChild(creerDemiPageLivret(demiDroite, livre, f, margeInt, margeExt, promessesImages));
+  feuille.appendChild(creerDemiPageLivret(demiGauche, f, margeInt, margeExt));
+  feuille.appendChild(creerDemiPageLivret(demiDroite, f, margeInt, margeExt));
   return feuille;
 }
 
-function creerDemiPageLivret(demi, livre, f, margeInt, margeExt, promessesImages) {
+// Une demi-feuille : une page de texte, ou une blanche de complément. Les
+// couvertures ne passent plus par ici — elles ont leur propre export.
+function creerDemiPageLivret(demi, f, margeInt, margeExt) {
   if (!demi || demi.type === "blanche") return creerPageBlancheImpression(f);
-  if (demi.type === "couverture") return creerCouvertureImpression(livre, "couverture", f, promessesImages);
-  if (demi.type === "quatrieme") return creerCouvertureImpression(livre, "quatrieme", f, promessesImages);
+  if (demi.type === "essai") return creerDemiEssai(demi, f);
   return creerPageTexteImpression(demi.page, demi.numero, f, margeInt, margeExt);
+}
+
+// Une demi-feuille d'essai : une grande marque et, dessous, ce qu'elle veut
+// dire. Rien d'autre — elle doit se lire à bout de bras.
+function creerDemiEssai(demi, f) {
+  const div = document.createElement("div");
+  // Une lettre seule se lit en très grand ; une réponse de trois mots, non —
+  // à la même taille elle passerait à la ligne et remplirait la demi-feuille.
+  div.className = "page-impression page-essai" + (demi.reponse ? " essai-reponse" : "");
+  div.style.width = f.larg + "mm";
+  div.style.height = f.haut + "mm";
+  div.innerHTML =
+    '<div class="essai-marque">' + demi.marque + "</div>" +
+    '<div class="essai-legende">' + demi.legende + "</div>";
+  return div;
 }
 
 function creerPageBlancheImpression(f) {
@@ -456,7 +1031,7 @@ function creerCouvertureImpression(livre, mode, f, promessesImages) {
       if (cacheImagesURL[data.imageChemin]) {
         img.src = cacheImagesURL[data.imageChemin];
       } else {
-        const token = sessionStorage.getItem("gh_token");
+        const token = localStorage.getItem("gh_token");
         obtenirUrlImage(data.imageChemin, token).then((url) => {
           cacheImagesURL[data.imageChemin] = url;
           img.src = url;
@@ -476,6 +1051,9 @@ function creerCouvertureImpression(livre, mode, f, promessesImages) {
     ${afficherAuteur ? `<div class="auteur-impression" style="color:${couleurTexte};${styleTexteCouv(data,'auteur')}">${livre.auteur || ""}</div>` : ""}
   `;
   div.appendChild(couche);
+  if (mode === "quatrieme") {
+    div.insertAdjacentHTML("beforeend", htmlResumeCouv(data, couleurTexte, "resume-impression"));
+  }
 
   return div;
 }
@@ -540,18 +1118,19 @@ const FILET_REPERE_PT     = 0.25;
 const MARGE_TECHNIQUE_MM = DECALAGE_REPERE_MM + LONGUEUR_REPERE_MM + 1; // 12 mm
 
 // Pied de page de l'export imprimeur, en pixels logiques (voir PIED_PAGE_PX
-// dans editeur.js). 48 px ≈ 12,7 mm : le folio tient à 7,5 mm du bord rogné
-// sans que la dernière ligne de texte vienne le chevaucher.
-const PIED_PRO_PX  = 56;
-const PIED_PRO_MM  = PIED_PRO_PX * 25.4 / 96;      // ≈ 14,8 mm
+// dans editeur.js). Le folio y descend plus bas — 8 mm du bord rogné au lieu
+// de 6 — pour respecter le blanc tournant : la bande doit donc être plus
+// haute que celle de l'export normal, sans quoi le texte la rejoindrait.
+const PIED_PRO_PX  = 72;
+const PIED_PRO_MM  = PIED_PRO_PX * 25.4 / 96;      // ≈ 19,1 mm
 const FOLIO_PRO_MM = 8;                            // > BLANC_TOURNANT_MM
 // Le texte rendu à l'impression occupe quelques pixels de plus que dans le
 // mesureur de pagination (justification et césure automatique, absentes du
 // mesureur). L'export normal absorbe déjà cet écart par une tolérance ; on
 // garde le même principe ici, en dimensionnant le pied pour que la tolérance
 // ne fasse jamais descendre le texte sur la bande du folio :
-//   bas du texte  = 210 - 20 - 177,2 = 12,8 mm du bord rogné
-//   haut du folio = 8 + 3,5          = 11,5 mm du bord rogné
+//   bas du texte  = 210 - 20 - 172,9 = 17,1 mm du bord rogné
+//   haut du folio = 8 + 4,7          = 12,7 mm du bord rogné
 const TOLERANCE_PRO_MM = 2;
 
 // Épaisseur d'une feuille : grammage × main / 1000 (en mm).
@@ -562,6 +1141,216 @@ const MAIN_DEFAUT = 1.2;
 
 function epaisseurDosMm(nbPages, grammage, main) {
   return (nbPages / 2) * grammage * main / 1000;
+}
+
+// ----- Plastification de la couverture -----
+//
+// Une pochette à plastifier enferme la feuille entre DEUX films : la
+// couverture épaissit donc de deux fois l'épaisseur annoncée sur la boîte.
+//
+// Et cette épaisseur compte deux fois de plus au dos : le dos est délimité
+// par deux plis, et chaque pli s'écarte de l'épaisseur du matériau qu'il
+// plie. Une pochette de 125 µm ajoute ainsi un demi-millimètre au dos —
+// invisible sur un pavé, mais c'est le tiers du dos d'un livret de 80 pages.
+//
+// Les épaisseurs sont celles des pochettes courantes du commerce, en microns
+// PAR FACE, comme elles sont vendues.
+const PLASTIFICATIONS = [
+  { cle: "aucune", nom: "Non plastifiée", micronsParFace: 0 },
+  { cle: "80",  nom: "Pochette 80 µm (la plus courante)", micronsParFace: 80 },
+  { cle: "100", nom: "Pochette 100 µm", micronsParFace: 100 },
+  { cle: "125", nom: "Pochette 125 µm (rigide)", micronsParFace: 125 },
+  { cle: "175", nom: "Pochette 175 µm (très rigide)", micronsParFace: 175 }
+];
+const PLASTIFICATION_DEFAUT = "aucune";
+
+function plastificationParCle(cle) {
+  return PLASTIFICATIONS.find((p) => p.cle === cle) || PLASTIFICATIONS[0];
+}
+
+// ----- Le papier de la COUVERTURE -----
+//
+// Il manquait au calcul, et c'était une erreur de fond : le panneau affirmait
+// même que seule l'épaisseur des pages comptait. C'est faux. La couverture
+// s'enroule autour de la pile, et à chacun des deux plis elle s'écarte de sa
+// propre épaisseur. Un bristol de 250 g élargit ainsi le dos d'un bon demi-
+// millimètre — sur un dos de 5 mm, l'erreur saute aux yeux.
+//
+// La « main » d'un papier de couverture est plus faible que celle d'un papier
+// de bureau : un carton est dense, il ne gonfle pas. 1,0 est la valeur usuelle.
+const PAPIERS_COUVERTURE = [
+  { cle: "80",  nom: "Papier ordinaire — 80 g",   grammage: 80,  main: 1.2 },
+  { cle: "100", nom: "Papier un peu épais — 100 g", grammage: 100, main: 1.2 },
+  { cle: "120", nom: "Papier épais — 120 g",      grammage: 120, main: 1.1 },
+  { cle: "160", nom: "Bristol léger — 160 g",     grammage: 160, main: 1.0 },
+  { cle: "200", nom: "Bristol — 200 g",           grammage: 200, main: 1.0 },
+  { cle: "250", nom: "Bristol fort — 250 g",      grammage: 250, main: 1.0 },
+  { cle: "300", nom: "Carte — 300 g",             grammage: 300, main: 1.0 }
+];
+const PAPIER_COUVERTURE_DEFAUT = "250";
+
+function papierCouverture(cle) {
+  return PAPIERS_COUVERTURE.find((p) => p.cle === cle) ||
+         PAPIERS_COUVERTURE.find((p) => p.cle === PAPIER_COUVERTURE_DEFAUT);
+}
+
+// ----- La main mesurée, et non devinée -----
+//
+// La « main » dit de combien un papier gonfle à grammage égal. Les valeurs du
+// tableau sont des moyennes — et une moyenne se trompe : 207 feuilles de 100 g
+// annoncées à 24,8 mm en mesurent 27,8 sur une rame réelle, soit une main de
+// 1,34 et non 1,2. Trois millimètres d'écart sur le dos, c'est une couverture
+// ratée.
+//
+// Cette valeur appartient à la RAME, pas au livre : elle se mesure une fois et
+// se retient, comme le décalage recto-verso appartient à l'imprimante. On la
+// range donc par grammage — deux papiers différents n'ont aucune raison de
+// gonfler pareil.
+const CLE_MAINS = "gh_mains_papier";
+
+function mainsMesurees() {
+  try {
+    const brut = JSON.parse(localStorage.getItem(CLE_MAINS) || "{}");
+    return brut && typeof brut === "object" ? brut : {};
+  } catch (e) { return {}; }
+}
+
+// La main à employer pour ce papier : celle qu'on a mesurée, sinon celle du
+// tableau.
+function mainPapier(pa) {
+  const v = parseFloat(mainsMesurees()[pa.grammage]);
+  return isFinite(v) && v > 0 ? v : pa.main;
+}
+
+function papierEstMesure(pa) {
+  return isFinite(parseFloat(mainsMesurees()[pa.grammage]));
+}
+
+// « J'ai mesuré N feuilles : X mm » → la main qui en découle, retenue pour ce
+// grammage. C'est l'inverse exact du calcul d'épaisseur.
+function enregistrerMainMesuree(grammage, feuilles, epaisseurMm) {
+  const n = parseFloat(feuilles), e = parseFloat(epaisseurMm), g = parseFloat(grammage);
+  if (!isFinite(n) || !isFinite(e) || !isFinite(g) || n <= 0 || e <= 0 || g <= 0) return null;
+  const main = e * 1000 / (n * g);
+  if (main < 0.5 || main > 3) return null;   // hors du plausible : saisie fautive
+  const table = mainsMesurees();
+  table[g] = Math.round(main * 1000) / 1000;
+  try { localStorage.setItem(CLE_MAINS, JSON.stringify(table)); } catch (e2) {}
+  return table[g];
+}
+
+function oublierMainMesuree(grammage) {
+  const table = mainsMesurees();
+  delete table[parseFloat(grammage)];
+  try { localStorage.setItem(CLE_MAINS, JSON.stringify(table)); } catch (e) {}
+}
+
+// Épaisseur d'UNE feuille, en millimètres.
+function epaisseurFeuilleMm(grammage, main) {
+  return grammage * main / 1000;
+}
+
+// ----- Le « tour » : tout ce qui s'ajoute autour de la pile -----
+//
+// Le dos ne vaut pas l'épaisseur des pages. S'y ajoutent, dans l'ordre :
+//   — la colle, déposée sur la tranche entre la pile et la couverture ;
+//   — la couverture, qui s'écarte de sa propre épaisseur à chacun des plis ;
+//   — le film de plastification, qui fait corps avec elle.
+//
+// AUCUN de ces trois termes ne se calcule exactement. Le facteur 2 des plis
+// est une convention d'atelier, pas une loi : il dépend du rayon du pli et de
+// la force du marquage. Et l'épaisseur de colle dépend entièrement de la main
+// qui l'étale — une vinylique passée fin donne trois dixièmes, une
+// thermofusible au pistolet peut en donner huit.
+//
+// D'où la règle de ce panneau : le calcul propose une ESTIMATION honnête,
+// mais dès qu'un livre a été relié, sa mesure la remplace. Un tour mesuré est
+// exact pour tous les livres suivants faits des mêmes matériaux — c'est la
+// seule voie vers un dos juste au dixième.
+const COLLE_PAR_DEFAUT_MM = 0.5;
+const CLE_TOUR = "gh_tour_couverture";
+
+function tourMesure() {
+  try {
+    const t = JSON.parse(localStorage.getItem(CLE_TOUR) || "null");
+    return t && isFinite(parseFloat(t.mm)) ? t : null;
+  } catch (e) { return null; }
+}
+
+function enregistrerTourMesure(mm, materiaux) {
+  const v = parseFloat(mm);
+  if (!isFinite(v) || v < 0 || v > 15) return null;
+  const t = { mm: Math.round(v * 100) / 100, materiaux: materiaux || "" };
+  try { localStorage.setItem(CLE_TOUR, JSON.stringify(t)); } catch (e) {}
+  return t;
+}
+
+function oublierTourMesure() {
+  try { localStorage.removeItem(CLE_TOUR); } catch (e) {}
+}
+
+function colleMm() {
+  const v = parseFloat(localStorage.getItem("gh_colle_mm"));
+  return isFinite(v) && v >= 0 && v <= 5 ? v : COLLE_PAR_DEFAUT_MM;
+}
+
+// ----- Ajustement de la taille de la couverture -----
+//
+// Le format donne la cote THÉORIQUE de la page (105 × 148 pour un A6). Un livre
+// relié à la maison tombe presque toujours un peu plus grand : le pli épaissit,
+// la coupe n'est jamais au dixième, et la couverture, pour bien envelopper, doit
+// mordre de quelques dixièmes au-delà des pages. On laisse donc l'utilisateur
+// AGRANDIR la seule couverture — mesure du livre fini à l'appui — sans toucher
+// aux pages intérieures. La valeur est propre à sa reliure, on la retient.
+const CLE_DEBORD = "gh_couv_debord";
+
+function debordCouverture() {
+  try {
+    const d = JSON.parse(localStorage.getItem(CLE_DEBORD) || "null");
+    const l = parseFloat(d && d.larg);
+    const h = parseFloat(d && d.haut);
+    return {
+      larg: isFinite(l) && l >= 0 && l <= 10 ? l : 0,
+      haut: isFinite(h) && h >= 0 && h <= 10 ? h : 0
+    };
+  } catch (e) { return { larg: 0, haut: 0 }; }
+}
+
+function enregistrerDebordCouverture(larg, haut) {
+  const l = Math.min(10, Math.max(0, parseFloat(larg) || 0));
+  const h = Math.min(10, Math.max(0, parseFloat(haut) || 0));
+  try { localStorage.setItem(CLE_DEBORD, JSON.stringify({ larg: l, haut: h })); } catch (e) {}
+  return { larg: l, haut: h };
+}
+
+// Le format agrandi du débord, à n'employer QUE pour la planche de couverture.
+function formatAvecDebord(f, debord) {
+  const d = debord || debordCouverture();
+  return Object.assign({}, f, { larg: f.larg + d.larg, haut: f.haut + d.haut });
+}
+
+// L'estimation, quand rien n'a encore été mesuré.
+function tourEstimeMm(cleCouverture, clePlastification) {
+  const pa = papierCouverture(cleCouverture);
+  const film = 2 * plastificationParCle(clePlastification).micronsParFace / 1000;
+  return 2 * (epaisseurFeuilleMm(pa.grammage, pa.main) + film) + colleMm();
+}
+
+// Ce qui s'ajoute réellement : la mesure si on en a une, l'estimation sinon.
+function supplementDosCouvertureMm(cleCouverture, clePlastification) {
+  const t = tourMesure();
+  return t ? parseFloat(t.mm) : tourEstimeMm(cleCouverture, clePlastification);
+}
+
+function libelleMateriaux(cleCouverture, clePlastification) {
+  const pa = papierCouverture(cleCouverture);
+  const pl = plastificationParCle(clePlastification);
+  return pa.grammage + " g" + (pl.micronsParFace ? " + " + pl.micronsParFace + " µm" : ", non plastifiée");
+}
+
+// La part du seul film, pour pouvoir la détailler à l'écran.
+function supplementDosPlastificationMm(cle) {
+  return 4 * plastificationParCle(cle).micronsParFace / 1000;
 }
 
 // Nom de fichier accepté : A-Z, a-z, 0-9 et _ uniquement, précédé de
@@ -595,6 +1384,791 @@ function avecPaginationImprimeur(livre, travail) {
     appliquerFormatPage(livre.format || "149x210");
     repaginerTout();
   }
+}
+
+// ----- Deux pages par feuille, à couper au milieu -----
+//
+// Même reliure que « page à page », mais deux pages côte à côte : on coupe la
+// pile, on pose la moitié droite sous la moitié gauche, et le livre est dans
+// l'ordre.
+//
+// C'est ce qui rend l'imposition indispensable. Poser 1 et 2 côte à côte
+// donnerait, après la coupe, deux tas où les pages sautent de deux en deux. La
+// colonne de gauche porte donc la PREMIÈRE moitié du livre, celle de droite la
+// SECONDE : chaque tas reste continu, et l'un se pose sous l'autre.
+//
+// Deux difficultés viennent de l'imprimante, pas du calcul :
+//
+//  1. Le sens de retournement. Sur les grands bords, la moitié gauche reste à
+//     gauche au verso ; sur les petits bords, elle passe à droite et le livre
+//     sort mélangé. Aucun réglage du navigateur ne le dit — c'est donc
+//     l'auteur qui l'indique, et l'imposition s'y adapte.
+//
+//  2. Le registre recto-verso. Une imprimante familiale décale le verso d'un
+//     ou deux millimètres. Une coupe unique au milieu tomberait juste d'un
+//     côté et dans le texte de l'autre. On laisse donc une GOUTTIÈRE blanche
+//     entre les deux pages, avec un trait de chaque côté : on coupe deux fois,
+//     la bande centrale part, et chaque page garde son format exact quel que
+//     soit le décalage.
+const GOUTTIERE_MM = 6;
+
+function exporterDeuxPages(mode) {
+  flushSpread();
+  repaginerTout();
+  const livre = livreActuel();
+  const f = FORMATS[livre.format || "149x210"] || FORMATS["149x210"];
+
+  // « auto » et « passes » disent comment imprimer ; « court » dit comment la
+  // feuille se retourne. Les deux se combinent (« passes-court »).
+  const passes = mode.indexOf("passes") !== -1;
+  const bordsCourts = mode.indexOf("court") !== -1;
+
+  let stylePage = document.getElementById("stylePageImpression");
+  if (!stylePage) {
+    stylePage = document.createElement("style");
+    stylePage.id = "stylePageImpression";
+    document.head.appendChild(stylePage);
+  }
+
+  // La gouttière élargit la planche de quelques millimètres. Si ces
+  // millimètres obligent à passer au format de papier au-dessus — deux pages
+  // de roman font déjà 298 mm sur une A4 —, on y renonce : demander de l'A3
+  // pour six millimètres serait un remède pire que le mal.
+  const aire = (pa) => (pa ? pa.larg * pa.haut : Infinity);
+  const sansGouttiere = papierMinimal(2 * f.larg, f.haut, 2);
+  const avecGouttiere = papierMinimal(2 * f.larg + GOUTTIERE_MM, f.haut, 2);
+  const gouttiere = aire(avecGouttiere) <= aire(sansGouttiere) ? GOUTTIERE_MM : 0;
+  const papier = gouttiere ? avecGouttiere : sansGouttiere;
+  const largFeuille = 2 * f.larg + gouttiere;
+
+  if (papier) reglerPagePapier(stylePage, papier);
+  else stylePage.textContent = "@page { size: " + largFeuille + "mm " + f.haut + "mm; margin: 0; }";
+
+  let zone = document.getElementById("zoneImpression");
+  if (zone) zone.remove();
+  zone = document.createElement("div");
+  zone.id = "zoneImpression";
+  appliquerDecalageVerso(zone);
+  document.body.appendChild(zone);
+
+  const margeInt = f.margeH + DELTA_RELIURE_MM;
+  const margeExt = Math.max(6, f.margeH - DELTA_RELIURE_MM);
+
+  // Les faces, dans l'ordre de lecture — le texte seul, les couvertures
+  // s'imprimant à part.
+  const suite = [];
+  (livre.pages || []).forEach((page, i) => suite.push({ type: "texte", page, numero: i + 1 }));
+  // Une feuille porte quatre faces : le compte doit tomber juste, sinon la
+  // coupe décale tout le second tas.
+  while (suite.length % 4 !== 0) suite.push({ type: "blanche" });
+
+  const moitie = suite.length / 2;
+
+  // « Comme le livret » sort sans repères imprimés, à la demande : la
+  // gouttière reste, mais la feuille est nue. L'autre sens les garde.
+  const sansTraits = bordsCourts;
+
+  for (let k = 0; k < suite.length / 4; k++) {
+    const recto = creerFaceDeuxPages(suite[2 * k], suite[moitie + 2 * k],
+                                     f, margeInt, margeExt, gouttiere, sansTraits);
+    // Sur les petits bords, la feuille se retourne autour de son axe vertical :
+    // ce qui était à gauche revient à droite. On échange donc les deux moitiés
+    // du verso pour que chaque bande garde ses deux faces.
+    const verso = bordsCourts
+      ? creerFaceDeuxPages(suite[moitie + 2 * k + 1], suite[2 * k + 1],
+                           f, margeInt, margeExt, gouttiere, sansTraits)
+      : creerFaceDeuxPages(suite[2 * k + 1], suite[moitie + 2 * k + 1],
+                           f, margeInt, margeExt, gouttiere, sansTraits);
+
+    [recto, verso].forEach((face) => {
+      zone.appendChild(papier ? poserSurPapier(face, papier, largFeuille, f.haut) : face);
+    });
+  }
+
+  const message = document.getElementById("message");
+  if (message) message.textContent = "Préparation de l'impression...";
+  ouvrirAttente("Préparation de l'impression…",
+    "Les pages et leurs images sont assemblées ; la fenêtre d'impression s'ouvrira toute seule.");
+  setTimeout(() => {
+    if (message) message.textContent = "";
+    fermerAttente();
+    lancerImpression(passes ? "passes" : "auto");
+  }, 0);
+}
+
+// ----- La feuille d'essai -----
+//
+// Le sens de retournement est la seule inconnue de cette reliure, et personne
+// ne peut y répondre de tête : le pilote ne le dit pas toujours, et en deux
+// passes c'est la main qui décide. Le découvrir en imprimant tout un livre
+// coûte cent feuilles ; le découvrir sur UNE feuille ne coûte rien.
+//
+// Le principe évite toute ambiguïté de manipulation. On ne demande pas de
+// « retourner la feuille » — selon qu'on la tourne autour d'un bord ou de
+// l'autre, on ne voit pas la même chose. On demande de la COUPER, ce qui est
+// de toute façon le geste de cette reliure : une moitié porte le A, et son
+// dos porte, écrit en toutes lettres, le réglage à choisir.
+function imprimerFeuilleEssai() {
+  const livre = livreActuel();
+  const f = FORMATS[livre.format || "149x210"] || FORMATS["149x210"];
+
+  const aire = (pa) => (pa ? pa.larg * pa.haut : Infinity);
+  const sansGouttiere = papierMinimal(2 * f.larg, f.haut, 2);
+  const avecGouttiere = papierMinimal(2 * f.larg + GOUTTIERE_MM, f.haut, 2);
+  const gouttiere = aire(avecGouttiere) <= aire(sansGouttiere) ? GOUTTIERE_MM : 0;
+  const papier = gouttiere ? avecGouttiere : sansGouttiere;
+  const largFeuille = 2 * f.larg + gouttiere;
+
+  let stylePage = document.getElementById("stylePageImpression");
+  if (!stylePage) {
+    stylePage = document.createElement("style");
+    stylePage.id = "stylePageImpression";
+    document.head.appendChild(stylePage);
+  }
+  if (papier) reglerPagePapier(stylePage, papier);
+  else stylePage.textContent = "@page { size: " + largFeuille + "mm " + f.haut + "mm; margin: 0; }";
+
+  let zone = document.getElementById("zoneImpression");
+  if (zone) zone.remove();
+  zone = document.createElement("div");
+  zone.id = "zoneImpression";
+  appliquerDecalageVerso(zone);
+  document.body.appendChild(zone);
+
+  const marque = (m, l) => ({ type: "essai", marque: m, legende: l });
+  const reponse = (m, l) => ({ type: "essai", marque: m, legende: l, reponse: true });
+
+  // Recto : deux repères. Verso : les deux réponses possibles, chacune du
+  // côté qui la désigne.
+  // Sans repères de coupe : cet essai ne demande aucune précision, on coupe
+  // la feuille à peu près en deux et l'on retourne la moitié qui porte le A.
+  const recto = creerFaceDeuxPages(
+    marque("A", "Coupez la feuille en deux, à peu près au milieu, puis regardez le DOS de cette moitié-ci."),
+    marque("B", "Celle-ci ne sert qu'à faire la paire."),
+    f, f.margeH, f.margeH, gouttiere, true);
+  const verso = creerFaceDeuxPages(
+    reponse("L'autre sens", "Si c'est ceci que vous lisez au dos du A, choisissez « L'autre sens »."),
+    reponse("Comme le livret", "Si c'est ceci que vous lisez au dos du A, choisissez « Comme le livret »."),
+    f, f.margeH, f.margeH, gouttiere, true);
+
+  [recto, verso].forEach((face) => {
+    zone.appendChild(papier ? poserSurPapier(face, papier, largFeuille, f.haut) : face);
+  });
+
+  // L'essai doit emprunter le MÊME chemin que l'impression réelle : en deux
+  // passes, c'est justement la remise de la pile dans le bac qu'on teste.
+  lancerImpression(choixImpression.imprimante === "passes" ? "passes" : "auto");
+}
+
+// Une face : deux pages séparées par la gouttière, avec ses traits de coupe.
+//
+// `sansTraits` laisse la gouttière mais retire les repères imprimés. La bande
+// blanche continue de faire son office — elle absorbe le décalage recto-verso
+// de l'imprimante, et l'on coupe n'importe où dedans — mais rien n'est tracé
+// sur la feuille.
+function creerFaceDeuxPages(demiGauche, demiDroite, f, margeInt, margeExt, gouttiere, sansTraits) {
+  const feuille = document.createElement("div");
+  feuille.className = "feuille-impression";
+  feuille.style.width = (2 * f.larg + gouttiere) + "mm";
+  feuille.style.height = f.haut + "mm";
+
+  feuille.appendChild(creerDemiPageLivret(demiGauche, f, margeInt, margeExt));
+
+  if (gouttiere > 0) {
+    const bande = document.createElement("div");
+    bande.className = "gouttiere-impression";
+    bande.style.width = gouttiere + "mm";
+    feuille.appendChild(bande);
+  }
+
+  feuille.appendChild(creerDemiPageLivret(demiDroite, f, margeInt, margeExt));
+
+  // Les deux traits, posés DANS la gouttière : ils ne touchent aucune page, et
+  // la bande qu'ils encadrent part avec la coupe.
+  if (sansTraits) return feuille;
+
+  if (gouttiere > 0) {
+    [f.larg + 0.4, f.larg + gouttiere - 0.4].forEach((x) => {
+      const trait = document.createElement("div");
+      trait.className = "trait-milieu";
+      trait.style.left = x + "mm";
+      trait.style.height = f.haut + "mm";
+      feuille.appendChild(trait);
+    });
+  } else {
+    // Pas la place pour une gouttière : un seul trait, sur la ligne de coupe.
+    const trait = document.createElement("div");
+    trait.className = "trait-milieu";
+    trait.style.left = f.larg + "mm";
+    trait.style.height = f.haut + "mm";
+    feuille.appendChild(trait);
+  }
+
+  return feuille;
+}
+
+// ----- Couverture seule (reliure maison) -----
+//
+// Le dos collé se fabrique en deux temps : les pages d'un côté, la couverture
+// de l'autre. Elle doit sortir OUVERTE À PLAT — 4e de couverture, dos, 1re —
+// pour qu'une fois pliée sur les deux traits, la tranche tombe au milieu.
+//
+// C'est la planche de l'export imprimeur, sans le contrôle avant envoi qui
+// n'a pas lieu d'être ici : on ne demande que l'épaisseur du dos.
+
+function exporterCouvertureSeule() {
+  flushSpread();
+  const livre = livreActuel();
+  const f = FORMATS[livre.format || "149x210"] || FORMATS["149x210"];
+  // Le nombre de pages à l'écran suffit à estimer le dos : inutile de relancer
+  // la pagination imprimeur, qui coûte plusieurs secondes sur un gros livre et
+  // ne changerait l'épaisseur que d'une fraction de millimètre.
+  const nbPages = (livre.pages || []).length;
+  ouvrirDialogueCouvertureSeule(livre, f, nbPages, false);
+}
+
+// La même couverture, pour un cahier agrafé. Un livret n'a pas de dos plat :
+// la planche vaut exactement deux pages, à plier en deux et à agrafer avec le
+// cahier. Plutôt que de demander à l'auteur d'y penser et de saisir 0, le
+// bouton du livret ouvre le panneau avec le dos déjà écarté.
+function exporterCouvertureLivret() {
+  flushSpread();
+  const livre = livreActuel();
+  const f = FORMATS[livre.format || "149x210"] || FORMATS["149x210"];
+  ouvrirDialogueCouvertureSeule(livre, f, (livre.pages || []).length, true);
+}
+
+// Papiers courants pour les PAGES INTÉRIEURES. C'est leur épaisseur qui fait
+// le dos, pas celle de la couverture : le dos entoure la pile des pages.
+//
+// La « main » (ou bouffant) dit combien un papier gonfle à grammage égal —
+// un mot d'imprimeur qui ne dit rien à personne. On la range donc dans les
+// réglages fins et on propose des papiers nommés, avec leur usage.
+const PAPIERS_INTERIEUR = [
+  { cle: "70",  nom: "Papier fin — 70 g",        grammage: 70,  main: 1.2 },
+  { cle: "80",  nom: "Papier ordinaire — 80 g",  grammage: 80,  main: 1.2 },
+  { cle: "90",  nom: "Un peu épais — 90 g",      grammage: 90,  main: 1.2 },
+  { cle: "100", nom: "Épais — 100 g",            grammage: 100, main: 1.2 },
+  { cle: "120", nom: "Très épais — 120 g",       grammage: 120, main: 1.2 }
+];
+const PAPIER_INTERIEUR_DEFAUT = "80";
+
+function papierInterieur(cle) {
+  return PAPIERS_INTERIEUR.find((p) => p.cle === cle) || PAPIERS_INTERIEUR[1];
+}
+
+function ouvrirDialogueCouvertureSeule(livre, f, nbPages, agrafe) {
+  const ancien = document.getElementById("dialogueCouverture");
+  if (ancien) ancien.remove();
+
+  const papierPages = papierInterieur(PAPIER_INTERIEUR_DEFAUT);
+  const dosCalcule = agrafe ? 0 :
+    epaisseurDosMm(nbPages, papierPages.grammage, papierPages.main) +
+    supplementDosCouvertureMm(PAPIER_COUVERTURE_DEFAUT, PLASTIFICATION_DEFAUT);
+
+  // La couverture peut être agrandie de quelques dixièmes pour bien envelopper
+  // le livre relié ; les pages, elles, gardent le format nominal. `fCouv()` rend
+  // le format agrandi courant, relu à chaque frappe dans les champs de débord.
+  let debord = debordCouverture();
+  const fCouv = () => formatAvecDebord(f, debord);
+  const largSupport = (dosMm) => 2 * fCouv().larg + dosMm + 2 * MARGE_TECHNIQUE_MM;
+  const hautSupport = () => fCouv().haut + 2 * MARGE_TECHNIQUE_MM;
+  const coteMm = (v) => String(Math.round(v * 10) / 10).replace(".", ",");
+
+  let html = '<div class="modal-impression-carte mi-carte" role="dialog" aria-modal="true">' +
+    '<button class="mi-fermer" aria-label="Fermer">&#10005;</button>' +
+    "<h3>" + (agrafe ? "La couverture du livret" : "La couverture") + "</h3>" +
+    '<p class="mi-intro">' + (agrafe
+      ? "Une seule feuille, ouverte à plat : la 4e de couverture et la 1re. " +
+        "On la plie en deux et on l'agrafe avec le cahier."
+      : "Une seule feuille, ouverte à plat : la 4e de couverture, le dos, la 1re. " +
+        "Des traits marquent où plier et où couper.") + "</p>";
+
+  // Le dessin dit en un coup d'œil ce qui va sortir de l'imprimante.
+  html += '<div class="dc-apercu">' + schemaPlancheHtml(fCouv(), dosCalcule, agrafe) + "</div>";
+
+  if (!agrafe) {
+    html += '<div class="mi-groupe"><h4>Quelle épaisseur fera le dos ?</h4>' +
+      '<p class="mi-groupe-aide">Le dos enserre la pile de vos pages, et la ' +
+      "couverture s'enroule autour : les <b>deux</b> papiers comptent, plus le " +
+      "film si vous plastifiez. Indiquez ce que vous mettrez réellement dans le bac.</p>" +
+      '<div class="dc-ligne">' +
+        '<label class="tr-champ"><span>Papier de vos pages</span>' +
+          '<select id="dcPapierPages">' +
+            PAPIERS_INTERIEUR.map((pa) => '<option value="' + pa.cle + '"' +
+              (pa.cle === PAPIER_INTERIEUR_DEFAUT ? " selected" : "") + ">" + pa.nom + "</option>").join("") +
+          "</select></label>" +
+        '<label class="tr-champ tr-court"><span>Dos obtenu</span>' +
+          '<input type="number" id="dcDos" value="' + dosCalcule.toFixed(1) +
+          '" min="0" max="60" step="0.1"> <small>mm</small></label>' +
+      "</div>" +
+      '<div class="dc-ligne">' +
+        '<label class="tr-champ"><span>Papier de la couverture</span>' +
+          '<select id="dcPapierCouv">' +
+            PAPIERS_COUVERTURE.map((pa) => '<option value="' + pa.cle + '"' +
+              (pa.cle === PAPIER_COUVERTURE_DEFAUT ? " selected" : "") + ">" + pa.nom + "</option>").join("") +
+          "</select></label>" +
+        '<label class="tr-champ"><span>Couverture plastifiée ?</span>' +
+          '<select id="dcPlastification">' +
+            PLASTIFICATIONS.map((p) => '<option value="' + p.cle + '"' +
+              (p.cle === PLASTIFICATION_DEFAUT ? " selected" : "") + ">" + p.nom + "</option>").join("") +
+          "</select></label>" +
+      "</div>" +
+      '<p class="mi-groupe-aide dc-calcul"></p>' +
+      '<details class="mi-details-schema"><summary>Le dos ne tombe pas juste ?</summary>' +
+        "<p>Le calcul part d'un papier moyen ; le vôtre gonfle peut-être un peu plus " +
+        "ou un peu moins. La mesure vaut mieux que le calcul : <b>imprimez vos pages, " +
+        "tassez la pile sur une table, mesurez son épaisseur à la règle</b>, puis " +
+        "reportez cette mesure dans « Dos obtenu » <b>en y ajoutant</b> ce que le " +
+        "calcul annonce pour la couverture et la plastification — la règle mesure " +
+        "vos pages, pas ce qui s'enroule autour.</p>" +
+        "<p>Un essai de contour tranche plus vite qu'un raisonnement : il sort la " +
+        "planche aux cotes exactes, sans encre, et vous la pliez sur votre pile.</p>" +
+
+        "<p><b>Le plus sûr : donnez-lui votre mesure.</b> Rien à imprimer — la main " +
+        "est une propriété du papier, pas de ce qu'on écrit dessus. Prenez des feuilles " +
+        "<b>blanches</b> dans votre rame, tassez la pile sur une table et mesurez-la au " +
+        "réglet. L'éditeur en déduit combien votre papier gonfle et s'en souviendra.</p>" +
+        '<div class="dc-ligne dc-mesure">' +
+          '<label class="tr-champ tr-court"><span>J\'ai mesuré</span>' +
+            '<input type="number" id="dcMesureFeuilles" value="100" ' +
+            'min="1" max="2000" step="1"> <small>feuilles</small></label>' +
+          '<label class="tr-champ tr-court"><span>qui font</span>' +
+            '<input type="number" id="dcMesureMm" placeholder="13,4" min="0.1" max="300" ' +
+            'step="0.1"> <small>mm</small></label>' +
+          '<button type="button" class="dc-appliquer-mesure">Utiliser cette mesure</button>' +
+        "</div>" +
+        '<p class="mi-groupe-aide dc-etat-mesure"></p>' +
+        '<p class="mi-groupe-aide">Plus la pile est haute, plus la mesure est juste : ' +
+        "le demi-millimètre d'imprécision du réglet se divise par le nombre de feuilles. " +
+        "Sur 100 feuilles il fausse le dos d'un bon millimètre ; sur une <b>rame entière " +
+        "de 500, encore fermée</b>, de deux dixièmes seulement.</p>" +
+        '<p class="mi-groupe-aide">Inutile de chercher cette valeur sur l\'emballage : ' +
+        "une rame de bureau y annonce son grammage et sa blancheur, presque jamais son " +
+        "épaisseur, et la main pour ainsi dire jamais. Elle figure sur la fiche technique " +
+        "du fabricant, sous le nom d'<b>épaisseur</b> en µm (norme ISO 534) — divisez-la " +
+        "alors par le grammage et multipliez par mille. Mais votre réglet vaut mieux " +
+        "qu'une fiche : celle-ci donne une valeur nominale, le vôtre mesure votre rame.</p>" +
+
+        '<label class="tr-champ tr-court"><span>Main du papier</span>' +
+          '<input type="number" id="dcMain" value="' + mainPapier(papierPages) +
+          '" min="0.8" max="2.5" step="0.01"></label>' +
+        "<p>La « main » dit de combien un papier gonfle à grammage égal. 1,2 correspond " +
+        "à un papier de bureau courant ; un papier bouffant de roman monte à 1,8. " +
+        "La mesure ci-dessus la remplit pour vous.</p>" +
+      "</details>" +
+    "</div>";
+  } else {
+    html += '<p class="mi-groupe-aide">Un cahier agrafé n\'a pas de dos plat : la planche ' +
+      "vaut exactement deux pages, et le pli tombe en son milieu. Pour un dos collé, " +
+      "repassez par « La couverture » du dos collé.</p>" +
+      '<input type="hidden" id="dcDos" value="0">';
+  }
+
+  html += '<div class="mi-groupe"><h4>Ajuster la taille de la couverture</h4>' +
+    '<p class="mi-groupe-aide">Le format prévoit une page de <b>' + coteMm(f.larg) + " × " +
+      coteMm(f.haut) + " mm</b>. Un livre relié à la maison tombe souvent un peu plus grand : " +
+      "si la couverture imprimée couvre juste, agrandissez-la. Mesurez le livre fini et " +
+      "reportez ici les millimètres qui manquent — les pages intérieures, elles, ne bougent pas.</p>" +
+    '<div class="dc-ligne">' +
+      '<label class="tr-champ tr-court"><span>Élargir la couverture</span>' +
+        '<input type="number" id="dcDebordLarg" value="' + debord.larg +
+        '" min="0" max="10" step="0.5"> <small>mm</small></label>' +
+      '<label class="tr-champ tr-court"><span>Rehausser la couverture</span>' +
+        '<input type="number" id="dcDebordHaut" value="' + debord.haut +
+        '" min="0" max="10" step="0.5"> <small>mm</small></label>' +
+      '<div class="tr-champ"><span>Couverture obtenue</span>' +
+        '<strong class="dc-cote-couv"></strong></div>' +
+    "</div>" +
+  "</div>";
+
+  html += '<div class="mi-groupe"><h4>Sur quelle feuille imprimez-vous ?</h4>' +
+    '<div class="dc-ligne">' +
+      '<label class="tr-champ"><span>Papier chargé dans l\'imprimante</span>' +
+        '<select id="dcPapier">' +
+          PAPIERS.map((pa) => '<option value="' + pa.cle + '">' + pa.nom +
+            " — " + pa.larg + " × " + pa.haut + " mm</option>").join("") +
+          '<option value="exact">Taille exacte de la planche (pour un PDF)</option>' +
+        "</select></label>" +
+      '<div class="tr-champ"><span>Planche à plat</span>' +
+        '<strong class="dc-support">' + largSupport(dosCalcule).toFixed(0) +
+        " × " + hautSupport().toFixed(0) + " mm</strong></div>" +
+    "</div>" +
+    '<p class="mi-groupe-aide dc-papier"></p>' +
+  "</div>";
+
+  html += '<p class="mi-resume">Dans la fenêtre d\'impression : échelle <b>100 %</b> ' +
+    "(jamais « ajuster à la page »), marges « aucune », et décochez les en-têtes et " +
+    "pieds de page du navigateur. Sans quoi les plis ne tomberaient plus au bon endroit.</p>";
+
+  html += '<p class="mi-groupe-aide">Une couverture, c\'est une feuille noircie ' +
+    "d'un bord à l'autre : de quoi vider une cartouche pour découvrir que le dos " +
+    "tombe deux millimètres à côté. L'<b>essai de contour</b> sort la même planche, " +
+    "aux mêmes cotes, mais réduite à ses traits — vous la pliez sur votre bloc de " +
+    "pages pour vérifier avant d'y mettre la couleur.</p>";
+
+  html += '<div class="mi-actions">' +
+    '<button class="ci-annuler" type="button">Annuler</button>' +
+    '<button class="dc-essai" type="button">Essai de contour</button>' +
+    '<button class="mi-lancer" type="button">Imprimer la couverture</button>' +
+  "</div></div>";
+
+  const fond = document.createElement("div");
+  fond.id = "dialogueCouverture";
+  fond.className = "modal-impression";
+  fond.innerHTML = html;
+  fond.addEventListener("click", (e) => { if (e.target === fond) fond.remove(); });
+  document.body.appendChild(fond);
+
+  const champDos = fond.querySelector("#dcDos");
+  const selPapier = fond.querySelector("#dcPapier");
+  const selPages = fond.querySelector("#dcPapierPages");
+  const selCouv = fond.querySelector("#dcPapierCouv");
+  const selPlast = fond.querySelector("#dcPlastification");
+  const champMain = fond.querySelector("#dcMain");
+
+  const dosSaisi = () => {
+    const v = parseFloat(champDos.value);
+    return isFinite(v) && v >= 0 ? v : dosCalcule;
+  };
+
+  // Le dessin, la taille de planche et la remarque sur le papier suivent
+  // chaque frappe : on voit tout de suite l'effet de ce qu'on change.
+  const rafraichir = () => {
+    const dosMm = dosSaisi();
+    const fc = fCouv();
+    const l = largSupport(dosMm);
+
+    fond.querySelector(".dc-apercu").innerHTML = schemaPlancheHtml(fc, dosMm, agrafe);
+    fond.querySelector(".dc-support").textContent = l.toFixed(0) + " × " + hautSupport().toFixed(0) + " mm";
+    const coteCouv = fond.querySelector(".dc-cote-couv");
+    if (coteCouv) coteCouv.textContent = coteMm(fc.larg) + " × " + coteMm(fc.haut) + " mm";
+
+    // L'état du calibrage : sans lui, on ne saurait pas si le chiffre repose
+    // sur une moyenne de tableau ou sur une pile réellement mesurée.
+    const etatMesure = fond.querySelector(".dc-etat-mesure");
+    if (etatMesure && selPages) {
+      const pa = papierInterieur(selPages.value);
+      etatMesure.textContent = papierEstMesure(pa)
+        ? "Votre papier de " + pa.grammage + " g est calibré : main " +
+          String(mainPapier(pa)).replace(".", ",") + ". Le tableau donnait " +
+          String(pa.main).replace(".", ",") + "."
+        : "Papier de " + pa.grammage + " g non calibré : le calcul emploie la moyenne du tableau.";
+      etatMesure.classList.toggle("dc-mesure-faite", papierEstMesure(pa));
+    }
+
+    // L'état du tour : mesuré une bonne fois, ou encore estimé.
+    const etatTour = fond.querySelector(".dc-etat-tour");
+    if (etatTour) {
+      const t = tourMesure();
+      const materiauxCourants = libelleMateriaux(
+        selCouv ? selCouv.value : PAPIER_COUVERTURE_DEFAUT,
+        selPlast ? selPlast.value : PLASTIFICATION_DEFAUT);
+      if (t) {
+        etatTour.innerHTML = "Tour mesuré : <b>" +
+          String(t.mm).replace(".", ",") + " mm</b>" +
+          (t.materiaux ? ", relevé avec une couverture " + echapperTitre(t.materiaux) : "") +
+          ". Il remplace le calcul." +
+          (t.materiaux && t.materiaux !== materiauxCourants
+            ? " <b>Vos réglages actuels (" + echapperTitre(materiauxCourants) +
+              ") ne correspondent pas : refaites la mesure.</b>"
+            : "") +
+          ' <button type="button" class="dc-oublier-tour">Revenir au calcul</button>';
+        etatTour.classList.add("dc-mesure-faite");
+        const oublier = etatTour.querySelector(".dc-oublier-tour");
+        if (oublier) oublier.onclick = () => { oublierTourMesure(); recalculerDos(); };
+      } else {
+        etatTour.textContent = "Tour non mesuré : le calcul emploie une estimation.";
+        etatTour.classList.remove("dc-mesure-faite");
+      }
+    }
+
+    const calcul = fond.querySelector(".dc-calcul");
+    if (calcul && selPages) {
+      const pa = papierInterieur(selPages.value);
+      const m = parseFloat(champMain && champMain.value) || mainPapier(pa);
+      const pages = epaisseurDosMm(nbPages, pa.grammage, m);
+      const cleCouv = selCouv ? selCouv.value : PAPIER_COUVERTURE_DEFAUT;
+      const clePlast = selPlast ? selPlast.value : PLASTIFICATION_DEFAUT;
+      const cv = papierCouverture(cleCouv);
+      const mesure = tourMesure();
+      const tour = supplementDosCouvertureMm(cleCouv, clePlast);
+      const mm = (v) => v.toFixed(2).replace(".", ",");
+
+      // Le détail poste par poste, et non le seul total : c'est le seul moyen
+      // de voir d'où sort le chiffre — et de repérer celui qui cloche.
+      let texte = "Pour " + nbPages + " pages — " +
+        Math.ceil(nbPages / 2) + " feuilles de " + pa.grammage + " g/m² : " + mm(pages) + " mm" +
+        (papierEstMesure(pa) ? " (mesuré)" : " (estimé)") + " ; ";
+      if (mesure) {
+        texte += "tour de couverture mesuré sur un livre relié : " + mm(tour) + " mm";
+      } else {
+        const plast = supplementDosPlastificationMm(clePlast);
+        const couvSeule = 2 * epaisseurFeuilleMm(cv.grammage, cv.main);
+        const parts = ["colle " + mm(colleMm()) + " mm",
+                       "couverture " + cv.grammage + " g/m² aux deux plis " + mm(couvSeule) + " mm"];
+        if (plast) parts.push("plastification " + mm(plast) + " mm");
+        texte += "tour de couverture estimé " + mm(tour) + " mm (" + parts.join(", ") + ")";
+      }
+      calcul.textContent = texte + ". Total : " + mm(pages + tour) + " mm.";
+    }
+
+    const papier = papierParCle(selPapier.value);
+    const note = fond.querySelector(".dc-papier");
+    if (!papier) {
+      note.textContent = "Taille exacte : à réserver au PDF. Sur une imprimante, le pilote " +
+        "ramènerait la planche au format du papier chargé, et la couverture ne ferait plus " +
+        "la bonne taille.";
+      note.classList.add("dc-alerte");
+    } else if (papier.larg < l || papier.haut < hautSupport()) {
+      const mieux = papierMinimal(l, hautSupport());
+      note.textContent = "La planche ne tient pas sur cette feuille : elle serait rognée. " +
+        "Prenez du " + (mieux ? mieux.nom : "plus grand") + ".";
+      note.classList.add("dc-alerte");
+    } else {
+      note.textContent = "La planche tient sur cette feuille, à sa taille réelle.";
+      note.classList.remove("dc-alerte");
+    }
+  };
+
+  // Changer de papier ou de plastification recalcule le dos ; le modifier à
+  // la main fige la valeur.
+  const recalculerDos = () => {
+    const pa = papierInterieur(selPages.value);
+    const m = parseFloat(champMain && champMain.value) || mainPapier(pa);
+    const total = epaisseurDosMm(nbPages, pa.grammage, m) +
+      supplementDosCouvertureMm(selCouv ? selCouv.value : PAPIER_COUVERTURE_DEFAUT,
+                                selPlast ? selPlast.value : PLASTIFICATION_DEFAUT);
+    champDos.value = total.toFixed(1);
+    rafraichir();
+  };
+  // Changer de papier : la main suit celle qu'on a mesurée pour CE grammage,
+  // sans quoi la valeur du papier précédent resterait en place.
+  const changerPapierPages = () => {
+    if (champMain) champMain.value = mainPapier(papierInterieur(selPages.value));
+    recalculerDos();
+  };
+  if (selPages) selPages.onchange = changerPapierPages;
+  if (selCouv) selCouv.onchange = recalculerDos;
+  if (selPlast) selPlast.onchange = recalculerDos;
+  if (champMain) champMain.oninput = recalculerDos;
+
+  const boutonTour = fond.querySelector(".dc-appliquer-tour");
+  if (boutonTour) {
+    boutonTour.onclick = () => {
+      const p = parseFloat(fond.querySelector("#dcTourPages").value);
+      const dosJuste = parseFloat(fond.querySelector("#dcTourDos").value);
+      const ecart = dosJuste - p;
+      const t = enregistrerTourMesure(ecart, libelleMateriaux(
+        selCouv ? selCouv.value : PAPIER_COUVERTURE_DEFAUT,
+        selPlast ? selPlast.value : PLASTIFICATION_DEFAUT));
+      if (!t) {
+        alert("Mesures inexploitables.\n\nLe dos d'un livre relié est forcément PLUS " +
+              "épais que ses pages seules, et de quelques millimètres au plus : c'est " +
+              "l'épaisseur de la colle, de la couverture et du film réunis.");
+        return;
+      }
+      recalculerDos();
+    };
+  }
+
+  const champColle = fond.querySelector("#dcColle");
+  if (champColle) {
+    champColle.oninput = () => {
+      const v = parseFloat(champColle.value);
+      if (isFinite(v) && v >= 0 && v <= 5) {
+        try { localStorage.setItem("gh_colle_mm", String(v)); } catch (e) {}
+      }
+      recalculerDos();
+    };
+  }
+
+  const boutonMesure = fond.querySelector(".dc-appliquer-mesure");
+  if (boutonMesure) {
+    boutonMesure.onclick = () => {
+      const pa = papierInterieur(selPages.value);
+      const feuilles = fond.querySelector("#dcMesureFeuilles").value;
+      const champMm = fond.querySelector("#dcMesureMm");
+      const main = enregistrerMainMesuree(pa.grammage, feuilles, champMm.value);
+      if (main === null) {
+        alert("Mesure inexploitable.\n\nIndiquez un nombre de feuilles et une épaisseur " +
+              "en millimètres. Une pile de 200 feuilles de papier ordinaire fait entre " +
+              "18 et 30 mm : au-delà, c'est que l'une des deux valeurs est fausse.");
+        return;
+      }
+      if (champMain) champMain.value = main;
+      recalculerDos();
+    };
+  }
+  champDos.oninput = rafraichir;
+  selPapier.onchange = rafraichir;
+
+  // Agrandir la couverture : on retient la mesure et l'on redessine la planche.
+  const champDebordL = fond.querySelector("#dcDebordLarg");
+  const champDebordH = fond.querySelector("#dcDebordHaut");
+  const majDebord = () => {
+    debord = enregistrerDebordCouverture(
+      champDebordL ? champDebordL.value : 0,
+      champDebordH ? champDebordH.value : 0);
+    rafraichir();
+  };
+  if (champDebordL) champDebordL.oninput = majDebord;
+  if (champDebordH) champDebordH.oninput = majDebord;
+
+  const parDefaut = papierMinimal(largSupport(dosCalcule), hautSupport());
+  if (parDefaut) selPapier.value = parDefaut.cle;
+  rafraichir();
+
+  fond.querySelector(".mi-fermer").onclick = () => fond.remove();
+  fond.querySelector(".ci-annuler").onclick = () => fond.remove();
+  fond.querySelector(".mi-lancer").onclick = () => {
+    const dosMm = dosSaisi();
+    const papier = papierParCle(selPapier.value);
+    fond.remove();
+    // La couverture sort au format agrandi ; les pages, elles, gardent le leur.
+    // Aucune page intérieure à fournir : la planche de couverture n'en utilise pas.
+    setTimeout(() => genererFichierImprimeur("couverture", dosMm, livre, fCouv(), [], papier), 50);
+  };
+  fond.querySelector(".dc-essai").onclick = () => {
+    const dosMm = dosSaisi();
+    const papier = papierParCle(selPapier.value);
+    // Le dialogue reste ouvert : on va chercher la feuille, on mesure, et l'on
+    // corrige le dos sans avoir à refaire tout le parcours.
+    imprimerEssaiCouverture(fCouv(), dosMm, papier, agrafe);
+  };
+}
+
+// ----- L'essai de contour -----
+//
+// Une couverture est noircie d'un bord à l'autre : l'imprimer pour découvrir
+// que le dos tombe deux millimètres à côté coûte une cartouche. L'essai sort
+// donc EXACTEMENT la même planche — mêmes cotes, même papier, mêmes repères —
+// mais réduite à ses traits. On la plie sur son bloc de pages, on vérifie que
+// le dos l'enserre juste, et l'on n'imprime la vraie qu'ensuite.
+//
+// Les cotes sont écrites dessus : une planche muette obligerait à ressortir le
+// réglet pour savoir ce qu'on est en train de vérifier.
+function imprimerEssaiCouverture(f, dosMm, papier, agrafe) {
+  const largTrim = 2 * f.larg + dosMm;
+
+  let stylePage = document.getElementById("stylePageImpression");
+  if (!stylePage) {
+    stylePage = document.createElement("style");
+    stylePage.id = "stylePageImpression";
+    document.head.appendChild(stylePage);
+  }
+  if (papier) reglerPagePapier(stylePage, papier);
+  else {
+    stylePage.textContent = "@page { size: " + (largTrim + 2 * MARGE_TECHNIQUE_MM) + "mm " +
+      (f.haut + 2 * MARGE_TECHNIQUE_MM) + "mm; margin: 0; }";
+  }
+
+  let zone = document.getElementById("zoneImpression");
+  if (zone) zone.remove();
+  zone = document.createElement("div");
+  zone.id = "zoneImpression";
+  zone.classList.add("zone-pro");
+  document.body.appendChild(zone);
+
+  const planche = creerCouvertureEssai(f, dosMm, agrafe, papier);
+  zone.appendChild(papier ? poserSurPapier(planche, papier, largTrim, f.haut) : planche);
+
+  definirPasseLivret(null);
+  window.print();
+}
+
+function creerCouvertureEssai(f, dosMm, agrafe, papier) {
+  const largTrim = 2 * f.larg + dosMm;
+  const feuille = creerFeuillePro(largTrim, f.haut);
+  const zone = creerZoneRognePro(largTrim, f.haut);
+  zone.classList.add("couv-essai");
+
+  const panneau = (largeur, titre, detail) => {
+    const d = document.createElement("div");
+    d.className = "essai-panneau";
+    d.style.width = largeur + "mm";
+    d.innerHTML = '<span class="essai-panneau-nom">' + titre + "</span>" +
+      '<span class="essai-panneau-cote">' + detail + "</span>";
+    return d;
+  };
+
+  const cote = (v) => String(Math.round(v * 10) / 10).replace(".", ",");
+
+  zone.appendChild(panneau(f.larg, "4e de couverture", cote(f.larg) + " × " + cote(f.haut) + " mm"));
+  if (dosMm > 0) {
+    // Sous six millimètres, même écrit en hauteur le mot déborde du dos et
+    // vient mordre sur les plats. La cote est de toute façon rappelée dans la
+    // légende : mieux vaut un dos vide qu'un dos illisible.
+    const large = dosMm >= 6;
+    const dos = panneau(dosMm, large ? "dos" : "", large ? cote(dosMm) + " mm" : "");
+    dos.classList.add("essai-dos");
+    zone.appendChild(dos);
+  }
+  zone.appendChild(panneau(f.larg, "1re de couverture", cote(f.larg) + " × " + cote(f.haut) + " mm"));
+
+  feuille.appendChild(zone);
+
+  // Les plis, en tirets, comme sur la vraie planche — mais ici ils traversent
+  // la feuille : elle finira à la poubelle, et c'est justement le pli qu'on
+  // vient éprouver.
+  const positions = dosMm > 0 ? [f.larg, f.larg + dosMm] : [f.larg];
+  positions.forEach((x) => {
+    const t = document.createElement("div");
+    t.className = "essai-pli";
+    t.style.left = (MARGE_TECHNIQUE_MM + x) + "mm";
+    t.style.top = MARGE_TECHNIQUE_MM + "mm";
+    t.style.height = f.haut + "mm";
+    feuille.appendChild(t);
+  });
+
+  const legende = document.createElement("div");
+  legende.className = "essai-legende-couv";
+  legende.style.left = MARGE_TECHNIQUE_MM + "mm";
+  legende.style.top = (MARGE_TECHNIQUE_MM + f.haut + 3) + "mm";
+  legende.style.width = largTrim + "mm";
+  legende.innerHTML =
+    "<b>Essai de contour</b> — planche " + cote(largTrim) + " × " + cote(f.haut) + " mm" +
+    (dosMm > 0 ? ", dos " + cote(dosMm) + " mm" : "") +
+    (papier ? ", sur " + papier.nom : "") + ". " +
+    (agrafe
+      ? "Pliez sur le trait central et glissez le cahier dedans."
+      : "Pliez sur les deux traits et enserrez votre bloc de pages : le dos doit " +
+        "tomber juste. Sinon, corrigez « Dos obtenu » et refaites un essai.");
+  feuille.appendChild(legende);
+
+  return feuille;
+}
+
+// La planche vue de dessus : 4e de couverture, dos, 1re — avec le dos à
+// l'échelle, pour qu'on voie tout de suite s'il est plausible.
+function schemaPlancheHtml(f, dosMm, agrafe) {
+  const H = 108;                      // hauteur du dessin, en px
+  const echelle = H / f.haut;
+  const largPan = f.larg * echelle;
+  const largDos = Math.max(agrafe ? 1 : 2, dosMm * echelle);
+  const total = 2 * largPan + largDos;
+
+  const panneau = (x, etiquette) =>
+    '<rect x="' + x.toFixed(1) + '" y="6" width="' + largPan.toFixed(1) + '" height="' + H +
+      '" rx="2" fill="#fffdf8" stroke="currentColor" stroke-width="1.4"/>' +
+    '<text x="' + (x + largPan / 2).toFixed(1) + '" y="' + (H / 2 + 10) +
+      '" font-size="10" text-anchor="middle" fill="currentColor" opacity=".75">' + etiquette + "</text>";
+
+  // Taille intrinsèque donnée en pixels : sans elle, le SVG s'étire à la
+  // largeur du dialogue et grossit ses libellés jusqu'à l'absurde.
+  const largeurPx = total + 4;
+  const hauteurPx = H + 30;
+  return '<svg width="' + largeurPx.toFixed(0) + '" height="' + hauteurPx +
+    '" viewBox="0 0 ' + largeurPx.toFixed(1) + ' ' + hauteurPx + '" class="dc-schema" role="img" ' +
+    'aria-label="La planche de couverture, à plat">' +
+    panneau(2, "4e de couv.") +
+    '<rect x="' + (2 + largPan).toFixed(1) + '" y="6" width="' + largDos.toFixed(1) +
+      '" height="' + H + '" fill="currentColor" opacity=".16" stroke="currentColor" stroke-width="1.4"/>' +
+    panneau(2 + largPan + largDos, "1re de couv.") +
+    '<text x="' + (2 + largPan + largDos / 2).toFixed(1) + '" y="' + (H + 22) +
+      '" font-size="9" text-anchor="middle" fill="currentColor">' +
+      (agrafe ? "le pli" : "dos " + dosMm.toFixed(1).replace(".", ",") + " mm") + "</text>" +
+  "</svg>";
 }
 
 // ----- Panneau de contrôle avant génération -----
@@ -751,9 +2325,11 @@ function ouvrirControleImprimeur(cible, livre, f, pagesEcran, pagesPro) {
 
 // ----- Génération du fichier -----
 
-function genererFichierImprimeur(cible, dosMm, livre, f, pagesPro) {
+function genererFichierImprimeur(cible, dosMm, livre, f, pagesPro, papier) {
   const message = document.getElementById("message");
   if (message) message.textContent = "Préparation du fichier imprimeur...";
+  ouvrirAttente("Préparation du fichier…",
+    "La planche et ses images sont assemblées ; la fenêtre d'impression s'ouvrira toute seule.");
 
   const promessesImages = [];
 
@@ -773,10 +2349,26 @@ function genererFichierImprimeur(cible, dosMm, livre, f, pagesPro) {
     }
 
     if (cible === "couverture") {
-      const largSupport = 2 * f.larg + dosMm + 2 * MARGE_TECHNIQUE_MM;
+      const largTrim = 2 * f.larg + dosMm;          // la couverture finie
+      const largSupport = largTrim + 2 * MARGE_TECHNIQUE_MM;
       const hautSupport = f.haut + 2 * MARGE_TECHNIQUE_MM;
-      stylePage.textContent = "@page { size: " + largSupport + "mm " + hautSupport + "mm; margin: 0; }";
-      zone.appendChild(creerCouverturePlat(livre, f, dosMm, promessesImages));
+      // Sur une imprimante, la planche est centrée sur une feuille réelle pour
+      // sortir à sa taille exacte. Pour l'imprimeur, c'est le support lui-même
+      // qui doit faire cette taille : pas d'enveloppe.
+      if (papier) {
+        const planche = creerCouverturePlat(livre, f, dosMm, promessesImages, false);
+        reglerPagePapier(stylePage, papier);
+        // On cerne le format ROGNÉ, pas le support : le support n'est qu'un
+        // porte-repères, et l'encadrer donnait deux rectangles concentriques
+        // sur la feuille — dont un qu'il ne fallait surtout pas suivre.
+        const feuilleP = poserSurPapier(planche, papier, largTrim, f.haut);
+        ajouterLegendeCouverture(feuilleP, papier, largSupport, hautSupport, dosMm);
+        zone.appendChild(feuilleP);
+      } else {
+        const planche = creerCouverturePlat(livre, f, dosMm, promessesImages, true);
+        stylePage.textContent = "@page { size: " + largSupport + "mm " + hautSupport + "mm; margin: 0; }";
+        zone.appendChild(planche);
+      }
       return;
     }
 
@@ -796,6 +2388,7 @@ function genererFichierImprimeur(cible, dosMm, livre, f, pagesPro) {
 
   Promise.all(promessesImages).finally(() => {
     if (message) message.textContent = "";
+    fermerAttente();
     definirPasseLivret(null);
     window.print();
   });
@@ -853,14 +2446,23 @@ function ajouterReperesCoupe(feuille, largTrim, hautTrim) {
 }
 
 // Repères de pli : verticaux, de part et d'autre du dos.
-function ajouterReperesPli(feuille, hautTrim, positionsMm) {
+//
+// `pointille` les distingue des traits de coupe. Chez un imprimeur, la
+// convention du métier suffit ; chez soi, deux hairlines identiques à cinq
+// millimètres l'une de l'autre — l'une à scier, l'autre à plier — ne se
+// distinguent pas, et l'on coupe la couverture en trois.
+//
+// Ils restent DEHORS du format rogné : un pointillé qui traverserait le dos
+// resterait imprimé sur le livre fini. La contrepartie est que la coupe les
+// emporte, d'où la consigne de marquer les plis avant de couper.
+function ajouterReperesPli(feuille, hautTrim, positionsMm, pointille) {
   const M = MARGE_TECHNIQUE_MM;
   const d = DECALAGE_REPERE_MM;
   const L = LONGUEUR_REPERE_MM;
   positionsMm.forEach((x) => {
     [M - d - L, M + hautTrim + d].forEach((y) => {
       const t = document.createElement("div");
-      t.className = "repere-pro repere-v repere-pli-pro";
+      t.className = "repere-pro repere-v repere-pli-pro" + (pointille ? " repere-pli-tirets" : "");
       t.style.left = (M + x) + "mm";
       t.style.top = y + "mm";
       t.style.width = "0mm";
@@ -897,8 +2499,499 @@ function creerPagePro(contenu, numero, f, margeInt, margeExt) {
   return feuille;
 }
 
+// ----- La tranche (le dos du livre) -----
+//
+// Troisième face visible d'un livre relié, et la seule qu'on voie une fois
+// rangé dans une bibliothèque. Elle se règle donc comme les deux autres, à
+// ceci près qu'elle est haute et étroite : pas d'image de fond ici, une
+// bande de quelques millimètres n'en montrerait rien.
+//
+// Chaque réglage peut valoir « comme la couverture » (valeur nulle) : un
+// livre déjà écrit garde exactement l'aspect qu'il avait, sans migration.
+
+function donneesTranche(livre) {
+  const t = (livre && livre.tranche) || {};
+  const couv = (livre && livre.couverture) || {};
+  return {
+    fond: t.fond || couv.fond || "#1a1a2e",
+    texte: t.texte || couv.texte || "#ffffff",
+    // Le contenu par défaut est celui d'avant ce réglage : « Titre — Auteur ».
+    contenu: typeof t.contenu === "string" && t.contenu.trim()
+      ? t.contenu
+      : [livre && livre.titre, livre && livre.auteur].filter(Boolean).join(" — "),
+    // Sens de lecture. Les deux existent en rayon : de haut en bas chez la
+    // plupart des éditeurs actuels, de bas en haut dans la tradition
+    // française. On garde le premier par défaut, qui est ce que le dos
+    // faisait avant d'être réglable.
+    sens: t.sens === "montant" ? "montant" : "descendant",
+    taille: Number(t.taille) > 0 ? Number(t.taille) : 10,
+    // Blocs facultatifs, dans l'ordre où ils se posent sur le dos.
+    // Tous vides par défaut : un livre déjà écrit ne change pas d'aspect.
+    bandeau: Number(t.bandeau) > 0 ? Number(t.bandeau) : 0,
+    // Image du bandeau : la sienne si on lui en a donné une, sinon celle de
+    // la couverture, qui se prolonge alors sur le dos.
+    imageChemin: t.imageChemin || null,
+    pastille: typeof t.pastille === "string" ? t.pastille : "",
+    pastilleFond: t.pastilleFond || "#22c55e",
+    pastilleTexte: t.pastilleTexte || "#0b1220",
+    pastilleTaille: Number(t.pastilleTaille) > 0 ? Number(t.pastilleTaille) : 9,
+    surtitre: typeof t.surtitre === "string" ? t.surtitre : "",
+    surtitreTaille: Number(t.surtitreTaille) > 0 ? Number(t.surtitreTaille) : 6,
+    credits: typeof t.credits === "string" ? t.credits : "",
+    creditsTaille: Number(t.creditsTaille) > 0 ? Number(t.creditsTaille) : 5.5,
+    pied: typeof t.pied === "string" ? t.pied : "",
+    piedTaille: Number(t.piedTaille) > 0 ? Number(t.piedTaille) : 6,
+    // En dessous de 6 mm, l'usage est de laisser le dos nu : le texte
+    // tomberait sur les plis. On peut passer outre en connaissance de cause.
+    forcerTexte: !!t.forcerTexte
+  };
+}
+
+// Le texte tient-il sur ce dos ? En dessous de 6 mm, non — sauf insistance.
+function tranchePorteTexte(reglages, dosMm) {
+  return !!reglages.contenu.trim() && (dosMm >= 6 || reglages.forcerTexte);
+}
+
+// Le dos, tel qu'il s'imprime. Un seul constructeur sert la planche de
+// couverture ET l'aperçu du panneau de réglage : ce qu'on voit à l'écran est
+// exactement ce qui sortira, à l'échelle près.
+//
+// L'ordre des blocs est celui d'un livre en rayon : le bandeau d'image en
+// tête, la pastille de tome, le titre au centre, les crédits en dessous, la
+// marque de l'éditeur au pied.
+function construireDosLivre(livre, dosMm, hautMm, promessesImages) {
+  const r = donneesTranche(livre);
+  const dos = document.createElement("div");
+  dos.className = "dos-pro";
+  dos.style.width = dosMm + "mm";
+  dos.style.height = hautMm + "mm";
+  dos.style.background = r.fond;
+  dos.style.color = r.texte;
+
+  const montant = r.sens === "montant";
+  // Un texte tourné se lit dans le sens choisi ; la pastille et le pied
+  // restent droits, comme sur les livres qu'ils imitent.
+  const tourne = (el) => {
+    el.classList.add("dos-vertical");
+    if (montant) el.classList.add("montant");
+    return el;
+  };
+
+  // 1) Bandeau : le haut de l'image de couverture, qui se prolonge sur le dos.
+  const cheminBandeau = r.imageChemin ||
+    (livre.couverture && livre.couverture.imageChemin) || null;
+  if (r.bandeau > 0 && cheminBandeau) {
+    const bande = document.createElement("div");
+    bande.className = "dos-bandeau";
+    bande.style.height = r.bandeau + "mm";
+    const img = document.createElement("img");
+    bande.appendChild(img);
+    dos.appendChild(bande);
+    chargerImageCouverture(img, cheminBandeau, promessesImages);
+  }
+
+  // 2) Pastille : le numéro de tome, droit, sur son propre aplat.
+  if (r.pastille.trim()) {
+    const p = document.createElement("div");
+    p.className = "dos-pastille";
+    p.style.background = r.pastilleFond;
+    p.style.color = r.pastilleTexte;
+    p.style.fontSize = r.pastilleTaille + "pt";
+    p.textContent = r.pastille;
+    dos.appendChild(p);
+  }
+
+  // 3) Le titre, au centre, éventuellement précédé d'un surtitre en plus
+  //    petit — les deux côte à côte sur la largeur du dos.
+  const centre = document.createElement("div");
+  centre.className = "dos-centre";
+  if (tranchePorteTexte(r, dosMm)) {
+    const groupe = tourne(document.createElement("div"));
+    groupe.className += " dos-titre-groupe";
+
+    if (r.surtitre.trim()) {
+      const st = document.createElement("div");
+      st.className = "dos-ligne";
+      st.style.fontSize = r.surtitreTaille + "pt";
+      st.textContent = r.surtitre;
+      groupe.appendChild(st);
+    }
+    const t = document.createElement("div");
+    t.className = "dos-ligne dos-titre";
+    t.style.fontSize = r.taille + "pt";
+    t.textContent = r.contenu;
+    groupe.appendChild(t);
+
+    centre.appendChild(groupe);
+  }
+  dos.appendChild(centre);
+
+  // 4) Crédits : une colonne par ligne saisie (« Scénariste YC »).
+  const lignes = r.credits.split("\n").map((l) => l.trim()).filter(Boolean);
+  if (lignes.length && tranchePorteTexte(r, dosMm)) {
+    const groupe = tourne(document.createElement("div"));
+    groupe.className += " dos-credits";
+    groupe.style.fontSize = r.creditsTaille + "pt";
+    lignes.forEach((l) => {
+      const d = document.createElement("div");
+      d.className = "dos-ligne";
+      d.textContent = l;
+      groupe.appendChild(d);
+    });
+    dos.appendChild(groupe);
+  }
+
+  // 5) Pied : la marque de l'éditeur, droite comme la pastille.
+  if (r.pied.trim()) {
+    const p = document.createElement("div");
+    p.className = "dos-pied";
+    p.style.fontSize = r.piedTaille + "pt";
+    p.textContent = r.pied;
+    dos.appendChild(p);
+  }
+
+  return dos;
+}
+
+// L'image de couverture, résolue depuis GitHub comme pour les autres faces.
+// Sans tableau de promesses (aperçu à l'écran), on n'attend rien.
+function chargerImageCouverture(img, chemin, promessesImages) {
+  const poser = (url) => { img.src = url; };
+  if (cacheImagesURL[chemin]) {
+    poser(cacheImagesURL[chemin]);
+    return;
+  }
+  const token = localStorage.getItem("gh_token");
+  const promesse = new Promise((resoudre) => {
+    const secours = setTimeout(resoudre, 8000);
+    img.onload = () => { clearTimeout(secours); resoudre(); };
+    img.onerror = () => { clearTimeout(secours); img.remove(); resoudre(); };
+    obtenirUrlImage(chemin, token).then((url) => {
+      cacheImagesURL[chemin] = url;
+      poser(url);
+    }).catch(() => { clearTimeout(secours); img.remove(); resoudre(); });
+  });
+  if (promessesImages) promessesImages.push(promesse);
+}
+
+// ----- Réglage de la tranche -----
+//
+// La couverture et la 4e ouvrent une vue entière : elles ont une image de
+// fond à cadrer. La tranche, elle, s'ajuste sur un panneau, avec l'aperçu à
+// côté des champs — un aperçu qui n'est pas une imitation : c'est le dos
+// réel, construit par le même code que la planche d'impression, simplement
+// réduit à l'échelle.
+
+const HAUTEUR_APERCU_DOS = 300; // px
+
+function ouvrirTranche() {
+  if (modeApercu || modeCouverture) return;
+  flushSpread();
+
+  const livre = livreActuel();
+  if (!livre) return;
+  if (!livre.tranche) livre.tranche = {};
+  const t = livre.tranche;
+  const d = donneesTranche(livre);
+  const f = FORMATS[livre.format || "149x210"] || FORMATS["149x210"];
+
+  const ancien = document.getElementById("dialogueTranche");
+  if (ancien) ancien.remove();
+
+  // Épaisseur d'aperçu : celle qu'aura le dos pour le nombre de pages actuel.
+  const dosMm = epaisseurDosMm((livre.pages || []).length, GRAMMAGE_DEFAUT, MAIN_DEFAUT);
+  const aImage = !!(livre.couverture && livre.couverture.imageChemin);
+
+  const champ = (id, libelle, valeur, attrs) =>
+    '<label class="tr-champ"><span>' + libelle + "</span>" +
+    '<input id="' + id + '" value="' + echapperTitre(valeur) + '" ' + (attrs || "") + "></label>";
+
+  const nombre = (id, libelle, valeur, min, max) =>
+    '<label class="tr-champ tr-court"><span>' + libelle + "</span>" +
+    '<input type="number" id="' + id + '" value="' + valeur + '" min="' + min +
+    '" max="' + max + '" step="0.5"></label>';
+
+  let html = '<div class="modal-impression-carte ci-carte tr-carte" role="dialog" aria-modal="true">' +
+    '<button class="mi-fermer" aria-label="Fermer">&#10005;</button>' +
+    "<h3>La tranche</h3>" +
+    '<p class="mi-intro">Le dos du livre : la seule face visible une fois rangé ' +
+    "dans une bibliothèque. Chaque bloc est facultatif — laissez vide ce dont " +
+    "vous ne voulez pas.</p>" +
+    '<div class="tranche-atelier">' +
+      '<div class="tranche-reglages">' +
+
+      '<fieldset class="tr-bloc"><legend>Fond</legend>' +
+        '<div class="tranche-duo">' +
+          '<label>Couleur <input type="color" id="trFond" value="' + d.fond + '"></label>' +
+          '<label>Texte <input type="color" id="trTexte" value="' + d.texte + '"></label>' +
+          '<button type="button" class="btn-lien" id="trReset">Comme la couverture</button>' +
+        "</div>" +
+        '<div class="tranche-duo">' +
+          nombre("trBandeau", "Bandeau d'image (mm)", d.bandeau, 0, 200) +
+          '<label class="btn-fichier">Choisir une image' +
+            '<input type="file" id="trImage" accept="image/*" hidden></label>' +
+          '<button type="button" class="btn-lien" id="trImageRetirer">Retirer</button>' +
+        "</div>" +
+        '<p class="aide-champ" id="trImageNote"></p>' +
+      "</fieldset>" +
+
+      '<fieldset class="tr-bloc"><legend>Pastille</legend>' +
+        '<div class="tranche-duo">' +
+          champ("trPastille", "Texte", d.pastille, 'maxlength="6" class="tr-mini"') +
+          '<label>Fond <input type="color" id="trPastilleFond" value="' + d.pastilleFond + '"></label>' +
+          '<label>Texte <input type="color" id="trPastilleTexte" value="' + d.pastilleTexte + '"></label>' +
+          nombre("trPastilleTaille", "pt", d.pastilleTaille, 4, 24) +
+        "</div>" +
+        '<p class="aide-champ">Le numéro de tome, posé droit sur son aplat de couleur.</p>' +
+      "</fieldset>" +
+
+      '<fieldset class="tr-bloc"><legend>Titre</legend>' +
+        '<div class="tranche-duo">' +
+          champ("trSurtitre", "Surtitre", d.surtitre) +
+          nombre("trSurtitreTaille", "pt", d.surtitreTaille, 4, 24) +
+        "</div>" +
+        '<div class="tranche-duo">' +
+          champ("trContenu", "Titre", d.contenu) +
+          nombre("trTaille", "pt", d.taille, 4, 36) +
+        "</div>" +
+        '<div class="tranche-duo">' +
+          '<label>Sens <select id="trSens">' +
+            '<option value="descendant">De haut en bas</option>' +
+            '<option value="montant">De bas en haut</option>' +
+          "</select></label>" +
+          '<label class="tranche-case"><input type="checkbox" id="trForcer"' +
+            (d.forcerTexte ? " checked" : "") + "> Écrire même sur un dos très fin</label>" +
+        "</div>" +
+        '<p class="aide-champ">Le surtitre se pose à côté du titre, en travers du dos. ' +
+          "Vide, le titre reprend « Titre — Auteur ».</p>" +
+      "</fieldset>" +
+
+      '<fieldset class="tr-bloc"><legend>Crédits et éditeur</legend>' +
+        '<label class="tr-champ tr-large"><span>Crédits</span>' +
+          '<textarea id="trCredits" rows="2">' + echapperTitre(d.credits) + "</textarea></label>" +
+        '<div class="tranche-duo">' +
+          nombre("trCreditsTaille", "pt", d.creditsTaille, 4, 20) +
+          champ("trPied", "Éditeur (au pied)", d.pied) +
+          nombre("trPiedTaille", "pt", d.piedTaille, 4, 20) +
+        "</div>" +
+        '<p class="aide-champ">Une ligne par colonne : « Scénariste YC » puis ' +
+          "« Dessinateur RAK HYUN » donnent deux colonnes côte à côte.</p>" +
+      "</fieldset>" +
+
+      "</div>" +
+      '<div class="tranche-apercu">' +
+        '<div class="tranche-scene" id="trScene"></div>' +
+        "<small id='trLegende'></small>" +
+        '<p class="aide-champ" id="trNoteDos"></p>' +
+      "</div>" +
+    "</div>" +
+    '<div class="ci-actions">' +
+      '<button class="ci-annuler">Annuler</button>' +
+      '<button class="ci-generer">Enregistrer</button>' +
+    "</div></div>";
+
+  const fond = document.createElement("div");
+  fond.id = "dialogueTranche";
+  fond.className = "modal-impression";
+  fond.innerHTML = html;
+  fond.addEventListener("click", (e) => { if (e.target === fond) fond.remove(); });
+  document.body.appendChild(fond);
+
+  fond.querySelector("#trSens").value = d.sens;
+
+  const val = (id) => fond.querySelector("#" + id).value;
+  const num = (id, defaut) => {
+    const n = parseFloat(val(id));
+    return isFinite(n) && n >= 0 ? n : defaut;
+  };
+
+  const lire = () => ({
+    fond: val("trFond"),
+    texte: val("trTexte"),
+    bandeau: aImage ? num("trBandeau", 0) : 0,
+    pastille: val("trPastille"),
+    pastilleFond: val("trPastilleFond"),
+    pastilleTexte: val("trPastilleTexte"),
+    pastilleTaille: num("trPastilleTaille", d.pastilleTaille),
+    surtitre: val("trSurtitre"),
+    surtitreTaille: num("trSurtitreTaille", d.surtitreTaille),
+    contenu: val("trContenu"),
+    taille: num("trTaille", d.taille),
+    sens: val("trSens"),
+    credits: val("trCredits"),
+    creditsTaille: num("trCreditsTaille", d.creditsTaille),
+    pied: val("trPied"),
+    piedTaille: num("trPiedTaille", d.piedTaille),
+    forcerTexte: fond.querySelector("#trForcer").checked
+  });
+
+  // L'aperçu : le VRAI dos, construit par le constructeur d'impression sur
+  // un livre provisoire, puis réduit. Aucune imitation à maintenir en
+  // parallèle du rendu réel.
+  const rafraichir = () => {
+    const r = lire();
+    // L'image reste celle qui est enregistrée : elle s'envoie à part, pas au
+    // moment d'appuyer sur « Enregistrer ».
+    const provisoire = Object.assign({}, livre,
+      { tranche: Object.assign({}, r, { imageChemin: t.imageChemin || null }) });
+    const scene = fond.querySelector("#trScene");
+    scene.innerHTML = "";
+
+    // Un dos très fin resterait un trait : l'aperçu ne descend pas sous 3 mm,
+    // la légende donnant l'épaisseur réelle juste en dessous.
+    const dosApercu = Math.max(dosMm, 3);
+    const dos = construireDosLivre(provisoire, dosApercu, f.haut, null);
+    const echelle = HAUTEUR_APERCU_DOS / (f.haut * PX_PAR_MM);
+    dos.style.transform = "scale(" + echelle + ")";
+    dos.style.transformOrigin = "top left";
+    scene.style.height = HAUTEUR_APERCU_DOS + "px";
+    scene.style.width = (dosApercu * PX_PAR_MM * echelle) + "px";
+    scene.appendChild(dos);
+
+    fond.querySelector("#trLegende").textContent =
+      "Dos de " + dosMm.toFixed(1).replace(".", ",") + " mm · " + (livre.pages || []).length + " pages";
+    fond.querySelector("#trNoteDos").textContent = dosMm >= 6
+      ? "Assez épais pour porter du texte."
+      : "Sous 6 mm, l'usage est de laisser le dos nu : le texte tomberait sur les plis.";
+  };
+
+  fond.querySelectorAll("input, select, textarea").forEach((c) => {
+    c.addEventListener("input", rafraichir);
+    c.addEventListener("change", rafraichir);
+  });
+
+  fond.querySelector("#trReset").onclick = () => {
+    const couv = livre.couverture || {};
+    fond.querySelector("#trFond").value = couv.fond || "#1a1a2e";
+    fond.querySelector("#trTexte").value = couv.texte || "#ffffff";
+    rafraichir();
+  };
+
+  // Le bandeau n'a de sens que s'il y a une image à montrer — la sienne ou,
+  // à défaut, celle de la couverture.
+  const majImage = () => {
+    const propre = !!t.imageChemin;
+    const source = propre ? "sienne" : (aImage ? "couverture" : "aucune");
+    fond.querySelector("#trBandeau").disabled = source === "aucune";
+    fond.querySelector("#trImageRetirer").style.display = propre ? "" : "none";
+    fond.querySelector("#trImageNote").textContent =
+      source === "sienne"
+        ? "Image propre à la tranche. « Retirer » revient à celle de la couverture."
+        : source === "couverture"
+          ? "À défaut d'image propre, le haut de celle de la couverture se prolonge sur le dos. 0 mm = aucun bandeau."
+          : "Aucune image disponible : choisissez-en une, ou donnez-en une à la couverture.";
+  };
+
+  fond.querySelector("#trImage").addEventListener("change", (e) => {
+    envoyerImageTranche(e, livre, t, () => { majImage(); rafraichir(); },
+      fond.querySelector("#trImageNote"));
+  });
+
+  fond.querySelector("#trImageRetirer").onclick = () => {
+    const ancien = t.imageChemin;
+    t.imageChemin = null;
+    if (ancien) {
+      supprimerFichierGithub(ancien, localStorage.getItem("gh_token"),
+        "Retrait de l'image de tranche").catch(() => {});
+      delete cacheImagesURL[ancien];
+    }
+    marquerModifie();
+    planifierBrouillon();
+    majImage();
+    rafraichir();
+  };
+
+  majImage();
+  rafraichir();
+
+  fond.querySelector(".mi-fermer").onclick = () => fond.remove();
+  fond.querySelector(".ci-annuler").onclick = () => fond.remove();
+  fond.querySelector(".ci-generer").onclick = () => {
+    const r = lire();
+    const couv = livre.couverture || {};
+    // Ce qui vaut le réglage par défaut n'est pas enregistré : la tranche
+    // continue alors de suivre la couverture et le titre du livre.
+    t.fond = r.fond === (couv.fond || "#1a1a2e") ? null : r.fond;
+    t.texte = r.texte === (couv.texte || "#ffffff") ? null : r.texte;
+    const parDefaut = [livre.titre, livre.auteur].filter(Boolean).join(" — ");
+    t.contenu = r.contenu.trim() === parDefaut ? "" : r.contenu;
+
+    t.bandeau = r.bandeau;
+    t.pastille = r.pastille;
+    t.pastilleFond = r.pastilleFond;
+    t.pastilleTexte = r.pastilleTexte;
+    t.pastilleTaille = r.pastilleTaille;
+    t.surtitre = r.surtitre;
+    t.surtitreTaille = r.surtitreTaille;
+    t.taille = r.taille;
+    t.sens = r.sens;
+    t.credits = r.credits;
+    t.creditsTaille = r.creditsTaille;
+    t.pied = r.pied;
+    t.piedTaille = r.piedTaille;
+    t.forcerTexte = r.forcerTexte;
+
+    fond.remove();
+    marquerModifie();
+    planifierBrouillon();
+    const message = document.getElementById("message");
+    if (message) {
+      message.textContent = "Tranche enregistrée.";
+      setTimeout(() => {
+        if (message.textContent.indexOf("Tranche") !== -1) message.textContent = "";
+      }, 3000);
+    }
+  };
+}
+
+// Envoi de l'image de tranche. Elle vit dans le même dossier que celles des
+// couvertures, sous un nom qui lui est propre : remplacer l'une ne touche
+// jamais l'autre.
+function envoyerImageTranche(event, livre, tranche, surFin, note) {
+  const fichier = event.target.files[0];
+  event.target.value = "";
+  if (!fichier) return;
+
+  const token = localStorage.getItem("gh_token");
+  const ancien = tranche.imageChemin;
+
+  const lecteur = new FileReader();
+  lecteur.onload = async (e) => {
+    const dataUrl = e.target.result;
+    const extension = extraireExtensionDataUrl(dataUrl);
+    const chemin = obtenirPrefixeImagesUtilisateur() + "/" + livre.id + "_tranche." + extension;
+
+    // Comme pour la couverture : le travail a lieu dans la réponse du lecteur
+    // de fichier, c'est donc ici que le voile se pose.
+    ouvrirAttente("Envoi de l'image…", "Le transfert d'une image prend quelques secondes.");
+    if (note) note.textContent = "Envoi de l'image en cours…";
+    try {
+      await uploaderImageBase64(chemin, dataUrl, token,
+        "Image de tranche — " + (livre.titre || livre.id));
+      if (ancien && ancien !== chemin) {
+        supprimerFichierGithub(ancien, token, "Remplacement de l'image de tranche").catch(() => {});
+        delete cacheImagesURL[ancien];
+      }
+      tranche.imageChemin = chemin;
+      cacheImagesURL[chemin] = dataUrl;   // aperçu immédiat, sans requête
+      marquerModifie();
+      planifierBrouillon();
+      surFin();
+    } catch (erreur) {
+      if (note) note.textContent = erreur.message;
+    } finally {
+      fermerAttente();
+    }
+  };
+  lecteur.readAsDataURL(fichier);
+}
+
 // Couverture ouverte à plat : 4e de couverture | dos | 1re de couverture.
-function creerCouverturePlat(livre, f, dosMm, promessesImages) {
+// `pourImprimeur` : la planche part telle quelle chez un professionnel, avec
+// les repères d'angle qu'attend son massicot. Chez soi, on coupe à la règle :
+// ce sont alors les lignes pleines posées par poserSurPapier qui cernent la
+// couverture, et la planche se contente d'indiquer ses plis.
+function creerCouverturePlat(livre, f, dosMm, promessesImages, pourImprimeur) {
   const largTrim = 2 * f.larg + dosMm;
   const feuille = creerFeuillePro(largTrim, f.haut);
   const zone = creerZoneRognePro(largTrim, f.haut);
@@ -919,27 +3012,37 @@ function creerCouverturePlat(livre, f, dosMm, promessesImages) {
 
   zone.appendChild(creerPanneauCouverture(livre, "quatrieme", f, promessesImages));
 
-  const dos = document.createElement("div");
-  dos.className = "dos-pro";
-  dos.style.width = dosMm + "mm";
-  dos.style.height = f.haut + "mm";
-  dos.style.background = fondCouleur;
-  // Sous 6 mm, l'usage est de laisser le dos nu : le texte tomberait sur les plis.
-  if (dosMm >= 6) {
-    const t = document.createElement("div");
-    t.className = "dos-texte-pro";
-    t.style.color = (livre.couverture && livre.couverture.texte) || "#ffffff";
-    t.textContent = [livre.titre, livre.auteur].filter(Boolean).join(" — ");
-    dos.appendChild(t);
-  }
-  zone.appendChild(dos);
+  zone.appendChild(construireDosLivre(livre, dosMm, f.haut, promessesImages));
 
   zone.appendChild(creerPanneauCouverture(livre, "couverture", f, promessesImages));
 
   feuille.appendChild(zone);
-  ajouterReperesCoupe(feuille, largTrim, f.haut);
-  ajouterReperesPli(feuille, f.haut, [f.larg, f.larg + dosMm]);
+  if (pourImprimeur) ajouterReperesCoupe(feuille, largTrim, f.haut);
+  ajouterReperesPli(feuille, f.haut, [f.larg, f.larg + dosMm], !pourImprimeur);
   return feuille;
+}
+
+// La légende, posée sur le BLANC DE LA FEUILLE, sous la planche — et non dans
+// la marge technique, où elle passerait au travers des repères de pli.
+// Elle ne survit pas non plus à la coupe, et c'est très bien : elle n'a plus
+// rien à dire une fois la couverture détourée.
+//
+// Sans elle, la feuille porte deux sortes de repères qui se ressemblent, et
+// rien ne dit lequel est un trait de scie et lequel est un pli.
+function ajouterLegendeCouverture(feuilleP, papier, largSupport, hautSupport, dosMm) {
+  const margeBasse = (papier.haut - hautSupport) / 2;
+  if (margeBasse < 6) return;   // pas la place d'écrire quoi que ce soit
+
+  const p = document.createElement("div");
+  p.className = "legende-couv-pro";
+  p.style.left = ((papier.larg - largSupport) / 2) + "mm";
+  p.style.top = (papier.haut - margeBasse + 2) + "mm";
+  p.style.width = largSupport + "mm";
+  p.innerHTML =
+    "<b>Trait plein</b> : couper — posez la règle sur deux repères opposés, elle enjambe la couverture. &nbsp;·&nbsp; " +
+    "<b>Pointillé</b> : plier" + (dosMm > 0 ? ", les deux bords du dos" : ", le pli central") +
+    ". &nbsp;·&nbsp; Marquez les plis au crayon <b>avant</b> de couper : leurs repères sont hors de la couverture, la coupe les emporte.";
+  feuilleP.appendChild(p);
 }
 
 // Un panneau de couverture au format rogné, réutilisant le rendu existant.

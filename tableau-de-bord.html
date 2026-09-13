@@ -3,38 +3,118 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#4f46e5">
+<meta name="theme-color" content="#14110c" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f4efe4">
 <title>Tableau de bord — Team53FR</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
-</head>
-<body>
-  <header class="app-header">
-    <div class="app-header-ligne">
-      <h1><span id="entete-pastille">🔐</span> Team53FR</h1>
-      <div class="actions-entete">
-        <a href="admin-comptes.html" id="lien-admin" class="icone-bouton" title="Gestion des comptes" style="display:none">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-        </a>
-        <button class="icone-bouton deconnexion" title="Se déconnecter" onclick="seDeconnecter()">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-        </button>
-      </div>
-    </div>
-  </header>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icone-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Site Guide">
+<script>
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+  }
+</script>
 
-  <div class="contenu">
-    <div id="zone-sites"></div>
+<link rel="icon" href="icone-192.png">
+</head>
+<body class="page-tdb">
+
+  <div class="tdb-barre">
+    <span class="tdb-marque"><b>Team53FR</b></span>
+    <div class="tdb-outils">
+      <a href="compte.html" title="Mon compte" aria-label="Mon compte">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      </a>
+      <a href="admin-comptes.html" id="lien-admin" title="Gestion des comptes" aria-label="Gestion des comptes" style="display:none">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </a>
+      <button class="deconnexion" title="Se déconnecter" aria-label="Se déconnecter" onclick="seDeconnecter()">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </button>
+    </div>
   </div>
 
+  <header class="tdb-hero">
+    <p class="tdb-date" id="tdb-date"></p>
+    <h1 class="tdb-titre" id="tdb-titre"></h1>
+    <p class="tdb-sous" id="tdb-sous"></p>
+  </header>
+
+  <main class="tdb-sommaire">
+    <p class="tdb-entete-liste" id="tdb-entete-liste">Vos ateliers</p>
+    <div id="zone-sites"></div>
+
+    <div id="encart-app" class="tdb-note-app" hidden>
+      <p id="encart-app-detail">Ce portail peut s'installer sur votre écran d'accueil et s'ouvrir en plein écran, comme une application.</p>
+      <button type="button" id="btn-installer">Installer</button>
+      <button type="button" class="tdb-fermer-note" id="btn-fermer-encart" aria-label="Masquer">✕</button>
+    </div>
+  </main>
+
+  <script src="attente.js"></script>
   <script src="script.js"></script>
   <script>
+    // Chaque site a sa couleur et sa vignette : c'est ce qui les distingue au
+    // premier coup d'œil, là où trois tuiles identiques ne disaient rien.
+    // Un site inconnu du portail retombe sur un repère neutre plutôt que sur
+    // rien du tout.
+    const ALLURE_SITES = {
+      "editeur-livre": {
+        accent: "#b4552c", accentSombre: "#d87a4e",
+        glyphe: '<path d="M12 6.5C10.2 5 7.7 4.4 4.5 4.6v12.2c3.2-.2 5.7.4 7.5 1.9 1.8-1.5 4.3-2.1 7.5-1.9V4.6c-3.2-.2-5.7.4-7.5 1.9z"/><path d="M12 6.5v12.2"/>'
+      },
+      "ma-bibliotheque": {
+        accent: "#3f6b4a", accentSombre: "#6ea37c",
+        glyphe: '<rect x="4" y="5" width="3.6" height="14" rx="1"/><rect x="9.2" y="5" width="3.6" height="14" rx="1"/><path d="M15.6 6.4l3.4.9-3 12.1-3.4-.9z"/>'
+      },
+      "droid-fortnite": {
+        accent: "#3b6ea5", accentSombre: "#79aada",
+        glyphe: '<rect x="5" y="8" width="14" height="11" rx="3"/><path d="M12 4.5v3.5"/><circle cx="9.3" cy="13" r="1.2"/><circle cx="14.7" cy="13" r="1.2"/><path d="M9.5 16.5h5"/>'
+      }
+    };
+    const ALLURE_DEFAUT = {
+      accent: "#8a5a3b", accentSombre: "#c08e63",
+      glyphe: '<circle cx="12" cy="12" r="7.5"/><path d="M12 8v8M8 12h8"/>'
+    };
+
+    // « Bonjour » à 22 h sonne faux : le portail dit l'heure qu'il est.
+    function salutation() {
+      const h = new Date().getHours();
+      if (h < 6) return "Bonne nuit";
+      if (h < 12) return "Bonjour";
+      if (h < 18) return "Bon après-midi";
+      return "Bonsoir";
+    }
+
+    function dateDuJour() {
+      return new Date().toLocaleDateString("fr-FR",
+        { weekday: "long", day: "numeric", month: "long" });
+    }
+
     async function initTableauDeBord() {
       const token = exigerConnexionCentrale();
       if (!token) return;
 
-      const nom = localStorage.getItem("team53_nom");
-      if (nom) document.querySelector(".app-header h1").innerHTML =
-        '<span id="entete-pastille">🔐</span> Bonjour, ' + echapper(nom);
+      // Les accès, le rôle et le pseudo sont relus à chaque ouverture : sans
+      // cela, un accès accordé à l'instant n'apparaîtrait qu'à la prochaine
+      // connexion, et le nouveau site resterait invisible sans explication.
+      const valide = await rafraichirSessionCentrale(token);
+      if (!valide) {
+        // Le compte n'existe plus : la session ne vaut plus rien.
+        seDeconnecter();
+        return;
+      }
+
+      const nom = localStorage.getItem("team53_nom") || localStorage.getItem("team53_login") || "";
+      document.getElementById("tdb-date").textContent = dateDuJour();
+      document.getElementById("tdb-titre").innerHTML =
+        salutation() + (nom ? ", <em>" + echapper(nom) + "</em>" : "");
 
       if (localStorage.getItem("team53_role") === "admin") {
         document.getElementById("lien-admin").style.display = "";
@@ -50,31 +130,60 @@
       }
 
       const autorises = sites.filter(s => acces.includes(s.id));
+      const sous = document.getElementById("tdb-sous");
+      const enteteListe = document.getElementById("tdb-entete-liste");
 
       if (!autorises.length) {
+        sous.textContent = "Aucun atelier ne vous est encore ouvert.";
+        enteteListe.hidden = true;
         zone.innerHTML =
-          '<div class="etat-vide">' +
-          '<div class="pastille-lg" style="margin:0 auto 1rem;">🔒</div>' +
-          '<h2>Aucun site accessible</h2>' +
-          '<p>Demande à un administrateur de t\'accorder l\'accès à un site.</p>' +
-          '</div>';
+          '<div class="tdb-vide">' +
+            "<h2>Rien à ouvrir pour l'instant</h2>" +
+            "<p>Demandez à un administrateur de vous accorder l'accès à un site.</p>" +
+          "</div>";
         return;
       }
 
-      const grille = document.createElement("div");
-      grille.className = "grille-sites";
-      autorises.forEach(site => {
-        const carte = document.createElement("button");
-        carte.className = "carte-site";
-        carte.innerHTML =
-          '<div class="icone-site">' + (site.icone || "🌐") + '</div>' +
-          '<h2>' + echapper(site.nom) + '</h2>' +
-          '<p>' + echapper(site.description || "") + '</p>';
-        carte.addEventListener("click", () => relayerVersSite(site));
-        grille.appendChild(carte);
+      sous.textContent = autorises.length > 1
+        ? "Vos " + autorises.length + " ateliers vous attendent. Choisissez celui du jour."
+        : "Votre atelier vous attend.";
+
+      const liste = document.createElement("div");
+      liste.className = "tdb-liste";
+
+      autorises.forEach((site, i) => {
+        const allure = ALLURE_SITES[site.id] || ALLURE_DEFAUT;
+        const entree = document.createElement("button");
+        entree.type = "button";
+        entree.className = "tdb-entree";
+        // Les deux teintes sont posées ensemble ; c'est la feuille de style qui
+        // choisit. Décider ici, au rendu, figeait la couleur du thème en cours :
+        // basculer en clair gardait l'accent de la nuit.
+        entree.style.setProperty("--accent-clair", allure.accent);
+        entree.style.setProperty("--accent-sombre", allure.accentSombre);
+        entree.innerHTML =
+          '<span class="tdb-num">' + String(i + 1).padStart(2, "0") + "</span>" +
+          '<span class="tdb-vignette">' +
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" ' +
+              'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+              allure.glyphe +
+            "</svg>" +
+          "</span>" +
+          '<span class="tdb-texte">' +
+            '<span class="tdb-nom">' + echapper(site.nom) + "</span>" +
+            '<p class="tdb-desc">' + echapper(site.description || "") + "</p>" +
+          "</span>" +
+          '<span class="tdb-fleche" aria-hidden="true">' +
+            '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+              'stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' +
+              '<line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>' +
+          "</span>";
+        entree.addEventListener("click", () => relayerVersSite(site));
+        liste.appendChild(entree);
       });
+
       zone.innerHTML = "";
-      zone.appendChild(grille);
+      zone.appendChild(liste);
     }
 
     function echapper(txt) {
@@ -85,5 +194,6 @@
 
     initTableauDeBord();
   </script>
+  <script src="installation.js"></script>
 </body>
 </html>

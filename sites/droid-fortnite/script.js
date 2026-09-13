@@ -1,15 +1,65 @@
+// ----- Ces actions passent par le reseau : on le dit, et on empeche d'y toucher -----
+// Voir attente.js. Les actions de FOND (sauvegarde differee, chargement d'une
+// vignette, migration silencieuse) n'y figurent surtout pas : les voiler
+// bloquerait la page pour un travail que l'on a justement choisi de rendre
+// invisible.
+envelopperAttente({
+  seConnecter: ["Connexion…", "Votre identifiant est vérifié."],
+});
+
 // ===== Connexion à la base « BDD » sur GitHub =====
 // Même dépôt BDD que les autres sites (Team53FR/BDD), dans son propre
 // dossier, pour ne jamais toucher aux données des autres sites.
 const PROPRIETAIRE = "Team53FR";
 const DEPOT_BDD = "BDD";
 const DOSSIER_BDD = "DroidFortnite";
+
+// ===== Comptes centralisés =====
+//
+// Les comptes ne vivent plus dans le users.json de chaque site, mais dans un
+// seul fichier — Web/utilisateurs.json — qui porte aussi la liste des sites
+// auxquels chacun a accès. Un mot de passe changé l'est donc partout à la
+// fois, et deux fichiers ne peuvent plus diverger en silence.
+const CHEMIN_UTILISATEURS = "/Web/utilisateurs.json";
+// Identifiants des sites du portail, dans l'ordre du tableau de bord. Sert à
+// écrire une liste d'accès complète pour un compte qui n'en avait pas.
+const SITES_CONNUS = ["editeur-livre", "ma-bibliotheque", "droid-fortnite"];
+const ID_SITE = "droid-fortnite";
+
+// Un compte peut-il entrer ici ? Un administrateur du portail, oui, toujours.
+// Sinon il faut que ce site figure dans ses accès. Une entrée sans champ
+// « acces » date d'avant la centralisation : on la laisse passer plutôt que
+// d'enfermer quelqu'un dehors, la liste étant ensuite gérée par le portail.
+function aAccesAuSite(utilisateur) {
+  if (!utilisateur) return false;
+  if (utilisateur.role === "admin") return true;
+  if (!Array.isArray(utilisateur.acces)) return true;
+  return utilisateur.acces.includes(ID_SITE);
+}
+
+// Date de connexion : la globale, plus celle propre à ce site. Les deux
+// coexistent — le portail montre la dernière visite tous sites confondus,
+// chaque site la sienne — et l'ancien champ « derniereConnexion » des
+// fichiers de site retrouve ainsi sa place.
+function noterConnexion(utilisateur) {
+  const maintenant = new Date().toISOString();
+  utilisateur.derniereConnexion = maintenant;
+  if (!utilisateur.connexions || typeof utilisateur.connexions !== "object") {
+    utilisateur.connexions = {};
+  }
+  utilisateur.connexions[ID_SITE] = maintenant;
+}
 // ====================================================
 
 function urlContenuBDD(chemin) {
-  const base = (DOSSIER_BDD || "").replace(/^\/+|\/+$/g, "");
+  // Un chemin commençant par « / » part de la RACINE du dépôt et ignore le
+  // dossier du site : c'est ainsi qu'on atteint le fichier central des
+  // comptes, qui n'appartient à aucun site en particulier.
+  const depuisRacine = chemin.charAt(0) === "/";
+  const base = depuisRacine ? "" : (DOSSIER_BDD || "").replace(/^\/+|\/+$/g, "");
   const prefixe = base ? base + "/" : "";
-  return `https://api.github.com/repos/${PROPRIETAIRE}/${DEPOT_BDD}/contents/${prefixe}${chemin}`;
+  const suite = depuisRacine ? chemin.slice(1) : chemin;
+  return `https://api.github.com/repos/${PROPRIETAIRE}/${DEPOT_BDD}/contents/${prefixe}${suite}`;
 }
 
 async function lireFichierJSON(nomFichier, token) {
@@ -36,12 +86,27 @@ async function lireFichierJSON(nomFichier, token) {
     } catch (e) {
       throw new Error(`Le contenu de "${nomFichier}" n'a pas pu être décodé (encodage invalide).`);
     }
-  } else if (data.download_url) {
-    const reponseBrute = await fetch(data.download_url);
-    if (!reponseBrute.ok) {
+  } else if (data.sha) {
+    // Fichier trop volumineux pour l'API Contents (plus de 1 Mo) : son contenu
+    // n'accompagne plus les métadonnées. On le lit alors par l'API des blobs,
+    // en demandant le format brut — authentifiée, elle marche sur un dépôt
+    // privé, là où l'URL de téléchargement directe se fait refuser.
+    const reponseBlob = await fetch(
+      `https://api.github.com/repos/${PROPRIETAIRE}/${DEPOT_BDD}/git/blobs/${data.sha}`,
+      { headers: { "Authorization": `Bearer ${token}`, "Accept": "application/vnd.github.raw" } });
+
+    if (reponseBlob.ok) {
+      contenuDecode = await reponseBlob.text();
+    } else if (data.download_url) {
+      // Dernier recours : l'URL directe, qui porte son propre jeton temporaire.
+      const reponseBrute = await fetch(data.download_url);
+      if (!reponseBrute.ok) {
+        throw new Error(`Le fichier "${nomFichier}" est trop volumineux et sa version brute n'a pas pu être récupérée.`);
+      }
+      contenuDecode = await reponseBrute.text();
+    } else {
       throw new Error(`Le fichier "${nomFichier}" est trop volumineux et sa version brute n'a pas pu être récupérée.`);
     }
-    contenuDecode = await reponseBrute.text();
   } else {
     throw new Error(`Le fichier "${nomFichier}" est trop volumineux pour être lu (aucune URL brute disponible).`);
   }
@@ -252,9 +317,503 @@ function couleurDroide(id) {
   for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
   return `hsl(${hash % 360}, 55%, 50%)`;
 }
+
+
+// ===== Unités de grandeur (K, M, B, T…) =====
+//
+// Les montants du jeu grimpent vite : on saisit « 4 » + « K » plutôt que
+// « 4000 », et surtout plutôt que « 4K » — cette chaîne était stockée telle
+// quelle et parseFloat("4K") vaut 4, si bien que le total de l'escouade
+// sous-comptait d'un facteur mille sans rien signaler.
+//
+// La valeur enregistrée est donc TOUJOURS un nombre en crédits : l'unité
+// n'est qu'une commodité de saisie et d'affichage, redéduite à l'ouverture
+// du formulaire. Un seul nombre canonique, et tous les calculs restent justes.
+//
+// Liste éditable depuis le panneau admin (DroidFortnite/unites.json), pour
+// le jour où le jeu dépassera le billion.
+const UNITES_INITIALES = [
+  { symbole: "K", facteur: 1e3 },
+  { symbole: "M", facteur: 1e6 },
+  { symbole: "B", facteur: 1e9 },
+  { symbole: "T", facteur: 1e12 }
+];
+
+// Symbole réservé au rendement des Iconiques, qui rapportent un pourcentage
+// du revenu total et non des crédits par seconde. Jamais dans unites.json :
+// ce n'est pas un facteur, c'est une autre nature de valeur.
+const UNITE_POURCENT = "%";
+
+let unites = UNITES_INITIALES;
+
+function normaliserUnites(brutes) {
+  return (Array.isArray(brutes) ? brutes : [])
+    .map((u) => (typeof u === "string"
+      ? { symbole: u, facteur: NaN }
+      : { symbole: String(u && u.symbole || "").trim(), facteur: Number(u && u.facteur) }))
+    .filter((u) => u.symbole && isFinite(u.facteur) && u.facteur > 0)
+    .sort((a, b) => a.facteur - b.facteur);
+}
+
+// Nombre -> { valeur, unite } avec la plus grande unité qui laisse |valeur| >= 1.
+function decomposerValeur(n) {
+  if (typeof n !== "number" || !isFinite(n)) return { valeur: "", unite: "" };
+  if (n === 0) return { valeur: 0, unite: "" };
+  let choisie = { symbole: "", facteur: 1 };
+  unites.forEach((u) => { if (Math.abs(n) >= u.facteur) choisie = u; });
+  const valeur = n / choisie.facteur;
+  // 2 décimales suffisent, et on ne garde pas les zéros inutiles.
+  return { valeur: Math.round(valeur * 100) / 100, unite: choisie.symbole };
+}
+
+// { valeur, unite } -> nombre en crédits, ou « 25% » pour un pourcentage.
+// Retourne null si rien n'a été saisi.
+function composerValeur(valeurBrute, symbole) {
+  const texte = String(valeurBrute == null ? "" : valeurBrute).trim();
+  if (!texte) return null;
+  const n = parseFloat(texte.replace(",", "."));
+  if (!isFinite(n)) return null;
+  if (symbole === UNITE_POURCENT) return (Math.round(n * 100) / 100) + UNITE_POURCENT;
+  const u = unites.find((x) => x.symbole === symbole);
+  return u ? n * u.facteur : n;
+}
+
+// Abrège un montant selon les unités connues : 7200 -> « 7.2 K ».
+// Partagé par le Droidex, le panneau admin et la liste des renaissances.
+function formaterCredits(n) {
+  if (typeof n !== "number" || !isFinite(n)) return String(n);
+  const d = decomposerValeur(n);
+  return d.unite ? d.valeur + " " + d.unite : String(d.valeur);
+}
+
+// Les droïdes Iconiques n'existent qu'au premier palier dans le jeu.
+// Partagé : le Droidex les masque ailleurs, le formulaire admin n'y propose
+// pas de prix ni de rendement.
+function estDisponibleAuPalier(d, palierNom) {
+  const rarete = raretes.find((r) => r.nom === (d && d.rarete));
+  if (!rarete || !rarete.premierPalierSeulement) return true;
+  const premier = paliers[0] && paliers[0].nom;
+  return palierNom === premier;
+}
+
+// ===== Prix et rendement, palier par palier =====
+//
+// Le rendement d'un droïde monte à chaque amélioration : un même droïde a
+// donc autant de valeurs que de paliers. Les deux tables sont indexées par
+// NOM de palier, comme l'est déjà la possession (voir clePossession) — ce
+// qui les garde cohérentes si un palier est ajouté ou réordonné.
+//
+//   { id: "mouse", ..., prix: { "Défaut": 950, "Or": 4000 },
+//                       rendements: { "Défaut": 2, "Or": 4 } }
+//
+// Les valeurs sont conservées telles qu'elles ont été saisies : la plupart
+// sont des nombres, mais les droïdes Iconiques rapportent un pourcentage du
+// revenu total (« 15% »), que formaterRendement laisse passer tel quel.
+
+function valeurPalier(table, palier) {
+  if (!table || typeof table !== "object") return null;
+  const v = table[palier];
+  return (v === undefined || v === null || v === "") ? null : v;
+}
+
+// Formate un montant : nombre -> abrégé (k, M, Md), texte -> inchangé.
+function formaterValeurSaisie(v) {
+  if (v === null) return null;
+  const n = typeof v === "number" ? v : parseFloat(String(v).replace(",", "."));
+  const brut = String(v).trim();
+  // « 15% » ou toute autre notation libre : on n'y touche pas.
+  if (!isFinite(n) || /[^\d.,\s]/.test(brut)) return brut;
+  return formaterCredits(n);
+}
+
+function formaterPrix(d, palier) {
+  return formaterValeurSaisie(valeurPalier(d.prix, palier));
+}
+
+function formaterRendement(d, palier) {
+  const f = formaterValeurSaisie(valeurPalier(d.rendements, palier));
+  return f === null ? null : f + "/s";
+}
+
+// ===== Couleurs des raretés =====
+//
+// Éditables depuis le panneau admin (DroidFortnite/raretes.json) plutôt que
+// figées dans la feuille de style. Chaque rareté a un fond et une couleur de
+// texte : c'est le couple qui doit rester lisible, pas le fond seul.
+//
+// Les règles sont injectées dans un <style> plutôt qu'appliquées badge par
+// badge : elles valent ainsi partout où un badge apparaît — cartes du
+// Droidex, panneau admin, feuille de choix de l'escouade — sans que chaque
+// endroit ait à y penser.
+const RARETES_INITIALES = [
+  { nom: "Typique",    fond: "#123540", texte: "#7dd3e0" },
+  { nom: "Rare",       fond: "#0e3a44", texte: "#22d3ee" },
+  { nom: "Épique",     fond: "#4c1d95", texte: "#ddd6fe" },
+  { nom: "Légendaire", fond: "#78350f", texte: "#fde68a" },
+  { nom: "Mythique",   fond: "#831843", texte: "#fbcfe8" },
+  // « premierPalierSeulement » remplace le test sur le nom : dans le jeu, les
+  // Iconiques ne s'améliorent pas. Une rareté ajoutée plus tard peut se voir
+  // attribuer le même comportement sans toucher au code.
+  { nom: "Iconique",   fond: "#065f46", texte: "#a7f3d0", premierPalierSeulement: true }
+];
+
+let raretes = RARETES_INITIALES;
+
+// La liste stockée fait foi : son ORDRE est celui du plus faible au plus
+// fort, et sert de tri partout. Une entrée incomplète est complétée par la
+// rareté de départ du même nom, ou par des couleurs neutres.
+function normaliserRaretes(brutes) {
+  const liste = (Array.isArray(brutes) ? brutes : [])
+    .map((r) => (typeof r === "string" ? { nom: r } : r))
+    .filter((r) => r && String(r.nom || "").trim());
+  if (!liste.length) return RARETES_INITIALES.slice();
+  return liste.map((r) => {
+    const nom = String(r.nom).trim();
+    const defaut = RARETES_INITIALES.find((d) => d.nom === nom) || {};
+    return {
+      nom,
+      fond: r.fond || defaut.fond || "#334155",
+      texte: r.texte || defaut.texte || "#e2e8f0",
+      premierPalierSeulement: r.premierPalierSeulement !== undefined
+        ? !!r.premierPalierSeulement
+        : !!defaut.premierPalierSeulement
+    };
+  });
+}
+
+// Remplit un <select> avec les raretés connues, en gardant la valeur
+// choisie si elle existe encore.
+function remplirSelectRaretes(select, valeur, libelleVide) {
+  if (!select) return;
+  const choisi = valeur !== undefined ? valeur : select.value;
+  select.innerHTML =
+    (libelleVide ? '<option value="">' + libelleVide + "</option>" : "") +
+    raretes.map((r) => '<option value="' + r.nom.replace(/"/g, "&quot;") + '">' +
+      r.nom + "</option>").join("");
+  if (choisi && raretes.some((r) => r.nom === choisi)) select.value = choisi;
+}
+
+function appliquerCouleursRaretes() {
+  let style = document.getElementById("stylesRaretes");
+  if (!style) {
+    style = document.createElement("style");
+    style.id = "stylesRaretes";
+    document.head.appendChild(style);
+  }
+  style.textContent = raretes.map((r) =>
+    ".badge-rarete." + classeRareteCss(r.nom) +
+    " { background: " + r.fond + "; color: " + r.texte + "; }"
+  ).join("\n");
+}
+
+// ===== Couleur d'un palier : une teinte, ou plusieurs =====
+//
+// « Arc-en-ciel » n'est pas une couleur : c'est une suite de couleurs. Un
+// palier accepte donc soit une chaîne (cas courant), soit un tableau de
+// chaînes, auquel cas son contour devient un dégradé.
+function couleursPalier(couleur) {
+  if (Array.isArray(couleur)) return couleur.filter(Boolean);
+  return couleur ? [couleur] : [];
+}
+
+// Valeur CSS de fond : une couleur pleine, ou un dégradé.
+function fondPalier(couleur) {
+  const c = couleursPalier(couleur);
+  if (!c.length) return "transparent";
+  if (c.length === 1) return c[0];
+  return "linear-gradient(135deg, " + c.join(", ") + ")";
+}
+
+// Contour d'une carte. Une bordure CSS ne peut pas être un dégradé, et
+// border-image ignore border-radius (coins carrés). On superpose donc deux
+// fonds : l'intérieur opaque rogné sur la boîte de padding, le dégradé rogné
+// sur la boîte de bordure — ce qui donne un contour dégradé aux coins ronds.
+function appliquerContourPalier(el, couleur) {
+  const c = couleursPalier(couleur);
+  el.classList.remove("contour-degrade");
+  el.style.backgroundImage = "";
+  if (!c.length) return;
+  if (c.length === 1) { el.style.borderColor = c[0]; return; }
+  el.classList.add("contour-degrade");
+  el.style.borderColor = "transparent";
+  el.style.backgroundImage =
+    "linear-gradient(var(--fond-carte-droide), var(--fond-carte-droide)), " +
+    "linear-gradient(135deg, " + c.join(", ") + ")";
+}
+
+// ===== Super renaissance =====
+//
+// À chaque super renaissance, les paliers de renaissance demandent des
+// droïdes différents — les niveaux et leurs coûts, eux, ne bougent pas.
+// Le champ « elements » devient donc une table indexée par numéro de super
+// renaissance : { "0": "CB (Défaut), …", "1": "…" }.
+//
+// L'ancienne forme (une simple chaîne) vaut pour la super renaissance 0 :
+// les données déjà saisies restent valables sans migration.
+
+function elementsParSuper(r) {
+  const brut = r && r.elements;
+  if (typeof brut === "string") return { 0: brut };
+  if (brut && typeof brut === "object") {
+    const table = {};
+    Object.keys(brut).forEach((cle) => {
+      const n = Number(cle);
+      if (Number.isInteger(n) && n >= 0) table[n] = String(brut[cle] || "");
+    });
+    return table;
+  }
+  return {};
+}
+
+function elementsPourSuper(r, superN) {
+  return elementsParSuper(r)[Number(superN) || 0] || "";
+}
+
+// Combien de super renaissances la donnée décrit-elle ? Au moins une (la 0),
+// et une de plus dès qu'un palier en mentionne une plus haute.
+function nombreSuperRenaissances(liste) {
+  let maxi = 0;
+  (Array.isArray(liste) ? liste : []).forEach((r) => {
+    Object.keys(elementsParSuper(r)).forEach((n) => { maxi = Math.max(maxi, Number(n)); });
+  });
+  return maxi + 1;
+}
+
+// La progression suit la même dimension : atteindre le palier 5 avant une
+// super renaissance ne doit pas le laisser coché après, puisqu'on recommence.
+// Ancienne forme (un simple tableau) = progression de la super renaissance 0.
+function progressionParSuper(brut) {
+  if (Array.isArray(brut)) return { 0: brut.slice() };
+  if (brut && typeof brut === "object") {
+    const table = {};
+    Object.keys(brut).forEach((cle) => {
+      const n = Number(cle);
+      if (Number.isInteger(n) && n >= 0 && Array.isArray(brut[cle])) table[n] = brut[cle].slice();
+    });
+    return table;
+  }
+  return {};
+}
+
+// Le champ « elements » d'une renaissance est du texte libre, saisi à la
+// main : « CB (Défaut), Pit (Défaut), DRK-1 Probe (Or) ». On le relit pour
+// retrouver les droïdes du catalogue et montrer leurs visuels plutôt qu'une
+// ligne de texte. Ce qui ne se laisse pas reconnaître reste affiché tel quel :
+// mieux vaut une étiquette texte qu'un élément disparu de la liste.
+function analyserElementsRenaissance(texte) {
+  return String(texte || "")
+    .split(",")
+    .map((morceau) => morceau.trim())
+    .filter(Boolean)
+    .map((morceau) => {
+      const m = morceau.match(/^(.*?)\s*\(([^()]*)\)\s*$/);
+      const nom = (m ? m[1] : morceau).trim();
+      const palier = m ? m[2].trim() : "";
+      const droide = catalogue.find((d) =>
+        d.nom.toLowerCase() === nom.toLowerCase());
+      // Palier absent ou inconnu : on retombe sur le premier, le seul dont on
+      // soit certain qu'il existe.
+      const palierConnu = paliers.some((p) => p.nom === palier);
+      const palierFinal = palierConnu ? palier : (paliers[0] && paliers[0].nom);
+      return { texte: morceau, droide, palier: palierFinal, palierPrecise: palierConnu };
+    });
+}
+
+// ===== Carte de droïde : visuel commun au Droidex et au panneau admin =====
+//
+// Reprend la présentation du tracker communautaire Droidex : vignette
+// sombre au format portrait, le nom en médaillon en haut à gauche, la
+// classe et la rareté en pied, un contour teinté par le palier, et la
+// carte estompée tant que le droïde n'est pas possédé.
+
+// Correspondance entre les paliers d'ici et les suffixes de fichier
+// employés par Droidex (dont les images sont nommées NOM_PALIER.webp).
+const PALIERS_IMAGE_EXTERNE = {
+  "Défaut": "DEFAULT",
+  "Or": "GOLD",
+  "Diamant": "DIAMOND",
+  "Arc-en-ciel": "RAINBOW",
+  "Beskar": "BESKAR",
+  "Galactique": "GALACTIC"
+};
+
+// Source d'images externe, vide par défaut — et c'est volontaire.
+//
+// Renseignée (par exemple "https://droidex.web.app"), chaque carte va
+// chercher son visuel à l'adresse {base}/droids/{NOM}_{PALIER}.webp, ce qui
+// habille les 379 droïdes d'un coup. Mais ces visuels sont hébergés par un
+// autre site, qui n'a rien demandé : le trafic est à sa charge, il peut
+// renommer ou bloquer ses fichiers du jour au lendemain, et ce sont des
+// extractions des visuels du jeu (c'est précisément pour cela que les cartes
+// se contentaient jusqu'ici d'une teinte générée — voir couleurDroide).
+//
+// À laisser vide, donc, sauf décision explicite. Les images ajoutées droïde
+// par droïde depuis le panneau admin restent prioritaires dans tous les cas.
+let BASE_IMAGES_EXTERNES = "";
+
+// Droidex nomme ses fichiers d'après le NOM du droïde, en majuscules et les
+// espaces remplacés par des tirets bas : « DRK-1 Probe » -> DRK-1_PROBE.
+// (L'identifiant ne conviendrait pas : ses tirets confondent les espaces et
+// les vrais traits d'union — drk-1-probe ne dit pas lequel est lequel.)
+function slugImageDroide(nom) {
+  return (nom || "").trim().toUpperCase().replace(/\s+/g, "_");
+}
+
+function urlImageExterne(nom, palier) {
+  if (!BASE_IMAGES_EXTERNES) return null;
+  const suffixe = PALIERS_IMAGE_EXTERNE[palier];
+  if (!suffixe) return null;   // palier inconnu de cette source
+  return BASE_IMAGES_EXTERNES.replace(/\/+$/, "") +
+    "/droids/" + encodeURIComponent(slugImageDroide(nom) + "_" + suffixe + ".webp");
+}
+
+function echapperTexte(txt) {
+  const d = document.createElement("div");
+  d.textContent = txt == null ? "" : String(txt);
+  return d.innerHTML;
+}
+
+// Construit la carte d'un droïde.
+//   options.possede    : carte en pleine lumière plutôt qu'estompée
+//   options.couleur    : couleur du contour (celle du palier actif)
+//   options.palier     : palier affiché, pour retrouver l'image externe
+//   options.admin      : affiche la corbeille au lieu de la case à cocher
+function construireCarteDroide(d, options) {
+  const o = options || {};
+  const carte = document.createElement("div");
+  carte.className = "carte-droide" + (o.possede ? " possede" : "") + (o.admin ? " admin" : "");
+  appliquerContourPalier(carte, o.couleur);
+
+  carte.innerHTML =
+    `<div class="dx-nom">${echapperTexte(d.nom)}</div>` +
+    (o.admin
+      ? `<button type="button" class="dx-action droide-supprimer" title="Supprimer">🗑</button>`
+      : `<span class="dx-case" aria-hidden="true">✓</span>`) +
+    `<div class="dx-visuel">` +
+      `<span class="dx-scan"></span>` +
+      `<span class="dx-vide" style="--teinte:${couleurDroide(d.id)}">${iconeClasse(d.classe)}</span>` +
+    `</div>` +
+    `<div class="dx-bas">` +
+      `<div class="dx-pied">` +
+        `<span class="dx-classe" title="${echapperTexte(d.classe)}">${iconeClasse(d.classe)}</span>` +
+        `<span class="badge-rarete ${classeRareteCss(d.rarete)}">${echapperTexte(d.rarete)}</span>` +
+      `</div>` +
+      ligneChiffresHtml(d, o.palier) +
+    `</div>`;
+
+  // Repère « droïde de fusion » : petit médaillon distinct, pour reconnaître
+  // d'un coup d'œil les droïdes obtenus en combinant trois autres.
+  if (estDroideFusion(d.nom)) {
+    const marque = document.createElement("span");
+    marque.className = "dx-fusion";
+    marque.innerHTML = '<span class="dx-fusion-ico">\u{1F9EC}</span><span class="dx-fusion-txt">FUSION</span>';
+    marque.title = "Droïde de fusion";
+    carte.appendChild(marque);
+  }
+
+  appliquerVisuelDroide(carte.querySelector(".dx-visuel"), d, o.palier);
+  return carte;
+}
+
+// Prix et rendement du palier affiché, en pied de carte. La ligne
+// disparaît entièrement tant qu'aucune des deux valeurs n'est renseignée,
+// pour ne pas afficher des tirets sur tout un catalogue encore vide.
+function ligneChiffresHtml(d, palier) {
+  const prix = formaterPrix(d, palier);
+  const rendement = formaterRendement(d, palier);
+  if (prix === null && rendement === null) return "";
+  return `<div class="dx-chiffres">` +
+    `<span class="dx-prix">${prix === null ? "" : echapperTexte(prix)}</span>` +
+    `<span class="dx-rendement">${rendement === null ? "" : echapperTexte(rendement)}</span>` +
+  `</div>`;
+}
+
+// Choisit le visuel de la carte, dans l'ordre :
+//   1. l'image ajoutée pour ce droïde depuis le panneau admin ;
+//   2. l'image de la source externe, si elle est configurée ;
+//   3. la teinte générée et l'icône de classe, déjà en place dans le HTML.
+async function appliquerVisuelDroide(zone, d, palier) {
+  if (!zone) return;
+
+  // Une centaine de vignettes se chargent d'un coup sur l'onglet « Tous » :
+  // sous cette rafale, quelques requêtes échouent sans que le fichier soit
+  // en cause. Abandonner au premier échec laissait ces droïdes sur leur
+  // teinte générée jusqu'au rechargement complet de la page — d'où des
+  // images « disparues » qui existaient pourtant bien. On réessaie donc,
+  // en espaçant, avant de renoncer.
+  // Nombre de REESSAIS après la tentative initiale : 2 réessais = 3 essais.
+  const REESSAIS_IMAGE = 2;
+
+  const poser = (url, reessaisRestants) => {
+    const img = document.createElement("img");
+    img.alt = "";
+    img.loading = "lazy";
+    img.decoding = "async";
+    img.referrerPolicy = "no-referrer";
+    img.onerror = () => {
+      img.remove();
+      // La carte a pu être remplacée entre-temps (changement d'onglet,
+      // filtre) : inutile de réessayer dans un élément détaché.
+      if (reessaisRestants > 0 && zone.isConnected) {
+        // Délai croissant et légèrement aléatoire, pour ne pas relancer
+        // toutes les images manquantes au même instant.
+        const attente = (REESSAIS_IMAGE - reessaisRestants + 1) * 400 + Math.random() * 400;
+        setTimeout(() => poser(url, reessaisRestants - 1), attente);
+      }
+    };
+    img.onload = () => { const v = zone.querySelector(".dx-vide"); if (v) v.style.display = "none"; };
+    img.src = url;
+    zone.appendChild(img);
+  };
+
+  if (d.image) {
+    try {
+      let url = cacheImages.get(d.image);
+      if (!url) {
+        url = await obtenirUrlImage(d.image, token);
+        cacheImages.set(d.image, url);
+      }
+      poser(url, REESSAIS_IMAGE);
+      return;
+    } catch (e) {
+      // On continue vers la source externe puis la teinte générée.
+    }
+  }
+
+  const externe = urlImageExterne(d.nom, palier);
+  if (externe) poser(externe, REESSAIS_IMAGE);
+}
+
+// ===== Session : une seule connexion pour tous les sites =====
+//
+// Le portail central mémorise sa session dans localStorage sous team53_*.
+// Ce site vivant sur la même origine (GitHub Pages), il y a accès
+// directement : inutile de se reconnecter en arrivant ici depuis un
+// signet, ou après avoir fermé le navigateur.
+//
+// La session propre au site passe d'abord — elle peut être plus récente,
+// si l'on s'est connecté ici directement — puis la session centrale.
+
+const CLES_SESSION = ["df_token", "df_login"];
+const CLES_CENTRALES = { df_token: "team53_token",
+                         df_login: "team53_login" };
+
+// Recopie la session centrale sous les clés de ce site, si la nôtre manque.
+function adopterSessionCentrale() {
+  if (localStorage.getItem("df_token")) return false;
+  if (!localStorage.getItem("team53_token")) return false;
+  for (const cle of CLES_SESSION) {
+    const valeur = localStorage.getItem(CLES_CENTRALES[cle]);
+    if (valeur !== null) localStorage.setItem(cle, valeur);
+  }
+  return true;
+}
+
+adopterSessionCentrale();
+
 // ===== Connexion (comptes multiples) =====
-// Les identifiants vivent dans DroidFortnite/users.json sur le dépôt BDD :
-//   [{ "login": "...", "password": "...", "nomAffichage": "..." }]
+// Les identifiants vivent dans le fichier central Web/utilisateurs.json, avec
+// la liste des sites auxquels chaque compte a accès (voir aAccesAuSite).
 // Token + identité mémorisés sur l'appareil (localStorage), comme
 // ma-bibliotheque : usage personnel/familial sur un appareil déjà protégé.
 async function seConnecter() {
@@ -271,37 +830,55 @@ async function seConnecter() {
   message.textContent = "Vérification en cours...";
 
   try {
-    const { contenu } = await lireFichierJSON("users.json", token);
+    const { contenu, sha } = await lireFichierJSON(CHEMIN_UTILISATEURS, token);
     const utilisateurs = Array.isArray(contenu) ? contenu : [];
     const utilisateur = utilisateurs.find(u => u.login === login && u.password === password);
 
-    if (utilisateur) {
-      localStorage.setItem("df_token", token);
-      localStorage.setItem("df_login", utilisateur.login);
-      window.location.href = "suivi.html";
-    } else {
+    if (!utilisateur) {
       message.textContent = "Identifiants incorrects.";
+      return;
     }
+    if (!aAccesAuSite(utilisateur)) {
+      message.textContent = "Ce compte n'a pas accès à ce site. Demandez l'accès à un administrateur depuis le portail central.";
+      return;
+    }
+
+    localStorage.setItem("df_token", token);
+    localStorage.setItem("df_login", utilisateur.login);
+
+    try {
+      noterConnexion(utilisateur);
+      await ecrireFichierJSON(CHEMIN_UTILISATEURS, utilisateurs, sha, token,
+        `Dernière connexion de ${login} sur ${ID_SITE}`);
+    } catch (e) { /* la connexion se poursuit */ }
+
+    window.location.href = "suivi.html";
   } catch (erreur) {
     if (erreur.status === 404) {
-      message.textContent = "Aucun compte configuré : demande à un administrateur de t'accorder l'accès depuis le portail central.";
+      message.textContent = "Aucun compte configuré : demandez à un administrateur de créer le vôtre depuis le portail central.";
     } else {
       message.textContent = erreur.message;
     }
   }
 }
 
+// La session est commune à tous les sites du portail : on la ferme donc
+// partout, sans quoi la session centrale reprendrait la main au
+// rechargement suivant.
 function seDeconnecter() {
-  localStorage.removeItem("df_token");
-  localStorage.removeItem("df_login");
-  window.location.href = "connexion.html";
+  for (const cle of CLES_SESSION) localStorage.removeItem(cle);
+  for (const cle of Object.values(CLES_CENTRALES)) localStorage.removeItem(cle);
+  localStorage.removeItem("team53_role");
+  localStorage.removeItem("team53_nom");
+  localStorage.removeItem("team53_acces");
+  window.location.replace("../../connexion.html");
 }
 
 function exigerConnexion() {
   const token = localStorage.getItem("df_token");
   const login = localStorage.getItem("df_login");
   if (!token || !login) {
-    window.location.href = "connexion.html";
+    window.location.replace("connexion.html");
     return null;
   }
   return token;
@@ -537,7 +1114,8 @@ const PALIERS_INITIAUX = [
   { nom: "Défaut", couleur: "#9ca3af" },
   { nom: "Or", couleur: "#eab308" },
   { nom: "Diamant", couleur: "#38bdf8" },
-  { nom: "Arc-en-ciel", couleur: "#a855f7" },
+  // Plusieurs couleurs : le contour devient un dégradé (voir fondPalier).
+  { nom: "Arc-en-ciel", couleur: ["#f43f5e", "#f97316", "#facc15", "#22c55e", "#3b82f6", "#a855f7"] },
   { nom: "Beskar", couleur: "#94a3b8" },
   { nom: "Galactique", couleur: "#4f46e5" },
   { nom: "Stellar", couleur: "#f97316" }
@@ -545,7 +1123,9 @@ const PALIERS_INITIAUX = [
 
 // Ordre d'affichage des raretés, du plus faible au plus fort (utilisé pour
 // trier la liste des droïdes dans le panneau admin).
-const ORDRE_RARETE = ["Typique", "Rare", "Épique", "Légendaire", "Mythique", "Iconique"];
+// L'ordre des raretés vient de raretes.json : il donne l'ordre des listes
+// déroulantes (du plus faible au plus fort). Les grilles, elles, suivent
+// l'ordre du catalogue — celui du jeu.
 
 // Types de droïde (Ouvrier/Astromec/Combat...) : point de départ pour
 // l'amorçage de classes.json (partagé, éditable dans l'onglet « Types » du
@@ -562,7 +1142,108 @@ const CLASSES_INITIALES = [
 // avant l'ajout d'une couleur par palier) : on la reconnaît et la convertit
 // à la volée, sans rien casser pour qui l'a déjà utilisée.
 function normaliserPaliers(bruts) {
-  return (Array.isArray(bruts) ? bruts : []).map((p) =>
-    typeof p === "string" ? { nom: p, couleur: null } : p
-  );
+  return (Array.isArray(bruts) ? bruts : []).map((p) => {
+    if (typeof p === "string") return { nom: p, couleur: null };
+    // couleur peut être une chaîne (une teinte) ou un tableau (un dégradé).
+    const couleurs = couleursPalier(p && p.couleur);
+    return { nom: p.nom, couleur: couleurs.length > 1 ? couleurs : (couleurs[0] || null) };
+  });
+}
+
+// ===== Fusions =====
+//
+// Une recette de fusion combine trois droïdes (avec quantités) pour obtenir
+// un droïde SPÉCIAL — un résultat qui n'existe pas dans le catalogue normal.
+// La recette porte donc elle-même les champs d'un droïde (nom, classe,
+// rareté, image facultative), ce qui permet de réutiliser la carte du Droidex
+// pour l'afficher, plus la liste de ses ingrédients.
+//
+//   { id, nom: "WHL-EX", classe: "Ouvrier", rarete: "Rare",
+//     ingredients: [ { nom: "Mouse", quantite: 2 }, { nom: "ARG", quantite: 1 } ] }
+//
+// Partagé (DroidFortnite/fusions.json), éditable depuis admin.html comme le
+// reste. Données de départ tirées de l'exemple fourni — à compléter/corriger
+// librement, ce ne sont qu'un point de départ.
+const FUSIONS_INITIALES = [
+  { id: "fus-whl-ex",   nom: "WHL-EX",   classe: "Ouvrier",  rarete: "Rare",
+    ingredients: [ { nom: "Mouse", quantite: 2 }, { nom: "ARG", quantite: 1 } ] },
+  { id: "fus-zro-tec",  nom: "ZRO-TEC",  classe: "Astromec", rarete: "Rare",
+    ingredients: [ { nom: "ID10", quantite: 2 }, { nom: "2BB", quantite: 1 } ] },
+  { id: "fus-btl-r",    nom: "BTL-R",    classe: "Combat",   rarete: "Rare",
+    ingredients: [ { nom: "B1 Battle", quantite: 1 }, { nom: "R9", quantite: 1 }, { nom: "BDX Explorer", quantite: 1 } ] },
+  { id: "fus-n-ul",     nom: "N-UL",     classe: "Ouvrier",  rarete: "Épique",
+    ingredients: [ { nom: "B1 Heavy", quantite: 1 }, { nom: "Gunrunner", quantite: 1 }, { nom: "BB", quantite: 1 } ] },
+  { id: "fus-scrp-r",   nom: "SCRP-R",   classe: "Astromec", rarete: "Épique",
+    ingredients: [ { nom: "Gonk", quantite: 1 }, { nom: "Groundmech", quantite: 1 }, { nom: "R6", quantite: 1 } ] },
+  { id: "fus-arm-core", nom: "ARM-CORE", classe: "Combat",   rarete: "Épique",
+    ingredients: [ { nom: "ARG", quantite: 2 }, { nom: "B2 Heavy", quantite: 1 } ] },
+  { id: "fus-opt-ar",   nom: "OPT-AR",   classe: "Combat",   rarete: "Épique",
+    ingredients: [ { nom: "R2", quantite: 2 }, { nom: "B2 Super", quantite: 1 } ] }
+];
+
+// Rang d'une rareté : sa position dans la liste des raretés (du plus faible au
+// plus fort). Une rareté inconnue passe en dernier. Partagé (tri du catalogue).
+function rangRarete(nom) {
+  const i = raretes.findIndex((r) => r.nom === nom);
+  return i === -1 ? raretes.length : i;
+}
+
+// Tri STABLE du catalogue par rareté (faible -> fort). Aucune clé secondaire
+// (surtout pas le nom) : l'ordre du jeu, saisi à la main, est ainsi conservé au
+// sein d'une même rareté — c'est ce que le tri « par rareté puis par nom »
+// cassait. Un droïde ajouté rejoint donc son groupe de rareté au lieu de tomber
+// en fin de liste.
+function trierCatalogueParRarete(liste) {
+  return (Array.isArray(liste) ? liste.slice() : [])
+    .sort((a, b) => rangRarete(a.rarete) - rangRarete(b.rarete));
+}
+
+// Retrouve un droïde du catalogue par son NOM (les ingrédients ET le résultat
+// d'une fusion référencent les droïdes par nom, comme le champ « elements » des
+// renaissances).
+function droideParNom(nom) {
+  const cible = String(nom || "").trim().toLowerCase();
+  return catalogue.find((d) => d.nom.toLowerCase() === cible) || null;
+}
+
+// ----- Résultat d'une fusion : un droïde DU CATALOGUE -----
+// La recette référence le résultat par son nom (champ « resultat »). On tolère
+// l'ancienne forme, où le résultat était décrit à part dans la recette
+// (nom/classe/rarete) : ces champs servent alors de repli si le droïde n'est
+// pas (encore) dans le catalogue.
+function nomResultatFusion(f) {
+  return (f && (f.resultat || f.nom)) || "";
+}
+function droideResultatFusion(f) {
+  return droideParNom(nomResultatFusion(f));
+}
+function rareteResultatFusion(f) {
+  const d = droideResultatFusion(f);
+  if (d) return d.rarete;
+  return (f && f.rarete) || "";
+}
+
+// Un droïde du catalogue est-il le RÉSULTAT d'une fusion ? Sert à l'étiqueter
+// et à le filtrer dans le Droidex. S'appuie sur la liste des fusions chargée
+// par la page ; tolère son absence (pages qui ne la chargent pas).
+function estDroideFusion(nom) {
+  const liste = (typeof fusions !== "undefined" && Array.isArray(fusions)) ? fusions : [];
+  const cible = String(nom || "").trim().toLowerCase();
+  if (!cible) return false;
+  return liste.some((f) => nomResultatFusion(f).toLowerCase() === cible);
+}
+
+function normaliserIngredients(ingredients) {
+  return (Array.isArray(ingredients) ? ingredients : [])
+    .map((i) => ({
+      nom: String(i && i.nom || "").trim(),
+      quantite: Math.max(1, Math.round(Number(i && i.quantite) || 1))
+    }))
+    .filter((i) => i.nom);
+}
+
+// Nombre total de droïdes consommés (somme des quantités) — le jeu en demande
+// trois, on l'affiche pour repérer une recette incomplète d'un coup d'œil.
+function totalDroidesFusion(f) {
+  return normaliserIngredients(f && f.ingredients).reduce((n, i) => n + i.quantite, 0);
 }

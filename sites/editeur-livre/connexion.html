@@ -8,6 +8,22 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="site.css">
+<script>
+  // Déjà connecté : cette page n'a pas lieu d'être affichée.
+  // location.replace() et non href : pousser une entrée dans l'historique
+  // ferait rebondir « retour » entre cette page et la destination, sans
+  // jamais permettre de remonter plus haut.
+  (function () {
+    try {
+      if (localStorage.getItem("gh_token") || localStorage.getItem("team53_token")) {
+        location.replace("bibliotheque.html");
+      }
+    } catch (e) {}
+  })();
+</script>
+
+<link rel="icon" href="icone-192.png">
+<link rel="apple-touch-icon" href="icone-192.png">
 </head>
 <body>
   <div class="page-centree">
@@ -50,7 +66,7 @@
           <input type="password" id="token" placeholder="ghp_xxxxxxxxxxxx" autocomplete="off"
                  onkeydown="if(event.key==='Enter'){seConnecter();}">
         </div>
-        <p class="aide-champ">Le token sert à enregistrer vos livres. Il reste uniquement dans cet onglet et n'est jamais stocké ailleurs.</p>
+        <p class="aide-champ">Le token sert à lire et enregistrer vos données. Il reste mémorisé sur cet appareil, pour tous les sites du portail — vous ne le retapez plus. Déconnectez-vous si vous prêtez l'appareil.</p>
 
         <button class="btn btn-primaire" style="justify-content:center" onclick="seConnecter()">Se connecter</button>
 
@@ -62,6 +78,7 @@
     </div>
   </div>
 
+  <script src="attente.js"></script>
   <script src="script.js"></script>
   <script src="retour-portail.js"></script>
 </body>

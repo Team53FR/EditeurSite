@@ -1,3 +1,12 @@
+// ----- Ces actions passent par le reseau : on le dit, et on empeche d'y toucher -----
+// Voir attente.js. Les actions de FOND (sauvegarde differee, chargement d'une
+// vignette, migration silencieuse) n'y figurent surtout pas : les voiler
+// bloquerait la page pour un travail que l'on a justement choisi de rendre
+// invisible.
+envelopperAttente({
+  chargerLecture: "Ouverture du livre…",
+});
+
 // ===== Lecteur de livre publié (lecture seule) =====
 // Reprend l'expérience du « mode aperçu » de l'éditeur (double-page + tournage
 // de page), mais en lecture seule et de façon autonome. Utilise directement
@@ -19,13 +28,13 @@ let cacheImagesURL = {};
 // ---------- Chargement du livre publié ----------
 
 async function chargerLecture() {
-  const token = sessionStorage.getItem("gh_token");
+  const token = localStorage.getItem("gh_token");
   const message = document.getElementById("message");
 
-  if (!token || !sessionStorage.getItem("gh_login")) {
+  if (!token || !localStorage.getItem("gh_login")) {
     // Lecture réservée aux utilisateurs connectés.
     const params = location.search;
-    window.location.href = "connexion.html";
+    window.location.replace("connexion.html");
     return;
   }
 
@@ -61,11 +70,14 @@ async function chargerLecture() {
 
 function appliquerFormatPage(formatKey) {
   const f = FORMATS[formatKey] || FORMATS["149x210"];
+  // La lecture compose comme l'éditeur : mêmes tailles, donc mêmes coupes
+  // de page que celles enregistrées avec le livre.
+  appliquerTypoFormat(formatKey);
   const largPx = Math.round(f.larg * PX_PAR_MM);
   const hautPx = Math.round(f.haut * PX_PAR_MM);
   const margeVPx = Math.round(f.margeV * PX_PAR_MM);
   const margeHPx = Math.round(f.margeH * PX_PAR_MM);
-  const numPageH = 32;
+  const numPageH = 64;   // même bande qu'à l'édition et à l'impression
   const gap = 26;
 
   document.querySelectorAll(".page-livre").forEach(el => {
@@ -169,7 +181,7 @@ function creerPageCouvertureApercu(mode) {
     img.style.top = "0";
     img.style.left = "0";
     page.appendChild(img);
-    const token = sessionStorage.getItem("gh_token");
+    const token = localStorage.getItem("gh_token");
     if (cacheImagesURL[data.imageChemin]) {
       positionnerImageApercu(img, data, cacheImagesURL[data.imageChemin], page, data.imageChemin);
     } else {
@@ -191,6 +203,9 @@ function creerPageCouvertureApercu(mode) {
     ${afficherAuteur ? `<div class="apercu-auteur" style="color:${couleurTexte};${styleTexteCouv(data, "auteur")}">${livre.auteur || "Auteur"}</div>` : ""}
   `;
   page.appendChild(couche);
+  if (mode === "quatrieme") {
+    page.insertAdjacentHTML("beforeend", htmlResumeCouv(data, couleurTexte, "apercu-resume"));
+  }
   return page;
 }
 
@@ -209,7 +224,7 @@ function positionnerImageApercu(img, data, url, page, chemin, dejaRetente) {
   img.onerror = () => {
     if (dejaRetente) return;
     delete cacheImagesURL[chemin];
-    const token = sessionStorage.getItem("gh_token");
+    const token = localStorage.getItem("gh_token");
     obtenirUrlImage(chemin, token).then((u) => { cacheImagesURL[chemin] = u; positionnerImageApercu(img, data, u, page, chemin, true); }).catch(() => {});
   };
   img.src = url;

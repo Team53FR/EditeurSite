@@ -39,14 +39,96 @@
     break-after: auto;
   }
 
+  /* Feuille d'essai : une marque qui se lit à bout de bras, sa légende
+     dessous. Rien d'autre ne doit occuper la demi-feuille. */
+  .page-essai {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10mm;
+    padding: 12mm;
+    text-align: center;
+  }
+  .essai-marque {
+    font-size: 26mm;
+    line-height: 1.05;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+  .essai-reponse .essai-marque {
+    font-size: 11mm;
+    line-height: 1.2;
+  }
+  .essai-legende {
+    font-size: 4.2mm;
+    line-height: 1.5;
+    max-width: 90%;
+  }
+
+  /* Feuille de papier réelle : le travail y est centré à sa taille exacte.
+     Sans cela, le navigateur met le format déclaré à l'échelle du papier
+     chargé — et deux exports de tailles différentes ressortent à deux
+     échelles différentes, la couverture ne tombant plus autour des pages. */
+  .feuille-papier {
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    background: white;
+    page-break-after: always;
+    break-after: page;
+  }
+
+  .feuille-papier:last-child {
+    page-break-after: auto;
+    break-after: auto;
+  }
+
+  /* Traits de coupe posés dans la marge de la feuille. Filet fin et noir pur :
+     ils doivent se voir pour couper droit, sans épaissir le trait de lame. */
+  .feuille-papier { position: relative; }
+  .trait-coupe { position: absolute; box-sizing: content-box; }
+  .trait-coupe.trait-h { border-top: 0.25pt solid #000; }
+  .trait-coupe.trait-v { border-left: 0.25pt solid #000; }
+
+  /* Le saut de page appartient à la feuille, pas à ce qu'elle porte. */
+  .feuille-papier > .page-impression,
+  .feuille-papier > .feuille-impression,
+  .feuille-papier > .feuille-pro {
+    page-break-after: auto;
+    break-after: auto;
+    flex-shrink: 0;
+  }
+
   /* Mode livret : deux demi-pages côte à côte sur une même feuille */
   .feuille-impression {
+    position: relative;
     display: flex;
     box-sizing: border-box;
     overflow: hidden;
     page-break-after: always;
     break-after: page;
     background: white;
+  }
+
+  /* Bande blanche entre les deux pages. C'est elle qui absorbe le décalage
+     recto-verso de l'imprimante : on coupe de part et d'autre, elle part, et
+     les deux pages gardent leur format exact. */
+  .gouttiere-impression {
+    flex-shrink: 0;
+    background: white;
+  }
+
+  /* Traits de coupe de la gouttière. Pointillé fin, posé dans la bande
+     blanche : il ne touche aucune page et disparaît avec la coupe. */
+  .trait-milieu {
+    position: absolute;
+    top: 0;
+    width: 0;
+    border-left: 0.25pt dotted #888;
+    z-index: 5;
   }
 
   .feuille-impression:last-child {
@@ -65,7 +147,7 @@
      La moindre différence de taille fait déborder le texte, qui est alors
      coupé par overflow:hidden. */
   .texte-impression {
-    font-size: 11pt;
+    font-size: var(--taille-paragraphe, 11pt);
     line-height: 1.45;
     color: #1a1a1a;
     overflow: hidden;
@@ -81,7 +163,7 @@
   }
 
   .texte-impression h2 {
-    font-size: 20pt;
+    font-size: var(--taille-titre, 20pt);
     font-weight: bold;
     text-align: center;
     margin: 0 0 8px 0;
@@ -90,7 +172,7 @@
   }
 
   .texte-impression h3 {
-    font-size: 13pt;
+    font-size: var(--taille-sous-titre, 13pt);
     font-weight: bold;
     font-style: italic;
     text-align: center;
@@ -161,6 +243,19 @@
   #zoneImpression.passe-recto > *:nth-child(even) { display: none; }
   #zoneImpression.passe-verso > *:nth-child(odd)  { display: none; }
 
+  /* Compensation du registre recto-verso.
+     Aucune imprimante familiale ne repose la feuille exactement au même
+     endroit pour son second passage : le verso sort décalé d'un ou deux
+     millimètres, toujours du même côté et toujours de la même quantité.
+     C'est mesurable, donc corrigeable — on décale le dessin du verso de
+     l'écart annoncé, en sens inverse, et l'impression retombe juste.
+     Les faces paires sont les versos (voir les règles ci-dessus). */
+  #zoneImpression > *:nth-child(even) {
+    position: relative;
+    left: var(--decalage-verso, 0mm);
+    top: var(--decalage-verso-y, 0mm);
+  }
+
 
   /* ----- Fichier pour l'imprimeur -----
      Feuille = format rogné + 12 mm de marge technique (5 mm de fond perdu,
@@ -190,11 +285,74 @@
     background: white;
   }
 
+  /* ----- Essai de contour de la couverture -----
+     La même planche, aux mêmes cotes, mais sans un gramme d'encre inutile :
+     des filets, trois étiquettes et les mesures. On la plie sur son bloc de
+     pages pour vérifier le dos avant d'imprimer la vraie. */
+  .couv-essai {
+    display: flex;
+    align-items: stretch;
+    border: 0.4pt solid #000;
+  }
+  .essai-panneau {
+    flex-shrink: 0;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2mm;
+    text-align: center;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  .essai-panneau-nom { font-size: 4mm; font-weight: 700; }
+  .essai-panneau-cote { font-size: 3.2mm; }
+  /* Le dos est souvent trop étroit pour un mot posé à plat : on le tourne,
+     comme le texte d'une vraie tranche. */
+  .essai-dos { justify-content: flex-start; padding-top: 10mm; }
+  .essai-dos .essai-panneau-nom,
+  .essai-dos .essai-panneau-cote {
+    writing-mode: vertical-rl;
+    font-size: 3mm;
+    white-space: nowrap;
+  }
+  .essai-pli {
+    position: absolute;
+    width: 0;
+    border-left: 0.5pt dashed #000;
+  }
+  .essai-legende-couv {
+    position: absolute;
+    box-sizing: border-box;
+    text-align: center;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 2.8mm;
+    line-height: 1.4;
+    color: #000;
+  }
+
   /* Traits de coupe et de pli : filet de 0,25 pt, minimum exigé.
      Dessinés en noir pur, jamais dans la zone de fond perdu. */
   .repere-pro { position: absolute; box-sizing: content-box; }
   .repere-h { border-top: 0.25pt solid #000; }
   .repere-v { border-left: 0.25pt solid #000; }
+
+  /* Impression maison : le pli doit se voir d'un coup d'oeil comme AUTRE
+     CHOSE qu'une coupe. Plus epais et en tirets — deux hairlines identiques
+     a cinq millimetres l'une de l'autre se confondent, et l'on scie la
+     couverture au lieu de la plier. */
+  .repere-pli-tirets { border-left: 0.7pt dashed #000; }
+
+  /* La legende, dans la marge technique : elle part avec la coupe. */
+  .legende-couv-pro {
+    position: absolute;
+    box-sizing: border-box;
+    text-align: center;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 2.6mm;
+    line-height: 1.35;
+    color: #000;
+  }
 
   /* Couverture ouverte à plat : 4e | dos | 1re */
   .couv-plat {
@@ -217,25 +375,6 @@
     overflow: hidden;
   }
 
-  .dos-pro {
-    position: relative;
-    z-index: 1;
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-  }
-
-  /* Titre au dos : lisible de haut en bas, dos vers soi */
-  .dos-texte-pro {
-    writing-mode: vertical-rl;
-    white-space: nowrap;
-    font-size: 10pt;
-    letter-spacing: 0.06em;
-    overflow: hidden;
-    max-height: 90%;
-  }
 
   /* Folio remonté à 8 mm du bord rogné (blanc tournant de 7 mm exigé).
      line-height fixé à 1 pour que la hauteur de la bande soit prévisible et
@@ -247,6 +386,9 @@
 
   /* Le panneau d'aide ne doit jamais s'imprimer */
   .panneau-versos { display: none !important; }
+  /* La feuille d'essai s'imprime SANS fermer le panneau de réglages : sans
+     cette règle, le panneau lui-même partirait à l'imprimante. */
+  .modal-impression { display: none !important; }
 }
 
 /* ----- Panneau « Étape 2 : les versos » (impression en deux passes) ----- */
@@ -304,3 +446,71 @@
 
 .panneau-versos-actions .pv-imprimer:hover { background: #6d3a2b; border-color: #6d3a2b; }
 .panneau-versos-actions .pv-annuler:hover { background: #fff; }
+
+
+/* ===== Le dos du livre =====
+   Ces règles servent deux fois : la planche de couverture à l'impression, et
+   l'aperçu du panneau de réglage, qui construit exactement le même dos à
+   l'échelle. Elles sont donc hors du bloc @media print. */
+.dos-pro {
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  overflow: hidden;
+  font-family: "EB Garamond", Georgia, serif;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
+/* Bandeau : le haut de l'image de couverture, prolongé sur le dos. */
+.dos-bandeau { flex-shrink: 0; overflow: hidden; }
+.dos-bandeau img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  object-position: center top;
+  display: block;
+}
+
+/* Pastille de tome et marque de l'éditeur : droites, pas tournées — c'est
+   ainsi qu'on les lit en rayon, sans pencher la tête. */
+.dos-pastille, .dos-pied {
+  flex-shrink: 0;
+  text-align: center;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.dos-pastille { padding: 0.6mm 0; font-weight: 700; }
+.dos-pied { padding: 1.2mm 0; opacity: 0.9; }
+
+/* Le titre occupe tout ce qui reste, centré sur la hauteur du dos. */
+.dos-centre {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+/* Texte tourné. En écriture verticale, les blocs enfants se rangent en
+   travers du dos : c'est ce qui met le surtitre à côté du titre, et les
+   crédits en colonnes, comme sur un livre de librairie.
+   « montant » retourne le tout pour une lecture de bas en haut. */
+.dos-vertical {
+  writing-mode: vertical-rl;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: center;
+  justify-content: center;
+  max-height: 100%;
+  overflow: hidden;
+}
+.dos-vertical.montant { transform: rotate(180deg); }
+.dos-ligne { white-space: nowrap; letter-spacing: 0.06em; line-height: 1.15; }
+.dos-titre { font-weight: 700; }
+.dos-credits { flex-shrink: 0; padding: 1.5mm 0; gap: 0.5mm; }

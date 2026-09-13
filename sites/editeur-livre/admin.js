@@ -1,7 +1,31 @@
-// Gestion des utilisateurs (réservée aux administrateurs).
-// Les comptes sont stockés dans users.json du dépôt BDD : [{ login, password, role }].
+// ----- Ces actions passent par le reseau : on le dit, et on empeche d'y toucher -----
+// Voir attente.js. Les actions de FOND (sauvegarde differee, chargement d'une
+// vignette, migration silencieuse) n'y figurent surtout pas : les voiler
+// bloquerait la page pour un travail que l'on a justement choisi de rendre
+// invisible.
+envelopperAttente({
+  chargerUtilisateurs: "Chargement des comptes…",
+  enregistrerUtilisateur: "Enregistrement du compte…",
+  retirerAcces: "Retrait de l'accès…",
+  supprimerUtilisateur: ["Suppression du compte…", "Selon le choix, ses données sont aussi effacées : cela peut prendre un moment."],
+  ouvrirStatsUtilisateur: "Lecture des statistiques…",
+});
 
-let utilisateurs = [];
+// Gestion des utilisateurs (réservée aux administrateurs).
+//
+// Les comptes sont centralisés dans Web/utilisateurs.json : cette page ne
+// montre donc que ceux qui ont accès à l'éditeur, et n'écrit que dans le
+// fichier central, en préservant les champs qu'elle n'affiche pas (accès aux
+// autres sites, dates de connexion…).
+//
+// Deux gestes, volontairement distincts depuis que le fichier est commun :
+// « Retirer l'accès » ferme le seul éditeur, « Supprimer » efface le compte
+// du portail et de tous les sites. Le second demande une confirmation qui
+// nomme ce qu'on perd — sur un fichier partagé, les deux ne peuvent pas
+// porter le même bouton.
+
+let tousLesComptes = [];   // le fichier central en entier
+let utilisateurs = [];     // ceux qui ont accès à l'éditeur
 let shaUsers = null;
 let modeEditionLogin = null; // login en cours de modification, ou null (mode ajout)
 
@@ -20,25 +44,18 @@ function formaterDateConnexion(iso) {
   });
 }
 
-function seDeconnecter() {
-  sessionStorage.removeItem("gh_token");
-  sessionStorage.removeItem("gh_login");
-  sessionStorage.removeItem("gh_role");
-  sessionStorage.removeItem("gh_nom");
-  sessionStorage.removeItem("livre_id");
-  window.location.href = "index.html";
-}
 
 async function chargerUtilisateurs() {
-  const token = sessionStorage.getItem("gh_token");
-  const login = sessionStorage.getItem("gh_login");
+  const token = localStorage.getItem("gh_token");
+  const login = localStorage.getItem("gh_login");
   const message = document.getElementById("message");
 
-  if (!token || !login) { window.location.href = "connexion.html"; return; }
+  if (!token || !login) { window.location.replace("connexion.html"); return; }
 
   try {
-    const { contenu, sha } = await lireFichierJSON("users.json", token);
-    utilisateurs = Array.isArray(contenu) ? contenu : [];
+    const { contenu, sha } = await lireFichierJSON(CHEMIN_UTILISATEURS, token);
+    tousLesComptes = Array.isArray(contenu) ? contenu : [];
+    utilisateurs = tousLesComptes.filter(aAccesAuSite);
     shaUsers = sha;
   } catch (erreur) {
     message.textContent = erreur.message;
@@ -46,7 +63,7 @@ async function chargerUtilisateurs() {
   }
 
   // Contrôle basé sur les données réelles : l'utilisateur courant doit être admin
-  const moi = utilisateurs.find(u => u.login === login);
+  const moi = tousLesComptes.find(u => u.login === login);
   if (!moi || moi.role !== "admin") {
     alert("Accès réservé aux administrateurs.");
     window.location.href = "bibliotheque.html";
@@ -56,9 +73,16 @@ async function chargerUtilisateurs() {
   afficherUtilisateurs();
 }
 
+function desactiver(bouton, raison) {
+  bouton.disabled = true;
+  bouton.title = raison;
+  bouton.style.opacity = ".5";
+  bouton.style.cursor = "not-allowed";
+}
+
 function afficherUtilisateurs() {
   const liste = document.getElementById("listeUtilisateurs");
-  const moi = sessionStorage.getItem("gh_login");
+  const moi = localStorage.getItem("gh_login");
   liste.innerHTML = "";
 
   utilisateurs.forEach((u) => {
@@ -97,14 +121,27 @@ function afficherUtilisateurs() {
     bEdit.onclick = () => editerUtilisateur(u.login);
     actions.appendChild(bEdit);
 
+    // Deux gestes bien distincts, parce que le fichier des comptes est commun
+    // à tout le portail : lui fermer l'éditeur, ou effacer son compte partout.
+    const bAcces = document.createElement("button");
+    bAcces.className = "btn-mini";
+    bAcces.textContent = "Retirer l'accès";
+    if (estMoi) {
+      desactiver(bAcces, "Vous ne pouvez pas vous retirer l'accès");
+    } else if (role === "admin") {
+      // Un administrateur entre partout par son rôle : lui retirer cet accès
+      // ne changerait rien, et le bouton mentirait.
+      desactiver(bAcces, "Un administrateur a accès à tous les sites. Changez son rôle, ou supprimez son compte.");
+    } else {
+      bAcces.onclick = () => retirerAcces(u.login);
+    }
+    actions.appendChild(bAcces);
+
     const bDel = document.createElement("button");
     bDel.className = "btn-mini danger";
     bDel.textContent = "Supprimer";
     if (estMoi) {
-      bDel.disabled = true;
-      bDel.title = "Vous ne pouvez pas supprimer votre propre compte";
-      bDel.style.opacity = ".5";
-      bDel.style.cursor = "not-allowed";
+      desactiver(bDel, "Vous ne pouvez pas supprimer votre propre compte");
     } else {
       bDel.onclick = () => supprimerUtilisateur(u.login);
     }
@@ -140,7 +177,7 @@ function annulerEdition() {
   document.getElementById("champPassword").value = "";
   document.getElementById("champRole").value = "user";
   document.getElementById("formTitre").textContent = "Ajouter un utilisateur";
-  document.getElementById("formNote").textContent = "Le mot de passe est stocké tel quel dans users.json.";
+  document.getElementById("formNote").textContent = "Le compte est créé dans le fichier central du portail, avec accès à l'éditeur.";
   document.getElementById("btnEnregistrer").textContent = "Ajouter";
   document.getElementById("btnAnnuler").style.display = "none";
   document.getElementById("message").textContent = "";
@@ -148,9 +185,9 @@ function annulerEdition() {
 }
 
 async function enregistrerUtilisateur() {
-  const token = sessionStorage.getItem("gh_token");
+  const token = localStorage.getItem("gh_token");
   const message = document.getElementById("message");
-  const moi = sessionStorage.getItem("gh_login");
+  const moi = localStorage.getItem("gh_login");
 
   const login = document.getElementById("champLogin").value.trim();
   const password = document.getElementById("champPassword").value;
@@ -161,7 +198,9 @@ async function enregistrerUtilisateur() {
     return;
   }
 
-  const copie = JSON.parse(JSON.stringify(utilisateurs));
+  // On travaille sur le fichier central AU COMPLET : les comptes des autres
+  // sites doivent se retrouver intacts dans ce qu'on réécrit.
+  const copie = JSON.parse(JSON.stringify(tousLesComptes));
 
   if (modeEditionLogin) {
     const u = copie.find(x => x.login === modeEditionLogin);
@@ -173,17 +212,28 @@ async function enregistrerUtilisateur() {
     u.password = password;
     u.role = role;
   } else {
-    if (copie.some(x => x.login === login)) {
-      message.textContent = `L'identifiant « ${login} » existe déjà.`;
-      return;
+    const existant = copie.find(x => x.login === login);
+    if (existant) {
+      // Le compte existe ailleurs dans le portail : on lui ouvre l'éditeur
+      // plutôt que de refuser un identifiant qui n'est pas un doublon.
+      if (!Array.isArray(existant.acces)) existant.acces = [];
+      if (existant.acces.includes(ID_SITE)) {
+        message.textContent = `L'identifiant « ${login} » existe déjà.`;
+        return;
+      }
+      existant.acces.push(ID_SITE);
+      existant.password = password;
+      existant.role = role;
+    } else {
+      copie.push({ login, password, role, nomAffichage: "", acces: [ID_SITE] });
     }
-    copie.push({ login, password, role });
   }
 
   const commit = modeEditionLogin ? `Modification de l'utilisateur ${modeEditionLogin}` : `Ajout de l'utilisateur ${login}`;
   try {
-    shaUsers = await ecrireFichierJSON("users.json", copie, shaUsers, token, commit);
-    utilisateurs = copie;
+    shaUsers = await ecrireFichierJSON(CHEMIN_UTILISATEURS, copie, shaUsers, token, commit);
+    tousLesComptes = copie;
+    utilisateurs = copie.filter(aAccesAuSite);
     annulerEdition();
     message.textContent = "Enregistré avec succès.";
     setTimeout(() => { if (message.textContent === "Enregistré avec succès.") message.textContent = ""; }, 2500);
@@ -194,26 +244,77 @@ async function enregistrerUtilisateur() {
   }
 }
 
-async function supprimerUtilisateur(login) {
-  const moi = sessionStorage.getItem("gh_login");
-  if (login === moi) return; // garde-fou : pas d'auto-suppression
+async function retirerAcces(login) {
+  const moi = localStorage.getItem("gh_login");
+  if (login === moi) return; // garde-fou : pas d'auto-retrait
 
-  if (!confirm(`Supprimer l'utilisateur « ${login} » ? Cette action est irréversible.\n\n(Sa bibliothèque n'est pas supprimée.)`)) return;
+  if (!confirm(`Retirer à « ${login} » l'accès à l'éditeur de livre ?\n\n` +
+    "Son compte, sa bibliothèque et ses accès aux autres sites sont conservés. " +
+    "La suppression complète d'un compte se fait depuis le portail central.")) return;
 
-  const token = sessionStorage.getItem("gh_token");
+  const token = localStorage.getItem("gh_token");
   const message = document.getElementById("message");
-  const copie = utilisateurs.filter(u => u.login !== login);
+  const copie = JSON.parse(JSON.stringify(tousLesComptes));
+  const u = copie.find(x => x.login === login);
+  if (!u) { message.textContent = "Utilisateur introuvable."; return; }
+  // Une entrée sans liste d'accès date d'avant la centralisation : elle vaut
+  // « accès à tout ». Pour lui en retirer un, il faut d'abord l'écrire.
+  if (!Array.isArray(u.acces)) u.acces = SITES_CONNUS.slice();
+  u.acces = u.acces.filter(id => id !== ID_SITE);
 
   try {
-    shaUsers = await ecrireFichierJSON("users.json", copie, shaUsers, token, `Suppression de l'utilisateur ${login}`);
-    utilisateurs = copie;
+    shaUsers = await ecrireFichierJSON(CHEMIN_UTILISATEURS, copie, shaUsers, token,
+      `Retrait de l'accès ${ID_SITE} pour ${login}`);
+    tousLesComptes = copie;
+    utilisateurs = copie.filter(aAccesAuSite);
     if (modeEditionLogin === login) annulerEdition();
     else afficherUtilisateurs();
-    message.textContent = "Utilisateur supprimé.";
-    setTimeout(() => { if (message.textContent === "Utilisateur supprimé.") message.textContent = ""; }, 2500);
+    message.textContent = "Accès retiré.";
+    setTimeout(() => { if (message.textContent === "Accès retiré.") message.textContent = ""; }, 2500);
   } catch (erreur) {
     message.textContent = erreur.conflit
       ? "La liste des utilisateurs a été modifiée ailleurs. Rechargez la page avant de réessayer."
+      : erreur.message;
+  }
+}
+
+// Suppression franche du compte, dans le fichier central : la personne perd
+// le portail et tous les sites, pas seulement l'éditeur. Ses données restent
+// (bibliothèque, livres, droïdes) : rien n'est effacé du dépôt, seul le
+// compte disparaît.
+async function supprimerUtilisateur(login) {
+  const moi = localStorage.getItem("gh_login");
+  if (login === moi) return; // garde-fou : pas d'auto-suppression
+
+  if (!confirm(`Supprimer le compte « ${login} » ?\n\nIl perdra l'accès au portail ET à tous les sites, pas seulement à l'éditeur. ` +
+    `Une seconde question proposera ensuite d'effacer aussi ses données.\n\nPour lui fermer le seul éditeur, utilisez « Retirer l'accès ».`)) return;
+
+  const token = localStorage.getItem("gh_token");
+  const message = document.getElementById("message");
+  const copie = tousLesComptes.filter(u => u.login !== login);
+
+  try {
+    shaUsers = await ecrireFichierJSON(CHEMIN_UTILISATEURS, copie, shaUsers, token,
+      `Suppression du compte ${login}`);
+    tousLesComptes = copie;
+    utilisateurs = copie.filter(aAccesAuSite);
+    if (modeEditionLogin === login) annulerEdition();
+    else afficherUtilisateurs();
+    message.textContent = "Compte supprimé.";
+
+    // Seconde question, posée après coup et jamais cochée d'avance : effacer
+    // ses données est irréversible et ne se répare pas en recréant le compte.
+    if (confirm(`Supprimer aussi TOUT ce que « ${login} » possédait ?\n\nSes livres, sa bibliothèque, ses images et sa progression Droid Fortnite ` +
+      `seront effacés du dépôt, et ses livres publiés retirés de la liste commune.\n\nSans cela, ces fichiers restent en place : recréer le même identifiant les retrouve.`)) {
+      message.textContent = "Suppression des données...";
+      const rapport = await supprimerDonneesUtilisateur(login, token);
+      message.textContent = "Compte supprimé. " + resumePurge(rapport);
+      return;
+    }
+    setTimeout(() => { if (message.textContent === "Compte supprimé.") message.textContent = ""; }, 2500);
+  } catch (erreur) {
+    message.textContent = erreur.conflit
+      ? "La liste des comptes a été modifiée ailleurs. Rechargez la page avant de réessayer."
       : erreur.message;
   }
 }
@@ -348,7 +449,7 @@ async function ouvrirStatsUtilisateur(login) {
   contenu.innerHTML = '<div class="stats-chargement">Chargement des statistiques…</div>';
 
   const u = utilisateurs.find(x => x.login === login) || { login };
-  const token = sessionStorage.getItem("gh_token");
+  const token = localStorage.getItem("gh_token");
 
   let livres = [];
   let erreur = null;
@@ -405,7 +506,7 @@ function basculerDetailLivre(tr) {
 function rendreStats(u, livres, erreur) {
   const role = u.role === "admin" ? "admin" : "user";
   const initiale = (u.login || "?").slice(0, 2).toUpperCase();
-  const estMoi = u.login === sessionStorage.getItem("gh_login");
+  const estMoi = u.login === localStorage.getItem("gh_login");
   const st = statutConnexion(u.derniereConnexion, estMoi);
 
   const agg = livres.reduce((a, l) => {
