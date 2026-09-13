@@ -554,6 +554,18 @@ uniquement quand un seul compte écrit jamais un fichier donné, comme
 fusionne les entrées locales absentes (par `id`), pour ne jamais perdre
 silencieusement l'ajout fait par quelqu'un d'autre entre-temps.
 
+**Onglet Renaissance — recherche « puis-je le vendre ? »** (`verifierVenteDroide()`
+dans `suivi.js`) : un champ cherche un droïde par son nom (sans avoir à le
+retrouver dans la liste des paliers) et répond par la même pastille 🔒/💰 que
+sur chaque élément affiché — sauf que la question posée est différente.
+`marqueurUtilite()` (existant, posé sur un élément précis) compare aux
+niveaux plus loin que celui affiché ; `besoinsRestants()` (nouveau) ignore le
+niveau affiché et ne compte comme un besoin que les paliers PAS ENCORE
+cochés de la super renaissance actuelle, à n'importe lequel de leurs niveaux
+— la question qu'on se pose en tenant un droïde en main, loin de la liste.
+Se rafraîchit avec le reste de l'onglet (changement de super renaissance,
+case cochée/décochée) puisqu'appelé à la fin d'`afficherRenaissance()`.
+
 **Raretés** : `DroidFortnite/raretes.json` porte la liste complète, éditable
 depuis l'onglet **Raretés** du panneau admin — ajout, suppression,
 réordonnancement et couleurs (fond + texte).

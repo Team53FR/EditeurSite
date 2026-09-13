@@ -910,6 +910,69 @@ function marqueurUtilite(droide, niveauCourant, besoins) {
     echapperHTML("Vendable : aucun palier suivant ne le demande") + '">💰</span>';
 }
 
+// ----- Recherche libre : « puis-je le vendre ? » -----
+//
+// Les pastilles 🔒/💰 posées sur chaque élément répondent déjà à la question,
+// mais seulement pour un droïde qu'on a sous les yeux, à un palier donné, en
+// le comparant aux niveaux PLUS LOIN dans la liste que celui affiché. Ici, on
+// cherche un droïde par son nom, sans avoir à le retrouver dans la liste, et
+// la question posée est différente : par rapport à la super renaissance
+// actuelle ET à ce qui est déjà FAIT (coché), un palier restant en a-t-il
+// encore besoin, à N'IMPORTE lequel de ses niveaux ?
+function besoinsRestants() {
+  const parDroide = new Map();   // id -> [{ niveau, palier }, …]
+  const faits = new Set(atteintsSuper());
+  renaissance.forEach((r) => {
+    if (faits.has(r.id)) return; // déjà fait : ne compte plus comme un besoin
+    analyserElementsRenaissance(elementsPourSuper(r, superActif)).forEach((e) => {
+      if (!e.droide) return;
+      if (!parDroide.has(e.droide.id)) parDroide.set(e.droide.id, []);
+      parDroide.get(e.droide.id).push({ niveau: r.niveau, palier: e.palier });
+    });
+  });
+  parDroide.forEach((liste) => liste.sort((a, b) => a.niveau - b.niveau));
+  return parDroide;
+}
+
+// Même verdict et mêmes pastilles que marqueurUtilite(), mais construit à
+// partir de besoinsRestants() au lieu d'un niveau affiché précis.
+function marqueurUtiliteRecherche(droide, besoins) {
+  const suite = besoins.get(droide.id) || [];
+  if (suite.length) {
+    const detail = suite.map((b) => "palier " + b.niveau + " (" + b.palier + ")").join(", ");
+    return '<span class="element-utilite garder" title="' +
+      echapperHTML("À garder : encore requis au " + detail) + '">🔒</span>';
+  }
+  if (poseDansEscouade(droide.id)) {
+    return '<span class="element-utilite reserve" title="' +
+      echapperHTML("Plus requis par les paliers restants, mais posé dans ton rendement") +
+      '">💰</span>';
+  }
+  return '<span class="element-utilite vendable" title="' +
+    echapperHTML("Vendable : aucun palier restant ne le demande") + '">💰</span>';
+}
+
+function verifierVenteDroide() {
+  const champ = document.getElementById("champRechercheVente");
+  const resultat = document.getElementById("resultatVente");
+  if (!champ || !resultat) return;
+  const saisie = champ.value.trim().toLowerCase();
+
+  if (!saisie) { resultat.innerHTML = ""; return; }
+
+  const trouves = catalogue.filter((d) => d.nom.toLowerCase().includes(saisie));
+  if (!trouves.length) {
+    resultat.innerHTML = '<p class="ligne-resultat-vente">Aucun droïde ne correspond.</p>';
+    return;
+  }
+
+  const besoins = besoinsRestants();
+  resultat.innerHTML = trouves.map((d) =>
+    '<div class="ligne-resultat-vente">' + marqueurUtiliteRecherche(d, besoins) +
+      "<b>" + echapperHTML(d.nom) + "</b></div>"
+  ).join("");
+}
+
 function construireElementsRenaissance(texte, niveauCourant, besoins) {
   const zone = document.createElement("div");
   zone.className = "elements-renaissance";
@@ -1148,6 +1211,11 @@ function afficherRenaissance(options) {
     ` title="Décocher tous les paliers de cette super renaissance">Tout décocher</button>`;
   const decocher = document.querySelector("#compteurRenaissance .btn-decocher");
   if (decocher) decocher.addEventListener("click", toutDecocherRenaissance);
+
+  // La recherche « puis-je le vendre ? » dépend de la super renaissance
+  // affichée et de ce qui est coché : elle se rafraîchit à chaque rendu de
+  // cet onglet, comme le reste ci-dessus.
+  verifierVenteDroide();
 }
 
 // Amène le premier palier non validé sous les yeux. Replier ceux du dessus
