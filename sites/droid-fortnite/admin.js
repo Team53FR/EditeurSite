@@ -7,6 +7,8 @@ let catalogue = [];
 let shaCatalogue = null;
 let paliers = [];
 let shaPaliers = null;
+let classes = [];
+let shaClasses = null;
 let modeEditionId = null; // id du droïde en cours de modification, ou null (mode ajout)
 const cacheImages = new Map(); // chemin GitHub -> URL locale (blob:)
 
@@ -51,7 +53,7 @@ function retirerImageAdmin() {
   document.getElementById("boutonSupprimerImageAdmin").style.display = "none";
 }
 
-// ===== Onglets (Droïdes / Ajouter / Paliers) =====
+// ===== Onglets (Droïdes / Ajouter / Paliers / Types) =====
 let ongletAdminActif = "droides";
 
 function changerOngletAdmin(type) {
@@ -60,6 +62,7 @@ function changerOngletAdmin(type) {
   document.getElementById("zoneDroides").style.display = type === "droides" ? "" : "none";
   document.getElementById("zoneAjout").style.display = type === "ajout" ? "" : "none";
   document.getElementById("zonePaliers").style.display = type === "paliers" ? "" : "none";
+  document.getElementById("zoneClasses").style.display = type === "classes" ? "" : "none";
 }
 
 // Clic sur l'onglet « Ajouter » : repart toujours d'un formulaire vide (pour
@@ -76,21 +79,36 @@ if (token) {
 async function chargerDonnees() {
   const message = document.getElementById("messageDroideAdmin");
   try {
-    const [rCatalogue, rPaliers] = await Promise.all([
+    const [rCatalogue, rPaliers, rClasses] = await Promise.all([
       chargerOuAmorcer("catalogue.json", CATALOGUE_INITIAL, token, "Amorçage du catalogue de droïdes"),
-      chargerOuAmorcer("paliers.json", PALIERS_INITIAUX, token, "Amorçage de la liste des paliers")
+      chargerOuAmorcer("paliers.json", PALIERS_INITIAUX, token, "Amorçage de la liste des paliers"),
+      chargerOuAmorcer("classes.json", CLASSES_INITIALES, token, "Amorçage des types de droïdes")
     ]);
     catalogue = Array.isArray(rCatalogue.contenu) ? rCatalogue.contenu : [];
     shaCatalogue = rCatalogue.sha;
     const paliersCharges = normaliserPaliers(rPaliers.contenu);
     paliers = paliersCharges.length ? paliersCharges : PALIERS_INITIAUX;
     shaPaliers = rPaliers.sha;
+    classes = Array.isArray(rClasses.contenu) && rClasses.contenu.length ? rClasses.contenu : CLASSES_INITIALES;
+    shaClasses = rClasses.sha;
   } catch (e) {
     message.textContent = e.message;
     return;
   }
+  remplirSelectClasseAdmin();
   afficherDroides();
   afficherPaliers();
+  afficherClasses();
+}
+
+// Remplit le <select> de classe du formulaire d'ajout/modification depuis la
+// liste chargée (plutôt que des options figées dans le HTML) — un type
+// ajouté ci-dessous y apparaît aussitôt.
+function remplirSelectClasseAdmin() {
+  const champ = document.getElementById("champClasse");
+  const valeur = champ.value;
+  champ.innerHTML = classes.map((c) => `<option value="${echapper(c.nom)}">${c.icone} ${echapper(c.nom)}</option>`).join("");
+  if (classes.some((c) => c.nom === valeur)) champ.value = valeur;
 }
 
 // ===== Droïdes =====
@@ -112,7 +130,7 @@ function afficherDroides() {
     carte.title = "Modifier";
     carte.innerHTML =
       `<div class="droide-entete">` +
-        `<div class="droide-icone" id="icone-admin-${d.id}" style="background:${d.image ? "" : couleurDroide(d.id)};color:${d.image ? "" : "#fff"}">${iconeClasse(d.classe)}</div>` +
+        `<div class="droide-icone" id="icone-admin-${d.id}" style="background:${d.image ? "" : couleurDroide(d.id)};color:${d.image ? "" : "#fff"}">${iconeClasse(d.classe, classes)}</div>` +
         `<div class="droide-nom">${echapper(d.nom)}</div>` +
         `<button type="button" class="droide-supprimer" title="Supprimer">🗑</button>` +
       `</div>` +
@@ -175,7 +193,7 @@ function annulerEditionDroide() {
   dataUrlImageAdmin = null;
   imageSupprimeeAdmin = false;
   document.getElementById("champNom").value = "";
-  document.getElementById("champClasse").value = "Ouvrier";
+  if (classes.length) document.getElementById("champClasse").value = classes[0].nom;
   document.getElementById("champRarete").value = "Typique";
   document.getElementById("apercuDroideAdmin").innerHTML = iconePlaceholderDroideAdmin();
   document.getElementById("boutonSupprimerImageAdmin").style.display = "none";
@@ -347,4 +365,73 @@ function supprimerPalier(index) {
   if (!confirm(`Supprimer le palier « ${nom} » ?\n\nLa progression déjà enregistrée pour ce palier n'est pas supprimée, juste rendue invisible (elle réapparaîtrait si un palier du même nom est recréé).`)) return;
   const copie = paliers.filter((_, i) => i !== index);
   sauvegarderPaliers(copie, `Suppression du palier ${nom}`);
+}
+
+// ===== Types de droïde (classes) =====
+// Contrairement aux paliers, l'ordre n'a aucun effet côté jeu (juste l'ordre
+// des options dans les <select>) : pas de boutons ↑/↓, seulement ajout/
+// modification d'icône/suppression.
+function afficherClasses() {
+  const liste = document.getElementById("listeClasses");
+  liste.innerHTML = "";
+
+  classes.forEach((c, index) => {
+    const li = document.createElement("li");
+    li.className = "ligne-item";
+    li.innerHTML =
+      `<div class="ligne-info"><div class="ligne-titre">${echapper(c.nom)}</div></div>` +
+      `<input type="text" class="classe-icone" maxlength="4" value="${echapper(c.icone || "")}" title="Icône (emoji)">` +
+      `<div class="ligne-actions"></div>`;
+
+    li.querySelector(".classe-icone").addEventListener("change", (e) => changerIconeClasse(index, e.target.value));
+
+    const bDel = document.createElement("button");
+    bDel.className = "btn-mini danger";
+    bDel.textContent = "Supprimer";
+    bDel.onclick = () => supprimerClasse(index);
+    li.querySelector(".ligne-actions").appendChild(bDel);
+
+    liste.appendChild(li);
+  });
+}
+
+async function sauvegarderClasses(copie, messageCommit) {
+  const message = document.getElementById("messageClasses");
+  message.textContent = "Enregistrement...";
+  try {
+    shaClasses = await sauvegarderAvecRetry("classes.json", copie, shaClasses, token, messageCommit);
+    classes = copie;
+    afficherClasses();
+    remplirSelectClasseAdmin();
+    message.textContent = "";
+  } catch (e) {
+    message.textContent = e.message;
+  }
+}
+
+function changerIconeClasse(index, icone) {
+  const copie = classes.slice();
+  copie[index] = Object.assign({}, copie[index], { icone: icone.trim() || "\u{1F916}" });
+  sauvegarderClasses(copie, `Icône du type ${copie[index].nom}`);
+}
+
+function ajouterClasse() {
+  const champNom = document.getElementById("champNouvelleClasse");
+  const champIcone = document.getElementById("champIconeNouvelleClasse");
+  const nom = champNom.value.trim();
+  const message = document.getElementById("messageClasses");
+  if (!nom) { message.textContent = "Le nom du type est obligatoire."; return; }
+  if (classes.some((c) => c.nom === nom)) { message.textContent = "Ce type existe déjà."; return; }
+  champNom.value = "";
+  const icone = champIcone.value.trim() || "\u{1F916}";
+  champIcone.value = "";
+  sauvegarderClasses(classes.concat([{ nom, icone }]), `Ajout du type ${nom}`);
+}
+
+function supprimerClasse(index) {
+  const nom = classes[index].nom;
+  if (classes.length <= 1) { document.getElementById("messageClasses").textContent = "Il doit rester au moins un type."; return; }
+  if (!confirm(`Supprimer le type « ${nom} » ?\n\nLes droïdes déjà classés dans ce type ne sont pas modifiés (leur classe reste enregistrée telle quelle, juste sans option correspondante dans les formulaires).`)) return;
+  const copie = classes.filter((_, i) => i !== index);
+  sauvegarderClasses(copie, `Suppression du type ${nom}`);
 }

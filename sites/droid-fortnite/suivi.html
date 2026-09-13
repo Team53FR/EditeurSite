@@ -40,9 +40,6 @@
       <div class="filtres">
         <select id="filtreClasse" onchange="afficherDroidex()">
           <option value="">Toutes les classes</option>
-          <option value="Ouvrier">🔧 Ouvrier</option>
-          <option value="Astromec">📡 Astromec</option>
-          <option value="Combat">⚔️ Combat</option>
         </select>
         <select id="filtreRarete" onchange="afficherDroidex()">
           <option value="">Toutes les raretés</option>
@@ -78,6 +75,12 @@
 
     <div id="zoneRenaissance" style="display:none">
       <p class="note-source">Paliers de renaissance issus d'un tracker communautaire — la liste peut être incomplète (le jeu évolue). Ajoute les paliers manquants toi-même.</p>
+      <div class="recherche">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="champRechercheVente" placeholder="Un droïde à vendre ? Vérifie ici..." oninput="verifierVenteDroide()">
+      </div>
+      <p class="note-source">Vérifié au palier actuellement sélectionné dans le Droidex : <b id="labelPalierVente"></b></p>
+      <p id="resultatVente" class="resultat-vente"></p>
       <div class="compteur-global" id="compteurRenaissance"></div>
       <div class="liste-renaissance" id="listeRenaissance"></div>
     </div>
@@ -101,11 +104,7 @@
         </div>
         <div class="champ">
           <label for="champDroideClasse">Classe</label>
-          <select id="champDroideClasse">
-            <option value="Ouvrier">🔧 Ouvrier</option>
-            <option value="Astromec">📡 Astromec</option>
-            <option value="Combat">⚔️ Combat</option>
-          </select>
+          <select id="champDroideClasse"></select>
         </div>
         <div class="champ">
           <label for="champDroideRarete">Rareté</label>

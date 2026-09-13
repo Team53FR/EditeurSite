@@ -6,6 +6,7 @@ let shaCatalogue = null;
 let renaissance = [];
 let shaRenaissance = null;
 let paliers = PALIERS_INITIAUX; // remplacé par le contenu réel de paliers.json au chargement
+let classes = CLASSES_INITIALES; // remplacé par le contenu réel de classes.json au chargement
 // droidesPossedes : tableau de clés "<idDroide>::<palier>" — chaque droïde
 // peut être possédé indépendamment à CHAQUE palier (Défaut, Or, Diamant...),
 // comme dans le jeu (le compteur du jeu compte chaque palier séparément).
@@ -51,10 +52,11 @@ if (token) {
 
 async function chargerTout() {
   try {
-    const [rCatalogue, rRenaissance, rPaliers, rPerso] = await Promise.all([
+    const [rCatalogue, rRenaissance, rPaliers, rClasses, rPerso] = await Promise.all([
       chargerOuAmorcer("catalogue.json", CATALOGUE_INITIAL, token, "Amorçage du catalogue de droïdes"),
       chargerOuAmorcer("renaissance.json", RENAISSANCE_INITIALE, token, "Amorçage des paliers de renaissance"),
       chargerOuAmorcer("paliers.json", PALIERS_INITIAUX, token, "Amorçage de la liste des paliers"),
+      chargerOuAmorcer("classes.json", CLASSES_INITIALES, token, "Amorçage des types de droïdes"),
       chargerBibliothequePerso()
     ]);
     catalogue = Array.isArray(rCatalogue.contenu) ? rCatalogue.contenu : [];
@@ -64,6 +66,7 @@ async function chargerTout() {
     const paliersCharges = normaliserPaliers(rPaliers.contenu);
     paliers = paliersCharges.length ? paliersCharges : PALIERS_INITIAUX;
     palierActif = paliers[0].nom;
+    classes = Array.isArray(rClasses.contenu) && rClasses.contenu.length ? rClasses.contenu : CLASSES_INITIALES;
   } catch (e) {
     document.getElementById("chargement").innerHTML =
       `<p style="color:var(--danger);text-align:center">${echapperHTML(e.message)}</p>`;
@@ -71,10 +74,26 @@ async function chargerTout() {
   }
 
   construireOngletsPalier();
+  remplirSelectsClasses();
   document.getElementById("chargement").style.display = "none";
   document.getElementById("zoneDroidex").style.display = "";
   afficherDroidex();
   afficherRenaissance();
+  mettreAJourVerificationVente();
+}
+
+// Remplit les <select> de classe (filtre du Droidex + formulaire d'ajout)
+// depuis la liste chargée, plutôt que des options figées dans le HTML — pour
+// qu'un type ajouté depuis le panneau admin apparaisse aussitôt ici aussi.
+function remplirSelectsClasses() {
+  const filtre = document.getElementById("filtreClasse");
+  const valeurFiltre = filtre.value;
+  filtre.innerHTML = `<option value="">Toutes les classes</option>` +
+    classes.map((c) => `<option value="${echapperHTML(c.nom)}">${c.icone} ${echapperHTML(c.nom)}</option>`).join("");
+  filtre.value = valeurFiltre;
+
+  const champ = document.getElementById("champDroideClasse");
+  champ.innerHTML = classes.map((c) => `<option value="${echapperHTML(c.nom)}">${c.icone} ${echapperHTML(c.nom)}</option>`).join("");
 }
 
 function construireOngletsPalier() {
@@ -94,6 +113,7 @@ function changerPalierActif(nom) {
   palierActif = nom;
   document.querySelectorAll(".onglet-palier").forEach((b) => b.classList.toggle("actif", b.textContent === nom));
   afficherDroidex();
+  mettreAJourVerificationVente();
 }
 
 async function chargerBibliothequePerso() {
@@ -197,7 +217,7 @@ function afficherDroidex() {
     if (couleurPalierActif) carte.style.borderColor = couleurPalierActif;
     carte.innerHTML =
       `<div class="droide-entete">` +
-        `<div class="droide-icone" id="icone-${d.id}" style="background:${d.image ? "" : couleurDroide(d.id)};color:${d.image ? "" : "#fff"}">${iconeClasse(d.classe)}</div>` +
+        `<div class="droide-icone" id="icone-${d.id}" style="background:${d.image ? "" : couleurDroide(d.id)};color:${d.image ? "" : "#fff"}">${iconeClasse(d.classe, classes)}</div>` +
         `<div class="droide-nom">${echapperHTML(d.nom)}</div>` +
         `<span class="droide-case">✓</span>` +
       `</div>` +
@@ -243,7 +263,7 @@ function basculerPossession(idDroide) {
 
 function ouvrirAjoutDroide() {
   document.getElementById("champDroideNom").value = "";
-  document.getElementById("champDroideClasse").value = "Ouvrier";
+  if (classes.length) document.getElementById("champDroideClasse").value = classes[0].nom;
   document.getElementById("champDroideRarete").value = "Typique";
   document.getElementById("messageDroide").textContent = "";
   document.getElementById("voileDroide").classList.add("ouvert");
@@ -318,6 +338,7 @@ function basculerAtteint(idRenaissance) {
   if (index === -1) perso.renaissanceAtteinte.push(idRenaissance);
   else perso.renaissanceAtteinte.splice(index, 1);
   afficherRenaissance();
+  verifierVenteDroide();
   sauvegarderPerso();
 }
 
@@ -354,6 +375,49 @@ async function enregistrerRenaissance() {
     afficherToast("Palier ajouté.");
   } catch (e) {
     message.textContent = e.message;
+  }
+}
+
+// ===== Vérification « puis-je le vendre ? » =====
+// Le champ "elements" de chaque palier de renaissance est un texte libre du
+// type "CB (Défaut), Pit (Défaut), DRK-1 Probe (Or)" (nom du droïde suivi de
+// son palier entre parenthèses). On cherche si le nom saisi y apparaît, AU
+// PALIER actuellement sélectionné dans le Droidex (palierActif, partagé entre
+// les deux onglets), pour un palier de renaissance pas encore atteint — s'il
+// y est, ce droïde à ce palier sert encore de matériau, mieux vaut ne pas le
+// vendre.
+function mettreAJourVerificationVente() {
+  const label = document.getElementById("labelPalierVente");
+  if (label) label.textContent = palierActif;
+  verifierVenteDroide();
+}
+
+function verifierVenteDroide() {
+  const champ = document.getElementById("champRechercheVente");
+  const resultat = document.getElementById("resultatVente");
+  if (!champ || !resultat) return;
+  const saisie = champ.value.trim().toLowerCase();
+
+  if (!saisie) {
+    resultat.textContent = "";
+    resultat.className = "resultat-vente";
+    return;
+  }
+
+  const suffixe = `(${palierActif})`.toLowerCase();
+  const necessaire = renaissance
+    .filter((r) => !perso.renaissanceAtteinte.includes(r.id))
+    .find((r) => (r.elements || "").split(",").some((morceau) => {
+      const m = morceau.trim().toLowerCase();
+      return m.endsWith(suffixe) && m.slice(0, m.length - suffixe.length).trim().includes(saisie);
+    }));
+
+  if (necessaire) {
+    resultat.textContent = `⛔ Non : encore nécessaire (${palierActif}) pour le palier de renaissance ${necessaire.niveau}.`;
+    resultat.className = "resultat-vente non";
+  } else {
+    resultat.textContent = `✅ Oui, tu peux le vendre : pas requis (${palierActif}) pour un palier de renaissance restant.`;
+    resultat.className = "resultat-vente oui";
   }
 }
 

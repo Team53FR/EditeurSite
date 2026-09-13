@@ -235,10 +235,13 @@ function classeRareteCss(rarete) {
     .toLowerCase();
 }
 
-function iconeClasse(classe) {
-  if (classe === "Astromec") return "\u{1F4E1}";
-  if (classe === "Combat") return "\u2694\uFE0F";
-  return "\u{1F527}";
+// La liste des classes (types de droide) est chargee depuis classes.json
+// (partagee, editable dans l'onglet Types du panneau admin) : on cherche
+// l'icone associee dans le tableau CHARGE, transmis par l'appelant, avec un
+// repli generique si le type est inconnu (ex. donnee pas encore rechargee).
+function iconeClasse(classe, classes) {
+  const trouve = (classes || CLASSES_INITIALES).find((c) => c.nom === classe);
+  return (trouve && trouve.icone) || "\u{1F916}";
 }
 
 // Visuel généré (pas une image du jeu, dont je n'ai pas le droit de
@@ -543,6 +546,17 @@ const PALIERS_INITIAUX = [
 // Ordre d'affichage des raretés, du plus faible au plus fort (utilisé pour
 // trier la liste des droïdes dans le panneau admin).
 const ORDRE_RARETE = ["Typique", "Rare", "Épique", "Légendaire", "Mythique", "Iconique"];
+
+// Types de droïde (Ouvrier/Astromec/Combat...) : point de départ pour
+// l'amorçage de classes.json (partagé, éditable dans l'onglet « Types » du
+// panneau admin — ex. ajouter « Espion » si le jeu introduit une nouvelle
+// classe). Chaque type porte son icône (un émoji), affichée sur les cartes
+// tant qu'aucune photo perso n'est ajoutée.
+const CLASSES_INITIALES = [
+  { nom: "Ouvrier", icone: "\u{1F527}" },
+  { nom: "Astromec", icone: "\u{1F4E1}" },
+  { nom: "Combat", icone: "⚔️" }
+];
 
 // paliers.json pouvait exister sous l'ancienne forme (tableau de chaînes,
 // avant l'ajout d'une couleur par palier) : on la reconnaît et la convertit

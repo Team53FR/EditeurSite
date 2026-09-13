@@ -65,7 +65,7 @@ mélanger ses données avec celles d'un autre site :
 |-------------------|------------------------------|--------------------------------------------|
 | editeur-livre      | `EditeurLivre/`             | `users.json`, `bibliotheques/<login>.json`, `images/<login>/…` |
 | ma-bibliotheque    | `MaBibliotheque/`           | `users.json`, `bibliotheques/<login>.json`, `images/<login>/…` |
-| droid-fortnite     | `DroidFortnite/`            | `users.json`, `catalogue.json`, `renaissance.json`, `paliers.json` (partagés), `bibliotheques/<login>.json` (personnel) |
+| droid-fortnite     | `DroidFortnite/`            | `users.json`, `catalogue.json`, `renaissance.json`, `paliers.json`, `classes.json` (partagés), `bibliotheques/<login>.json` (personnel) |
 | portail central    | `Web/`                      | `utilisateurs.json`, `sites.json`         |
 
 Les trois sites suivent donc le **même modèle par compte** pour leurs données
@@ -300,7 +300,7 @@ origine que le portail, aucun changement du relais nécessaire). Le bouton
 flottant d'ajout et le lien ⚙ vers `admin.html` sont masqués pour les
 comptes non-admin dans `suivi.html`.
 
-Organisé en **trois onglets** (même pattern `.onglet-type` que Droidex/
+Organisé en **quatre onglets** (même pattern `.onglet-type` que Droidex/
 Renaissance de `suivi.html`) :
 - **Droïdes** : catalogue en petites cartes (comme le Droidex, classes
   `.grille-droides`/`.carte-droide` réutilisées telles quelles — une liste
@@ -318,6 +318,16 @@ Renaissance de `suivi.html`) :
 - **Paliers** : liste ordonnée avec ↑/↓/Supprimer **et un sélecteur de
   couleur par palier** (`<input type="color">`, change immédiatement à
   l'enregistrement).
+- **Types** : liste des classes de droïde (`DroidFortnite/classes.json`,
+  `{ nom, icone }`, amorcé avec Ouvrier/Astromec/Combat) avec un champ texte
+  pour l'icône (emoji) et Supprimer, plus un formulaire d'ajout. Remplit
+  dynamiquement les `<select>` de classe de `admin.html` et `suivi.html`
+  (`remplirSelectClasseAdmin()`/`remplirSelectsClasses()`) — un type ajouté
+  ici apparaît aussitôt comme option, sans rien coder en dur. Pas de
+  réordonnancement (l'ordre n'a pas d'effet côté jeu) ; au moins un type doit
+  toujours rester. `iconeClasse(classe, classes)` (dans `script.js`) cherche
+  l'icône du type dans la liste chargée, avec un repli générique (🤖) si le
+  type n'y figure plus.
 
 **La couleur du contour d'une carte de droïde est celle du palier actif**
 (pas une couleur propre à chaque droïde) : dans `suivi.js`,
@@ -330,6 +340,17 @@ casser si le fichier existait déjà avant ce changement. Pas de renommage
 possible (seulement ajout/suppression/réordonnancement) : renommer
 casserait silencieusement les clés `"<idDroide>::<ancienNom>"` déjà
 enregistrées dans les progressions personnelles.
+
+**Onglet Renaissance — « puis-je le vendre ? »** (`verifierVenteDroide()`
+dans `suivi.js`) : un champ de recherche compare le nom saisi au texte libre
+`elements` de chaque palier de renaissance pas encore atteint (format
+`"Nom (Palier)"`, ex. `"CB (Défaut), Pit (Or)"`), au palier actuellement
+sélectionné dans l'onglet Droidex (`palierActif`, partagé entre les deux
+onglets — affiché en toutes lettres au-dessus du résultat pour éviter toute
+ambiguïté). Trouvé → message rouge (encore nécessaire) ; sinon → message
+vert (peut être vendu). Recherche texte libre volontairement simple (pas de
+lien structuré vers `catalogue.json`), cohérente avec le champ `elements`
+lui-même qui est du texte libre.
 
 `comprimerImage()` préserve la transparence de la source : elle exporte en
 PNG si l'image redimensionnée contient un pixel non totalement opaque,
