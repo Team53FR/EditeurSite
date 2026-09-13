@@ -795,16 +795,6 @@ a { color: var(--primaire); }
 .toast.visible { transform: translateX(-50%) translateY(0); }
 .toast.erreur { background: var(--danger-fonce); }
 
-/* ===== Résultat de la vérification « puis-je le vendre ? » ===== */
-.resultat-vente {
-  font-size: 0.88rem; font-weight: 600;
-  padding: 0.6rem 0.8rem; border-radius: 10px;
-  margin: 0 0 0.9rem;
-}
-.resultat-vente:empty { display: none; }
-.resultat-vente.oui { background: color-mix(in srgb, var(--succes) 16%, transparent); color: var(--succes); border: 1px solid color-mix(in srgb, var(--succes) 35%, transparent); }
-.resultat-vente.non { background: color-mix(in srgb, var(--danger) 16%, transparent); color: var(--danger); border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent); }
-
 /* ===== Note « données communautaires » ===== */
 .note-source {
   font-size: 0.78rem; color: var(--texte-att);

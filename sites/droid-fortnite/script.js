@@ -302,10 +302,11 @@ function classeRareteCss(rarete) {
 
 // La liste des classes (types de droide) est chargee depuis classes.json
 // (partagee, editable dans l'onglet Types du panneau admin) : on cherche
-// l'icone associee dans le tableau CHARGE, transmis par l'appelant, avec un
-// repli generique si le type est inconnu (ex. donnee pas encore rechargee).
-function iconeClasse(classe, classes) {
-  const trouve = (classes || CLASSES_INITIALES).find((c) => c.nom === classe);
+// l'icone associee dans la variable globale "classes" (comme raretes/unites
+// ci-dessous), avec un repli generique si le type est inconnu.
+function iconeClasse(classe) {
+  const liste = (classes && classes.length) ? classes : CLASSES_INITIALES;
+  const trouve = liste.find((c) => c.nom === classe);
   return (trouve && trouve.icone) || "\u{1F916}";
 }
 
@@ -1137,6 +1138,36 @@ const CLASSES_INITIALES = [
   { nom: "Astromec", icone: "\u{1F4E1}" },
   { nom: "Combat", icone: "⚔️" }
 ];
+
+// Variable globale, comme raretes/unites : réassignée par suivi.js/admin.js
+// une fois classes.json chargé, lue telle quelle par iconeClasse() ci-dessus
+// et par le reste du code partagé (filtres, escouade...).
+let classes = CLASSES_INITIALES;
+
+// Une entrée incomplète reçoit l'icône de départ du même nom, ou un repli
+// générique — même logique que normaliserRaretes().
+function normaliserClasses(brutes) {
+  const liste = (Array.isArray(brutes) ? brutes : [])
+    .filter((c) => c && String(c.nom || "").trim());
+  if (!liste.length) return CLASSES_INITIALES.slice();
+  return liste.map((c) => {
+    const nom = String(c.nom).trim();
+    const defaut = CLASSES_INITIALES.find((d) => d.nom === nom) || {};
+    return { nom, icone: c.icone || defaut.icone || "\u{1F916}" };
+  });
+}
+
+// Remplit un <select> avec les classes connues, en gardant la valeur choisie
+// si elle existe encore — même convention que remplirSelectRaretes().
+function remplirSelectClasses(select, valeur, libelleVide) {
+  if (!select) return;
+  const choisi = valeur !== undefined ? valeur : select.value;
+  select.innerHTML =
+    (libelleVide ? '<option value="">' + libelleVide + "</option>" : "") +
+    classes.map((c) => '<option value="' + c.nom.replace(/"/g, "&quot;") + '">' +
+      c.icone + " " + c.nom + "</option>").join("");
+  if (choisi && classes.some((c) => c.nom === choisi)) select.value = choisi;
+}
 
 // paliers.json pouvait exister sous l'ancienne forme (tableau de chaînes,
 // avant l'ajout d'une couleur par palier) : on la reconnaît et la convertit

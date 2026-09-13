@@ -60,13 +60,14 @@ if (token) {
 
 async function chargerTout() {
   try {
-    const [rCatalogue, rRenaissance, rFusions, rPaliers, rUnites, rRaretes] = await Promise.all([
+    const [rCatalogue, rRenaissance, rFusions, rPaliers, rUnites, rRaretes, rClasses] = await Promise.all([
       chargerOuAmorcer("catalogue.json", CATALOGUE_INITIAL, token, "Amorçage du catalogue de droïdes"),
       chargerOuAmorcer("renaissance.json", RENAISSANCE_INITIALE, token, "Amorçage des paliers de renaissance"),
       chargerOuAmorcer("fusions.json", FUSIONS_INITIALES, token, "Amorçage des recettes de fusion"),
       chargerOuAmorcer("paliers.json", PALIERS_INITIAUX, token, "Amorçage de la liste des paliers"),
       chargerOuAmorcer("unites.json", UNITES_INITIALES, token, "Amorçage des unités de grandeur"),
       chargerOuAmorcer("raretes.json", RARETES_INITIALES, token, "Amorçage des couleurs de rareté"),
+      chargerOuAmorcer("classes.json", CLASSES_INITIALES, token, "Amorçage des types de droïde"),
       chargerBibliothequePerso()
     ]);
     catalogue = Array.isArray(rCatalogue.contenu) ? rCatalogue.contenu : [];
@@ -79,12 +80,18 @@ async function chargerTout() {
     unites = unitesChargees.length ? unitesChargees : UNITES_INITIALES;
     raretes = normaliserRaretes(rRaretes.contenu);
     appliquerCouleursRaretes();
+    classes = normaliserClasses(rClasses.contenu);
+    CLASSES_ESCOUADE = classes.map((c) => c.nom);
     // Les pastilles de rareté du filtre suivent la liste des raretés, qui peut
     // s'allonger depuis le panneau admin.
     construireFiltreRareteChips();
+    // Les icônes de classe du filtre suivent classes.json, même principe.
+    construireFiltreClasseChips();
     // Le menu d'unités du budget (onglet Analyse) suit la liste des unités.
     const selUnite = document.getElementById("uniteBudget");
     if (selUnite) selUnite.innerHTML = optionsUniteBudget();
+    // Le filtre de classe de l'onglet Analyse suit lui aussi classes.json.
+    remplirSelectClasses(document.getElementById("filtreClasseAnalyse"), "", "Toutes les classes");
   } catch (e) {
     document.getElementById("chargement").innerHTML =
       `<p style="color:var(--danger);text-align:center">${echapperHTML(e.message)}</p>`;
@@ -317,6 +324,28 @@ function construireFiltreRareteChips() {
   });
 }
 
+// Une pastille par classe (type de droïde), avec son icône — même principe
+// que construireFiltreRareteChips() ci-dessus, mais suivant classes.json.
+function construireFiltreClasseChips() {
+  const zone = document.getElementById("filtreClasseChips");
+  if (!zone) return;
+  zone.innerHTML = "";
+  // Une classe filtrée qui n'existe plus (supprimée depuis l'admin) est réinitialisée.
+  if (filtresDroidex.classe && !classes.some((c) => c.nom === filtresDroidex.classe)) {
+    filtresDroidex.classe = "";
+  }
+  classes.forEach((c) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "chip-icone" + (filtresDroidex.classe === c.nom ? " actif" : "");
+    b.dataset.classe = c.nom;
+    b.title = c.nom;
+    b.textContent = c.icone;
+    b.onclick = () => basculerFiltre("classe", c.nom);
+    zone.appendChild(b);
+  });
+}
+
 function afficherDroidex() {
   const recherche = (document.getElementById("champRecherche").value || "").trim().toLowerCase();
   const filtreClasse = filtresDroidex.classe;
@@ -397,7 +426,11 @@ function basculerPossession(idDroide, palier) {
 // est une progression, propre à chaque compte, et chacun peut donc l'ajuster
 // sans passer par un administrateur.
 
-const CLASSES_ESCOUADE = ["Ouvrier", "Astromec", "Combat"];
+// Suit désormais classes.json (rempli au chargement, voir chargerTout()) :
+// un type ajouté depuis le panneau admin obtient ses propres emplacements
+// d'escouade dès qu'il apparaît ici, sans rien migrer — escouade() ci-dessous
+// initialise déjà n'importe quelle classe absente de la progression stockée.
+let CLASSES_ESCOUADE = CLASSES_INITIALES.map((c) => c.nom);
 const SLOTS_PAR_DEFAUT = 3;
 const SLOTS_MAX = 30;
 

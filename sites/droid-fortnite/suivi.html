@@ -43,11 +43,8 @@
         <input type="text" id="champRecherche" placeholder="Rechercher un droïde..." oninput="afficherDroidex()">
       </div>
       <div class="filtres-compacts" role="toolbar" aria-label="Filtres">
-        <div class="groupe-filtre" id="filtreClasseChips" aria-label="Classe">
-          <button type="button" class="chip-icone" data-classe="Ouvrier"  onclick="basculerFiltre('classe','Ouvrier')"  title="Ouvrier">🔧</button>
-          <button type="button" class="chip-icone" data-classe="Astromec" onclick="basculerFiltre('classe','Astromec')" title="Astromec">📡</button>
-          <button type="button" class="chip-icone" data-classe="Combat"   onclick="basculerFiltre('classe','Combat')"   title="Combat">⚔️</button>
-        </div>
+        <!-- Rempli au chargement depuis classes.json (construireFiltreClasseChips) -->
+        <div class="groupe-filtre" id="filtreClasseChips" aria-label="Classe"></div>
         <span class="sep-filtre"></span>
         <div class="groupe-filtre" id="filtreRareteChips" aria-label="Rareté"></div>
         <span class="sep-filtre"></span>
@@ -125,12 +122,8 @@
         </label>
       </div>
       <div class="filtres">
-        <select id="filtreClasseAnalyse" onchange="afficherAnalyse()">
-          <option value="">Toutes les classes</option>
-          <option value="Ouvrier">🔧 Ouvrier</option>
-          <option value="Astromec">📡 Astromec</option>
-          <option value="Combat">⚔️ Combat</option>
-        </select>
+        <!-- Rempli au chargement depuis classes.json (remplirSelectClasses) -->
+        <select id="filtreClasseAnalyse" onchange="afficherAnalyse()"></select>
         <label class="ligne-case case-analyse">
           <input type="checkbox" id="analyseSansFusion" onchange="afficherAnalyse()">
           🧬 Cacher les fusions

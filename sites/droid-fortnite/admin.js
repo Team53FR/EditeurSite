@@ -10,6 +10,7 @@ envelopperAttente({
   sauvegarderPaliers: "Enregistrement des paliers…",
   sauvegarderUnites: "Enregistrement des unités…",
   sauvegarderRaretes: "Enregistrement des raretés…",
+  sauvegarderClasses: "Enregistrement des types de droïde…",
   sauvegarderRenaissanceAdmin: "Enregistrement des renaissances…",
   sauvegarderFusionAdmin: "Enregistrement des fusions…",
 });
@@ -25,6 +26,7 @@ let paliers = [];
 let shaPaliers = null;
 let shaUnites = null;
 let shaRaretes = null;
+let shaClasses = null;
 let renaissance = [];
 let shaRenaissance = null;
 let fusions = [];
@@ -74,7 +76,7 @@ function retirerImageAdmin() {
   document.getElementById("boutonSupprimerImageAdmin").style.display = "none";
 }
 
-// ===== Onglets (Droïdes / Ajouter / Paliers / Renaissance / Unités / Raretés) =====
+// ===== Onglets (Droïdes / Ajouter / Paliers / Renaissance / Unités / Raretés / Types) =====
 let ongletAdminActif = "droides";
 
 function changerOngletAdmin(type) {
@@ -89,6 +91,7 @@ function changerOngletAdmin(type) {
   if (type === "fusion") afficherFusionAdmin();
   document.getElementById("zoneUnites").style.display = type === "unites" ? "" : "none";
   document.getElementById("zoneRaretes").style.display = type === "raretes" ? "" : "none";
+  document.getElementById("zoneClasses").style.display = type === "classes" ? "" : "none";
 }
 
 // Clic sur l'onglet « Ajouter » : repart toujours d'un formulaire vide (pour
@@ -105,11 +108,12 @@ if (token) {
 async function chargerDonnees() {
   const message = document.getElementById("messageDroideAdmin");
   try {
-    const [rCatalogue, rPaliers, rUnites, rRaretes, rRenaissance, rFusions] = await Promise.all([
+    const [rCatalogue, rPaliers, rUnites, rRaretes, rClasses, rRenaissance, rFusions] = await Promise.all([
       chargerOuAmorcer("catalogue.json", CATALOGUE_INITIAL, token, "Amorçage du catalogue de droïdes"),
       chargerOuAmorcer("paliers.json", PALIERS_INITIAUX, token, "Amorçage de la liste des paliers"),
       chargerOuAmorcer("unites.json", UNITES_INITIALES, token, "Amorçage des unités de grandeur"),
       chargerOuAmorcer("raretes.json", RARETES_INITIALES, token, "Amorçage des couleurs de rareté"),
+      chargerOuAmorcer("classes.json", CLASSES_INITIALES, token, "Amorçage des types de droïde"),
       chargerOuAmorcer("renaissance.json", RENAISSANCE_INITIALE, token, "Amorçage des paliers de renaissance"),
       chargerOuAmorcer("fusions.json", FUSIONS_INITIALES, token, "Amorçage des recettes de fusion")
     ]);
@@ -124,6 +128,8 @@ async function chargerDonnees() {
     raretes = normaliserRaretes(rRaretes.contenu);
     shaRaretes = rRaretes.sha;
     appliquerCouleursRaretes();
+    classes = normaliserClasses(rClasses.contenu);
+    shaClasses = rClasses.sha;
     renaissance = Array.isArray(rRenaissance.contenu) ? rRenaissance.contenu : [];
     shaRenaissance = rRenaissance.sha;
     fusions = Array.isArray(rFusions.contenu) ? rFusions.contenu : [];
@@ -136,10 +142,12 @@ async function chargerDonnees() {
   // droïdes auraient été ajoutés en fin de liste (avant ce tri à l'ajout).
   catalogue = trierCatalogueParRarete(catalogue);
   remplirSelectRaretes(document.getElementById("champRarete"), raretes[0] && raretes[0].nom);
+  remplirSelectClasses(document.getElementById("champClasse"), classes[0] && classes[0].nom);
   afficherDroides();
   afficherPaliers();
   afficherUnites();
   afficherRaretes();
+  afficherClasses();
   document.getElementById("champUniteCredits").innerHTML = optionsUnite("", false);
   afficherRenaissanceAdmin();
   afficherFusionAdmin();
@@ -319,7 +327,7 @@ function annulerEditionDroide() {
   dataUrlImageAdmin = null;
   imageSupprimeeAdmin = false;
   document.getElementById("champNom").value = "";
-  document.getElementById("champClasse").value = "Ouvrier";
+  if (classes.length) document.getElementById("champClasse").value = classes[0].nom;
   document.getElementById("champRarete").value = "Typique";
   construireGrillePrixRendement(null);
   document.getElementById("apercuDroideAdmin").innerHTML = iconePlaceholderDroideAdmin();
@@ -769,6 +777,98 @@ async function sauvegarderRaretes(nouvelles, messageCommit) {
   } catch (e) {
     message.textContent = e.message;
   }
+}
+
+// ===== Types de droïde (classes) =====
+// Détermine les options de classe proposées à l'ajout d'un droïde, et
+// l'icône affichée sur ses cartes tant qu'aucune photo perso n'est ajoutée
+// (iconeClasse() dans script.js, référence directement la variable globale
+// "classes" — mêmes conventions que raretes/unites). Pas de réordonnancement
+// (l'ordre n'a aucun effet côté jeu, contrairement aux raretés/paliers).
+function afficherClasses() {
+  const liste = document.getElementById("listeClasses");
+  liste.innerHTML = "";
+
+  classes.forEach((c, index) => {
+    // Un type encore porté par des droïdes ne doit pas disparaître sans
+    // qu'on le sache : ils se retrouveraient avec une classe inconnue.
+    const utilisee = catalogue.filter((d) => d.classe === c.nom).length;
+
+    const li = document.createElement("li");
+    li.className = "ligne-item";
+    li.innerHTML =
+      '<div class="ligne-info">' +
+        '<div class="ligne-titre">' + c.icone + " " + echapper(c.nom) + "</div>" +
+        '<div class="ligne-sous">' + (utilisee ? utilisee + " droïde(s)" : "aucun droïde") + "</div>" +
+      "</div>" +
+      '<input type="text" class="classe-icone" maxlength="4" value="' + echapper(c.icone || "") + '" title="Icône (emoji)">' +
+      '<div class="ligne-actions"></div>';
+
+    li.querySelector(".classe-icone").addEventListener("change", (e) => changerIconeClasse(index, e.target.value));
+
+    const bSuppr = document.createElement("button");
+    bSuppr.className = "btn-mini danger";
+    bSuppr.textContent = "Supprimer";
+    bSuppr.title = utilisee ? "Supprimer (des droïdes le portent)" : "Supprimer";
+    bSuppr.onclick = () => supprimerClasse(index, utilisee);
+    li.querySelector(".ligne-actions").appendChild(bSuppr);
+
+    liste.appendChild(li);
+  });
+}
+
+async function sauvegarderClasses(nouvelles, messageCommit) {
+  const message = document.getElementById("messageClasses");
+  message.className = "message";
+  message.textContent = "Enregistrement...";
+  try {
+    shaClasses = await sauvegarderAvecRetry("classes.json", nouvelles, shaClasses, token, messageCommit);
+    classes = nouvelles;
+    afficherClasses();
+    remplirSelectClasses(document.getElementById("champClasse"));
+    afficherDroides();          // icônes des cartes suivent
+    message.className = "message ok";
+    message.textContent = "Enregistré.";
+  } catch (e) {
+    message.textContent = e.message;
+  }
+}
+
+function changerIconeClasse(index, icone) {
+  const copie = classes.slice();
+  copie[index] = Object.assign({}, copie[index], { icone: icone.trim() || "\u{1F916}" });
+  sauvegarderClasses(copie, `Icône du type ${copie[index].nom}`);
+}
+
+function ajouterClasse() {
+  const champNom = document.getElementById("champNouvelleClasse");
+  const champIcone = document.getElementById("champIconeNouvelleClasse");
+  const nom = champNom.value.trim();
+  const message = document.getElementById("messageClasses");
+  message.className = "message";
+  if (!nom) { message.textContent = "Le nom du type est obligatoire."; return; }
+  if (classes.some((c) => c.nom.toLowerCase() === nom.toLowerCase())) {
+    message.textContent = "Ce type existe déjà."; return;
+  }
+  champNom.value = "";
+  const icone = champIcone.value.trim() || "\u{1F916}";
+  champIcone.value = "";
+  sauvegarderClasses(classes.concat([{ nom, icone }]), `Ajout du type ${nom}`);
+}
+
+function supprimerClasse(index, utilisee) {
+  const c = classes[index];
+  if (!c) return;
+  if (classes.length <= 1) {
+    document.getElementById("messageClasses").textContent = "Il faut au moins un type.";
+    return;
+  }
+  const avertissement = utilisee
+    ? "\n\n" + utilisee + " droïde(s) portent ce type. Ils le garderont, mais il " +
+      "n'aura plus d'icône propre. Modifie-les d'abord si tu veux éviter cela."
+    : "";
+  if (!confirm(`Supprimer le type « ${c.nom} » ?${avertissement}`)) return;
+  sauvegarderClasses(classes.filter((_, i) => i !== index), `Suppression du type ${c.nom}`);
 }
 
 // ===== Droïdes requis : des emplacements, comme dans l'escouade =====
@@ -1333,7 +1433,7 @@ async function creerDroideDepuisFusion(f) {
 
   if (droideParNom(nom)) { afficherFusionAdmin(); return; } // déjà créé entre-temps
 
-  const classe = ["Ouvrier", "Astromec", "Combat"].includes(f.classe) ? f.classe : "Ouvrier";
+  const classe = classes.some((c) => c.nom === f.classe) ? f.classe : ((classes[0] && classes[0].nom) || "Ouvrier");
   const rarete = raretes.some((r) => r.nom === f.rarete) ? f.rarete : (raretes[0] && raretes[0].nom);
   const entree = { id: genererId("d"), nom, classe, rarete };
 

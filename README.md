@@ -80,7 +80,7 @@ mélanger ses données avec celles d'un autre site :
 |-------------------|------------------------------|--------------------------------------------|
 | editeur-livre      | `EditeurLivre/`             | `bibliotheques/<login>.json`, `images/<login>/…`, `publies.json` |
 | ma-bibliotheque    | `MaBibliotheque/`           | `bibliotheques/<login>.json`, `images/<login>/…` |
-| droid-fortnite     | `DroidFortnite/`            | `catalogue.json`, `renaissance.json`, `paliers.json`, `unites.json`, `raretes.json` (partagés), `bibliotheques/<login>.json` (personnel) |
+| droid-fortnite     | `DroidFortnite/`            | `catalogue.json`, `renaissance.json`, `paliers.json`, `unites.json`, `raretes.json`, `classes.json` (partagés), `bibliotheques/<login>.json` (personnel) |
 | portail central    | `Web/`                      | `utilisateurs.json` (**tous les comptes**), `sites.json` |
 
 Les comptes ne figurent plus dans le dossier des sites : ils sont **tous** dans
@@ -576,6 +576,25 @@ réordonnancement et couleurs (fond + texte).
   où les badges n'avaient d'ailleurs aucune couleur avant. La feuille de style
   ne doit donc plus porter de règle `.badge-rarete.<rareté>`, qui l'emporterait
   en spécificité.
+
+**Types de droïde** : `DroidFortnite/classes.json` (`{ nom, icone }`, amorcé
+avec Ouvrier/Astromec/Combat) porte la liste, éditable depuis l'onglet
+**Types** du panneau admin — ajout, icône (un emoji) et suppression. Comme
+`raretes`/`unites`, la variable `classes` est déclarée une seule fois dans
+`script.js` (pas dans chaque page) et réassignée après chargement : le reste
+du code partagé (`iconeClasse()`, les `<select>` remplis par
+`remplirSelectClasses()`) la lit directement, sans qu'on la lui passe. Pas de
+réordonnancement (l'ordre n'a aucun effet côté jeu, contrairement aux
+raretés/paliers) ; au moins un type doit toujours rester, et supprimer un
+type encore porté par des droïdes avertit plutôt que de bloquer (ils le
+gardent, simplement sans icône propre — même logique que la suppression
+d'une rareté encore utilisée).
+
+Un type ajouté ici obtient aussitôt sa propre section d'escouade dans
+l'onglet **Rendement** : `CLASSES_ESCOUADE` (dans `suivi.js`) suit désormais
+`classes.map((c) => c.nom)` au lieu d'une liste figée, et `escouade()`
+initialise déjà n'importe quelle classe absente de la progression stockée
+(mêmes emplacements par défaut) — rien à migrer.
 
 **Un palier peut porter plusieurs couleurs.** `couleur` est soit une chaîne,
 soit un tableau ; à partir de deux, le contour des cartes devient un dégradé —
