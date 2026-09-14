@@ -2570,22 +2570,44 @@ function epaisseurDosKDP(nbPages, clePapier) {
 // génération (creerPageKDP) rouvre ensuite cette moyenne en deux marges
 // asymétriques dont la somme vaut exactement le double du pivot : la largeur
 // de texte déjà mesurée reste donc juste, sans nouvelle pagination.
-function avecPaginationKDP(livre, margeInt, travail) {
+// La marge de reliure dépend du nombre de pages du fichier final, qui
+// dépend lui-même de la marge (une marge plus large fait plus de pages).
+// On boucle donc jusqu'à ce que le palier de la table se stabilise — il n'y
+// a que 5 paliers, la convergence est quasi immédiate (une seule pagination
+// suffit dans l'immense majorité des cas, puisque la première estimation
+// part déjà du nombre de pages à l'écran).
+//
+// repaginerTout() coûte plusieurs secondes sur un gros livre : on ne la
+// relance donc PAS entre deux essais pour revenir au format d'écran, ce qui
+// doublait le travail à chaque palier testé. Le format d'écran n'est
+// remis en place qu'UNE seule fois, à la toute fin, dans le `finally`.
+function pagesEtMargeKDP(livre) {
   const piedInitial = PIED_PAGE_PX;
   const f = FORMATS[livre.format] || FORMATS["kdp5585"];
   const sauveMargeV = f.margeV, sauveMargeH = f.margeH;
   const sauveLarg = f.larg, sauveHaut = f.haut;
   const mesure = document.getElementById("mesureCachee");
+
+  const pagesEcran = (livre.pages || []).length;
+  let margeInt = kdpMargeReliure(pagesEcran);
+  let pagesPro = null;
+
   try {
     if (mesure) mesure.classList.add("mesure-pro");
     PIED_PAGE_PX = PIED_PRO_PX;
     f.larg = FORMAT_KDP.larg;
     f.haut = FORMAT_KDP.haut;
     f.margeV = KDP_MARGE_EXT_MM;
-    f.margeH = (margeInt + KDP_MARGE_EXT_MM) / 2;
-    appliquerFormatPage(livre.format);
-    repaginerTout();
-    return travail();
+
+    for (let i = 0; i < 5; i++) {
+      f.margeH = (margeInt + KDP_MARGE_EXT_MM) / 2;
+      appliquerFormatPage(livre.format);
+      repaginerTout();
+      pagesPro = (livre.pages || []).map((p) => (p && p.contenu) || "");
+      const suivante = kdpMargeReliure(pagesPro.length);
+      if (suivante === margeInt) break;
+      margeInt = suivante;
+    }
   } finally {
     if (mesure) mesure.classList.remove("mesure-pro");
     PIED_PAGE_PX = piedInitial;
@@ -2594,30 +2616,13 @@ function avecPaginationKDP(livre, margeInt, travail) {
     appliquerFormatPage(livre.format);
     repaginerTout();
   }
-}
 
-// La marge de reliure dépend du nombre de pages du fichier final, qui
-// dépend lui-même de la marge (une marge plus large fait plus de pages).
-// On boucle donc jusqu'à ce que le palier de la table se stabilise — il n'y
-// a que 5 paliers, la convergence est immédiate.
-function pagesEtMargeKDP(livre) {
-  const pagesEcran = (livre.pages || []).length;
-  let margeInt = kdpMargeReliure(pagesEcran);
-  let pagesPro = null;
-  for (let i = 0; i < 5; i++) {
-    pagesPro = avecPaginationKDP(livre, margeInt,
-      () => (livre.pages || []).map((p) => (p && p.contenu) || ""));
-    const suivante = kdpMargeReliure(pagesPro.length);
-    if (suivante === margeInt) break;
-    margeInt = suivante;
-  }
   return { pagesPro, margeInt, nbPages: pagesPro.length };
 }
 
 function exporterKDP(cible) {
   flushSpread();
   const livre = livreActuel();
-  const message = document.getElementById("message");
   if (livre.format !== "kdp5585") {
     alert("Ce format d'export est réglé sur le format Amazon KDP " +
       "(13,97 × 21,59 cm). Changez d'abord le format du livre pour « Amazon KDP », " +
@@ -2631,11 +2636,19 @@ function exporterKDP(cible) {
     return;
   }
 
-  if (message) message.textContent = "Calcul de la pagination KDP...";
-  const { pagesPro, margeInt, nbPages } = pagesEtMargeKDP(livre);
-  if (message) message.textContent = "";
+  const { pagesPro, margeInt } = pagesEtMargeKDP(livre);
   ouvrirControleKDP(cible, livre, (livre.pages || []).length, pagesPro, margeInt);
 }
+
+// La marge de reliure KDP dépend du nombre de pages, qui dépend lui-même de
+// la marge : le calcul recompose donc le livre entier une ou deux fois (voir
+// pagesEtMargeKDP), ce qui fige la page plusieurs secondes sur un gros
+// livre. Le voile de calcul (attente.js) s'affiche AVANT que le fil ne soit
+// pris, ce qu'un simple message ne saurait faire — voir editeur.js pour le
+// même principe sur changerFormat/ouvrirApercu.
+envelopperAttenteLourde({
+  exporterKDP: ["Préparation du fichier KDP…", "Le livre est recomposé aux marges imposées par Amazon."]
+});
 
 function ouvrirControleKDP(cible, livre, pagesEcran, pagesPro, margeInt) {
   fermerPanneauImpression();
