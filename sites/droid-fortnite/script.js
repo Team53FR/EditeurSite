@@ -436,6 +436,25 @@ function formaterRendement(d, palier) {
   return f === null ? null : f + "/s";
 }
 
+// ===== Vente et temps de fabrication, mêmes principes =====
+//
+// Le prix de vente se saisit et se totalise comme le prix d'achat (mêmes
+// unités K/M/Md) : il vit donc dans une table `vente`, indexée par palier,
+// au même titre que `prix` et `rendements`.
+//
+// Le temps de fabrication n'est PAS un montant : « 0:00:33 » ne se
+// multiplie ni ne s'additionne comme un nombre de crédits. Il se saisit et
+// s'affiche donc tel quel, en texte libre, dans une table `tempsFabrication`
+// — même faille (indexée par palier), pas d'unité à composer/décomposer.
+function formaterVente(d, palier) {
+  return formaterValeurSaisie(valeurPalier(d.vente, palier));
+}
+
+function formaterTempsFabrication(d, palier) {
+  const v = valeurPalier(d.tempsFabrication, palier);
+  return v === null ? null : String(v).trim() || null;
+}
+
 // ===== Couleurs des raretés =====
 //
 // Éditables depuis le panneau admin (DroidFortnite/raretes.json) plutôt que
@@ -689,7 +708,11 @@ function construireCarteDroide(d, options) {
     `<div class="dx-nom">${echapperTexte(d.nom)}</div>` +
     (o.admin
       ? `<button type="button" class="dx-action droide-supprimer" title="Supprimer">🗑</button>`
-      : `<span class="dx-case" aria-hidden="true">✓</span>`) +
+      // Un vrai bouton, pas une décoration : sur le Droidex, il bascule la
+      // possession sans ouvrir le panneau de détail (voir afficherDroidex).
+      // Les autres écrans (renaissance, fusion) le masquent en CSS — il reste
+      // alors inerte, comme avant.
+      : `<button type="button" class="dx-case" aria-label="Marquer comme possédé">✓</button>`) +
     `<div class="dx-visuel">` +
       `<span class="dx-scan"></span>` +
       `<span class="dx-vide" style="--teinte:${couleurDroide(d.id)}">${iconeClasse(d.classe)}</span>` +

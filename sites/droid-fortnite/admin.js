@@ -227,7 +227,8 @@ function construireGrillePrixRendement(d) {
   const iconique = !!(rarInfo && rarInfo.premierPalierSeulement);
 
   grille.innerHTML =
-    '<div class="entete-paliers"><span>Palier</span><span>Prix</span><span>Rendement /s</span></div>';
+    '<div class="entete-paliers"><span>Palier</span><span>Prix</span><span>Rendement /s</span>' +
+    '<span>Vente</span><span>Temps de fabrication</span></div>';
 
   // Un Iconique n'existe qu'au premier palier : inutile de proposer les autres.
   const lignes = paliers.filter((p) => estDisponibleAuPalier({ rarete }, p.nom));
@@ -240,6 +241,10 @@ function construireGrillePrixRendement(d) {
     // qu'on leur propose d'emblée.
     const rdt = decomposerPourFormulaire(d ? valeurPalier(d.rendements, p.nom) : null);
     if (iconique && !rdt.unite) rdt.unite = UNITE_POURCENT;
+    // Le prix de revente se saisit comme le prix d'achat (mêmes unités).
+    const vente = decomposerPourFormulaire(d ? valeurPalier(d.vente, p.nom) : null);
+    // Le temps de fabrication n'est pas un montant : texte libre, « 0:00:33 ».
+    const temps = d ? (valeurPalier(d.tempsFabrication, p.nom) || "") : "";
 
     ligne.innerHTML =
       '<span class="nom-palier">' +
@@ -259,6 +264,18 @@ function construireGrillePrixRendement(d) {
         '<select data-palier="' + echapper(p.nom) + '" data-unite="rendement" aria-label="Unité du rendement au palier ' + echapper(p.nom) + '">' +
           optionsUnite(rdt.unite, true) +
         "</select>" +
+      "</span>" +
+      '<span class="duo-valeur">' +
+        '<input type="text" inputmode="decimal" data-palier="' + echapper(p.nom) + '" data-champ="vente" ' +
+          'value="' + echapper(vente.valeur) + '" placeholder="—" aria-label="Prix de vente au palier ' + echapper(p.nom) + '">' +
+        '<select data-palier="' + echapper(p.nom) + '" data-unite="vente" aria-label="Unité de la vente au palier ' + echapper(p.nom) + '">' +
+          optionsUnite(vente.unite, false) +
+        "</select>" +
+      "</span>" +
+      '<span class="champ-libelle">' +
+        '<span class="libelle-mobile">Temps de fabrication</span>' +
+        '<input type="text" data-palier="' + echapper(p.nom) + '" data-champ="temps" ' +
+          'value="' + echapper(temps) + '" placeholder="ex. 0:00:33" aria-label="Temps de fabrication au palier ' + echapper(p.nom) + '">' +
       "</span>";
     grille.appendChild(ligne);
   });
@@ -267,21 +284,31 @@ function construireGrillePrixRendement(d) {
   if (note) note.style.display = iconique ? "" : "none";
 }
 
-// Relit la grille : deux tables indexées par nom de palier, sans les cases
-// laissées vides (inutile d'alourdir le catalogue de valeurs nulles).
+// Relit la grille : une table indexée par nom de palier pour chaque
+// colonne, sans les cases laissées vides (inutile d'alourdir le catalogue
+// de valeurs nulles).
+//
+// « temps » n'a pas de sélecteur d'unité : c'est du texte libre
+// (« 0:00:33 »), pas un montant — composerValeur() le tronquerait en
+// essayant d'y lire un nombre.
 function lireGrillePrixRendement() {
-  const prix = {};
-  const rendements = {};
+  const tables = { prix: {}, rendement: {}, vente: {} };
+  const tempsFabrication = {};
   document.querySelectorAll('#grillePrixRendement input[data-champ]').forEach((input) => {
     const palier = input.dataset.palier;
     const champ = input.dataset.champ;
+    if (champ === "temps") {
+      const texte = input.value.trim();
+      if (texte) tempsFabrication[palier] = texte;
+      return;
+    }
     const select = document.querySelector(
       '#grillePrixRendement select[data-palier="' + CSS.escape(palier) + '"][data-unite="' + champ + '"]');
     const valeur = composerValeur(input.value, select ? select.value : "");
-    if (valeur === null) return;
-    (champ === "prix" ? prix : rendements)[palier] = valeur;
+    if (valeur === null || !tables[champ]) return;
+    tables[champ][palier] = valeur;
   });
-  return { prix, rendements };
+  return { prix: tables.prix, rendements: tables.rendement, vente: tables.vente, tempsFabrication };
 }
 
 // Le droïde ouvert dans le formulaire, ou null en mode ajout. Sert à
@@ -300,6 +327,7 @@ async function editerDroide(id) {
   document.getElementById("champNom").value = d.nom;
   document.getElementById("champClasse").value = d.classe;
   document.getElementById("champRarete").value = d.rarete;
+  document.getElementById("champBonus").value = d.bonus || "";
   construireGrillePrixRendement(d);
   document.getElementById("titreFormDroide").textContent = "Modifier « " + d.nom + " »";
   document.getElementById("btnEnregistrerDroide").textContent = "Enregistrer les modifications";
@@ -329,6 +357,7 @@ function annulerEditionDroide() {
   document.getElementById("champNom").value = "";
   if (classes.length) document.getElementById("champClasse").value = classes[0].nom;
   document.getElementById("champRarete").value = "Typique";
+  document.getElementById("champBonus").value = "";
   construireGrillePrixRendement(null);
   document.getElementById("apercuDroideAdmin").innerHTML = iconePlaceholderDroideAdmin();
   document.getElementById("boutonSupprimerImageAdmin").style.display = "none";
@@ -377,9 +406,13 @@ async function enregistrerDroideAdmin() {
 
     const entree = { id, nom, classe, rarete };
     if (cheminImage) entree.image = cheminImage;
-    const { prix, rendements } = lireGrillePrixRendement();
+    const { prix, rendements, vente, tempsFabrication } = lireGrillePrixRendement();
     if (Object.keys(prix).length) entree.prix = prix;
     if (Object.keys(rendements).length) entree.rendements = rendements;
+    if (Object.keys(vente).length) entree.vente = vente;
+    if (Object.keys(tempsFabrication).length) entree.tempsFabrication = tempsFabrication;
+    const bonus = (document.getElementById("champBonus").value || "").trim();
+    if (bonus) entree.bonus = bonus;
 
     const copieBrute = modeEditionId
       ? catalogue.map((x) => x.id === modeEditionId ? entree : x)

@@ -381,14 +381,27 @@ function afficherDroidex() {
     const carte = construireCarteDroide(c.droide, {
       possede, couleur: c.couleur, palier: c.palier
     });
-    carte.setAttribute("role", "button");
-    carte.setAttribute("aria-pressed", possede ? "true" : "false");
     // Sur « Tous », le palier n'est pas déductible de la carte : on l'étiquette.
     if (palierActif === TOUS_PALIERS) {
       carte.insertAdjacentHTML("beforeend",
         '<span class="etiquette-palier">' + echapperHTML(c.palier) + "</span>");
     }
-    carte.addEventListener("click", () => basculerPossession(c.droide.id, c.palier));
+
+    // Deux zones cliquables, deux actions : le toggle (coin haut-droit)
+    // bascule directement la possession, sans ouvrir de panneau — c'est
+    // l'action rapide, celle qu'on répète cent fois. Le reste de la carte
+    // ouvre le détail, où l'on retrouve le même bouton en plus grand.
+    const toggle = carte.querySelector(".dx-case");
+    if (toggle) {
+      toggle.setAttribute("aria-pressed", possede ? "true" : "false");
+      toggle.onclick = (e) => {
+        e.stopPropagation();
+        basculerPossession(c.droide.id, c.palier);
+      };
+    }
+    carte.setAttribute("role", "button");
+    carte.setAttribute("aria-pressed", possede ? "true" : "false");
+    carte.onclick = () => ouvrirDetailDroide(c.droide.id, c.palier);
     grille.appendChild(carte);
   });
 
@@ -411,6 +424,113 @@ function basculerPossession(idDroide, palier) {
   else perso.droidesPossedes.splice(index, 1);
   afficherDroidex();
   marquerProgressionModifiee();
+}
+
+// ----- Détail d'un droïde -----
+//
+// Le panneau se souvient du couple droïde + palier ouvert, pas d'une copie
+// de ses données : à chaque (ré)affichage il relit le catalogue et la
+// possession en direct, ce qui le garde juste après un clic sur son propre
+// bouton « Marquer comme acquis » (qui ne le referme pas).
+let detailDroideEnCours = null; // { idDroide, palier } | null
+
+function ouvrirDetailDroide(idDroide, palier) {
+  detailDroideEnCours = { idDroide, palier };
+  afficherDetailDroide();
+  document.getElementById("voileDetailDroide").classList.add("ouvert");
+}
+
+function fermerDetailDroide() {
+  document.getElementById("voileDetailDroide").classList.remove("ouvert");
+  detailDroideEnCours = null;
+}
+
+function afficherDetailDroide() {
+  if (!detailDroideEnCours) return;
+  const { idDroide, palier } = detailDroideEnCours;
+  const d = catalogue.find((x) => x.id === idDroide);
+  if (!d) { fermerDetailDroide(); return; }
+
+  const possedeCePalier = perso.droidesPossedes.includes(clePossession(d.id, palier));
+
+  document.getElementById("titreDetailDroide").textContent = d.nom;
+
+  // La vignette, en réutilisant exactement le même rendu que la grille.
+  const zoneCarte = document.getElementById("detailDroideCarte");
+  zoneCarte.innerHTML = "";
+  const couleurPalier = (paliers.find((p) => p.nom === palier) || {}).couleur;
+  zoneCarte.appendChild(construireCarteDroide(d, { possede: possedeCePalier, couleur: couleurPalier, palier }));
+
+  document.getElementById("detailDroideMeta").innerHTML =
+    '<span class="dx-classe-detail">' + iconeClasse(d.classe) + " " + echapperHTML(d.classe) + "</span>" +
+    '<span class="badge-rarete ' + classeRareteCss(d.rarete) + '">' + echapperHTML(d.rarete) + "</span>" +
+    (estDroideFusion(d.nom) ? '<span class="dx-fusion-detail">🧬 Fusion</span>' : "");
+
+  const zoneBonus = document.getElementById("detailDroideBonus");
+  if (d.bonus) {
+    zoneBonus.style.display = "";
+    zoneBonus.textContent = "🎁 Bonus de compagnon : " + d.bonus;
+  } else {
+    zoneBonus.style.display = "none";
+  }
+
+  // Toutes les statistiques, à TOUS les paliers où ce droïde existe — pas
+  // seulement celui d'où le panneau a été ouvert : c'est justement l'intérêt
+  // d'un détail, montrer d'un coup ce que la carte doit répartir sur huit
+  // vignettes différentes.
+  const zoneStats = document.getElementById("detailDroideStats");
+  const lignesPaliers = paliers.filter((p) => estDisponibleAuPalier(d, p.nom));
+  // `data-libelle` répète l'intitulé de colonne sur chaque cellule : sur
+  // mobile, l'en-tête se masque et la grille s'empile (voir style.css), il
+  // faut donc que chaque valeur porte son intitulé avec elle.
+  const cellule = (libelle, v) =>
+    '<span data-libelle="' + echapperHTML(libelle) + '">' + (v === null ? "—" : echapperHTML(v)) + "</span>";
+  zoneStats.innerHTML =
+    '<div class="detail-stats-entete"><span>Palier</span><span>Prix</span><span>Rendement</span><span>Vente</span><span>Fabrication</span></div>' +
+    lignesPaliers.map((p) => {
+      const possedeCe = perso.droidesPossedes.includes(clePossession(d.id, p.nom));
+      return '<div class="detail-stats-ligne' + (p.nom === palier ? " actif" : "") + (possedeCe ? " possede" : "") + '">' +
+        '<span class="nom-palier">' +
+          '<span class="pastille-palier" style="background:' + fondPalier(p.couleur) + '"></span>' +
+          echapperHTML(p.nom) + (possedeCe ? " ✓" : "") +
+        "</span>" +
+        cellule("Prix", formaterPrix(d, p.nom)) +
+        cellule("Rendement", formaterRendement(d, p.nom)) +
+        cellule("Vente", formaterVente(d, p.nom)) +
+        cellule("Fabrication", formaterTempsFabrication(d, p.nom)) +
+      "</div>";
+    }).join("");
+
+  // Recette de fusion, si ce droïde s'obtient ainsi — les mêmes cartes
+  // d'ingrédients que dans l'onglet Fusion, pour ne pas dupliquer leur rendu.
+  const zoneFusionBloc = document.getElementById("detailDroideFusion");
+  const zoneFusionIng = document.getElementById("detailDroideFusionIngredients");
+  const recette = fusions.find((f) => nomResultatFusion(f) === d.nom);
+  if (recette) {
+    zoneFusionBloc.style.display = "";
+    zoneFusionIng.innerHTML = "";
+    const liste = normaliserIngredients(recette.ingredients);
+    if (!liste.length) {
+      zoneFusionIng.innerHTML = '<p class="renaissance-elements">Aucun ingrédient indiqué.</p>';
+    } else {
+      liste.forEach((ing) => zoneFusionIng.appendChild(construireIngredientFusion(ing)));
+    }
+  } else {
+    zoneFusionBloc.style.display = "none";
+  }
+
+  // Le bouton bascule la possession du palier ouvert, comme le toggle de la
+  // carte — et rafraîchit le panneau sur place, sans le refermer.
+  const bouton = document.getElementById("detailDroideBouton");
+  bouton.textContent = possedeCePalier
+    ? "✓ Acquis — marquer comme non acquis"
+    : "Marquer comme acquis";
+  bouton.classList.toggle("btn-primaire", !possedeCePalier);
+  bouton.classList.toggle("btn-secondaire", possedeCePalier);
+  bouton.onclick = () => {
+    basculerPossession(d.id, palier);
+    afficherDetailDroide();
+  };
 }
 
 

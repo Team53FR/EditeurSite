@@ -170,8 +170,31 @@
     </div>
   </div>
 
-  
-  
+  <!-- ===== Détail d'un droïde ===== -->
+  <div class="voile" id="voileDetailDroide" onclick="if(event.target===this)fermerDetailDroide()">
+    <div class="feuille feuille-detail-droide">
+      <div class="feuille-entete">
+        <h2 id="titreDetailDroide">Droïde</h2>
+        <button onclick="fermerDetailDroide()">✕</button>
+      </div>
+      <div class="feuille-corps">
+        <div class="detail-droide-haut">
+          <div class="detail-droide-carte" id="detailDroideCarte"></div>
+          <div class="detail-droide-meta" id="detailDroideMeta"></div>
+        </div>
+        <p class="detail-droide-bonus" id="detailDroideBonus" style="display:none"></p>
+        <div class="detail-stats" id="detailDroideStats"></div>
+        <div class="detail-droide-fusion" id="detailDroideFusion" style="display:none">
+          <h3>Recette de fusion</h3>
+          <div class="recette-ingredients" id="detailDroideFusionIngredients"></div>
+        </div>
+      </div>
+      <div class="feuille-pied">
+        <button class="btn btn-primaire" id="detailDroideBouton"></button>
+      </div>
+    </div>
+  </div>
+
   <div class="toast" id="toast"></div>
 
   <script src="attente.js"></script>

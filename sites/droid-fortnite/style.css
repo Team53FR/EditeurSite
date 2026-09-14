@@ -553,13 +553,21 @@ a { color: var(--primaire); }
   text-shadow: 0 0 2px rgba(0, 0, 0, .9);
 }
 
-/* Grille de saisie prix/rendement du formulaire admin */
+/* Grille de saisie des statistiques (prix, rendement, vente, temps) du
+   formulaire admin — cinq colonnes : le nom du palier, puis une par
+   statistique. */
 .grille-paliers { display: flex; flex-direction: column; gap: 0.4rem; }
 .ligne-palier {
   display: grid;
-  grid-template-columns: minmax(5.5rem, 1fr) 1fr 1fr;
+  grid-template-columns: minmax(5rem, 0.9fr) 1fr 1fr 1fr minmax(6.5rem, 1fr);
   align-items: center; gap: 0.4rem;
 }
+/* Temps de fabrication : texte libre, pas de sélecteur d'unité — un simple
+   champ, avec son intitulé visible seulement quand la grille s'empile
+   (voir le libellé « Temps » dans l'en-tête sur grand écran). */
+.champ-libelle { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
+.champ-libelle input { width: 100%; min-width: 0; }
+.champ-libelle .libelle-mobile { display: none; }
 /* Valeur + unité : « 4 » et « K » plutôt qu'un « 4K » que rien ne sait
    additionner. Le sélecteur reste étroit, la valeur prend le reste. */
 .duo-valeur { display: flex; gap: 0.25rem; min-width: 0; }
@@ -591,7 +599,7 @@ a { color: var(--primaire); }
 .ligne-palier input:focus { outline: 2px solid var(--primaire); outline-offset: 1px; }
 .entete-paliers {
   display: grid;
-  grid-template-columns: minmax(5.5rem, 1fr) 1fr 1fr;
+  grid-template-columns: minmax(5rem, 0.9fr) 1fr 1fr 1fr minmax(6.5rem, 1fr);
   gap: 0.4rem;
   font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em;
   color: var(--texte-att);
@@ -751,6 +759,93 @@ a { color: var(--primaire); }
   display: flex; gap: 0.7rem;
 }
 .feuille-pied .btn { flex: 1; }
+
+/* ===== Panneau de détail d'un droïde (Droidex) ===== */
+.feuille-detail-droide { max-width: 480px; }
+
+.detail-droide-haut {
+  display: flex; gap: 0.9rem; align-items: flex-start;
+  margin-bottom: 0.9rem;
+}
+.detail-droide-carte { width: 108px; flex-shrink: 0; }
+.detail-droide-carte .carte-droide { width: 100%; cursor: default; }
+.detail-droide-meta {
+  display: flex; flex-wrap: wrap; align-items: flex-start; gap: 0.4rem;
+  padding-top: 0.2rem;
+}
+.dx-classe-detail {
+  display: flex; align-items: center; gap: 0.3rem;
+  font-size: 0.85rem; color: var(--texte-att);
+  background: var(--fond); border: 1px solid var(--bordure); border-radius: 6px;
+  padding: 0.2rem 0.5rem;
+}
+.detail-droide-meta .badge-rarete {
+  display: inline-flex; align-items: center;
+  font-weight: 700; text-transform: uppercase;
+  padding: 0.2rem 0.55rem; border-radius: 6px;
+  font-size: 0.7rem; letter-spacing: 0.02em;
+}
+.dx-fusion-detail {
+  display: inline-flex; align-items: center; gap: 0.25rem;
+  font-size: 0.75rem; font-weight: 800; color: #fff;
+  background: #a855f7; border-radius: 6px; padding: 0.2rem 0.5rem;
+}
+
+.detail-droide-bonus {
+  margin: 0 0 0.9rem;
+  font-size: 0.85rem; line-height: 1.4;
+  background: var(--fond); border: 1px dashed var(--bordure); border-radius: 10px;
+  padding: 0.6rem 0.75rem;
+}
+
+/* Une ligne par palier, toutes les statistiques d'un coup — la carte n'en
+   montre qu'une tranche, faute de place ; c'est ici qu'on voit le reste. */
+.detail-stats { display: flex; flex-direction: column; gap: 0.3rem; margin-bottom: 0.9rem; }
+.detail-stats-entete, .detail-stats-ligne {
+  display: grid;
+  grid-template-columns: minmax(5.5rem, 1.2fr) repeat(4, 1fr);
+  gap: 0.4rem;
+  align-items: center;
+}
+.detail-stats-entete {
+  font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.04em;
+  color: var(--texte-att);
+  padding: 0 0.5rem;
+}
+.detail-stats-ligne {
+  font-size: 0.82rem;
+  padding: 0.4rem 0.5rem;
+  border-radius: 8px;
+  border: 1px solid var(--bordure);
+  background: var(--fond);
+}
+.detail-stats-ligne span:not(.nom-palier) { text-align: center; color: var(--texte-att); }
+.detail-stats-ligne.possede { border-color: var(--primaire); }
+.detail-stats-ligne.possede span:not(.nom-palier) { color: var(--texte); }
+.detail-stats-ligne.actif { background: var(--carte); box-shadow: inset 0 0 0 1px var(--primaire); }
+.detail-stats-ligne .nom-palier {
+  display: flex; align-items: center; gap: 0.35rem;
+  font-weight: 600; color: var(--texte);
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.detail-stats-ligne .pastille-palier {
+  width: 9px; height: 9px; border-radius: 3px; flex-shrink: 0;
+  border: 1px solid var(--bordure);
+}
+
+.detail-droide-fusion h3 { margin: 0 0 0.5rem; font-size: 0.9rem; }
+.detail-droide-fusion .recette-ingredients { justify-content: flex-start; }
+
+@media (max-width: 480px) {
+  .detail-stats-entete { display: none; }
+  .detail-stats-ligne {
+    grid-template-columns: 1fr;
+    gap: 0.2rem;
+    text-align: left;
+  }
+  .detail-stats-ligne span:not(.nom-palier) { text-align: left; }
+  .detail-stats-ligne span:not(.nom-palier)::before { content: attr(data-libelle) ": "; color: var(--texte-att); }
+}
 
 /* ===== Photo d'un droïde (formulaire de modification) ===== */
 .zone-couverture {
@@ -1296,6 +1391,11 @@ select option { background: var(--carte); color: var(--texte); }
   .duo-valeur select { width: 100%; }
   .ligne-palier .duo-valeur::before { content: "Prix"; }
   .ligne-palier .duo-valeur + .duo-valeur::before { content: "Rendement"; }
+  .ligne-palier .duo-valeur + .duo-valeur + .duo-valeur::before { content: "Vente"; }
+
+  /* Temps de fabrication : son intitulé, masqué à côté de l'en-tête de
+     colonne sur grand écran, ne réapparaît qu'ici, où les en-têtes le sont. */
+  .champ-libelle .libelle-mobile { display: block; font-size: 0.75rem; color: var(--texte-att); }
 
   /* Renaissance : niveau et suppression sur une ligne, crédits en dessous.
      Les trois emplacements restent côte à côte, ils tiennent en largeur. */
