@@ -150,7 +150,7 @@ a { color: var(--primaire); }
 
 .champ { margin-bottom: 1.1rem; }
 .champ label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.4rem; color: var(--texte-att); }
-.champ input, .champ select {
+.champ input, .champ select, .champ textarea {
   width: 100%;
   padding: 0.8rem 0.9rem;
   border-radius: 10px;
@@ -158,8 +158,17 @@ a { color: var(--primaire); }
   background: var(--fond);
   color: var(--texte);
 }
-.champ input:focus, .champ select:focus { outline: 2px solid var(--primaire); outline-offset: 1px; }
+.champ textarea { resize: vertical; }
+.champ input:focus, .champ select:focus, .champ textarea:focus { outline: 2px solid var(--primaire); outline-offset: 1px; }
 .aide-champ { font-size: 0.78rem; color: var(--texte-att); margin: -0.6rem 0 1.1rem; }
+
+/* Bloc repliable (import de catalogue) : un simple <details>, fermé par
+   défaut pour ne pas encombrer l'écran des droïdes tant qu'on ne s'en sert
+   pas. */
+#detailsImportCatalogue summary { cursor: pointer; list-style: none; }
+#detailsImportCatalogue summary::-webkit-details-marker { display: none; }
+#detailsImportCatalogue summary h2::before { content: "▸ "; }
+#detailsImportCatalogue[open] summary h2::before { content: "▾ "; }
 .message { min-height: 1.2em; font-size: 0.88rem; color: var(--danger); margin: 0.8rem 0 0; }
 .message.ok { color: var(--succes); }
 .retour { text-align: center; margin-top: 1.2rem; font-size: 0.88rem; }

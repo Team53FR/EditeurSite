@@ -433,6 +433,114 @@ async function enregistrerDroideAdmin() {
   }
 }
 
+// ===== Import en masse d'un catalogue JSON =====
+//
+// Pour coller un export (par exemple depuis un tableau communautaire) sans
+// ressaisir chaque droïde un par un dans le petit formulaire. Chaque entrée
+// est FUSIONNÉE avec celle déjà connue (comparée par id, puis par nom, comme
+// pour une recette de fusion) plutôt que de remplacer le catalogue en bloc :
+//   - nom / classe / rareté sont remplacés par l'import ;
+//   - prix / rendements / vente / tempsFabrication sont fusionnés PALIER PAR
+//     PALIER : un palier absent de l'import garde sa valeur déjà
+//     enregistrée, un palier présent la remplace ;
+//   - image / bonus ne sont écrasés QUE si l'import les fournit — un import
+//     qui ne connaît que prix/rendements ne doit jamais effacer une photo ou
+//     un bonus déjà saisis à la main.
+// Un type de droïde absent de classes.json est créé au passage (icône
+// générique, à changer ensuite dans l'onglet Types).
+function normaliserTableImport(t) {
+  const out = {};
+  if (t && typeof t === "object" && !Array.isArray(t)) {
+    Object.entries(t).forEach(([palier, v]) => {
+      if (v !== null && v !== undefined && v !== "") out[String(palier).trim()] = v;
+    });
+  }
+  return out;
+}
+
+async function importerCatalogueJSON() {
+  const champ = document.getElementById("champImportCatalogue");
+  const message = document.getElementById("messageImportCatalogue");
+  message.className = "message";
+
+  let entrees;
+  try {
+    entrees = JSON.parse(champ.value);
+  } catch (e) {
+    message.textContent = "JSON invalide : " + e.message;
+    return;
+  }
+  if (!Array.isArray(entrees) || !entrees.length) {
+    message.textContent = "Le contenu doit être un tableau non vide de droïdes.";
+    return;
+  }
+  const sansNom = entrees.filter((d) => !d || !String(d.nom || "").trim());
+  if (sansNom.length) {
+    message.textContent = "Chaque droïde doit avoir un nom (" + sansNom.length + " entrée(s) sans nom, rien n'a été importé).";
+    return;
+  }
+
+  message.textContent = "Import en cours...";
+
+  let copie = catalogue.slice();
+  let ajoutes = 0, modifies = 0;
+  const classesAjoutees = [];
+
+  entrees.forEach((brut) => {
+    const nom = String(brut.nom).trim();
+    let index = brut.id ? copie.findIndex((x) => x.id === String(brut.id).trim()) : -1;
+    if (index === -1) index = copie.findIndex((x) => x.nom.toLowerCase() === nom.toLowerCase());
+
+    const existant = index !== -1 ? copie[index] : null;
+    const entree = existant
+      ? Object.assign({}, existant)
+      : { id: (brut.id && String(brut.id).trim()) || genererId("d") };
+
+    entree.nom = nom;
+    entree.classe = (brut.classe && String(brut.classe).trim()) || entree.classe || (classes[0] && classes[0].nom) || "Ouvrier";
+    entree.rarete = (brut.rarete && String(brut.rarete).trim()) || entree.rarete || (raretes[0] && raretes[0].nom) || "Typique";
+    if (brut.image) entree.image = String(brut.image).trim();
+    if (brut.bonus) entree.bonus = String(brut.bonus).trim();
+
+    ["prix", "rendements", "vente", "tempsFabrication"].forEach((champStat) => {
+      const nouveaux = normaliserTableImport(brut[champStat]);
+      if (Object.keys(nouveaux).length) {
+        entree[champStat] = Object.assign({}, entree[champStat] || {}, nouveaux);
+      }
+    });
+
+    if (!classes.some((c) => c.nom === entree.classe) && !classesAjoutees.includes(entree.classe)) {
+      classesAjoutees.push(entree.classe);
+    }
+
+    if (existant) { copie[index] = entree; modifies++; }
+    else { copie.push(entree); ajoutes++; }
+  });
+
+  copie = trierCatalogueParRarete(copie);
+
+  try {
+    if (classesAjoutees.length) {
+      const nouvellesClasses = classes.concat(classesAjoutees.map((nom) => ({ nom, icone: "\u{1F916}" })));
+      shaClasses = await sauvegarderAvecRetry("classes.json", nouvellesClasses, shaClasses, token,
+        "Ajout de type(s) via import : " + classesAjoutees.join(", "));
+      classes = nouvellesClasses;
+      remplirSelectClasses(document.getElementById("champClasse"));
+    }
+
+    shaCatalogue = await sauvegarderAvecFusion("catalogue.json", copie, shaCatalogue, token,
+      `Import de catalogue (${ajoutes} ajoutés, ${modifies} mis à jour)`);
+    catalogue = copie;
+    afficherDroides();
+    champ.value = "";
+    message.className = "message ok";
+    message.textContent = ajoutes + " droïde(s) ajouté(s), " + modifies + " mis à jour" +
+      (classesAjoutees.length ? ", nouveau(x) type(s) : " + classesAjoutees.join(", ") : "") + ".";
+  } catch (e) {
+    message.textContent = e.message;
+  }
+}
+
 async function supprimerDroide(id) {
   const d = catalogue.find((x) => x.id === id);
   if (!d) return;

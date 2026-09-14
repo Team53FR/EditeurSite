@@ -48,6 +48,19 @@
         <p class="sous-titre">Catalogue partagé, dans l'ordre du jeu — le même que le Droidex. Clique une carte pour la modifier.</p>
         <div class="grille-droides" id="listeDroides"></div>
       </div>
+
+      <div class="bloc-carte">
+        <details id="detailsImportCatalogue">
+          <summary><h2 style="display:inline">Importer un catalogue (JSON)</h2></summary>
+          <p class="sous-titre" style="margin-top:0.6rem">Colle ici un tableau JSON de droïdes (id, nom, classe, rareté, prix, rendements...). Chaque droïde est mis à jour s'il existe déjà (comparé par id, puis par nom), sinon ajouté. Rien de ce que tu as déjà renseigné à la main (photo, bonus, vente, temps de fabrication) n'est écrasé si l'import ne le précise pas — seuls les paliers réellement donnés dans le JSON remplacent les tiens. Un type de droïde inconnu (ex. « Protocolaire ») est créé automatiquement.</p>
+          <div class="champ">
+            <label for="champImportCatalogue">Contenu JSON</label>
+            <textarea id="champImportCatalogue" rows="8" placeholder='[{"id":"mouse","nom":"Mouse","classe":"Ouvrier","rarete":"Typique","prix":{"Défaut":950},"rendements":{"Défaut":2}}]' style="font-family:monospace; font-size:0.8rem;"></textarea>
+          </div>
+          <button class="btn btn-primaire" onclick="importerCatalogueJSON()">Importer / mettre à jour</button>
+          <p id="messageImportCatalogue" class="message"></p>
+        </details>
+      </div>
     </div>
 
     <div id="zoneAjout" style="display:none">
