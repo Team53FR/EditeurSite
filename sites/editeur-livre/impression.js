@@ -266,14 +266,10 @@ const RELIURES = {
     detail: "À envoyer tel quel à un imprimeur : registre, blanc tournant et repères déjà réglés.",
     aideCle: "imprimeur",
     pro: true
-  },
-  kdp: {
-    nom: "Amazon KDP",
-    resume: "Un PDF prêt pour l'impression à la demande sur KDP.",
-    detail: "Format 13,97 × 21,59 cm imposé, marges et fond perdu selon le barème officiel.",
-    aideCle: "kdp",
-    pro: true
   }
+  // Amazon KDP n'a pas d'entrée ici : ce format a son propre panneau
+  // (ouvrirPanneauKDP), entièrement séparé de ce formulaire commun aux
+  // autres formats — voir ouvrirPanneauImpression().
 };
 
 // L'état du formulaire, conservé tant que le panneau reste ouvert.
@@ -292,6 +288,18 @@ let choixImpression = {
 
 function ouvrirPanneauImpression() {
   fermerPanneauImpression();
+
+  // Un livre au format KDP ne se relie ni en livret ni en dos collé chez
+  // soi : il part chez Amazon, qui impose son propre format et ses propres
+  // marges. Il a donc son PROPRE panneau (voir plus bas), séparé de celui-ci
+  // du sol au plafond, pour que rien de ce qui touche KDP ne puisse un jour
+  // changer le comportement des autres formats — ni l'inverse.
+  const livre = (typeof indexLivre === "number" && indexLivre !== -1) ? livreActuel() : null;
+  if (livre && livre.format === "kdp5585") {
+    ouvrirPanneauKDP();
+    return;
+  }
+
   // On repart du cas courant : le texte du livre, une page par feuille. Ce
   // qu'on imprime change à chaque fois, alors que le comportement de
   // l'imprimante — recto-verso, sens de retournement — reste le même d'une
@@ -353,7 +361,6 @@ function etapeReliure() {
     '<div class="mi-separateur-reliure"><span>Ou pour l\'envoyer à quelqu\'un d\'autre</span></div>' +
     '<div class="mi-reliures mi-reliures-pro">' +
       carte("imprimeur", RELIURES.imprimeur) +
-      carte("kdp", RELIURES.kdp) +
     "</div>";
 }
 
@@ -369,7 +376,7 @@ function illustrationReliure(cle) {
       '<rect x="37" y="30" width="6" height="3" rx="1" fill="currentColor"/>' +
     "</svg>";
   }
-  if (cle === "imprimeur" || cle === "kdp") {
+  if (cle === "imprimeur") {
     // Une feuille avec une flèche montante : un fichier qu'on envoie à un
     // tiers, plutôt qu'un livre qu'on assemble soi-même.
     return '<svg class="mi-reliure-dessin" viewBox="0 0 80 56" aria-hidden="true">' +
@@ -431,9 +438,7 @@ function etapeReglages() {
     { valeur: "couverture", nom: "La couverture",
       detail: c.reliure === "livret"
         ? "4e et 1re sur une feuille, à plier autour du cahier."
-        : (c.reliure === "kdp"
-          ? "4e, dos et 1re à plat, fond perdu de 3,2 mm compris."
-          : "4e, dos et 1re à plat, avec les traits de pli.") }
+        : "4e, dos et 1re à plat, avec les traits de pli." }
   ], "quoi");
 
   if (texte && c.reliure === "doscolle") {
@@ -523,11 +528,6 @@ function etapeReglages() {
 // Ce qu'on va obtenir, en une phrase, avant de cliquer.
 function resumeImpression() {
   const c = choixImpression;
-  if (c.reliure === "kdp") {
-    return c.quoi === "couverture"
-      ? "Une planche à la taille exacte : 4e de couverture, dos et 1re, fond perdu de 3,2 mm compris — sans repère de coupe."
-      : "Les pages intérieures à la taille finale (13,97 × 21,59 cm), marge de reliure ajustée au nombre de pages — sans repère de coupe.";
-  }
   if (c.reliure === "imprimeur") {
     return c.quoi === "couverture"
       ? "Une planche : 4e de couverture, dos et 1re à plat, fond perdu et repères de pli compris."
@@ -599,9 +599,6 @@ function actionImpression() {
   const c = choixImpression;
   if (c.reliure === "imprimeur") {
     return { fonction: "exporterImprimeur", mode: c.quoi === "couverture" ? "couverture" : "interieur" };
-  }
-  if (c.reliure === "kdp") {
-    return { fonction: "exporterKDP", mode: c.quoi === "couverture" ? "couverture" : "interieur" };
   }
   if (c.quoi === "couverture") {
     return c.reliure === "livret"
@@ -2480,6 +2477,51 @@ function genererFichierImprimeur(cible, dosMm, livre, f, pagesPro, papier) {
 //  Sources : centre d'aide KDP, rubriques « Concevoir votre contenu » et
 //  « Mettre en forme votre couverture » (kdp.amazon.com/help, 2026).
 // =====================================================================
+
+// ----- Panneau, entièrement séparé de celui des autres formats -----
+//
+// Il ne passe ni par choixImpression, ni par RELIURES, ni par
+// dessinerPanneauImpression()/etapeReglages() : ce sont les briques du
+// formulaire livret/dos collé/imprimeur, et KDP n'a rien à voir avec elles
+// — ni reliure à choisir, ni recto-verso à régler, ni décalage d'imprimante
+// à corriger. Tout mélange aurait fini, tôt ou tard, par faire dépendre
+// l'un du comportement de l'autre. Seul l'écrin (#panneauImpression, la
+// touche Échap, le clic sur le fond) est repris, pour que le panneau
+// s'ouvre et se ferme comme les autres.
+function ouvrirPanneauKDP() {
+  const fond = document.createElement("div");
+  fond.id = "panneauImpression";
+  fond.className = "modal-impression";
+  fond.addEventListener("click", (e) => { if (e.target === fond) fermerPanneauImpression(); });
+  document.body.appendChild(fond);
+
+  const carte = (cible, titre, detail) =>
+    '<button class="mi-reliure" data-cible="' + cible + '">' +
+      illustrationReliure("imprimeur") +
+      "<span class='mi-reliure-nom'>" + titre + "</span>" +
+      "<span class='mi-reliure-resume'>" + detail + "</span>" +
+    "</button>";
+
+  fond.innerHTML = '<div class="modal-impression-carte mi-carte" role="dialog" aria-modal="true">' +
+    '<button class="mi-fermer" aria-label="Fermer">&#10005;</button>' +
+    "<h3>Exporter pour Amazon KDP</h3>" +
+    '<p class="mi-intro">Amazon imprime votre livre elle-même, à la taille et aux marges ' +
+    "qu'elle impose : ce panneau ne pose donc aucune question de reliure ni " +
+    "d'imprimante, à la différence des autres formats.</p>" +
+    '<div class="mi-reliures">' +
+      carte("interieur", "L'intérieur", "Les pages de texte, numérotées, marge de reliure ajustée au nombre de pages.") +
+      carte("couverture", "La couverture", "4e de couverture, dos et 1re à plat, fond perdu de 3,2 mm compris.") +
+    "</div>" +
+    '<details class="mi-details-guide"><summary>Comment ça marche ?</summary>' +
+      construireAideHtml(AIDE_IMPRESSION.kdp) +
+    "</details>" +
+  "</div>";
+
+  fond.querySelector(".mi-fermer").onclick = fermerPanneauImpression;
+  fond.querySelectorAll(".mi-reliure").forEach((b) => {
+    b.onclick = () => exporterKDP(b.dataset.cible);
+  });
+}
 
 // Le seul format que ce mode connaisse : imposé par Amazon pour un poche US.
 const FORMAT_KDP = { larg: 139.7, haut: 215.9 }; // 13,97 × 21,59 cm = 5,5 × 8,5 po
