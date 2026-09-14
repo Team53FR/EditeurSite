@@ -440,7 +440,7 @@ function statsLivre(livre) {
   };
 }
 
-const LABELS_FORMAT = { "149x210": "Roman", "155x235": "Grand roman", "105x148": "Poche", "210x297": "A4" };
+const LABELS_FORMAT = { "149x210": "Roman", "155x235": "Grand roman", "105x148": "Poche", "210x297": "A4", "kdp5585": "Amazon KDP" };
 
 async function ouvrirStatsUtilisateur(login) {
   const modal = document.getElementById("modalStats");
