@@ -466,40 +466,53 @@ function afficherDetailDroide() {
     '<span class="badge-rarete ' + classeRareteCss(d.rarete) + '">' + echapperHTML(d.rarete) + "</span>" +
     (estDroideFusion(d.nom) ? '<span class="dx-fusion-detail">🧬 Fusion</span>' : "");
 
+  // Un droïde qui n'existe qu'à un seul palier (Iconique) n'a pas besoin de
+  // sélecteur : il n'y a rien d'autre à choisir.
+  const lignesPaliers = paliers.filter((p) => estDisponibleAuPalier(d, p.nom));
+  const zonePills = document.getElementById("detailDroidePaliers");
+  if (lignesPaliers.length > 1) {
+    zonePills.style.display = "";
+    zonePills.innerHTML = lignesPaliers.map((p) => {
+      const possedeCe = perso.droidesPossedes.includes(clePossession(d.id, p.nom));
+      return '<button type="button" class="detail-palier-pill' + (p.nom === palier ? " actif" : "") +
+          (possedeCe ? " possede" : "") + '" data-palier="' + echapperHTML(p.nom) + '">' +
+        '<span class="pastille-palier" style="background:' + fondPalier(p.couleur) + '"></span>' +
+        echapperHTML(p.nom) + (possedeCe ? " ✓" : "") +
+      "</button>";
+    }).join("");
+    zonePills.querySelectorAll(".detail-palier-pill").forEach((b) => {
+      b.onclick = () => {
+        detailDroideEnCours.palier = b.dataset.palier;
+        afficherDetailDroide();
+      };
+    });
+  } else {
+    zonePills.style.display = "none";
+    zonePills.innerHTML = "";
+  }
+
+  // Seulement les statistiques du palier affiché — pas celles des sept
+  // autres à la fois, qui noyaient le seul chiffre qui compte pour cette
+  // vignette-ci. Le sélecteur ci-dessus permet de passer à un autre palier
+  // sans refermer le panneau.
+  const zoneStats = document.getElementById("detailDroideStats");
+  const tuile = (libelle, v) => v === null ? "" :
+    '<div class="detail-stat-tuile"><span class="detail-stat-libelle">' + echapperHTML(libelle) + "</span>" +
+    '<span class="detail-stat-valeur">' + echapperHTML(v) + "</span></div>";
+  zoneStats.innerHTML =
+    tuile("Prix", formaterPrix(d, palier)) +
+    tuile("Rendement", formaterRendement(d, palier)) +
+    tuile("Vente", formaterVente(d, palier)) +
+    tuile("Fabrication", formaterTempsFabrication(d, palier));
+
   const zoneBonus = document.getElementById("detailDroideBonus");
-  if (d.bonus) {
+  const bonusPalier = formaterBonus(d, palier);
+  if (bonusPalier) {
     zoneBonus.style.display = "";
-    zoneBonus.textContent = "🎁 Bonus de compagnon : " + d.bonus;
+    zoneBonus.textContent = "🎁 Bonus de compagnon : " + bonusPalier;
   } else {
     zoneBonus.style.display = "none";
   }
-
-  // Toutes les statistiques, à TOUS les paliers où ce droïde existe — pas
-  // seulement celui d'où le panneau a été ouvert : c'est justement l'intérêt
-  // d'un détail, montrer d'un coup ce que la carte doit répartir sur huit
-  // vignettes différentes.
-  const zoneStats = document.getElementById("detailDroideStats");
-  const lignesPaliers = paliers.filter((p) => estDisponibleAuPalier(d, p.nom));
-  // `data-libelle` répète l'intitulé de colonne sur chaque cellule : sur
-  // mobile, l'en-tête se masque et la grille s'empile (voir style.css), il
-  // faut donc que chaque valeur porte son intitulé avec elle.
-  const cellule = (libelle, v) =>
-    '<span data-libelle="' + echapperHTML(libelle) + '">' + (v === null ? "—" : echapperHTML(v)) + "</span>";
-  zoneStats.innerHTML =
-    '<div class="detail-stats-entete"><span>Palier</span><span>Prix</span><span>Rendement</span><span>Vente</span><span>Fabrication</span></div>' +
-    lignesPaliers.map((p) => {
-      const possedeCe = perso.droidesPossedes.includes(clePossession(d.id, p.nom));
-      return '<div class="detail-stats-ligne' + (p.nom === palier ? " actif" : "") + (possedeCe ? " possede" : "") + '">' +
-        '<span class="nom-palier">' +
-          '<span class="pastille-palier" style="background:' + fondPalier(p.couleur) + '"></span>' +
-          echapperHTML(p.nom) + (possedeCe ? " ✓" : "") +
-        "</span>" +
-        cellule("Prix", formaterPrix(d, p.nom)) +
-        cellule("Rendement", formaterRendement(d, p.nom)) +
-        cellule("Vente", formaterVente(d, p.nom)) +
-        cellule("Fabrication", formaterTempsFabrication(d, p.nom)) +
-      "</div>";
-    }).join("");
 
   // Recette de fusion, si ce droïde s'obtient ainsi — les mêmes cartes
   // d'ingrédients que dans l'onglet Fusion, pour ne pas dupliquer leur rendu.

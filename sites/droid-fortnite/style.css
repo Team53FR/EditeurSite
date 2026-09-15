@@ -562,18 +562,20 @@ a { color: var(--primaire); }
   text-shadow: 0 0 2px rgba(0, 0, 0, .9);
 }
 
-/* Grille de saisie des statistiques (prix, rendement, vente, temps) du
-   formulaire admin — cinq colonnes : le nom du palier, puis une par
-   statistique. */
+/* Grille de saisie des statistiques (prix, rendement, vente, temps, bonus)
+   du formulaire admin — six colonnes : le nom du palier, puis une par
+   statistique. Bonus prend plus de place : son texte est le plus long
+   (« 20% Vitesse de Fabrication »). */
 .grille-paliers { display: flex; flex-direction: column; gap: 0.4rem; }
 .ligne-palier {
   display: grid;
-  grid-template-columns: minmax(5rem, 0.9fr) 1fr 1fr 1fr minmax(6.5rem, 1fr);
+  grid-template-columns: minmax(4.5rem, 0.7fr) 1fr 1fr 1fr minmax(5.5rem, 0.9fr) minmax(8rem, 1.3fr);
   align-items: center; gap: 0.4rem;
 }
-/* Temps de fabrication : texte libre, pas de sélecteur d'unité — un simple
-   champ, avec son intitulé visible seulement quand la grille s'empile
-   (voir le libellé « Temps » dans l'en-tête sur grand écran). */
+/* Temps de fabrication et bonus de compagnon : texte libre, pas de
+   sélecteur d'unité — un simple champ, avec son intitulé visible seulement
+   quand la grille s'empile (voir les libellés dans l'en-tête sur grand
+   écran). */
 .champ-libelle { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
 .champ-libelle input { width: 100%; min-width: 0; }
 .champ-libelle .libelle-mobile { display: none; }
@@ -608,7 +610,7 @@ a { color: var(--primaire); }
 .ligne-palier input:focus { outline: 2px solid var(--primaire); outline-offset: 1px; }
 .entete-paliers {
   display: grid;
-  grid-template-columns: minmax(5rem, 0.9fr) 1fr 1fr 1fr minmax(6.5rem, 1fr);
+  grid-template-columns: minmax(4.5rem, 0.7fr) 1fr 1fr 1fr minmax(5.5rem, 0.9fr) minmax(8rem, 1.3fr);
   gap: 0.4rem;
   font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em;
   color: var(--texte-att);
@@ -807,54 +809,56 @@ a { color: var(--primaire); }
   padding: 0.6rem 0.75rem;
 }
 
-/* Une ligne par palier, toutes les statistiques d'un coup — la carte n'en
-   montre qu'une tranche, faute de place ; c'est ici qu'on voit le reste. */
-.detail-stats { display: flex; flex-direction: column; gap: 0.3rem; margin-bottom: 0.9rem; }
-.detail-stats-entete, .detail-stats-ligne {
-  display: grid;
-  grid-template-columns: minmax(5.5rem, 1.2fr) repeat(4, 1fr);
-  gap: 0.4rem;
-  align-items: center;
+/* Sélecteur de palier : un droïde a jusqu'à sept variantes, chacune avec
+   ses propres statistiques — ce sont ces pastilles qui disent laquelle est
+   affichée en dessous, sans qu'il faille rouvrir la carte correspondante. */
+.detail-palier-pills {
+  display: flex; flex-wrap: wrap; gap: 0.4rem;
+  margin-bottom: 0.9rem;
 }
-.detail-stats-entete {
-  font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.04em;
+.detail-palier-pill {
+  display: flex; align-items: center; gap: 0.3rem;
+  padding: 0.35rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid var(--bordure);
+  background: var(--fond);
   color: var(--texte-att);
-  padding: 0 0.5rem;
+  font-size: 0.78rem; font-weight: 600;
+  cursor: pointer;
 }
-.detail-stats-ligne {
-  font-size: 0.82rem;
-  padding: 0.4rem 0.5rem;
-  border-radius: 8px;
+.detail-palier-pill .pastille-palier {
+  width: 8px; height: 8px; border-radius: 3px; flex-shrink: 0;
+  border: 1px solid var(--bordure);
+}
+.detail-palier-pill.possede { color: var(--texte); }
+.detail-palier-pill.actif {
+  background: var(--carte); color: var(--texte);
+  box-shadow: inset 0 0 0 1.5px var(--primaire);
+}
+
+/* Les statistiques du SEUL palier affiché : quatre tuiles, plutôt qu'un
+   tableau de sept lignes qui noyait le chiffre qu'on cherche vraiment. */
+.detail-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr));
+  gap: 0.5rem;
+  margin-bottom: 0.9rem;
+}
+.detail-stat-tuile {
+  display: flex; flex-direction: column; gap: 0.2rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 10px;
   border: 1px solid var(--bordure);
   background: var(--fond);
 }
-.detail-stats-ligne span:not(.nom-palier) { text-align: center; color: var(--texte-att); }
-.detail-stats-ligne.possede { border-color: var(--primaire); }
-.detail-stats-ligne.possede span:not(.nom-palier) { color: var(--texte); }
-.detail-stats-ligne.actif { background: var(--carte); box-shadow: inset 0 0 0 1px var(--primaire); }
-.detail-stats-ligne .nom-palier {
-  display: flex; align-items: center; gap: 0.35rem;
-  font-weight: 600; color: var(--texte);
-  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+.detail-stat-libelle {
+  font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.04em;
+  color: var(--texte-att);
 }
-.detail-stats-ligne .pastille-palier {
-  width: 9px; height: 9px; border-radius: 3px; flex-shrink: 0;
-  border: 1px solid var(--bordure);
-}
+.detail-stat-valeur { font-size: 0.95rem; font-weight: 700; color: var(--texte); }
 
 .detail-droide-fusion h3 { margin: 0 0 0.5rem; font-size: 0.9rem; }
 .detail-droide-fusion .recette-ingredients { justify-content: flex-start; }
-
-@media (max-width: 480px) {
-  .detail-stats-entete { display: none; }
-  .detail-stats-ligne {
-    grid-template-columns: 1fr;
-    gap: 0.2rem;
-    text-align: left;
-  }
-  .detail-stats-ligne span:not(.nom-palier) { text-align: left; }
-  .detail-stats-ligne span:not(.nom-palier)::before { content: attr(data-libelle) ": "; color: var(--texte-att); }
-}
 
 /* ===== Photo d'un droïde (formulaire de modification) ===== */
 .zone-couverture {

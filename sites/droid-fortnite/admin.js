@@ -228,7 +228,7 @@ function construireGrillePrixRendement(d) {
 
   grille.innerHTML =
     '<div class="entete-paliers"><span>Palier</span><span>Prix</span><span>Rendement /s</span>' +
-    '<span>Vente</span><span>Temps de fabrication</span></div>';
+    '<span>Vente</span><span>Temps de fabrication</span><span>Bonus de compagnon</span></div>';
 
   // Un Iconique n'existe qu'au premier palier : inutile de proposer les autres.
   const lignes = paliers.filter((p) => estDisponibleAuPalier({ rarete }, p.nom));
@@ -245,6 +245,9 @@ function construireGrillePrixRendement(d) {
     const vente = decomposerPourFormulaire(d ? valeurPalier(d.vente, p.nom) : null);
     // Le temps de fabrication n'est pas un montant : texte libre, « 0:00:33 ».
     const temps = d ? (valeurPalier(d.tempsFabrication, p.nom) || "") : "";
+    // Le bonus de compagnon non plus — et il grandit avec le palier
+    // (« 20% Vitesse de Fabrication » à Défaut, « 140% » à Stellar).
+    const bonusPalier = d ? (valeurPalier(d.bonus, p.nom) || "") : "";
 
     ligne.innerHTML =
       '<span class="nom-palier">' +
@@ -276,6 +279,11 @@ function construireGrillePrixRendement(d) {
         '<span class="libelle-mobile">Temps de fabrication</span>' +
         '<input type="text" data-palier="' + echapper(p.nom) + '" data-champ="temps" ' +
           'value="' + echapper(temps) + '" placeholder="ex. 0:00:33" aria-label="Temps de fabrication au palier ' + echapper(p.nom) + '">' +
+      "</span>" +
+      '<span class="champ-libelle">' +
+        '<span class="libelle-mobile">Bonus de compagnon</span>' +
+        '<input type="text" data-palier="' + echapper(p.nom) + '" data-champ="bonus" ' +
+          'value="' + echapper(bonusPalier) + '" placeholder="ex. 20% Vitesse de Fabrication" aria-label="Bonus de compagnon au palier ' + echapper(p.nom) + '">' +
       "</span>";
     grille.appendChild(ligne);
   });
@@ -294,12 +302,16 @@ function construireGrillePrixRendement(d) {
 function lireGrillePrixRendement() {
   const tables = { prix: {}, rendement: {}, vente: {} };
   const tempsFabrication = {};
+  const bonus = {};
+  // Ces deux-là ne sont pas des montants : du texte libre, sans sélecteur
+  // d'unité — composerValeur() les tronquerait en essayant d'y lire un nombre.
+  const CHAMPS_TEXTE = { temps: tempsFabrication, bonus: bonus };
   document.querySelectorAll('#grillePrixRendement input[data-champ]').forEach((input) => {
     const palier = input.dataset.palier;
     const champ = input.dataset.champ;
-    if (champ === "temps") {
+    if (CHAMPS_TEXTE[champ]) {
       const texte = input.value.trim();
-      if (texte) tempsFabrication[palier] = texte;
+      if (texte) CHAMPS_TEXTE[champ][palier] = texte;
       return;
     }
     const select = document.querySelector(
@@ -308,7 +320,7 @@ function lireGrillePrixRendement() {
     if (valeur === null || !tables[champ]) return;
     tables[champ][palier] = valeur;
   });
-  return { prix: tables.prix, rendements: tables.rendement, vente: tables.vente, tempsFabrication };
+  return { prix: tables.prix, rendements: tables.rendement, vente: tables.vente, tempsFabrication, bonus };
 }
 
 // Le droïde ouvert dans le formulaire, ou null en mode ajout. Sert à
@@ -327,7 +339,6 @@ async function editerDroide(id) {
   document.getElementById("champNom").value = d.nom;
   document.getElementById("champClasse").value = d.classe;
   document.getElementById("champRarete").value = d.rarete;
-  document.getElementById("champBonus").value = d.bonus || "";
   construireGrillePrixRendement(d);
   document.getElementById("titreFormDroide").textContent = "Modifier « " + d.nom + " »";
   document.getElementById("btnEnregistrerDroide").textContent = "Enregistrer les modifications";
@@ -357,7 +368,6 @@ function annulerEditionDroide() {
   document.getElementById("champNom").value = "";
   if (classes.length) document.getElementById("champClasse").value = classes[0].nom;
   document.getElementById("champRarete").value = "Typique";
-  document.getElementById("champBonus").value = "";
   construireGrillePrixRendement(null);
   document.getElementById("apercuDroideAdmin").innerHTML = iconePlaceholderDroideAdmin();
   document.getElementById("boutonSupprimerImageAdmin").style.display = "none";
@@ -406,13 +416,12 @@ async function enregistrerDroideAdmin() {
 
     const entree = { id, nom, classe, rarete };
     if (cheminImage) entree.image = cheminImage;
-    const { prix, rendements, vente, tempsFabrication } = lireGrillePrixRendement();
+    const { prix, rendements, vente, tempsFabrication, bonus } = lireGrillePrixRendement();
     if (Object.keys(prix).length) entree.prix = prix;
     if (Object.keys(rendements).length) entree.rendements = rendements;
     if (Object.keys(vente).length) entree.vente = vente;
     if (Object.keys(tempsFabrication).length) entree.tempsFabrication = tempsFabrication;
-    const bonus = (document.getElementById("champBonus").value || "").trim();
-    if (bonus) entree.bonus = bonus;
+    if (Object.keys(bonus).length) entree.bonus = bonus;
 
     const copieBrute = modeEditionId
       ? catalogue.map((x) => x.id === modeEditionId ? entree : x)
@@ -500,9 +509,8 @@ async function importerCatalogueJSON() {
     entree.classe = (brut.classe && String(brut.classe).trim()) || entree.classe || (classes[0] && classes[0].nom) || "Ouvrier";
     entree.rarete = (brut.rarete && String(brut.rarete).trim()) || entree.rarete || (raretes[0] && raretes[0].nom) || "Typique";
     if (brut.image) entree.image = String(brut.image).trim();
-    if (brut.bonus) entree.bonus = String(brut.bonus).trim();
 
-    ["prix", "rendements", "vente", "tempsFabrication"].forEach((champStat) => {
+    ["prix", "rendements", "vente", "tempsFabrication", "bonus"].forEach((champStat) => {
       const nouveaux = normaliserTableImport(brut[champStat]);
       if (Object.keys(nouveaux).length) {
         entree[champStat] = Object.assign({}, entree[champStat] || {}, nouveaux);

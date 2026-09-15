@@ -455,6 +455,14 @@ function formaterTempsFabrication(d, palier) {
   return v === null ? null : String(v).trim() || null;
 }
 
+// Le bonus de compagnon grandit lui aussi avec le palier (ex. Mouse : 20 %
+// de vitesse de fabrication au palier Défaut, 140 % au palier Stellar) :
+// texte libre par palier, comme le temps de fabrication.
+function formaterBonus(d, palier) {
+  const v = valeurPalier(d.bonus, palier);
+  return v === null ? null : String(v).trim() || null;
+}
+
 // ===== Couleurs des raretés =====
 //
 // Éditables depuis le panneau admin (DroidFortnite/raretes.json) plutôt que
