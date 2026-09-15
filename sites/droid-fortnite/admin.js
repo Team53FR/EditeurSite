@@ -1050,12 +1050,19 @@ async function changerImageClasse(index, fichier) {
 async function retirerImageClasse(index) {
   const c = classes[index];
   if (!c || !c.image) return;
-  // Attendue, contrairement au remplacement d'image (où l'ancien fichier
-  // n'a plus d'importance dès que le nouveau est en place) : si l'on
-  // enchaîne aussitôt avec un nouvel envoi au même chemin, la suppression
-  // doit être terminée avant, sans quoi GitHub peut répondre de façon
-  // inattendue à la vérification qui suit (voir obtenirShaFichier).
-  await supprimerFichierGithub(c.image, token, `Retrait de l'image du type ${c.nom}`).catch(() => {});
+  const message = document.getElementById("messageClasses");
+  // Attendue, et son échec doit bloquer la suite (contrairement au
+  // remplacement d'image, où l'ancien fichier n'a plus d'importance dès que
+  // le nouveau est en place) : si l'on enregistre quand même le type comme
+  // "sans image" alors que le fichier est toujours là, un nouvel envoi au
+  // même chemin se heurte à un fichier orphelin que plus rien ne référence.
+  try {
+    await supprimerFichierGithub(c.image, token, `Retrait de l'image du type ${c.nom}`);
+  } catch (e) {
+    message.className = "message";
+    message.textContent = e.message || "Impossible de supprimer l'image.";
+    return;
+  }
   const copie = classes.slice();
   const sansImage = Object.assign({}, c);
   delete sansImage.image;

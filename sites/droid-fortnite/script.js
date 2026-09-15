@@ -244,15 +244,39 @@ async function supprimerFichierGithub(chemin, token, messageCommit) {
   const sha = await obtenirShaFichier(chemin, token);
   if (!sha) return;
   const url = urlContenuBDD(chemin);
-  await fetch(url, {
+  const corps = { message: messageCommit || `Suppression de ${chemin}`, sha };
+  let reponse = await fetch(url, {
     method: "DELETE",
     headers: {
       "Authorization": `Bearer ${token}`,
       "Accept": "application/vnd.github+json"
     },
-    body: JSON.stringify({ message: messageCommit || `Suppression de ${chemin}`, sha })
+    body: JSON.stringify(corps)
   });
-  // Volontairement silencieux en cas d'échec : ne doit pas bloquer le reste du flux
+
+  // Le sha lu à l'instant ne correspond déjà plus (409/422) : on le relit une
+  // dernière fois et on retente, plutôt que de laisser le fichier orphelin
+  // sur le dépôt sans que personne ne le sache — un appelant qui compte sur
+  // la suppression (avant de renvoyer une nouvelle image au même chemin, par
+  // exemple) se retrouverait sinon bloqué sans explication.
+  if (!reponse.ok && (reponse.status === 409 || reponse.status === 422)) {
+    const shaFrais = await obtenirShaFichier(chemin, token).catch(() => null);
+    if (shaFrais) {
+      corps.sha = shaFrais;
+      reponse = await fetch(url, {
+        method: "DELETE",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Accept": "application/vnd.github+json"
+        },
+        body: JSON.stringify(corps)
+      });
+    }
+  }
+
+  if (!reponse.ok) {
+    throw new Error(`Impossible de supprimer "${chemin}" sur GitHub.`);
+  }
 }
 
 function mimeDepuisChemin(chemin) {
