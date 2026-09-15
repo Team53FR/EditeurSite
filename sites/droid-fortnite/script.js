@@ -159,8 +159,20 @@ async function obtenirShaFichier(chemin, token) {
   });
   if (reponse.status === 404) return null;
   if (!reponse.ok) throw new Error(`Impossible de vérifier l'existence de "${chemin}".`);
-  const data = await reponse.json();
-  return data.sha;
+  // Juste après un envoi ou une suppression du MÊME fichier, l'API a répondu
+  // 200 mais renvoyé les octets bruts de l'image au lieu des métadonnées
+  // JSON attendues (observé sur une image de type de droïde remplacée juste
+  // après avoir été retirée). Le fichier existe très probablement : on le
+  // signale par une erreur reconnaissable, pour que l'appelant retente au
+  // lieu de planter sur un JSON.parse() qui ne peut pas réussir.
+  const texte = await reponse.text();
+  try {
+    return JSON.parse(texte).sha;
+  } catch (e) {
+    const erreur = new Error(`Réponse inattendue de GitHub pour "${chemin}".`);
+    erreur.reponseNonJson = true;
+    throw erreur;
+  }
 }
 
 // ===== Images (photos ajoutées par les comptes du site, pas des visuels du
@@ -179,13 +191,22 @@ async function uploaderImageBase64(chemin, dataUrl, token, messageCommit) {
   if (virgule === -1) throw new Error("Format d'image invalide.");
   const contenuBase64 = dataUrl.slice(virgule + 1);
 
-  const shaExistant = await obtenirShaFichier(chemin, token);
+  let shaExistant;
+  try {
+    shaExistant = await obtenirShaFichier(chemin, token);
+  } catch (e) {
+    if (!e.reponseNonJson) throw e;
+    // Une suppression ou un envoi du même fichier vient peut-être de se
+    // terminer côté GitHub : on laisse un instant, puis on retente une fois.
+    await new Promise((r) => setTimeout(r, 600));
+    shaExistant = await obtenirShaFichier(chemin, token);
+  }
 
   const url = urlContenuBDD(chemin);
   const corps = { message: messageCommit || `Ajout de l'image ${chemin}`, content: contenuBase64 };
   if (shaExistant) corps.sha = shaExistant;
 
-  const reponse = await fetch(url, {
+  let reponse = await fetch(url, {
     method: "PUT",
     headers: {
       "Authorization": `Bearer ${token}`,
@@ -193,6 +214,26 @@ async function uploaderImageBase64(chemin, dataUrl, token, messageCommit) {
     },
     body: JSON.stringify(corps)
   });
+
+  // Le fichier existait déjà sans qu'on l'ait vu (notre vérification a
+  // manqué sa fenêtre, ou il vient d'être recréé entre-temps) : GitHub
+  // répond alors 422, réclamant le sha. On le relit une dernière fois et on
+  // réessaie l'envoi, plutôt que d'abandonner sur un simple malentendu de
+  // timing.
+  if (reponse.status === 422 && !corps.sha) {
+    const shaFrais = await obtenirShaFichier(chemin, token).catch(() => null);
+    if (shaFrais) {
+      corps.sha = shaFrais;
+      reponse = await fetch(url, {
+        method: "PUT",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Accept": "application/vnd.github+json"
+        },
+        body: JSON.stringify(corps)
+      });
+    }
+  }
 
   if (!reponse.ok) {
     let details = "";

@@ -1050,7 +1050,12 @@ async function changerImageClasse(index, fichier) {
 async function retirerImageClasse(index) {
   const c = classes[index];
   if (!c || !c.image) return;
-  supprimerFichierGithub(c.image, token, `Retrait de l'image du type ${c.nom}`).catch(() => {});
+  // Attendue, contrairement au remplacement d'image (où l'ancien fichier
+  // n'a plus d'importance dès que le nouveau est en place) : si l'on
+  // enchaîne aussitôt avec un nouvel envoi au même chemin, la suppression
+  // doit être terminée avant, sans quoi GitHub peut répondre de façon
+  // inattendue à la vérification qui suit (voir obtenirShaFichier).
+  await supprimerFichierGithub(c.image, token, `Retrait de l'image du type ${c.nom}`).catch(() => {});
   const copie = classes.slice();
   const sansImage = Object.assign({}, c);
   delete sansImage.image;
