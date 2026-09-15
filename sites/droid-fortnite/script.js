@@ -152,23 +152,28 @@ async function ecrireFichierJSON(nomFichier, contenu, sha, token, messageCommit)
   return data.content.sha;
 }
 
-async function obtenirShaFichier(chemin, token) {
+async function obtenirShaFichier(chemin, token, tentative = 0) {
   const url = urlContenuBDD(chemin);
   const reponse = await fetch(url, {
     headers: { "Authorization": `Bearer ${token}`, "Accept": "application/vnd.github+json" }
   });
   if (reponse.status === 404) return null;
   if (!reponse.ok) throw new Error(`Impossible de vérifier l'existence de "${chemin}".`);
-  // Juste après un envoi ou une suppression du MÊME fichier, l'API a répondu
-  // 200 mais renvoyé les octets bruts de l'image au lieu des métadonnées
-  // JSON attendues (observé sur une image de type de droïde remplacée juste
-  // après avoir été retirée). Le fichier existe très probablement : on le
-  // signale par une erreur reconnaissable, pour que l'appelant retente au
-  // lieu de planter sur un JSON.parse() qui ne peut pas réussir.
+  // Juste après un envoi ou une suppression du MÊME fichier, l'API répond
+  // parfois 200 mais renvoie les octets bruts de l'image au lieu des
+  // métadonnées JSON attendues (observé sur une image de type de droïde
+  // remplacée juste après avoir été retirée) — le temps que ça redevienne
+  // cohérent côté GitHub peut dépasser une seconde. On retente plusieurs
+  // fois avec un délai croissant avant d'abandonner, au lieu de planter sur
+  // un JSON.parse() qui ne peut pas réussir.
   const texte = await reponse.text();
   try {
     return JSON.parse(texte).sha;
   } catch (e) {
+    if (tentative < 4) {
+      await new Promise((r) => setTimeout(r, 500 * (tentative + 1)));
+      return obtenirShaFichier(chemin, token, tentative + 1);
+    }
     const erreur = new Error(`Réponse inattendue de GitHub pour "${chemin}".`);
     erreur.reponseNonJson = true;
     throw erreur;
@@ -191,16 +196,7 @@ async function uploaderImageBase64(chemin, dataUrl, token, messageCommit) {
   if (virgule === -1) throw new Error("Format d'image invalide.");
   const contenuBase64 = dataUrl.slice(virgule + 1);
 
-  let shaExistant;
-  try {
-    shaExistant = await obtenirShaFichier(chemin, token);
-  } catch (e) {
-    if (!e.reponseNonJson) throw e;
-    // Une suppression ou un envoi du même fichier vient peut-être de se
-    // terminer côté GitHub : on laisse un instant, puis on retente une fois.
-    await new Promise((r) => setTimeout(r, 600));
-    shaExistant = await obtenirShaFichier(chemin, token);
-  }
+  const shaExistant = await obtenirShaFichier(chemin, token);
 
   const url = urlContenuBDD(chemin);
   const corps = { message: messageCommit || `Ajout de l'image ${chemin}`, content: contenuBase64 };
