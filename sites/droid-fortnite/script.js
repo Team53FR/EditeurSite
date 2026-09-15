@@ -310,6 +310,42 @@ function iconeClasse(classe) {
   return (trouve && trouve.icone) || "\u{1F916}";
 }
 
+// ----- Image d'un type de droïde, à la place de son icône -----
+//
+// Comme pour la photo d'un droïde, l'image d'un type vit dans le dépôt BDD
+// (qui peut être privé) : il faut donc l'URL, pas seulement le chemin. Mais
+// il n'y a jamais que quelques types — tout tient en mémoire d'un coup, pas
+// besoin du chargement à la demande utilisé pour les cent et quelques
+// cartes du Droidex.
+const classesImageUrls = new Map(); // nom du type -> URL locale (blob:)
+
+async function precacherImagesClasses(token) {
+  const nomsAvecImage = new Set();
+  await Promise.all((classes || []).map(async (c) => {
+    if (!c.image) return;
+    nomsAvecImage.add(c.nom);
+    try {
+      const url = await obtenirUrlImage(c.image, token);
+      classesImageUrls.set(c.nom, url);
+    } catch (e) { /* reste sur l'icône */ }
+  }));
+  // Un type qui a perdu son image (ou a été supprimé) ne doit pas garder
+  // l'URL d'une image qui n'existe plus.
+  [...classesImageUrls.keys()].forEach((nom) => {
+    if (!nomsAvecImage.has(nom)) classesImageUrls.delete(nom);
+  });
+}
+
+// Le rendu d'un type, partout où il s'affiche : son image si elle est
+// chargée, son icône (emoji) sinon. Renvoie du HTML (jamais du texte à
+// mettre dans un <option>, qui n'affiche pas les images — voir
+// remplirSelectClasses, qui continue d'utiliser l'icône seule).
+function classeVisuelHtml(nomClasse) {
+  const url = classesImageUrls.get(nomClasse);
+  if (url) return `<img class="classe-glyphe" src="${url}" alt="">`;
+  return echapperTexte(iconeClasse(nomClasse));
+}
+
 // Visuel généré (pas une image du jeu, dont je n'ai pas le droit de
 // distribuer les visuels officiels) : une teinte dérivée du nom du droïde,
 // pour que chaque carte reste distincte visuellement même sans photo perso.
@@ -723,11 +759,11 @@ function construireCarteDroide(d, options) {
       : `<button type="button" class="dx-case" aria-label="Marquer comme possédé">✓</button>`) +
     `<div class="dx-visuel">` +
       `<span class="dx-scan"></span>` +
-      `<span class="dx-vide" style="--teinte:${couleurDroide(d.id)}">${iconeClasse(d.classe)}</span>` +
+      `<span class="dx-vide" style="--teinte:${couleurDroide(d.id)}">${classeVisuelHtml(d.classe)}</span>` +
     `</div>` +
     `<div class="dx-bas">` +
       `<div class="dx-pied">` +
-        `<span class="dx-classe" title="${echapperTexte(d.classe)}">${iconeClasse(d.classe)}</span>` +
+        `<span class="dx-classe" title="${echapperTexte(d.classe)}">${classeVisuelHtml(d.classe)}</span>` +
         `<span class="badge-rarete ${classeRareteCss(d.rarete)}">${echapperTexte(d.rarete)}</span>` +
       `</div>` +
       ligneChiffresHtml(d, o.palier) +
@@ -1184,7 +1220,9 @@ function normaliserClasses(brutes) {
   return liste.map((c) => {
     const nom = String(c.nom).trim();
     const defaut = CLASSES_INITIALES.find((d) => d.nom === nom) || {};
-    return { nom, icone: c.icone || defaut.icone || "\u{1F916}" };
+    const entree = { nom, icone: c.icone || defaut.icone || "\u{1F916}" };
+    if (c.image) entree.image = String(c.image).trim();
+    return entree;
   });
 }
 

@@ -11,6 +11,9 @@ envelopperAttente({
   sauvegarderUnites: "Enregistrement des unités…",
   sauvegarderRaretes: "Enregistrement des raretés…",
   sauvegarderClasses: "Enregistrement des types de droïde…",
+  changerImageClasse: ["Envoi de l'image…", "Le type est mis à jour dès que c'est fait."],
+  retirerImageClasse: "Suppression de l'image du type…",
+  ajouterClasse: "Ajout du type…",
   sauvegarderRenaissanceAdmin: "Enregistrement des renaissances…",
   sauvegarderFusionAdmin: "Enregistrement des fusions…",
 });
@@ -130,6 +133,7 @@ async function chargerDonnees() {
     appliquerCouleursRaretes();
     classes = normaliserClasses(rClasses.contenu);
     shaClasses = rClasses.sha;
+    await precacherImagesClasses(token);
     renaissance = Array.isArray(rRenaissance.contenu) ? rRenaissance.contenu : [];
     shaRenaissance = rRenaissance.sha;
     fusions = Array.isArray(rFusions.contenu) ? rFusions.contenu : [];
@@ -946,21 +950,41 @@ function afficherClasses() {
     const li = document.createElement("li");
     li.className = "ligne-item";
     li.innerHTML =
+      '<button type="button" class="classe-image-bouton" title="Changer l\'image de ' + echapper(c.nom) + '">' +
+        classeVisuelHtml(c.nom) +
+      "</button>" +
+      '<input type="file" accept="image/*" class="classe-image-fichier" style="display:none">' +
       '<div class="ligne-info">' +
-        '<div class="ligne-titre">' + c.icone + " " + echapper(c.nom) + "</div>" +
+        '<div class="ligne-titre">' + echapper(c.nom) + "</div>" +
         '<div class="ligne-sous">' + (utilisee ? utilisee + " droïde(s)" : "aucun droïde") + "</div>" +
       "</div>" +
-      '<input type="text" class="classe-icone" maxlength="4" value="' + echapper(c.icone || "") + '" title="Icône (emoji)">' +
+      '<input type="text" class="classe-icone" maxlength="4" value="' + echapper(c.icone || "") + '" title="Icône (emoji), utilisée si aucune image">' +
       '<div class="ligne-actions"></div>';
 
     li.querySelector(".classe-icone").addEventListener("change", (e) => changerIconeClasse(index, e.target.value));
+
+    const champFichier = li.querySelector(".classe-image-fichier");
+    li.querySelector(".classe-image-bouton").onclick = () => champFichier.click();
+    champFichier.addEventListener("change", (e) => {
+      changerImageClasse(index, e.target.files[0]);
+      e.target.value = "";
+    });
+
+    const actions = li.querySelector(".ligne-actions");
+    if (c.image) {
+      const bRetirer = document.createElement("button");
+      bRetirer.className = "btn-mini";
+      bRetirer.textContent = "Retirer l'image";
+      bRetirer.onclick = () => retirerImageClasse(index);
+      actions.appendChild(bRetirer);
+    }
 
     const bSuppr = document.createElement("button");
     bSuppr.className = "btn-mini danger";
     bSuppr.textContent = "Supprimer";
     bSuppr.title = utilisee ? "Supprimer (des droïdes le portent)" : "Supprimer";
     bSuppr.onclick = () => supprimerClasse(index, utilisee);
-    li.querySelector(".ligne-actions").appendChild(bSuppr);
+    actions.appendChild(bSuppr);
 
     liste.appendChild(li);
   });
@@ -973,9 +997,13 @@ async function sauvegarderClasses(nouvelles, messageCommit) {
   try {
     shaClasses = await sauvegarderAvecRetry("classes.json", nouvelles, shaClasses, token, messageCommit);
     classes = nouvelles;
+    // Rien qu'une poignée de types : autant relire les images à chaque
+    // enregistrement plutôt que de risquer d'oublier de le faire à un
+    // endroit — la nouvelle (ou l'ancienne, inchangée) est toujours à jour.
+    await precacherImagesClasses(token);
     afficherClasses();
     remplirSelectClasses(document.getElementById("champClasse"));
-    afficherDroides();          // icônes des cartes suivent
+    afficherDroides();          // icônes (ou images) des cartes suivent
     message.className = "message ok";
     message.textContent = "Enregistré.";
   } catch (e) {
@@ -989,7 +1017,69 @@ function changerIconeClasse(index, icone) {
   sauvegarderClasses(copie, `Icône du type ${copie[index].nom}`);
 }
 
-function ajouterClasse() {
+// L'image remplace l'icône partout où le type s'affiche (voir
+// classeVisuelHtml) — mais l'icône reste enregistrée, pour les endroits qui
+// ne peuvent pas afficher d'image (la liste déroulante du formulaire
+// d'ajout) et pour le jour où l'image serait retirée.
+async function changerImageClasse(index, fichier) {
+  if (!fichier) return;
+  const c = classes[index];
+  if (!c) return;
+  const message = document.getElementById("messageClasses");
+  message.className = "message";
+  try {
+    // 300 px suffisent largement à une icône de type ; comprimerImage garde
+    // le PNG (et sa transparence) si l'image en a besoin, repasse en JPEG
+    // sinon.
+    const dataUrl = await comprimerImage(fichier, 300, 0.85);
+    const chemin = `images/classes/${slugifierLogin(c.nom)}.${extraireExtensionDataUrl(dataUrl)}`;
+    await uploaderImageBase64(chemin, dataUrl, token, `Image du type ${c.nom}`);
+    // Une image remplacée par une autre extension (PNG <-> JPEG) laisserait
+    // sinon l'ancien fichier orphelin dans le dépôt.
+    if (c.image && c.image !== chemin) {
+      supprimerFichierGithub(c.image, token, "Remplacement de l'image").catch(() => {});
+    }
+    const copie = classes.slice();
+    copie[index] = Object.assign({}, c, { image: chemin });
+    await sauvegarderClasses(copie, `Image du type ${c.nom}`);
+  } catch (e) {
+    message.textContent = e.message || "Impossible de charger cette image.";
+  }
+}
+
+async function retirerImageClasse(index) {
+  const c = classes[index];
+  if (!c || !c.image) return;
+  supprimerFichierGithub(c.image, token, `Retrait de l'image du type ${c.nom}`).catch(() => {});
+  const copie = classes.slice();
+  const sansImage = Object.assign({}, c);
+  delete sansImage.image;
+  copie[index] = sansImage;
+  await sauvegarderClasses(copie, `Retrait de l'image du type ${c.nom}`);
+}
+
+// ----- Image du type en cours d'ajout, en attente (pas encore envoyée tant
+// qu'on ne valide pas le formulaire) — même principe que dataUrlImageAdmin
+// pour la photo d'un droïde. -----
+let dataUrlImageNouvelleClasse = null;
+
+function declencherChoixImageClasseAjout() {
+  document.getElementById("champImageNouvelleClasse").click();
+}
+
+async function imageChoisieClasseAjout(event) {
+  const fichier = event.target.files[0];
+  event.target.value = "";
+  if (!fichier) return;
+  try {
+    dataUrlImageNouvelleClasse = await comprimerImage(fichier, 300, 0.85);
+    document.getElementById("apercuImageNouvelleClasse").innerHTML = `<img src="${dataUrlImageNouvelleClasse}" alt="">`;
+  } catch (e) {
+    document.getElementById("messageClasses").textContent = "Impossible de charger cette image.";
+  }
+}
+
+async function ajouterClasse() {
   const champNom = document.getElementById("champNouvelleClasse");
   const champIcone = document.getElementById("champIconeNouvelleClasse");
   const nom = champNom.value.trim();
@@ -999,10 +1089,26 @@ function ajouterClasse() {
   if (classes.some((c) => c.nom.toLowerCase() === nom.toLowerCase())) {
     message.textContent = "Ce type existe déjà."; return;
   }
-  champNom.value = "";
+
   const icone = champIcone.value.trim() || "\u{1F916}";
+  const dataUrl = dataUrlImageNouvelleClasse;
+  champNom.value = "";
   champIcone.value = "";
-  sauvegarderClasses(classes.concat([{ nom, icone }]), `Ajout du type ${nom}`);
+  dataUrlImageNouvelleClasse = null;
+  const apercu = document.getElementById("apercuImageNouvelleClasse");
+  if (apercu) apercu.innerHTML = '<span class="classe-image-plus">🖼️</span>';
+
+  const entree = { nom, icone };
+  if (dataUrl) {
+    try {
+      const chemin = `images/classes/${slugifierLogin(nom)}.${extraireExtensionDataUrl(dataUrl)}`;
+      await uploaderImageBase64(chemin, dataUrl, token, `Image du type ${nom}`);
+      entree.image = chemin;
+    } catch (e) {
+      message.textContent = "Type ajouté, mais l'image n'a pas pu être envoyée : " + e.message;
+    }
+  }
+  await sauvegarderClasses(classes.concat([entree]), `Ajout du type ${nom}`);
 }
 
 function supprimerClasse(index, utilisee) {

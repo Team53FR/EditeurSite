@@ -132,7 +132,7 @@
     <div id="zoneClasses" style="display:none">
       <div class="bloc-carte">
         <h2>Types de droïde</h2>
-        <p class="sous-titre">Détermine les options de classe proposées à l'ajout d'un droïde, et l'icône affichée sur ses cartes tant qu'aucune photo perso n'est ajoutée. Le renommage n'est pas possible : chaque droïde stocke le nom de son type.</p>
+        <p class="sous-titre">Détermine les options de classe proposées à l'ajout d'un droïde, et le visuel affiché sur ses cartes tant qu'aucune photo perso n'est ajoutée : une image (PNG avec transparence de préférence) si vous en donnez une, sinon l'icône (emoji). Cliquez la vignette d'un type pour changer son image. Le renommage n'est pas possible : chaque droïde stocke le nom de son type.</p>
         <ul class="liste-simple" id="listeClasses"></ul>
 
         <div class="champ">
@@ -142,6 +142,15 @@
         <div class="champ">
           <label for="champIconeNouvelleClasse">Icône (emoji)</label>
           <input type="text" id="champIconeNouvelleClasse" class="classe-icone" maxlength="4" placeholder="🤖">
+        </div>
+        <div class="champ">
+          <label>Image (facultative — remplace l'icône partout où elle s'affiche)</label>
+          <div class="classe-image-ajout">
+            <button type="button" class="classe-image-bouton" id="apercuImageNouvelleClasse" onclick="declencherChoixImageClasseAjout()" title="Choisir une image" aria-label="Choisir une image">
+              <span class="classe-image-plus">🖼️</span>
+            </button>
+            <input type="file" accept="image/*" id="champImageNouvelleClasse" style="display:none" onchange="imageChoisieClasseAjout(event)">
+          </div>
         </div>
         <button class="btn btn-primaire" onclick="ajouterClasse()">Ajouter le type</button>
         <p id="messageClasses" class="message"></p>

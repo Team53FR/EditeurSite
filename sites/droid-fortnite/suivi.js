@@ -81,6 +81,7 @@ async function chargerTout() {
     raretes = normaliserRaretes(rRaretes.contenu);
     appliquerCouleursRaretes();
     classes = normaliserClasses(rClasses.contenu);
+    await precacherImagesClasses(token);
     CLASSES_ESCOUADE = classes.map((c) => c.nom);
     // Les pastilles de rareté du filtre suivent la liste des raretés, qui peut
     // s'allonger depuis le panneau admin.
@@ -340,7 +341,7 @@ function construireFiltreClasseChips() {
     b.className = "chip-icone" + (filtresDroidex.classe === c.nom ? " actif" : "");
     b.dataset.classe = c.nom;
     b.title = c.nom;
-    b.textContent = c.icone;
+    b.innerHTML = classeVisuelHtml(c.nom);
     b.onclick = () => basculerFiltre("classe", c.nom);
     zone.appendChild(b);
   });
@@ -462,7 +463,7 @@ function afficherDetailDroide() {
   zoneCarte.appendChild(construireCarteDroide(d, { possede: possedeCePalier, couleur: couleurPalier, palier }));
 
   document.getElementById("detailDroideMeta").innerHTML =
-    '<span class="dx-classe-detail">' + iconeClasse(d.classe) + " " + echapperHTML(d.classe) + "</span>" +
+    '<span class="dx-classe-detail">' + classeVisuelHtml(d.classe) + " " + echapperHTML(d.classe) + "</span>" +
     '<span class="badge-rarete ' + classeRareteCss(d.rarete) + '">' + echapperHTML(d.rarete) + "</span>" +
     (estDroideFusion(d.nom) ? '<span class="dx-fusion-detail">🧬 Fusion</span>' : "");
 
@@ -795,7 +796,7 @@ function afficherRendement() {
     section.className = "section-escouade";
     section.innerHTML =
       '<div class="entete-escouade">' +
-        '<h3>' + iconeClasse(classe) + " " + echapperHTML(classe) + "</h3>" +
+        '<h3>' + classeVisuelHtml(classe) + " " + echapperHTML(classe) + "</h3>" +
         '<span class="total-section">' + texteTotalSection(total) + "</span>" +
         '<div class="reglage-slots">' +
           '<button type="button" class="btn-slot" data-classe="' + echapperHTML(classe) + '" data-delta="-1"' +
