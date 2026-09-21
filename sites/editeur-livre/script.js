@@ -195,6 +195,23 @@ async function obtenirUrlImage(url) {
 // les noms de colonnes : le reste du code continue de manipuler la forme
 // historique { id, titre, auteur, format, espaceTitre, couverture, ... }.
 
+// Combien de pages ce livre fait-il ?
+//
+// Dans l'ordre : le cache écrit à la dernière sauvegarde ; à défaut les pages
+// elles-mêmes si elles ont été chargées ; à défaut le nombre de double-pages,
+// que la base sait compter. Une double-page vaut exactement DEUX pages
+// (regenererToutesPages en pose une à gauche, une à droite) — au retrait près
+// des pages vides de la fin, l'éditeur ayant déjà élagué les double-pages
+// vides en enregistrant. L'estimation est donc juste à une page, et la
+// prochaine sauvegarde écrit le compte exact.
+function nombreDePages(r) {
+  if (typeof r.nb_pages === "number") return r.nb_pages;
+  if (Array.isArray(r.pages) && r.pages.length) return r.pages.length;
+  const compte = r.livre_spreads;
+  const n = Array.isArray(compte) ? (compte[0] && compte[0].count) : (compte && compte.count);
+  return n ? n * 2 : 0;
+}
+
 function versLivreMemoire(r) {
   return {
     id: r.id,
@@ -210,7 +227,7 @@ function versLivreMemoire(r) {
     // Cache de pagination (voir supabase/schema.sql) : présent tel qu'il a
     // été écrit à la dernière sauvegarde.
     pages: Array.isArray(r.pages) ? r.pages : [],
-    nbPages: r.nb_pages || (Array.isArray(r.pages) ? r.pages.length : 0),
+    nbPages: nombreDePages(r),
     dateCreation: r.cree_le,
     dateModif: r.maj_le
   };
@@ -239,8 +256,14 @@ function versLigneLivre(livre, horodatage) {
 
 // Les colonnes lourdes (pages, et le texte des spreads) ne descendent pas :
 // la bibliothèque n'affiche qu'un titre, une vignette et un nombre de pages.
+//
+// `livre_spreads(count)` ne rapatrie pas les double-pages : la base les
+// compte et ne renvoie que le nombre. Il sert de filet quand `nb_pages` est
+// vide — un livre migré depuis l'ancienne base n'a pas encore son cache de
+// pagination, et la bibliothèque affichait alors « 0 p. ».
 const CHAMPS_LIVRE_META =
-  "id,titre,auteur,format,espace_titre,publie,publie_le,couverture,quatrieme,tranche,nb_pages,cree_le,maj_le";
+  "id,titre,auteur,format,espace_titre,publie,publie_le,couverture,quatrieme,tranche,nb_pages,cree_le,maj_le," +
+  "livre_spreads(count)";
 
 async function chargerBibliothequeMeta() {
   const lignes = await requeteSupabase(
