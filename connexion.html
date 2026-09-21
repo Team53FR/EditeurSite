@@ -51,15 +51,10 @@
 
       <div class="champ">
         <label for="password">Mot de passe</label>
-        <input type="password" id="password" placeholder="Ton mot de passe" autocomplete="current-password">
-      </div>
-
-      <div class="champ">
-        <label for="token">Token GitHub</label>
-        <input type="password" id="token" placeholder="ghp_xxxxxxxxxxxx" autocomplete="off"
+        <input type="password" id="password" placeholder="Ton mot de passe" autocomplete="current-password"
                onkeydown="if(event.key==='Enter'){seConnecter();}">
       </div>
-      <p class="aide-champ">Le token sert à lire et enregistrer vos données. Il reste mémorisé sur cet appareil, pour tous les sites du portail — vous ne le retapez plus. Déconnectez-vous si vous prêtez l'appareil.</p>
+      <p class="aide-champ">Ta connexion reste mémorisée sur cet appareil, pour tous les sites du portail. Déconnecte-toi si tu prêtes l'appareil.</p>
 
       <button class="btn btn-primaire btn-bloc" onclick="seConnecter()">Se connecter</button>
 

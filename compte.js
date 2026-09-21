@@ -12,13 +12,13 @@ envelopperAttente({
 
 // Page « Mon compte » : chacun modifie son pseudo et son mot de passe, et
 // consulte ses propres statistiques. Aucun droit d'administrateur requis —
-// on ne touche qu'à sa propre entrée de Web/utilisateurs.json.
+// les règles RLS de public.users ne laissent de toute façon lire/modifier
+// que sa propre ligne.
 
 const token = exigerConnexionCentrale();
 const monLogin = localStorage.getItem("team53_login");
+const monId = localStorage.getItem("team53_id");
 
-let utilisateurs = [];
-let shaUtilisateurs = null;
 let moi = null;
 
 if (token) chargerCompte();
@@ -26,36 +26,20 @@ if (token) chargerCompte();
 async function chargerCompte() {
   document.getElementById("champLogin").value = monLogin || "";
   try {
-    const r = await lireFichierJSON("utilisateurs.json", token);
-    utilisateurs = Array.isArray(r.contenu) ? r.contenu : [];
-    shaUtilisateurs = r.sha;
+    const lignes = await requeteSupabase(
+      `users?id=eq.${monId}&select=login,role,nom_affichage,acces,derniere_connexion`);
+    moi = lignes && lignes[0];
   } catch (e) {
     document.getElementById("messagePseudo").textContent = e.message;
     return;
   }
-  moi = utilisateurs.find((u) => u.login === monLogin) || null;
   if (!moi) {
     document.getElementById("messagePseudo").textContent =
       "Compte introuvable dans la base. Reconnecte-toi.";
     return;
   }
-  document.getElementById("champPseudo").value = moi.nomAffichage || "";
+  document.getElementById("champPseudo").value = moi.nom_affichage || "";
   afficherStats();
-}
-
-// Réécrit utilisateurs.json en ne modifiant QUE sa propre entrée : on relit
-// la version distante juste avant, pour ne pas écraser les changements qu'un
-// administrateur aurait faits entre-temps sur d'autres comptes.
-async function enregistrerMonEntree(modifier, messageCommit) {
-  const frais = await lireFichierJSON("utilisateurs.json", token);
-  const liste = Array.isArray(frais.contenu) ? frais.contenu : [];
-  const entree = liste.find((u) => u.login === monLogin);
-  if (!entree) throw new Error("Compte introuvable dans la base.");
-  modifier(entree);
-  shaUtilisateurs = await ecrireFichierJSON("utilisateurs.json", liste, frais.sha, token, messageCommit);
-  utilisateurs = liste;
-  moi = entree;
-  return entree;
 }
 
 // ----- Pseudo -----
@@ -72,11 +56,8 @@ async function enregistrerPseudo() {
   bouton.disabled = true;
   message.textContent = "Enregistrement...";
   try {
-    await enregistrerMonEntree(
-      (u) => { u.nomAffichage = pseudo; },
-      `Changement de pseudo de ${monLogin}`);
-
-    // Rien à reporter : les sites lisent ce même fichier.
+    await appelerFonctionSupabase("definir_mon_nom_affichage", { nouveau_nom: pseudo });
+    moi.nom_affichage = pseudo;
     localStorage.setItem("team53_nom", pseudo);
 
     message.className = "message ok";
@@ -98,36 +79,28 @@ async function changerMotDePasse() {
   const bouton = document.getElementById("btnMotDePasse");
 
   message.className = "message";
-  if (!moi) { message.textContent = "Compte introuvable."; return; }
-  if (ancien.value !== moi.password) { message.textContent = "Le mot de passe actuel est incorrect."; return; }
+  if (!ancien.value) { message.textContent = "Indique ton mot de passe actuel."; return; }
   if (!nouveau.value) { message.textContent = "Le nouveau mot de passe ne peut pas être vide."; return; }
   if (nouveau.value !== confirmation.value) { message.textContent = "Les deux nouveaux mots de passe diffèrent."; return; }
-  if (nouveau.value === moi.password) { message.textContent = "Le nouveau mot de passe est identique à l'ancien."; return; }
+  if (nouveau.value === ancien.value) { message.textContent = "Le nouveau mot de passe est identique à l'ancien."; return; }
 
   bouton.disabled = true;
   message.textContent = "Enregistrement...";
   try {
-    const motDePasse = nouveau.value;
-    await enregistrerMonEntree(
-      (u) => { u.password = motDePasse; },
-      `Changement de mot de passe de ${monLogin}`);
-
+    await appelerFonctionSupabase("changer_mon_mot_de_passe", { p_ancien: ancien.value, p_nouveau: nouveau.value });
     ancien.value = nouveau.value = confirmation.value = "";
     message.className = "message ok";
-    message.textContent = "Mot de passe changé, sur le portail comme sur tous les sites.";
+    message.textContent = "Mot de passe changé.";
   } catch (e) {
-    message.textContent = e.message;
+    message.textContent = e.status === 401 || /incorrect/i.test(e.message)
+      ? "Le mot de passe actuel est incorrect."
+      : e.message;
   } finally {
     bouton.disabled = false;
   }
 }
 
 // ----- Statistiques -----
-
-function compterMots(txt) {
-  const t = (txt || "").replace(/<[^>]*>/g, " ").trim();
-  return t ? t.split(/\s+/).length : 0;
-}
 
 function tempsRelatifCourt(iso) {
   if (!iso) return "jamais";
@@ -143,77 +116,56 @@ function tempsRelatifCourt(iso) {
   return d.toLocaleDateString("fr-FR");
 }
 
-// Une lecture par site, pour le seul compte courant : chaque site range la
-// progression personnelle sous un nom de fichier dérivé du login.
-async function lireDonneesSite(dossier, fichier) {
-  try {
-    const r = await lireFichierJSONAbsolu(dossier + "/" + fichier, token);
-    return r.contenu;
-  } catch (e) {
-    return null;   // 404 = rien encore, ce n'est pas une erreur
-  }
-}
-
 async function afficherStats() {
   const zone = document.getElementById("zoneStats");
   const acces = Array.isArray(moi.acces) ? moi.acces : [];
-  const slug = slugifierLoginPortail(monLogin);
 
   const cartes = [];
   cartes.push(carteStat("Compte", [
     ["Rôle", moi.role === "admin" ? "Administrateur" : "Utilisateur"],
-    ["Dernière connexion", tempsRelatifCourt(moi.derniereConnexion)],
+    ["Dernière connexion", tempsRelatifCourt(moi.derniere_connexion)],
     ["Sites accessibles", acces.length ? String(acces.length) : "aucun"]
   ]));
 
   const travaux = [];
 
   if (acces.includes("editeur-livre")) {
-    travaux.push(lireDonneesSite("EditeurLivre", `bibliotheques/${slug}.json`).then((d) => {
-      const livres = Array.isArray(d && d.livres) ? d.livres : (Array.isArray(d) ? d : []);
-      let pages = 0, mots = 0, publies = 0;
-      livres.forEach((l) => {
-        pages += Array.isArray(l.pages) ? l.pages.length : 0;
-        const contenu = (Array.isArray(l.spreads) && l.spreads.length)
-          ? l.spreads.join(" ")
-          : (Array.isArray(l.pages) ? l.pages.map((p) => (p && p.contenu) || "").join(" ") : "");
-        mots += compterMots(contenu);
-        if (l.publie) publies++;
-      });
-      return carteStat("📖 Éditeur de livre", [
-        ["Livres", String(livres.length)],
-        ["Pages", String(pages)],
-        ["Mots écrits", mots.toLocaleString("fr-FR")],
-        ["Publiés", String(publies)]
-      ]);
-    }));
+    travaux.push(requeteSupabase(`livres?user_id=eq.${monId}&select=id,publie`).then((livres) => {
+      const publies = livres.filter((l) => l.publie).length;
+      return requeteSupabase(`livre_spreads?select=livre_id&livre_id=in.(${livres.map((l) => `"${l.id}"`).join(",") || "\"\""})`)
+        .then((spreads) => carteStat("📖 Éditeur de livre", [
+          ["Livres", String(livres.length)],
+          ["Doubles-pages", String(spreads.length)],
+          ["Publiés", String(publies)]
+        ]))
+        .catch(() => carteStat("📖 Éditeur de livre", [["Livres", String(livres.length)], ["Publiés", String(publies)]]));
+    }).catch(() => carteStat("📖 Éditeur de livre", [["Livres", "—"]])));
   }
 
   if (acces.includes("ma-bibliotheque")) {
-    travaux.push(lireDonneesSite("MaBibliotheque", `bibliotheques/${slug}.json`).then((d) => {
-      const items = Array.isArray(d && d.livres) ? d.livres : (Array.isArray(d) ? d : []);
-      const series = items.filter((x) => Array.isArray(x.saisons) || Array.isArray(x.tomes)).length;
+    travaux.push(requeteSupabase(`bibliotheque_items?user_id=eq.${monId}&select=type`).then((items) => {
+      const series = items.filter((x) => x.type === "serie").length;
       return carteStat("📚 Ma Bibliothèque", [
         ["Entrées", String(items.length)],
         ["Séries", String(series)]
       ]);
-    }));
+    }).catch(() => carteStat("📚 Ma Bibliothèque", [["Entrées", "—"]])));
   }
 
   if (acces.includes("droid-fortnite")) {
-    travaux.push(lireDonneesSite("DroidFortnite", `bibliotheques/${slug}.json`).then((d) => {
-      const possedes = Array.isArray(d && d.droidesPossedes) ? d.droidesPossedes : [];
-      const distincts = new Set(possedes.map((c) => String(c).split("::")[0])).size;
-      const renaissances = Array.isArray(d && d.renaissanceAtteinte) ? d.renaissanceAtteinte.length : 0;
-      const places = d && d.rendement && d.rendement.places
-        ? Object.values(d.rendement.places).flat().filter(Boolean).length : 0;
+    travaux.push(Promise.all([
+      requeteSupabase(`droides_possedes?user_id=eq.${monId}&select=droide_id`),
+      requeteSupabase(`renaissance_atteinte?user_id=eq.${monId}&select=renaissance_id`),
+      requeteSupabase(`escouade_places?user_id=eq.${monId}&select=position`)
+    ]).then(([possedes, renaissances, places]) => {
+      const distincts = new Set(possedes.map((c) => c.droide_id)).size;
       return carteStat("🤖 Droid Fortnite", [
         ["Droïdes distincts", String(distincts)],
         ["Dont améliorations", String(possedes.length)],
-        ["Renaissances", String(renaissances)],
-        ["Escouade", places + " placés"]
+        ["Renaissances", String(renaissances.length)],
+        ["Escouade", places.length + " placés"]
       ]);
-    }));
+    }).catch(() => carteStat("🤖 Droid Fortnite", [["Droïdes distincts", "—"]])));
   }
 
   const resultats = await Promise.all(travaux);

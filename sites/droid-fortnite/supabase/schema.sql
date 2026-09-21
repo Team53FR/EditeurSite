@@ -7,79 +7,15 @@
 -- catalogue dedans. Les vraies données (92 droïdes, prix, rendements...)
 -- vivent encore sur GitHub et seront importées par un script à part.
 --
--- Authentification : ce site utilise l'auth Supabase (email/mot de passe),
--- indépendante du portail central (Web/utilisateurs.json). Chaque joueur a
--- un compte Supabase ; sa progression est rattachée à son auth.uid(), avec
--- RLS pour que personne ne puisse lire/modifier la progression d'un autre.
+-- Authentification : compte CENTRAL maison, partagé avec le portail et les
+-- deux autres sites (editeur-livre, ma-bibliotheque) — PAS Supabase Auth,
+-- voir ../../../supabase/schema-compte-central.sql pour la table `users`,
+-- connexion()/inscription() et est_admin(), utilisés ici tels quels. La
+-- progression de chaque joueur est rattachée à son auth.uid() (qui lit le
+-- jeton signé par connexion()/inscription(), pas une session Supabase
+-- Auth), avec RLS pour que personne ne puisse lire/modifier la progression
+-- d'un autre.
 -- ============================================================================
-
-
--- ===== Table des profils =====
--- Complète auth.users avec un rôle. Créée automatiquement à l'inscription
--- par le trigger plus bas — jamais insérée depuis le client, pour qu'un
--- joueur ne puisse pas s'auto-promouvoir admin.
-create table public.profils (
-  user_id    uuid primary key references auth.users(id) on delete cascade,
-  role       text not null default 'joueur' check (role in ('joueur', 'admin')),
-  pseudo     text,
-  cree_le    timestamptz not null default now()
-);
-
-create or replace function public.gerer_nouvel_utilisateur()
-returns trigger
-language plpgsql
-security definer
-set search_path = public
-as $$
-begin
-  insert into public.profils (user_id) values (new.id);
-  return new;
-end;
-$$;
-
-create trigger apres_inscription
-  after insert on auth.users
-  for each row execute function public.gerer_nouvel_utilisateur();
-
--- N'est invocable QUE par le trigger ci-dessus (jamais via l'API — voir
--- revoke plus bas). Un appel direct échouerait de toute façon : NEW n'existe
--- qu'en contexte de trigger.
-revoke execute on function public.gerer_nouvel_utilisateur() from public, anon, authenticated;
-
--- Promouvoir un compte admin (à lancer soi-même dans le SQL Editor) :
---   update public.profils set role = 'admin' where user_id = '<uuid du compte>';
-
--- security definer pour lire profils sans reboucler dans ses propres RLS
--- (sinon récursion). Reste exécutable par anon/authenticated : les
--- politiques "écriture admin" l'appellent sous l'identité de l'appelant, et
--- un appel direct ne renvoie que le statut admin du appelant lui-même — pas
--- de fuite d'info sur un autre compte.
-create or replace function public.est_admin()
-returns boolean
-language sql
-stable
-security definer
-set search_path = public
-as $$
-  select exists (
-    select 1 from public.profils where user_id = auth.uid() and role = 'admin'
-  );
-$$;
-revoke execute on function public.est_admin() from public;
-grant execute on function public.est_admin() to anon, authenticated;
-
--- Permet à un joueur connecté de changer SON pseudo, sans jamais pouvoir
--- toucher à son rôle. Réservé aux comptes connectés (pas anon).
-create or replace function public.definir_mon_pseudo(nouveau_pseudo text)
-returns void
-language sql
-security definer
-set search_path = public
-as $$
-  update public.profils set pseudo = nouveau_pseudo where user_id = auth.uid();
-$$;
-revoke execute on function public.definir_mon_pseudo(text) from public;
-grant execute on function public.definir_mon_pseudo(text) to authenticated;
 
 
 -- ===== Taxonomies partagées (paliers, unités, raretés, types) =====
@@ -179,7 +115,7 @@ create table public.renaissance_niveaux (
 -- ===== Progression personnelle (RLS : chacun ne touche qu'à ses lignes) =====
 
 create table public.progression (
-  user_id                  uuid primary key references auth.users(id) on delete cascade,
+  user_id                  uuid primary key references public.users(id) on delete cascade,
   super_renaissances       integer not null default 0 check (super_renaissances >= 0),
   multiplicateur_rendement numeric not null default 1 check (multiplicateur_rendement > 0),
   maj_le                   timestamptz not null default now()
@@ -187,7 +123,7 @@ create table public.progression (
 
 -- Remplace perso.droidesPossedes (clés "id::palier").
 create table public.droides_possedes (
-  user_id    uuid not null references auth.users(id) on delete cascade,
+  user_id    uuid not null references public.users(id) on delete cascade,
   droide_id  text not null references public.droides(id) on delete cascade,
   palier     text not null references public.paliers(nom),
   primary key (user_id, droide_id, palier)
@@ -197,7 +133,7 @@ create index droides_possedes_palier_idx on public.droides_possedes(palier);
 
 -- Remplace perso.renaissanceAtteinte[superRenaissance] = [id, id, ...].
 create table public.renaissance_atteinte (
-  user_id            uuid not null references auth.users(id) on delete cascade,
+  user_id            uuid not null references public.users(id) on delete cascade,
   super_renaissance  integer not null check (super_renaissance >= 0),
   renaissance_id     text not null references public.renaissance_niveaux(id) on delete cascade,
   primary key (user_id, super_renaissance, renaissance_id)
@@ -206,7 +142,7 @@ create index renaissance_atteinte_renaissance_id_idx on public.renaissance_attei
 
 -- Remplace perso.rendement.slots[classe] = nombre d'emplacements.
 create table public.escouade_slots (
-  user_id   uuid not null references auth.users(id) on delete cascade,
+  user_id   uuid not null references public.users(id) on delete cascade,
   classe    text not null references public.classes(nom),
   nb_slots  integer not null default 3 check (nb_slots between 0 and 30),
   primary key (user_id, classe)
@@ -215,7 +151,7 @@ create index escouade_slots_classe_idx on public.escouade_slots(classe);
 
 -- Remplace perso.rendement.places[classe][i] = clé du droïde placé (ou null).
 create table public.escouade_places (
-  user_id    uuid not null references auth.users(id) on delete cascade,
+  user_id    uuid not null references public.users(id) on delete cascade,
   classe     text not null references public.classes(nom),
   position   integer not null check (position >= 0),
   droide_id  text references public.droides(id) on delete cascade,
@@ -231,7 +167,6 @@ create index escouade_places_palier_idx on public.escouade_places(palier);
 -- Sécurité (Row Level Security)
 -- ============================================================================
 
-alter table public.profils              enable row level security;
 alter table public.paliers              enable row level security;
 alter table public.unites               enable row level security;
 alter table public.raretes              enable row level security;
@@ -246,12 +181,6 @@ alter table public.droides_possedes     enable row level security;
 alter table public.renaissance_atteinte enable row level security;
 alter table public.escouade_slots       enable row level security;
 alter table public.escouade_places      enable row level security;
-
--- ----- Profils -----
-create policy "profil : lecture de son propre profil" on public.profils
-  for select using ((select auth.uid()) = user_id or (select public.est_admin()));
-create policy "profil : écriture admin" on public.profils
-  for update using ((select public.est_admin())) with check ((select public.est_admin()));
 
 -- ----- Taxonomies + catalogue : lecture publique, écriture admin -----
 -- (select public.est_admin()) plutôt que public.est_admin() : évalué une
