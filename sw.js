@@ -13,10 +13,9 @@
 // retomber sur le cache qu'en dernier recours, hors connexion.
 //
 // Les données ne sont JAMAIS mises en cache : tout appel vers un autre
-// domaine (api.github.com en tête) passe directement au réseau, sans
-// interception. La coquille seule est conservée — un livre affiché depuis
-// un cache périmé pourrait être réécrit par-dessus la version fraîche et
-// perdre du texte.
+// domaine (Supabase en tête) passe directement au réseau, sans interception.
+// La coquille seule est conservée — un livre affiché depuis un cache périmé
+// pourrait être réécrit par-dessus la version fraîche et perdre du texte.
 
 // v2 : changement de nom et d'icone de l'app — sans ce renommage,
 // l'ancienne icone resterait servie depuis le cache deja installe.

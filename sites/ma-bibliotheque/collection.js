@@ -22,12 +22,14 @@ envelopperAttente({
 const token = exigerConnexion(); // redirige vers connexion.html si absent
 
 let livres = [];
-let shaLivres = null;
 let livreEnEdition = null;      // id du livre en cours d'édition, ou null si ajout
 let tomesPossedesEdition = [];  // tomes cochés dans le formulaire ouvert
 let dataUrlImageEnMemoire = null; // nouvelle couverture choisie, en attente d'envoi
 let imageSupprimee = false;
-const cacheImages = new Map(); // chemin GitHub -> URL locale (blob:)
+
+// L'identifiant du compte : chaque ligne de bibliotheque_items y est
+// rattachée (RLS), et c'est aussi le dossier des images dans le bucket.
+const monId = monIdentifiant();
 
 // Séries : mêmes livres.json (champ type: "livre"|"serie", "livre" par
 // défaut pour les entrées existantes créées avant cette fonctionnalité).
@@ -76,20 +78,80 @@ if (token) {
 }
 
 // ===== Chargement =====
+//
+// La table est normalisée (une colonne par champ) ; le reste du fichier
+// continue de manipuler la forme historique — { id, titre, auteur,
+// tomesTotal, tomesPossedes } pour un livre, { id, type:"serie", createur,
+// saisons } pour une série. Les deux fonctions ci-dessous font la traduction,
+// et sont le SEUL endroit qui connaisse les noms de colonnes.
+// Les saisons arrivent normalement en tableau. La première migration les a
+// écrites une fois en CHAÎNE JSON (un JSON.stringify de trop) : un tableau
+// attendu là où il y avait une chaîne rendait la série vide de saisons, sans
+// la moindre erreur. Les lignes ont été corrigées en base, mais on continue
+// d'accepter les deux formes — perdre les saisons d'une série en silence est
+// bien pire que de tolérer une valeur mal formée.
+function normaliserSaisons(brut) {
+  if (Array.isArray(brut)) return brut;
+  if (typeof brut === "string" && brut.trim()) {
+    try {
+      const relu = JSON.parse(brut);
+      return Array.isArray(relu) ? relu : [];
+    } catch (e) { return []; }
+  }
+  return [];
+}
+
+function versLivreMemoire(r) {
+  const base = {
+    id: r.id,
+    titre: r.titre,
+    image: r.image || null,
+    dateAjout: r.cree_le,
+    dateModif: r.maj_le
+  };
+  if (r.type === "serie") {
+    return Object.assign(base, {
+      type: "serie",
+      createur: r.auteur_ou_createur || "",
+      saisons: normaliserSaisons(r.saisons)
+    });
+  }
+  return Object.assign(base, {
+    type: "livre",
+    auteur: r.auteur_ou_createur || "",
+    tomesTotal: r.tomes_total || 1,
+    tomesPossedes: Array.isArray(r.tomes_possedes) ? r.tomes_possedes : []
+  });
+}
+
+function versLigneBase(l) {
+  const serie = (l.type || "livre") === "serie";
+  return {
+    id: l.id,
+    user_id: monId,
+    type: serie ? "serie" : "livre",
+    titre: l.titre,
+    auteur_ou_createur: (serie ? l.createur : l.auteur) || null,
+    image: l.image || null,
+    // Les champs de l'autre nature restent nuls : une même ligne décrit un
+    // livre OU une série, jamais les deux (voir la contrainte `type`).
+    tomes_total: serie ? null : (l.tomesTotal || 1),
+    tomes_possedes: serie ? null : (l.tomesPossedes || []),
+    saisons: serie ? (l.saisons || []) : null,
+    cree_le: l.dateAjout || new Date().toISOString(),
+    maj_le: l.dateModif || new Date().toISOString()
+  };
+}
+
 async function chargerCollection() {
   try {
-    const { contenu, sha } = await lireFichierJSON(cheminBibliothequeCourante(), token);
-    livres = Array.isArray(contenu) ? contenu : (Array.isArray(contenu.livres) ? contenu.livres : []);
-    shaLivres = sha;
+    const lignes = await requeteSupabase(
+      `bibliotheque_items?user_id=eq.${monId}&select=*&order=cree_le`);
+    livres = (lignes || []).map(versLivreMemoire);
   } catch (e) {
-    if (e.status === 404) {
-      livres = [];
-      shaLivres = null;
-    } else {
-      document.getElementById("chargement").innerHTML =
-        `<p style="color:var(--danger);text-align:center">${echapperHTML(e.message)}</p>`;
-      return;
-    }
+    document.getElementById("chargement").innerHTML =
+      `<p style="color:var(--danger);text-align:center">${echapperHTML(e.message)}</p>`;
+    return;
   }
   document.getElementById("chargement").style.display = "none";
   afficherLivres();
@@ -266,18 +328,18 @@ function echapperHTML(s) {
   ));
 }
 
-async function chargerImageCarte(id, chemin) {
-  try {
-    const url = await obtenirUrlImageCache(chemin);
-    const el = document.getElementById(`couv-${id}`);
-    if (el) el.innerHTML = `<img src="${url}" alt="">`;
-  } catch (e) { /* on garde le pictogramme par défaut */ }
+// La colonne `image` porte l'URL publique complète : le navigateur la charge
+// lui-même, en parallèle et avec son propre cache. Plus de téléchargement
+// authentifié ni de table d'URL blob à tenir à jour — c'est tout ce que
+// l'ancien cacheImages servait à compenser.
+async function chargerImageCarte(id, url) {
+  if (!url) return;
+  const el = document.getElementById(`couv-${id}`);
+  if (el) el.innerHTML = `<img src="${echapperHTML(url)}" alt="" loading="lazy" decoding="async">`;
 }
 
-async function obtenirUrlImageCache(chemin) {
-  if (cacheImages.has(chemin)) return cacheImages.get(chemin);
-  const url = await obtenirUrlImage(chemin, token);
-  cacheImages.set(chemin, url);
+// Conservée : plusieurs appels attendent encore une promesse d'URL.
+async function obtenirUrlImageCache(url) {
   return url;
 }
 
@@ -1342,8 +1404,9 @@ async function enregistrerSerie() {
 
   try {
     if (dataUrlImageEnMemoireSerie) {
-      cheminImage = `${obtenirPrefixeImagesUtilisateur()}/${id}.jpg`;
-      await uploaderImageBase64(cheminImage, dataUrlImageEnMemoireSerie, token, `Affiche — ${titre}`);
+      // L'URL publique renvoyée par l'envoi est ce qu'on range en base.
+      cheminImage = await uploaderImageStorage(
+        `${obtenirPrefixeImagesUtilisateur()}/${id}.jpg`, dataUrlImageEnMemoireSerie);
     } else if (imageSupprimeeSerie) {
       cheminImage = null;
     }
@@ -1368,10 +1431,8 @@ async function enregistrerSerie() {
     await sauvegarderCollectionAvecRetry();
 
     if (ancienChemin && ancienChemin !== cheminImage) {
-      supprimerFichierGithub(ancienChemin, token, "Remplacement de l'affiche").catch(() => {});
-      cacheImages.delete(ancienChemin);
+      supprimerImageStorage(ancienChemin).catch(() => {});
     }
-    if (cheminImage) cacheImages.delete(cheminImage);
 
     fermerFormulaireSerie();
     afficherLivres();
@@ -1397,8 +1458,7 @@ async function supprimerSerieCourante() {
     await sauvegarderCollectionAvecRetry();
 
     if (serie && serie.image) {
-      supprimerFichierGithub(serie.image, token, "Suppression d'une série").catch(() => {});
-      cacheImages.delete(serie.image);
+      supprimerImageStorage(serie.image).catch(() => {});
     }
 
     fermerFormulaireSerie();
@@ -1558,19 +1618,32 @@ function genererIdLivre() {
   return `l_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
 }
 
+// Aligne la table sur l'état local : on réécrit toutes les entrées courantes,
+// puis on efface celles qui ne sont plus là.
+//
+// L'ordre compte. Écrire D'ABORD, effacer ensuite : l'inverse (tout effacer
+// puis tout réinsérer, comme le fait la progression de Droid Fortnite) aurait
+// laissé la collection VIDE si la réinsertion échouait entre les deux — perte
+// sèche, alors qu'une progression de jeu se recoche. Ici l'upsert est
+// idempotent et la suppression ne vise que ce dont on est sûr qu'il a disparu.
 async function sauvegarderCollectionAvecRetry() {
-  try {
-    shaLivres = await ecrireFichierJSON(cheminBibliothequeCourante(), livres, shaLivres, token, "Mise à jour de la collection");
-  } catch (e) {
-    if (e.conflit) {
-      // Le fichier distant a bougé entre-temps (autre appareil) : on relit son
-      // SHA à jour et on retente l'écriture avec notre version locale.
-      const frais = await lireFichierJSON(cheminBibliothequeCourante(), token);
-      shaLivres = await ecrireFichierJSON(cheminBibliothequeCourante(), livres, frais.sha, token, "Mise à jour de la collection");
-    } else {
-      throw e;
-    }
+  if (livres.length) {
+    await requeteSupabase("bibliotheque_items", {
+      method: "POST",
+      headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+      body: JSON.stringify(livres.map(versLigneBase))
+    });
   }
+
+  // Les identifiants sont générés par genererIdLivre() — [a-z0-9_] — mais on
+  // les cite quand même : un identifiant hérité qui contiendrait une virgule
+  // découperait la liste en deux et ferait supprimer de travers.
+  const restants = livres.map((l) => '"' + String(l.id).replace(/"/g, '""') + '"');
+  const filtre = restants.length ? `&id=not.in.(${restants.join(",")})` : "";
+  await requeteSupabase(`bibliotheque_items?user_id=eq.${monId}${filtre}`, {
+    method: "DELETE",
+    headers: { Prefer: "return=minimal" }
+  });
 }
 
 async function enregistrerLivre() {
@@ -1593,8 +1666,8 @@ async function enregistrerLivre() {
 
   try {
     if (dataUrlImageEnMemoire) {
-      cheminImage = `${obtenirPrefixeImagesUtilisateur()}/${id}.jpg`;
-      await uploaderImageBase64(cheminImage, dataUrlImageEnMemoire, token, `Couverture — ${titre}`);
+      cheminImage = await uploaderImageStorage(
+        `${obtenirPrefixeImagesUtilisateur()}/${id}.jpg`, dataUrlImageEnMemoire);
     } else if (imageSupprimee) {
       cheminImage = null;
     }
@@ -1621,10 +1694,8 @@ async function enregistrerLivre() {
     // Nettoyage de l'ancienne couverture si elle a été remplacée ou retirée
     // (après coup, sans bloquer : la collection est déjà à jour côté utilisateur).
     if (ancienChemin && ancienChemin !== cheminImage) {
-      supprimerFichierGithub(ancienChemin, token, "Remplacement de la couverture").catch(() => {});
-      cacheImages.delete(ancienChemin);
+      supprimerImageStorage(ancienChemin).catch(() => {});
     }
-    if (cheminImage) cacheImages.delete(cheminImage); // forcer le rechargement de la nouvelle couverture
 
     fermerFormulaire();
     afficherLivres();
@@ -1650,8 +1721,7 @@ async function supprimerLivreCourant() {
     await sauvegarderCollectionAvecRetry();
 
     if (livre && livre.image) {
-      supprimerFichierGithub(livre.image, token, "Suppression d'un livre").catch(() => {});
-      cacheImages.delete(livre.image);
+      supprimerImageStorage(livre.image).catch(() => {});
     }
 
     fermerFormulaire();

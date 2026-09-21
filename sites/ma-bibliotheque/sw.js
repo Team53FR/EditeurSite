@@ -15,7 +15,11 @@
 // app a de toute façon besoin du réseau en permanence (API GitHub), donc le
 // réseau est presque toujours disponible — autant s'en servir pour rester à
 // jour, et ne retomber sur le cache qu'en dernier recours (hors-ligne).
-const CACHE_NOM = "ma-bibliotheque-v3";
+// v4 : bascule de la BDD GitHub vers Supabase (script.js et connexion.html
+// réécrits). Sans ce changement de nom, le cache aurait continué de servir
+// l'ancien script.js — qui interroge un dépôt GitHub dont le site ne se sert
+// plus — et la collection serait restée vide sans erreur visible.
+const CACHE_NOM = "ma-bibliotheque-v4";
 const FICHIERS_COQUILLE = [
   "./",
   "./index.html",

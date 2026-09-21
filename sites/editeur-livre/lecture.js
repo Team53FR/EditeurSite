@@ -29,32 +29,28 @@ let cacheImagesURL = {};
 // ---------- Chargement du livre publié ----------
 
 async function chargerLecture() {
-  const token = localStorage.getItem("gh_token");
   const message = document.getElementById("message");
 
-  if (!token || !localStorage.getItem("gh_login")) {
-    // Lecture réservée aux utilisateurs connectés.
-    const params = location.search;
-    window.location.replace("connexion.html");
-    return;
-  }
+  // Lecture réservée aux utilisateurs connectés.
+  if (!exigerConnexion()) return;
 
   const q = new URLSearchParams(location.search);
-  const proprietaire = q.get("u");
   const id = q.get("id");
-  if (!proprietaire || !id) {
+  if (!id) {
     message.textContent = "Livre introuvable (lien invalide).";
     return;
   }
 
   try {
-    const { contenu } = await lireFichierJSON(cheminBibliothequeDe(proprietaire), token);
-    const trouve = (contenu.livres || []).find(l => l.id === id);
-    if (!trouve) { message.textContent = "Ce livre n'existe plus."; return; }
-    if (!trouve.publie) { message.textContent = "Ce livre n'est pas (ou plus) publié."; return; }
-    livre = trouve;
+    // Plus besoin de savoir à QUI appartient le livre : la règle de lecture
+    // de la table laisse passer un livre publié quel qu'en soit l'auteur, et
+    // refuse les autres. Le paramètre « u » des anciens liens est ignoré.
+    livre = await chargerLivreComplet(id);
+    if (!livre.publie) { message.textContent = "Ce livre n'est pas (ou plus) publié."; return; }
   } catch (erreur) {
-    message.textContent = erreur.message;
+    message.textContent = erreur.status === 404
+      ? "Ce livre n'existe plus."
+      : erreur.message;
     return;
   }
 
@@ -182,11 +178,10 @@ function creerPageCouvertureApercu(mode) {
     img.style.top = "0";
     img.style.left = "0";
     page.appendChild(img);
-    const token = localStorage.getItem("gh_token");
     if (cacheImagesURL[data.imageChemin]) {
       positionnerImageApercu(img, data, cacheImagesURL[data.imageChemin], page, data.imageChemin);
     } else {
-      obtenirUrlImage(data.imageChemin, token).then((url) => {
+      obtenirUrlImage(data.imageChemin).then((url) => {
         cacheImagesURL[data.imageChemin] = url;
         positionnerImageApercu(img, data, url, page, data.imageChemin);
       }).catch(() => {});
@@ -225,8 +220,7 @@ function positionnerImageApercu(img, data, url, page, chemin, dejaRetente) {
   img.onerror = () => {
     if (dejaRetente) return;
     delete cacheImagesURL[chemin];
-    const token = localStorage.getItem("gh_token");
-    obtenirUrlImage(chemin, token).then((u) => { cacheImagesURL[chemin] = u; positionnerImageApercu(img, data, u, page, chemin, true); }).catch(() => {});
+    obtenirUrlImage(chemin).then((u) => { cacheImagesURL[chemin] = u; positionnerImageApercu(img, data, u, page, chemin, true); }).catch(() => {});
   };
   img.src = url;
 }

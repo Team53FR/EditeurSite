@@ -12,24 +12,20 @@ envelopperAttente({
 let listePubliesData = [];
 
 async function chargerPublies() {
-  const token = localStorage.getItem("gh_token");
   const message = document.getElementById("message");
 
-  if (!token || !localStorage.getItem("gh_login")) {
-    window.location.replace("connexion.html");
-    return;
-  }
+  if (!exigerConnexion()) return;
 
   try {
-    const { contenu } = await lireIndexPublies(token);
-    listePubliesData = Array.isArray(contenu) ? contenu : [];
+    // La galerie interroge les livres eux-mêmes : la règle de lecture ne
+    // laisse passer que les publiés. Plus d'index séparé à tenir d'accord.
+    // Le tri par date de publication est fait par la base.
+    listePubliesData = await listerLivresPublies();
   } catch (erreur) {
     message.textContent = erreur.message;
     return;
   }
 
-  // Plus récents d'abord
-  listePubliesData.sort((a, b) => String(b.publieLe || "").localeCompare(String(a.publieLe || "")));
   afficherPublies();
 }
 
@@ -100,23 +96,18 @@ function afficherPublies() {
   });
 }
 
-let cacheImagesPub = {};
-async function chargerImageFondVignette(couvDiv, chemin) {
-  const token = localStorage.getItem("gh_token");
-  if (!token) return;
-  try {
-    if (!cacheImagesPub[chemin]) cacheImagesPub[chemin] = await obtenirUrlImage(chemin, token);
-    couvDiv.style.backgroundImage = `url("${cacheImagesPub[chemin]}")`;
-    couvDiv.style.backgroundSize = "cover";
-    couvDiv.style.backgroundPosition = "center";
-  } catch (e) {
-    delete cacheImagesPub[chemin];
-  }
+// `imageChemin` porte l'URL publique : il n'y a plus rien à aller chercher.
+async function chargerImageFondVignette(couvDiv, url) {
+  if (!url) return;
+  couvDiv.style.backgroundImage = `url("${url}")`;
+  couvDiv.style.backgroundSize = "cover";
+  couvDiv.style.backgroundPosition = "center";
 }
 
 function lireLivre(entree) {
-  const params = new URLSearchParams({ u: entree.proprietaire, id: entree.id });
-  window.location.href = "lecture.html?" + params.toString();
+  // L'identifiant suffit : la règle de lecture décide seule si le livre est
+  // visible. Inutile de dire à qui il appartient.
+  window.location.href = "lecture.html?id=" + encodeURIComponent(entree.id);
 }
 
 

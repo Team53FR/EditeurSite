@@ -1101,8 +1101,7 @@ function creerCouvertureImpression(livre, mode, f, promessesImages) {
       if (cacheImagesURL[data.imageChemin]) {
         img.src = cacheImagesURL[data.imageChemin];
       } else {
-        const token = localStorage.getItem("gh_token");
-        obtenirUrlImage(data.imageChemin, token).then((url) => {
+        obtenirUrlImage(data.imageChemin).then((url) => {
           cacheImagesURL[data.imageChemin] = url;
           img.src = url;
         }).catch(() => { clearTimeout(secours); img.remove(); resoudre(); });
@@ -3147,12 +3146,11 @@ function chargerImageCouverture(img, chemin, promessesImages) {
     poser(cacheImagesURL[chemin]);
     return;
   }
-  const token = localStorage.getItem("gh_token");
   const promesse = new Promise((resoudre) => {
     const secours = setTimeout(resoudre, 8000);
     img.onload = () => { clearTimeout(secours); resoudre(); };
     img.onerror = () => { clearTimeout(secours); img.remove(); resoudre(); };
-    obtenirUrlImage(chemin, token).then((url) => {
+    obtenirUrlImage(chemin).then((url) => {
       cacheImagesURL[chemin] = url;
       poser(url);
     }).catch(() => { clearTimeout(secours); img.remove(); resoudre(); });
@@ -3377,8 +3375,7 @@ function ouvrirTranche() {
     const ancien = t.imageChemin;
     t.imageChemin = null;
     if (ancien) {
-      supprimerFichierGithub(ancien, localStorage.getItem("gh_token"),
-        "Retrait de l'image de tranche").catch(() => {});
+      supprimerImageStorage(ancien).catch(() => {});
       delete cacheImagesURL[ancien];
     }
     marquerModifie();
@@ -3438,24 +3435,22 @@ function envoyerImageTranche(event, livre, tranche, surFin, note) {
   event.target.value = "";
   if (!fichier) return;
 
-  const token = localStorage.getItem("gh_token");
   const ancien = tranche.imageChemin;
 
   const lecteur = new FileReader();
   lecteur.onload = async (e) => {
     const dataUrl = e.target.result;
     const extension = extraireExtensionDataUrl(dataUrl);
-    const chemin = obtenirPrefixeImagesUtilisateur() + "/" + livre.id + "_tranche." + extension;
 
     // Comme pour la couverture : le travail a lieu dans la réponse du lecteur
     // de fichier, c'est donc ici que le voile se pose.
     ouvrirAttente("Envoi de l'image…", "Le transfert d'une image prend quelques secondes.");
     if (note) note.textContent = "Envoi de l'image en cours…";
     try {
-      await uploaderImageBase64(chemin, dataUrl, token,
-        "Image de tranche — " + (livre.titre || livre.id));
+      const chemin = await uploaderImageStorage(
+        obtenirPrefixeImagesUtilisateur() + "/" + livre.id + "_tranche." + extension, dataUrl);
       if (ancien && ancien !== chemin) {
-        supprimerFichierGithub(ancien, token, "Remplacement de l'image de tranche").catch(() => {});
+        supprimerImageStorage(ancien).catch(() => {});
         delete cacheImagesURL[ancien];
       }
       tranche.imageChemin = chemin;

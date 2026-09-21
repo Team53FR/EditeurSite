@@ -6,12 +6,20 @@
 -- ../../../supabase/schema-compte-central.sql (à appliquer avant ce fichier,
 -- `livres.user_id` y fait référence).
 --
--- Ne stocke QUE `livre.spreads` (un blob HTML par double-page) : c'est la
--- vraie source de vérité du texte (voir editeur.js, "le texte est stocké EN
--- CONTINU par double-page"). `livre.pages` — le découpage page par page
--- utilisé par l'impression et la lecture — n'est qu'un cache dérivé,
--- régénéré côté client (regenererToutesPages()) : pas stocké ici, pour ne
--- pas garder deux fois le même texte à synchroniser.
+-- `livre_spreads` (un blob HTML par double-page) est la SOURCE DE VÉRITÉ du
+-- texte (voir editeur.js, "le texte est stocké EN CONTINU par double-page") :
+-- c'est elle, et elle seule, que l'éditeur relit et réécrit.
+--
+-- `livres.pages` est le découpage page par page. On avait d'abord choisi de
+-- ne pas le stocker — deux copies du même texte à tenir d'accord — en
+-- comptant sur regenererToutesPages() pour le refaire côté client. Mais ce
+-- calcul est une MESURE TYPOGRAPHIQUE : il pèse le texte dans une page réelle
+-- et n'existe que dans l'éditeur. La lecture et l'impression, elles, lisent
+-- `pages` sans pouvoir le reconstruire.
+--
+-- `pages` est donc conservé, mais comme CACHE en lecture seule : l'éditeur le
+-- réécrit à chaque sauvegarde à partir des spreads, personne d'autre n'y
+-- touche. En cas de désaccord, ce sont les spreads qui ont raison.
 --
 -- `EditeurLivre/publies.json` disparaît : remplacé par les colonnes
 -- publie/publie_le + une règle de lecture publique sur les livres publiés,
@@ -31,6 +39,11 @@ create table public.livres (
   couverture    jsonb,   -- {fond, imageChemin, texte, afficherTitre, afficherAuteur, imgZoom, imgOffsetX/Y, imgBaseW/H, ...}
   quatrieme     jsonb,   -- même famille de champs + resumeTexte/resumeLargeur/resumeAlign/...
   tranche       jsonb,   -- {fond, texte, bandeau, pastille, sens, credits, ...}
+  -- Cache dérivé des spreads (voir l'en-tête) : [{id, contenu}, ...].
+  pages         jsonb,
+  -- Même calcul, gardé à part pour que la bibliothèque compte les pages d'une
+  -- dizaine de livres sans rapatrier tout leur texte.
+  nb_pages      integer,
   cree_le       timestamptz not null default now(),
   maj_le        timestamptz not null default now()
 );

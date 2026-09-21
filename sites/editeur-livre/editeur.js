@@ -27,8 +27,13 @@ envelopperAttenteLourde({
 });
 
 let bibliotheque = null;
-let shaBiblio = null;
-let nomFichierBiblio = null;
+// Date de modification du livre telle qu'on l'a lue en l'ouvrant. Elle tient
+// le rôle qu'avait le sha GitHub : si elle a bougé au moment d'enregistrer,
+// c'est que le livre a été modifié ailleurs, et l'on demande avant d'écraser.
+let majLeConnu = null;
+
+// La ligne du compte, pour savoir si le tutoriel de l'éditeur a déjà été vu.
+let moiCentralEditeur = null;
 let livreId = null;
 let indexLivre = -1;
 let indexSpread = 0;
@@ -220,31 +225,34 @@ function appliquerReductionSommaire() {
 }
 
 async function chargerLivre() {
-  const token = localStorage.getItem("gh_token");
   const message = document.getElementById("message");
 
   livreId = sessionStorage.getItem("livre_id");
-  nomFichierBiblio = obtenirNomFichierBibliotheque();
 
-  if (!token || !livreId || !nomFichierBiblio) {
+  if (!exigerConnexion() || !livreId) {
     window.location.href = "bibliotheque.html";
     return;
   }
 
   try {
-    const { contenu, sha } = await lireFichierJSON(nomFichierBiblio, token);
-    bibliotheque = contenu;
-    shaBiblio = sha;
+    // Un seul livre descend ici, avec ses double-pages : l'éditeur n'en ouvre
+    // jamais deux à la fois. `bibliotheque` garde sa forme d'origine pour que
+    // le reste du fichier (livreActuel(), indexLivre…) n'ait rien à changer.
+    const livreCharge = await chargerLivreComplet(livreId);
+    bibliotheque = { livres: [livreCharge] };
+    majLeConnu = livreCharge.dateModif || null;
+    indexLivre = 0;
 
-    indexLivre = bibliotheque.livres.findIndex(l => l.id === livreId);
-    if (indexLivre === -1) {
-      message.textContent = "Livre introuvable.";
-      return;
-    }
+    // Sert au seul tutoriel : on ne bloque pas l'ouverture du livre pour ça.
+    rafraichirIdentiteCentrale().then((moi) => { moiCentralEditeur = moi; });
 
     const livre = livreActuel();
     if (!livre.pages || livre.pages.length === 0) {
       livre.pages = [{ id: "p1", contenu: "" }];
+      // Un livre migré depuis l'ancienne base n'a pas encore son cache de
+      // pagination : il se refait à la première mesure, et la prochaine
+      // sauvegarde l'enregistre.
+      pagesObsoletes = true;
     }
 
     document.getElementById("titreLivre").textContent = livre.titre || "Mon livre";
@@ -779,10 +787,14 @@ function changerFormat(nouveauFormat) {
 // ----- Sauvegarde -----
 
 async function sauvegarder() {
-  const token = localStorage.getItem("gh_token");
   const message = document.getElementById("message");
 
   flushSpread();
+
+  // Le cache de pagination part avec le livre : la lecture et l'impression le
+  // lisent sans pouvoir le recalculer (voir supabase/schema.sql). Il doit donc
+  // être à jour AVANT d'écrire, pas à la prochaine mesure.
+  assurerPagesAJour();
 
   // Nettoyer les pages vides en fin de livre (sauf la première)
   const pages = livreActuel().pages;
@@ -796,7 +808,7 @@ async function sauvegarder() {
   afficherSommaire();
 
   try {
-    shaBiblio = await ecrireFichierJSON(nomFichierBiblio, bibliotheque, shaBiblio, token, "Mise à jour du livre");
+    majLeConnu = await enregistrerLivreDistant(livreActuel(), majLeConnu);
     message.textContent = "Sauvegardé avec succès.";
     marquerSauvegarde();
     effacerBrouillon();
@@ -806,9 +818,8 @@ async function sauvegarder() {
   }
 }
 
-// Résolution d'un conflit d'écriture GitHub (le livre a été modifié ailleurs) (#3)
+// Résolution d'un conflit d'écriture (le livre a été modifié ailleurs) (#3)
 async function gererConflitSauvegarde() {
-  const token = localStorage.getItem("gh_token");
   const message = document.getElementById("message");
 
   const ecraser = confirm(
@@ -819,13 +830,8 @@ async function gererConflitSauvegarde() {
 
   if (ecraser) {
     try {
-      // Récupérer le SHA à jour puis réécrire par-dessus
-      const { sha } = await lireFichierJSON(nomFichierBiblio, token);
-      shaBiblio = sha;
-      shaBiblio = await ecrireFichierJSON(
-        nomFichierBiblio, bibliotheque, shaBiblio, token,
-        "Mise à jour du livre (résolution de conflit)"
-      );
+      // Sans date connue, l'enregistrement ne compare plus rien : il écrase.
+      majLeConnu = await enregistrerLivreDistant(livreActuel(), null);
       message.textContent = "Sauvegardé (version distante écrasée).";
       marquerSauvegarde();
       effacerBrouillon();
@@ -934,9 +940,8 @@ function previewCouverture() {
       afficherImageCouverture(cacheImagesURL[cheminImage], cheminImage);
     } else {
       img.style.display = "none";
-      const token = localStorage.getItem("gh_token");
       const requeteId = ++requeteImageEnCours;
-      obtenirUrlImage(cheminImage, token).then((urlImage) => {
+      obtenirUrlImage(cheminImage).then((urlImage) => {
         cacheImagesURL[cheminImage] = urlImage;
         if (requeteId === requeteImageEnCours) {
           previewCouverture();
@@ -1217,10 +1222,9 @@ function initGlissementImageCouverture() {
 function setCouleurFond(couleur) {
   const livre = livreActuel();
   const data = modeCouverture === "couverture" ? livre.couverture : livre.quatrieme;
-  const token = localStorage.getItem("gh_token");
 
   if (data.imageChemin) {
-    supprimerFichierGithub(data.imageChemin, token, "Suppression de l'image de couverture (couleur choisie)").catch(() => {});
+    supprimerImageStorage(data.imageChemin).catch(() => {});
     delete cacheImagesURL[data.imageChemin];
   }
 
@@ -1247,7 +1251,6 @@ function chargerImageFond(event) {
   const fichier = event.target.files[0];
   if (!fichier) return;
 
-  const token = localStorage.getItem("gh_token");
   const messageCouv = document.getElementById("messageCouv");
   const livre = livreActuel();
   const modeCourant = modeCouverture;
@@ -1258,17 +1261,18 @@ function chargerImageFond(event) {
   reader.onload = async (e) => {
     const dataUrl = e.target.result;
     const extension = extraireExtensionDataUrl(dataUrl);
-    const chemin = `${obtenirPrefixeImagesUtilisateur()}/${livre.id}_${modeCourant}.${extension}`;
 
     // Le travail se fait dans la réponse du lecteur de fichier, pas dans
     // chargerImageFond : le voile se pose donc ici, et pas autour de l'appel.
     ouvrirAttente("Envoi de l'image…", "Une image de couverture peut peser lourd : le transfert prend quelques secondes.");
     messageCouv.textContent = "Envoi de l'image en cours...";
     try {
-      await uploaderImageBase64(chemin, dataUrl, token, `Image de couverture — ${livre.titre || livre.id}`);
+      // L'envoi renvoie l'URL publique : c'est elle qu'on range dans le livre.
+      const chemin = await uploaderImageStorage(
+        `${obtenirPrefixeImagesUtilisateur()}/${livre.id}_${modeCourant}.${extension}`, dataUrl);
 
       if (ancienChemin && ancienChemin !== chemin) {
-        supprimerFichierGithub(ancienChemin, token, "Remplacement de l'image de couverture").catch(() => {});
+        supprimerImageStorage(ancienChemin).catch(() => {});
         delete cacheImagesURL[ancienChemin];
       }
 
@@ -1294,10 +1298,9 @@ function chargerImageFond(event) {
 function supprimerImageFond() {
   const livre = livreActuel();
   const data = modeCouverture === "couverture" ? livre.couverture : livre.quatrieme;
-  const token = localStorage.getItem("gh_token");
 
   if (data.imageChemin) {
-    supprimerFichierGithub(data.imageChemin, token, "Suppression de l'image de couverture").catch(() => {});
+    supprimerImageStorage(data.imageChemin).catch(() => {});
     delete cacheImagesURL[data.imageChemin];
   }
 
@@ -1594,11 +1597,10 @@ function creerPageCouvertureApercu(mode) {
     img.style.userSelect = "none";
     page.appendChild(img);
 
-    const token = localStorage.getItem("gh_token");
     if (cacheImagesURL[data.imageChemin]) {
       positionnerImageApercu(img, data, cacheImagesURL[data.imageChemin], page, data.imageChemin);
     } else {
-      obtenirUrlImage(data.imageChemin, token).then((url) => {
+      obtenirUrlImage(data.imageChemin).then((url) => {
         cacheImagesURL[data.imageChemin] = url;
         positionnerImageApercu(img, data, url, page, data.imageChemin);
       }).catch(() => {});
@@ -1642,8 +1644,7 @@ function positionnerImageApercu(img, data, url, page, chemin, dejaRetente) {
   img.onerror = () => {
     if (dejaRetente) return; // on ne retente qu'une fois pour éviter une boucle
     delete cacheImagesURL[chemin];
-    const token = localStorage.getItem("gh_token");
-    obtenirUrlImage(chemin, token).then((nouvelleUrl) => {
+    obtenirUrlImage(chemin).then((nouvelleUrl) => {
       cacheImagesURL[chemin] = nouvelleUrl;
       positionnerImageApercu(img, data, nouvelleUrl, page, chemin, true);
     }).catch(() => {});
@@ -1691,7 +1692,7 @@ function majIndicateur() {
 let timerBrouillon = null;
 
 function cleBrouillon() {
-  return `brouillon_${localStorage.getItem("gh_login")}_${livreId}`;
+  return `brouillon_${localStorage.getItem("team53_login")}_${livreId}`;
 }
 
 function planifierBrouillon() {
@@ -3440,7 +3441,6 @@ function surlignerMatch(match) {
 // ----- Sauvegarde : on régénère les pages dérivées avant d'écrire -----
 
 async function sauvegarder() {
-  const token = localStorage.getItem("gh_token");
   const message = document.getElementById("message");
 
   // Seule la double-page en cours d'édition peut déborder (flushSpread ne
@@ -3469,7 +3469,7 @@ async function sauvegarder() {
   afficherSommaire();
 
   try {
-    shaBiblio = await ecrireFichierJSON(nomFichierBiblio, bibliotheque, shaBiblio, token, "Mise à jour du livre");
+    majLeConnu = await enregistrerLivreDistant(livreActuel(), majLeConnu);
     message.textContent = "Sauvegardé avec succès.";
     marquerSauvegarde();
     effacerBrouillon();
@@ -3658,24 +3658,20 @@ function synchroniserControlesCouv(data) {
   set("alignResume", data.resumeAlign || "left");
 }
 
-// Persiste « tutoriel éditeur vu » dans le JSON de l'utilisateur (sa
-// bibliothèque), pour qu'il ne réapparaisse jamais, même sur un autre appareil.
+// Persiste « tutoriel éditeur vu » sur le compte, pour qu'il ne réapparaisse
+// jamais, même sur un autre appareil.
 async function marquerTutoEditeurVu() {
-  if (!bibliotheque || bibliotheque.tutoEditeurVu) return;
-  const token = localStorage.getItem("gh_token");
-  const nouveauSha = await marquerTutoVuDistant(
-    bibliotheque, "tutoEditeurVu", nomFichierBiblio, shaBiblio, token
-  );
-  if (nouveauSha) shaBiblio = nouveauSha;
+  await marquerTutoVuDistant("editeur");
 }
 
 // =====================================================================
 //  Publication d'un livre (lecture seule pour les autres utilisateurs)
 //
-//  - livre.publie : drapeau dans la bibliothèque du propriétaire.
-//  - publies.json : index central { id, titre, auteur, format, proprietaire,
-//    publieLe, couverture } pour la galerie. Le contenu réel du livre reste
-//    dans la bibliothèque du propriétaire (lisible par tout compte connecté).
+//  `livre.publie` est une colonne du livre, et la règle de lecture de la
+//  table laisse passer les livres publiés quel qu'en soit l'auteur. L'ancien
+//  index central publies.json a disparu avec elle : il n'y a plus deux
+//  endroits à tenir d'accord, ni de risque qu'un livre supprimé reste inscrit
+//  dans la galerie.
 // =====================================================================
 
 function majBoutonPublier() {
@@ -3693,8 +3689,6 @@ function majBoutonPublier() {
 async function basculerPublication() {
   if (indexLivre === -1) return;
   const livre = livreActuel();
-  const token = localStorage.getItem("gh_token");
-  const login = localStorage.getItem("gh_login");
   const message = document.getElementById("message");
   const btn = document.getElementById("btnPublier");
   const publier = !livre.publie;
@@ -3710,36 +3704,16 @@ async function basculerPublication() {
   if (message) message.textContent = publier ? "Publication en cours..." : "Dépublication en cours...";
 
   try {
-    // 1) Drapeau + enregistrement de la bibliothèque du propriétaire.
-    //    On régénère TOUTES les pages dérivées pour que le lecteur les ait à jour.
+    // Le drapeau part avec le livre, en une seule écriture. On régénère
+    // TOUTES les pages dérivées d'abord : ce sont elles que le lecteur
+    // affichera, il ne sait pas les recalculer (voir supabase/schema.sql).
     flushSpread();
     regenererToutesPages();
     livre.publie = publier;
-    if (publier) livre.publieLe = new Date().toISOString();
-    shaBiblio = await ecrireFichierJSON(nomFichierBiblio, bibliotheque, shaBiblio, token,
-      publier ? "Publication d'un livre" : "Dépublication d'un livre");
+    livre.publieLe = publier ? new Date().toISOString() : null;
+    majLeConnu = await enregistrerLivreDistant(livre, majLeConnu);
     marquerSauvegarde();
     effacerBrouillon();
-
-    // 2) Mise à jour de l'index central publies.json.
-    const { contenu: liste, sha } = await lireIndexPublies(token);
-    const i = liste.findIndex(e => e.proprietaire === login && e.id === livre.id);
-    if (publier) {
-      const entree = {
-        id: livre.id,
-        titre: livre.titre || "",
-        auteur: livre.auteur || "",
-        format: livre.format || "149x210",
-        proprietaire: login,
-        publieLe: livre.publieLe,
-        couverture: livre.couverture || {}
-      };
-      if (i >= 0) liste[i] = entree; else liste.push(entree);
-    } else if (i >= 0) {
-      liste.splice(i, 1);
-    }
-    await ecrireFichierJSON("publies.json", liste, sha, token,
-      publier ? "Ajout à l'index des publications" : "Retrait de l'index des publications");
 
     if (message) message.textContent = publier
       ? "Livre publié : les autres pourront le lire."
@@ -3798,7 +3772,7 @@ function lancerTutorielEditeur(forcer) {
       texte: "Revenez à votre bibliothèque pour ouvrir un autre livre ou en créer un nouveau. Pensez à sauvegarder avant de quitter cette page." }
   ], {
     forcer: forcer,
-    dejaVu: tutoDejaVu(bibliotheque, "tutoEditeurVu"),
+    dejaVu: tutoDejaVu(moiCentralEditeur, "editeur"),
     onTermine: () => marquerTutoEditeurVu()
   });
 }

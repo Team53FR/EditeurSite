@@ -10,52 +10,28 @@ envelopperAttente({
   enregistrerNom: "Enregistrement du pseudo…",
 });
 
+// La bibliothèque ne descend QUE les métadonnées des livres : un titre, une
+// vignette et un nombre de pages. Le texte (les double-pages) reste en base
+// jusqu'à ce qu'on ouvre un livre dans l'éditeur — ouvrir la bibliothèque ne
+// rapatrie donc plus tous les manuscrits d'un coup, comme le faisait le
+// fichier JSON unique.
 let bibliotheque = null;
-let shaBiblio = null;
-let nomFichierBiblio = null;
+let moiCentral = null;   // la ligne du compte (pseudo, rôle, tutoriels vus)
 
 async function chargerBibliotheque() {
-  const token = localStorage.getItem("gh_token");
   const message = document.getElementById("message");
+  if (!exigerConnexion()) return;
 
-  nomFichierBiblio = obtenirNomFichierBibliotheque();
-
-  if (!token || !nomFichierBiblio) {
-    window.location.replace("connexion.html");
+  try {
+    bibliotheque = await chargerBibliothequeMeta();
+  } catch (erreur) {
+    message.textContent = erreur.message;
     return;
   }
 
-  try {
-    const { contenu, sha } = await lireFichierJSON(nomFichierBiblio, token);
-    bibliotheque = contenu;
-    shaBiblio = sha;
-  } catch (erreur) {
-    if (erreur.status === 404) {
-      // Le fichier n'existe pas encore : on part d'une bibliothèque vide
-      bibliotheque = { livres: [] };
-      shaBiblio = null;
-    } else {
-      message.textContent = erreur.message;
-      return;
-    }
-  }
-
-  if (!bibliotheque.livres) bibliotheque.livres = [];
-
-  // Le pseudo affiché vient du fichier central, pas d'une copie locale figée
-  // à la dernière connexion.
-  await rafraichirIdentiteCentrale(token);
-
-  try {
-    const modifie = await migrerImagesEmbarquees(token);
-    if (modifie) {
-      message.textContent = "Optimisation des images de couverture en cours...";
-      shaBiblio = await ecrireFichierJSON(nomFichierBiblio, bibliotheque, shaBiblio, token, "Migration des images de couverture vers des fichiers séparés");
-      message.textContent = "Images de couverture optimisées avec succès.";
-    }
-  } catch (erreur) {
-    message.textContent = "Attention : optimisation des images incomplète — " + erreur.message;
-  }
+  // Le pseudo affiché vient du compte, pas d'une copie locale figée à la
+  // dernière connexion.
+  moiCentral = await rafraichirIdentiteCentrale();
 
   afficherListeLivres();
 
@@ -63,15 +39,11 @@ async function chargerBibliotheque() {
   setTimeout(() => lancerTutorielBiblio(false), 500);
 }
 
-// Persiste « tutoriel vu » dans le JSON de l'utilisateur (sa bibliothèque),
-// pour qu'il ne réapparaisse jamais, même sur un autre appareil.
+// Persiste « tutoriel vu » sur le compte, pour qu'il ne réapparaisse jamais,
+// même sur un autre appareil.
 async function marquerTutoVu(champ) {
-  if (!bibliotheque || bibliotheque[champ]) return; // déjà marqué : rien à faire
-  const token = localStorage.getItem("gh_token");
-  const nouveauSha = await marquerTutoVuDistant(
-    bibliotheque, champ, nomFichierBiblio, shaBiblio, token
-  );
-  if (nouveauSha) shaBiblio = nouveauSha;
+  await marquerTutoVuDistant(champ);
+  if (moiCentral) moiCentral[champ === "biblio" ? "tuto_biblio_vu" : "tuto_editeur_vu"] = true;
 }
 
 function lancerTutorielBiblio(forcer) {
@@ -93,28 +65,9 @@ function lancerTutorielBiblio(forcer) {
       texte: "Créez votre premier livre, puis ouvrez-le : un second guide vous présentera tous les outils d'écriture. Bonne écriture !" }
   ], {
     forcer: forcer,
-    dejaVu: tutoDejaVu(bibliotheque, "tutoBiblioVu"),
-    onTermine: () => marquerTutoVu("tutoBiblioVu")
+    dejaVu: tutoDejaVu(moiCentral, "biblio"),
+    onTermine: () => marquerTutoVu("biblio")
   });
-}
-
-async function migrerImagesEmbarquees(token) {
-  let modifie = false;
-  const prefixe = obtenirPrefixeImagesUtilisateur();
-  for (const livre of bibliotheque.livres) {
-    for (const cle of ["couverture", "quatrieme"]) {
-      const data = livre[cle];
-      if (data && typeof data.image === "string" && data.image.startsWith("data:")) {
-        const extension = extraireExtensionDataUrl(data.image);
-        const chemin = `${prefixe}/${livre.id}_${cle}.${extension}`;
-        await uploaderImageBase64(chemin, data.image, token, `Migration de l'image ${chemin}`);
-        data.imageChemin = chemin;
-        delete data.image;
-        modifie = true;
-      }
-    }
-  }
-  return modifie;
 }
 
 function echapper(txt) {
@@ -124,8 +77,8 @@ function echapper(txt) {
 }
 
 function nomAffiche() {
-  const login = localStorage.getItem("gh_login") || "";
-  const perso = (localStorage.getItem("gh_nom") || "").trim();
+  const login = localStorage.getItem("team53_login") || "";
+  const perso = (localStorage.getItem("team53_nom") || "").trim();
   return perso || login || "Auteur";
 }
 
@@ -150,10 +103,12 @@ function remplirProfil() {
 
   // Bouton de gestion des utilisateurs réservé aux admins
   const btnAdmin = document.getElementById("btnAdmin");
-  if (btnAdmin) btnAdmin.style.display = (localStorage.getItem("gh_role") === "admin") ? "" : "none";
+  if (btnAdmin) btnAdmin.style.display = estAdminCentral() ? "" : "none";
 
+  // nbPages vient de la colonne du même nom : le texte des livres n'est pas
+  // chargé ici, on ne peut donc plus compter les pages soi-même.
   const livres = (bibliotheque && bibliotheque.livres) || [];
-  const totalPages = livres.reduce((n, l) => n + (l.pages ? l.pages.length : 0), 0);
+  const totalPages = livres.reduce((n, l) => n + (l.nbPages || 0), 0);
   if (elLivres) elLivres.textContent = livres.length;
   if (elPages) elPages.textContent = totalPages;
 }
@@ -177,7 +132,7 @@ function afficherListeLivres() {
   const labels = { "149x210": "14,9×21", "155x235": "15,5×23,5", "105x148": "Poche", "210x297": "A4", "kdp5585": "KDP" };
 
   bibliotheque.livres.forEach((livre) => {
-    const nbPages = livre.pages ? livre.pages.length : 0;
+    const nbPages = livre.nbPages || 0;
     const labelFormat = labels[livre.format] || "14,9×21";
     const couv = livre.couverture || {};
     const fond = couv.fond || "#1a1a2e";
@@ -222,10 +177,6 @@ function afficherListeLivres() {
   });
 }
 
-// Cache des URL blob des images de couverture, pour ne pas les recharger
-// à chaque rendu de la liste.
-let cacheImagesCouvVignette = {};
-
 // Dimensions (mm) des formats, pour recalculer la taille de page de l'éditeur
 // à laquelle les décalages (imgOffsetX/Y) ont été enregistrés.
 const FORMATS_VIGNETTE = {
@@ -253,19 +204,10 @@ function dimensionsPageReference(formatKey) {
 // Affiche l'image de couverture exactement comme dans l'éditeur : image entière
 // (comme object-fit: contain), avec le zoom et le décalage choisis, le tout
 // mis à l'échelle pour tenir dans la vignette.
-async function chargerImageCouvVignette(couvDiv, chemin, formatKey, data) {
-  const token = localStorage.getItem("gh_token");
-  if (!token) return;
-  let url;
-  try {
-    if (!cacheImagesCouvVignette[chemin]) {
-      cacheImagesCouvVignette[chemin] = await obtenirUrlImage(chemin, token);
-    }
-    url = cacheImagesCouvVignette[chemin];
-  } catch (erreur) {
-    delete cacheImagesCouvVignette[chemin];
-    return; // on laisse la couleur de fond
-  }
+async function chargerImageCouvVignette(couvDiv, url, formatKey, data) {
+  // `imageChemin` porte désormais l'URL publique : plus rien à aller
+  // chercher, le navigateur charge l'image lui-même (et la met en cache).
+  if (!url) return;
 
   const ref = dimensionsPageReference(formatKey);
   couvDiv.style.position = "relative";
@@ -317,7 +259,6 @@ function ouvrirLivre(id) {
 }
 
 async function creerLivre() {
-  const token = localStorage.getItem("gh_token");
   const message = document.getElementById("message");
   const champTitre = document.getElementById("titreNouveauLivre");
   const titre = champTitre.value.trim();
@@ -329,15 +270,20 @@ async function creerLivre() {
   }
 
   const nouvelId = "l" + Date.now();
-  bibliotheque.livres.push({
+  // Un livre neuf naît avec une double-page vide : c'est elle, et non les
+  // « pages », qui porte le texte (voir supabase/schema.sql).
+  const nouveau = {
     id: nouvelId,
     titre: titre,
     format: format,
-    pages: [{ id: "p1", titre: "Page 1", contenu: "" }]
-  });
+    spreads: [""],
+    pages: [{ id: "p1", contenu: "" }],
+    nbPages: 1
+  };
+  bibliotheque.livres.push(nouveau);
 
   try {
-    shaBiblio = await ecrireFichierJSON(nomFichierBiblio, bibliotheque, shaBiblio, token, "Ajout d'un nouveau livre");
+    await creerLivreDistant(nouveau);
     champTitre.value = "";
     afficherListeLivres();
     message.textContent = "Livre créé avec succès.";
@@ -348,7 +294,6 @@ async function creerLivre() {
 }
 
 async function supprimerLivre(id) {
-  const token = localStorage.getItem("gh_token");
   const message = document.getElementById("message");
   const livre = bibliotheque.livres.find(l => l.id === id);
   if (!livre) return;
@@ -357,15 +302,17 @@ async function supprimerLivre(id) {
   bibliotheque.livres = bibliotheque.livres.filter(l => l.id !== id);
 
   try {
-    shaBiblio = await ecrireFichierJSON(nomFichierBiblio, bibliotheque, shaBiblio, token, "Suppression d'un livre");
+    // Les double-pages partent avec le livre (on delete cascade) ; les images,
+    // elles, vivent dans Storage, qui ignore tout des lignes qui s'y réfèrent.
+    await supprimerLivreDistant(id);
     afficherListeLivres();
     message.textContent = "Livre supprimé.";
 
     // Nettoyage des images associées (n'empêche pas la suppression si ça échoue)
-    for (const cle of ["couverture", "quatrieme"]) {
+    for (const cle of ["couverture", "quatrieme", "tranche"]) {
       const data = livre[cle];
       if (data && data.imageChemin) {
-        supprimerFichierGithub(data.imageChemin, token, "Suppression de l'image d'un livre supprimé").catch(() => {});
+        supprimerImageStorage(data.imageChemin).catch(() => {});
       }
     }
   } catch (erreur) {
@@ -374,13 +321,13 @@ async function supprimerLivre(id) {
   }
 }
 
-// ----- Nom d'affichage (libre-service, dans le fichier central) -----
+// ----- Nom d'affichage (libre-service, sur le compte central) -----
 
 function modifierNom() {
   const edition = document.getElementById("editionNom");
   const champ = document.getElementById("champNom");
   if (!edition || !champ) return;
-  champ.value = localStorage.getItem("gh_nom") || "";
+  champ.value = localStorage.getItem("team53_nom") || "";
   edition.style.display = "flex";
   const btn = document.getElementById("btnModifNom");
   if (btn) btn.style.display = "none";
@@ -398,42 +345,27 @@ function annulerNom() {
 }
 
 async function enregistrerNom() {
-  const token = localStorage.getItem("gh_token");
-  const login = localStorage.getItem("gh_login");
   const message = document.getElementById("message");
   const champ = document.getElementById("champNom");
   if (!champ) return;
 
   const nouveau = champ.value.trim();
-  const ancien = localStorage.getItem("gh_nom") || "";
+  const ancien = localStorage.getItem("team53_nom") || "";
   if (nouveau === ancien) { annulerNom(); return; }
 
   try {
-    // Le pseudo vit dans le fichier central des comptes : le changer ici le
-    // change pour le portail et pour tous les sites, comme le fait « Mon
-    // compte ». On relit juste avant d'écrire et on ne touche qu'à sa propre
-    // entrée, pour ne pas écraser ce qu'un administrateur aurait modifié.
-    const { contenu, sha } = await lireFichierJSON(CHEMIN_UTILISATEURS, token);
-    const utilisateurs = Array.isArray(contenu) ? contenu : [];
-    const u = utilisateurs.find(x => x.login === login);
-    if (!u) { message.textContent = "Compte introuvable dans les comptes du portail."; return; }
-
-    if (nouveau) u.nomAffichage = nouveau;
-    else delete u.nomAffichage; // un nom vide = revenir à l'identifiant
-
-    await ecrireFichierJSON(CHEMIN_UTILISATEURS, utilisateurs, sha, token,
-      `Changement de pseudo de ${login}`);
-
-    localStorage.setItem("gh_nom", nouveau);
-    localStorage.setItem("team53_nom", nouveau);
+    // Le pseudo vit sur le compte central : le changer ici le change pour le
+    // portail et pour tous les sites, comme le fait « Mon compte ». La
+    // fonction definir_mon_nom_affichage() ne touche QUE sa propre ligne —
+    // impossible d'écraser au passage le rôle ou les accès, ni le compte d'un
+    // autre, ce dont le fichier JSON partagé n'offrait aucune garantie.
+    await definirNomAffichage(nouveau);
     annulerNom();
     remplirProfil();
     message.textContent = "Nom mis à jour.";
     setTimeout(() => { if (message.textContent === "Nom mis à jour.") message.textContent = ""; }, 2500);
   } catch (erreur) {
-    message.textContent = erreur.conflit
-      ? "La liste des comptes a été modifiée ailleurs. Rechargez la page avant de réessayer."
-      : erreur.message;
+    message.textContent = erreur.message;
   }
 }
 
