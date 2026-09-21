@@ -19,11 +19,18 @@ let paliers = PALIERS_INITIAUX; // remplacé par le contenu réel de paliers.jso
 // comme dans le jeu (le compteur du jeu compte chaque palier séparément).
 let perso = { droidesPossedes: [], renaissanceAtteinte: {}, rendement: null };
 let superActif = 0;   // super renaissance affichée dans l'onglet Renaissance
-let shaPerso = null;
 
 let ongletActif = "droidex";
 let palierActif = PALIERS_INITIAUX[0].nom;
-const cacheImages = new Map(); // chemin GitHub -> URL locale (blob:)
+
+// L'identifiant du compte (auth.uid() côté base) — les quatre tables
+// personnelles (progression, droides_possedes, renaissance_atteinte,
+// escouade_slots/places) y sont toutes rattachées, RLS ne laissant chacune
+// lire/écrire que ses propres lignes. Déclaré ici (et pas plus bas, près de
+// chargerBibliothequePerso) : le chargement démarre plus bas dans ce même
+// fichier via "if (token) chargerTout()", qui appelle chargerBibliothequePerso
+// synchronement — monId doit donc déjà exister à ce moment-là.
+const monId = localStorage.getItem("team53_id");
 
 function clePossession(idDroide, palier) {
   return idDroide + "::" + palier;
@@ -61,27 +68,26 @@ if (token) {
 async function chargerTout() {
   try {
     const [rCatalogue, rRenaissance, rFusions, rPaliers, rUnites, rRaretes, rClasses] = await Promise.all([
-      chargerOuAmorcer("catalogue.json", CATALOGUE_INITIAL, token, "Amorçage du catalogue de droïdes"),
-      chargerOuAmorcer("renaissance.json", RENAISSANCE_INITIALE, token, "Amorçage des paliers de renaissance"),
-      chargerOuAmorcer("fusions.json", FUSIONS_INITIALES, token, "Amorçage des recettes de fusion"),
-      chargerOuAmorcer("paliers.json", PALIERS_INITIAUX, token, "Amorçage de la liste des paliers"),
-      chargerOuAmorcer("unites.json", UNITES_INITIALES, token, "Amorçage des unités de grandeur"),
-      chargerOuAmorcer("raretes.json", RARETES_INITIALES, token, "Amorçage des couleurs de rareté"),
-      chargerOuAmorcer("classes.json", CLASSES_INITIALES, token, "Amorçage des types de droïde"),
+      chargerCatalogueSupabase(),
+      chargerRenaissanceSupabase(),
+      chargerFusionsSupabase(),
+      chargerPaliersSupabase(),
+      chargerUnitesSupabase(),
+      chargerRaretesSupabase(),
+      chargerClassesSupabase(),
       chargerBibliothequePerso()
     ]);
-    catalogue = Array.isArray(rCatalogue.contenu) ? rCatalogue.contenu : [];
-    renaissance = Array.isArray(rRenaissance.contenu) ? rRenaissance.contenu : [];
-    fusions = Array.isArray(rFusions.contenu) ? rFusions.contenu : [];
-    const paliersCharges = normaliserPaliers(rPaliers.contenu);
+    catalogue = rCatalogue;
+    renaissance = rRenaissance;
+    fusions = rFusions;
+    const paliersCharges = normaliserPaliers(rPaliers);
     paliers = paliersCharges.length ? paliersCharges : PALIERS_INITIAUX;
     palierActif = paliers[0].nom;
-    const unitesChargees = normaliserUnites(rUnites.contenu);
+    const unitesChargees = normaliserUnites(rUnites);
     unites = unitesChargees.length ? unitesChargees : UNITES_INITIALES;
-    raretes = normaliserRaretes(rRaretes.contenu);
+    raretes = normaliserRaretes(rRaretes);
     appliquerCouleursRaretes();
-    classes = normaliserClasses(rClasses.contenu);
-    await precacherImagesClasses(token);
+    classes = normaliserClasses(rClasses);
     CLASSES_ESCOUADE = classes.map((c) => c.nom);
     // Les pastilles de rareté du filtre suivent la liste des raretés, qui peut
     // s'allonger depuis le panneau admin.
@@ -148,29 +154,34 @@ function changerPalierActif(nom) {
 }
 
 async function chargerBibliothequePerso() {
-  try {
-    const { contenu, sha } = await lireFichierJSON(cheminBibliothequeCourante(), token);
-    let droidesPossedes = [];
-    if (Array.isArray(contenu && contenu.droidesPossedes)) {
-      droidesPossedes = contenu.droidesPossedes;
-    } else if (contenu && contenu.droidesPossedes && typeof contenu.droidesPossedes === "object") {
-      // Ancienne forme (un seul palier par droïde, avant l'introduction des
-      // onglets de palier) : on reprend le palier déjà enregistré comme seul
-      // palier possédé pour ce droïde, rien n'est perdu.
-      droidesPossedes = Object.entries(contenu.droidesPossedes).map(([id, palier]) => clePossession(id, palier));
-    }
-    perso = {
-      droidesPossedes,
-      renaissanceAtteinte: progressionParSuper(contenu && contenu.renaissanceAtteinte),
-      superRenaissances: entierPositif(contenu && contenu.superRenaissances),
-      rendement: (contenu && contenu.rendement) || null
-    };
-    shaPerso = sha;
-  } catch (e) {
-    if (e.status !== 404) throw e;
-    perso = { droidesPossedes: [], renaissanceAtteinte: {}, superRenaissances: 0, rendement: null };
-    shaPerso = null;
-  }
+  const [progressionRows, possedesRows, atteinteRows, slotsRows, placesRows] = await Promise.all([
+    requeteSupabase(`progression?user_id=eq.${monId}&select=super_renaissances,multiplicateur_rendement`),
+    requeteSupabase(`droides_possedes?user_id=eq.${monId}&select=droide_id,palier`),
+    requeteSupabase(`renaissance_atteinte?user_id=eq.${monId}&select=super_renaissance,renaissance_id`),
+    requeteSupabase(`escouade_slots?user_id=eq.${monId}&select=classe,nb_slots`),
+    requeteSupabase(`escouade_places?user_id=eq.${monId}&select=classe,position,droide_id,palier`)
+  ]);
+
+  const prog = progressionRows[0] || {};
+  const renaissanceAtteinte = {};
+  atteinteRows.forEach((r) => {
+    if (!Array.isArray(renaissanceAtteinte[r.super_renaissance])) renaissanceAtteinte[r.super_renaissance] = [];
+    renaissanceAtteinte[r.super_renaissance].push(r.renaissance_id);
+  });
+
+  const slots = {}, places = {};
+  slotsRows.forEach((r) => { slots[r.classe] = r.nb_slots; });
+  placesRows.forEach((r) => {
+    if (!Array.isArray(places[r.classe])) places[r.classe] = [];
+    places[r.classe][r.position] = clePossession(r.droide_id, r.palier);
+  });
+
+  perso = {
+    droidesPossedes: possedesRows.map((r) => clePossession(r.droide_id, r.palier)),
+    renaissanceAtteinte,
+    superRenaissances: entierPositif(prog.super_renaissances),
+    rendement: { slots, places, multiplicateur: prog.multiplicateur_rendement || 1 }
+  };
 }
 
 // ===== Enregistrement de la progression =====
@@ -196,14 +207,62 @@ function marquerProgressionModifiee() {
   sauvegardeProgrammee = setTimeout(sauvegarderPerso, DELAI_SAUVEGARDE);
 }
 
-// Fichier personnel : un seul écrivain légitime (le compte lui-même), donc un
-// simple retry (relire le sha, réécrire l'état local) suffit — pas besoin de
-// la fusion utilisée pour les fichiers partagés.
+// Personnel : un seul écrivain légitime (le compte lui-même, RLS l'impose de
+// toute façon). Chaque table est remplacée en entier (retire toutes ses
+// lignes pour ce compte, réinsère l'état local courant) — même principe que
+// l'ancien « relire le sha, réécrire le fichier entier », transposé aux
+// tables normalisées : simple et correct, la fenêtre entre les deux passes
+// n'a pas d'effet visible puisque personne d'autre n'écrit ces lignes.
+async function remplacerLignes(table, lignes) {
+  await requeteSupabase(`${table}?user_id=eq.${monId}`, {
+    method: "DELETE", headers: { Prefer: "return=minimal" }
+  });
+  if (!lignes.length) return;
+  await requeteSupabase(table, {
+    method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify(lignes)
+  });
+}
+
+async function persisterPerso() {
+  const r = escouade();
+
+  await requeteSupabase("progression", {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify([{
+      user_id: monId,
+      super_renaissances: entierPositif(perso.superRenaissances),
+      multiplicateur_rendement: multiplicateurRendement()
+    }])
+  });
+
+  await remplacerLignes("droides_possedes", perso.droidesPossedes
+    .map(decouperCle).filter(Boolean)
+    .map((c) => ({ user_id: monId, droide_id: c.id, palier: c.palier })));
+
+  const atteinteLignes = [];
+  Object.entries(perso.renaissanceAtteinte || {}).forEach(([superR, ids]) => {
+    (ids || []).forEach((id) => atteinteLignes.push({ user_id: monId, super_renaissance: Number(superR), renaissance_id: id }));
+  });
+  await remplacerLignes("renaissance_atteinte", atteinteLignes);
+
+  await remplacerLignes("escouade_slots", CLASSES_ESCOUADE
+    .map((c) => ({ user_id: monId, classe: c, nb_slots: r.slots[c] })));
+
+  const placesLignes = [];
+  CLASSES_ESCOUADE.forEach((c) => (r.places[c] || []).forEach((cle, position) => {
+    if (!cle) return;
+    const d = decouperCle(cle);
+    if (d) placesLignes.push({ user_id: monId, classe: c, position, droide_id: d.id, palier: d.palier });
+  }));
+  await remplacerLignes("escouade_places", placesLignes);
+}
+
 async function sauvegarderPerso() {
   clearTimeout(sauvegardeProgrammee);
   if (!modificationsEnAttente) return;
   // Une écriture est déjà en vol : on la laisse finir, puis on repart pour
-  // celle-ci — sans quoi deux PUT concurrents se disputeraient le même sha.
+  // celle-ci — sans quoi deux séries de requêtes concurrentes se marcheraient dessus.
   if (sauvegardeEnCours) {
     await sauvegardeEnCours.catch(() => {});
     return sauvegarderPerso();
@@ -212,16 +271,11 @@ async function sauvegarderPerso() {
 
   sauvegardeEnCours = (async () => {
     try {
-      shaPerso = await ecrireFichierJSON(cheminBibliothequeCourante(), perso, shaPerso, token, "Mise à jour de la progression");
+      await persisterPerso();
     } catch (e) {
-      if (e.conflit) {
-        const frais = await lireFichierJSON(cheminBibliothequeCourante(), token);
-        shaPerso = await ecrireFichierJSON(cheminBibliothequeCourante(), perso, frais.sha, token, "Mise à jour de la progression");
-      } else {
-        // L'état local reste marqué modifié : la prochaine occasion réessaiera.
-        modificationsEnAttente = true;
-        afficherToast(e.message, true);
-      }
+      // L'état local reste marqué modifié : la prochaine occasion réessaiera.
+      modificationsEnAttente = true;
+      afficherToast(e.message, true);
     }
   })();
 

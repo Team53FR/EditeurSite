@@ -3,282 +3,70 @@
 // vignette, migration silencieuse) n'y figurent surtout pas : les voiler
 // bloquerait la page pour un travail que l'on a justement choisi de rendre
 // invisible.
-envelopperAttente({
-  seConnecter: ["Connexion…", "Votre identifiant est vérifié."],
-});
+envelopperAttente({});
 
-// ===== Connexion à la base « BDD » sur GitHub =====
-// Même dépôt BDD que les autres sites (Team53FR/BDD), dans son propre
-// dossier, pour ne jamais toucher aux données des autres sites.
-const PROPRIETAIRE = "Team53FR";
-const DEPOT_BDD = "BDD";
-const DOSSIER_BDD = "DroidFortnite";
+// ===== Droid Fortnite — Supabase (remplace la BDD GitHub) =====
+// Compte central maison, partagé avec le portail et les deux autres sites —
+// voir ../../../supabase/schema-compte-central.sql. La progression de
+// chaque joueur est rattachée à son auth.uid() (le jeton signé par
+// connexion()/inscription()), avec RLS pour que personne ne puisse lire/
+// modifier la progression d'un autre. Schéma complet : supabase/schema.sql
+// dans ce dossier.
+const SUPABASE_URL = "https://uxedmplaeuonhhpxqpse.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_vtFaCnMEFpqYvzzoth9T_w_6XCA4JCt";
 
-// ===== Comptes centralisés =====
-//
-// Les comptes ne vivent plus dans le users.json de chaque site, mais dans un
-// seul fichier — Web/utilisateurs.json — qui porte aussi la liste des sites
-// auxquels chacun a accès. Un mot de passe changé l'est donc partout à la
-// fois, et deux fichiers ne peuvent plus diverger en silence.
-const CHEMIN_UTILISATEURS = "/Web/utilisateurs.json";
-// Identifiants des sites du portail, dans l'ordre du tableau de bord. Sert à
-// écrire une liste d'accès complète pour un compte qui n'en avait pas.
-const SITES_CONNUS = ["editeur-livre", "ma-bibliotheque", "droid-fortnite"];
-const ID_SITE = "droid-fortnite";
-
-// Un compte peut-il entrer ici ? Un administrateur du portail, oui, toujours.
-// Sinon il faut que ce site figure dans ses accès. Une entrée sans champ
-// « acces » date d'avant la centralisation : on la laisse passer plutôt que
-// d'enfermer quelqu'un dehors, la liste étant ensuite gérée par le portail.
-function aAccesAuSite(utilisateur) {
-  if (!utilisateur) return false;
-  if (utilisateur.role === "admin") return true;
-  if (!Array.isArray(utilisateur.acces)) return true;
-  return utilisateur.acces.includes(ID_SITE);
+function _jetonCourant() {
+  return localStorage.getItem("team53_token") || SUPABASE_ANON_KEY;
 }
 
-// Date de connexion : la globale, plus celle propre à ce site. Les deux
-// coexistent — le portail montre la dernière visite tous sites confondus,
-// chaque site la sienne — et l'ancien champ « derniereConnexion » des
-// fichiers de site retrouve ainsi sa place.
-function noterConnexion(utilisateur) {
-  const maintenant = new Date().toISOString();
-  utilisateur.derniereConnexion = maintenant;
-  if (!utilisateur.connexions || typeof utilisateur.connexions !== "object") {
-    utilisateur.connexions = {};
-  }
-  utilisateur.connexions[ID_SITE] = maintenant;
-}
-// ====================================================
-
-function urlContenuBDD(chemin) {
-  // Un chemin commençant par « / » part de la RACINE du dépôt et ignore le
-  // dossier du site : c'est ainsi qu'on atteint le fichier central des
-  // comptes, qui n'appartient à aucun site en particulier.
-  const depuisRacine = chemin.charAt(0) === "/";
-  const base = depuisRacine ? "" : (DOSSIER_BDD || "").replace(/^\/+|\/+$/g, "");
-  const prefixe = base ? base + "/" : "";
-  const suite = depuisRacine ? chemin.slice(1) : chemin;
-  return `https://api.github.com/repos/${PROPRIETAIRE}/${DEPOT_BDD}/contents/${prefixe}${suite}`;
-}
-
-async function lireFichierJSON(nomFichier, token) {
-  const url = urlContenuBDD(nomFichier);
-  const reponse = await fetch(url, {
+async function appelerFonctionSupabase(nom, params) {
+  const reponse = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${nom}`, {
+    method: "POST",
     headers: {
-      "Authorization": `Bearer ${token}`,
-      "Accept": "application/vnd.github+json"
-    }
-  });
-
-  if (!reponse.ok) {
-    const erreur = new Error("Impossible de lire le fichier (token invalide ou dépôt introuvable).");
-    erreur.status = reponse.status;
-    throw erreur;
-  }
-
-  const data = await reponse.json();
-  let contenuDecode;
-
-  if (data.content) {
-    try {
-      contenuDecode = decodeURIComponent(escape(atob(data.content)));
-    } catch (e) {
-      throw new Error(`Le contenu de "${nomFichier}" n'a pas pu être décodé (encodage invalide).`);
-    }
-  } else if (data.sha) {
-    // Fichier trop volumineux pour l'API Contents (plus de 1 Mo) : son contenu
-    // n'accompagne plus les métadonnées. On le lit alors par l'API des blobs,
-    // en demandant le format brut — authentifiée, elle marche sur un dépôt
-    // privé, là où l'URL de téléchargement directe se fait refuser.
-    const reponseBlob = await fetch(
-      `https://api.github.com/repos/${PROPRIETAIRE}/${DEPOT_BDD}/git/blobs/${data.sha}`,
-      { headers: { "Authorization": `Bearer ${token}`, "Accept": "application/vnd.github.raw" } });
-
-    if (reponseBlob.ok) {
-      contenuDecode = await reponseBlob.text();
-    } else if (data.download_url) {
-      // Dernier recours : l'URL directe, qui porte son propre jeton temporaire.
-      const reponseBrute = await fetch(data.download_url);
-      if (!reponseBrute.ok) {
-        throw new Error(`Le fichier "${nomFichier}" est trop volumineux et sa version brute n'a pas pu être récupérée.`);
-      }
-      contenuDecode = await reponseBrute.text();
-    } else {
-      throw new Error(`Le fichier "${nomFichier}" est trop volumineux et sa version brute n'a pas pu être récupérée.`);
-    }
-  } else {
-    throw new Error(`Le fichier "${nomFichier}" est trop volumineux pour être lu (aucune URL brute disponible).`);
-  }
-
-  if (!contenuDecode.trim()) {
-    throw new Error(`Le fichier "${nomFichier}" est vide.`);
-  }
-
-  try {
-    return { contenu: JSON.parse(contenuDecode), sha: data.sha };
-  } catch (e) {
-    throw new Error(`Le fichier "${nomFichier}" contient un JSON invalide : ${e.message}`);
-  }
-}
-
-async function ecrireFichierJSON(nomFichier, contenu, sha, token, messageCommit) {
-  const url = urlContenuBDD(nomFichier);
-  const contenuEncode = btoa(unescape(encodeURIComponent(JSON.stringify(contenu, null, 2))));
-
-  const corps = { message: messageCommit || `Mise à jour de ${nomFichier}`, content: contenuEncode };
-  if (sha) corps.sha = sha;
-
-  const reponse = await fetch(url, {
-    method: "PUT",
-    headers: {
-      "Authorization": `Bearer ${token}`,
-      "Accept": "application/vnd.github+json"
+      "apikey": SUPABASE_ANON_KEY,
+      "Authorization": `Bearer ${_jetonCourant()}`,
+      "Content-Type": "application/json"
     },
-    body: JSON.stringify(corps)
+    body: JSON.stringify(params || {})
   });
-
+  const corps = await reponse.json().catch(() => null);
   if (!reponse.ok) {
-    let details = "";
-    try { const err = await reponse.json(); if (err.message) details = ` (${err.message})`; } catch (e) {}
-    const erreur = new Error(`Échec de l'écriture de "${nomFichier}"${details}.`);
+    const erreur = new Error((corps && corps.message) || "Une erreur est survenue.");
     erreur.status = reponse.status;
-    // 409 = le SHA fourni ne correspond plus à la version distante (modifiée ailleurs).
-    if (reponse.status === 409) erreur.conflit = true;
     throw erreur;
   }
-
-  const data = await reponse.json();
-  return data.content.sha;
+  return corps;
 }
 
-async function obtenirShaFichier(chemin, token, tentative = 0) {
-  const url = urlContenuBDD(chemin);
-  const reponse = await fetch(url, {
-    headers: { "Authorization": `Bearer ${token}`, "Accept": "application/vnd.github+json" }
-  });
-  if (reponse.status === 404) return null;
-  if (!reponse.ok) throw new Error(`Impossible de vérifier l'existence de "${chemin}".`);
-  // Juste après un envoi ou une suppression du MÊME fichier, l'API répond
-  // parfois 200 mais renvoie les octets bruts de l'image au lieu des
-  // métadonnées JSON attendues (observé sur une image de type de droïde
-  // remplacée juste après avoir été retirée) — le temps que ça redevienne
-  // cohérent côté GitHub peut dépasser une seconde. On retente plusieurs
-  // fois avec un délai croissant avant d'abandonner, au lieu de planter sur
-  // un JSON.parse() qui ne peut pas réussir.
+async function requeteSupabase(chemin, options) {
+  options = options || {};
+  const reponse = await fetch(`${SUPABASE_URL}/rest/v1/${chemin}`, Object.assign({}, options, {
+    headers: Object.assign({
+      "apikey": SUPABASE_ANON_KEY,
+      "Authorization": `Bearer ${_jetonCourant()}`,
+      "Content-Type": "application/json"
+    }, options.headers || {})
+  }));
+  if (!reponse.ok) {
+    const corps = await reponse.json().catch(() => null);
+    const erreur = new Error((corps && corps.message) || "Une erreur est survenue.");
+    erreur.status = reponse.status;
+    throw erreur;
+  }
+  // "Prefer: return=minimal" répond avec un corps vide — mais pas toujours en
+  // 204 (un POST le fait en 201 Created, corps vide aussi). On lit donc le
+  // texte brut plutôt que de se fier au code de statut pour savoir s'il y a
+  // du JSON à lire.
   const texte = await reponse.text();
-  try {
-    return JSON.parse(texte).sha;
-  } catch (e) {
-    if (tentative < 4) {
-      await new Promise((r) => setTimeout(r, 500 * (tentative + 1)));
-      return obtenirShaFichier(chemin, token, tentative + 1);
-    }
-    const erreur = new Error(`Réponse inattendue de GitHub pour "${chemin}".`);
-    erreur.reponseNonJson = true;
-    throw erreur;
-  }
+  return texte ? JSON.parse(texte) : null;
 }
 
-// ===== Images (photos ajoutées par les comptes du site, pas des visuels du
-// jeu — voir la note dans le formulaire d'ajout d'image) =====
-function extraireExtensionDataUrl(dataUrl) {
-  const correspondance = /^data:image\/([a-zA-Z0-9.+-]+);base64,/.exec(dataUrl);
-  if (!correspondance) return "jpg";
-  let ext = correspondance[1].toLowerCase();
-  if (ext === "jpeg") ext = "jpg";
-  if (ext === "svg+xml") ext = "svg";
-  return ext;
-}
-
-async function uploaderImageBase64(chemin, dataUrl, token, messageCommit) {
-  const virgule = dataUrl.indexOf(",");
-  if (virgule === -1) throw new Error("Format d'image invalide.");
-  const contenuBase64 = dataUrl.slice(virgule + 1);
-
-  const shaExistant = await obtenirShaFichier(chemin, token);
-
-  const url = urlContenuBDD(chemin);
-  const corps = { message: messageCommit || `Ajout de l'image ${chemin}`, content: contenuBase64 };
-  if (shaExistant) corps.sha = shaExistant;
-
-  let reponse = await fetch(url, {
-    method: "PUT",
-    headers: {
-      "Authorization": `Bearer ${token}`,
-      "Accept": "application/vnd.github+json"
-    },
-    body: JSON.stringify(corps)
-  });
-
-  // Le fichier existait déjà sans qu'on l'ait vu (notre vérification a
-  // manqué sa fenêtre, ou il vient d'être recréé entre-temps) : GitHub
-  // répond alors 422, réclamant le sha. On le relit une dernière fois et on
-  // réessaie l'envoi, plutôt que d'abandonner sur un simple malentendu de
-  // timing.
-  if (reponse.status === 422 && !corps.sha) {
-    const shaFrais = await obtenirShaFichier(chemin, token).catch(() => null);
-    if (shaFrais) {
-      corps.sha = shaFrais;
-      reponse = await fetch(url, {
-        method: "PUT",
-        headers: {
-          "Authorization": `Bearer ${token}`,
-          "Accept": "application/vnd.github+json"
-        },
-        body: JSON.stringify(corps)
-      });
-    }
-  }
-
-  if (!reponse.ok) {
-    let details = "";
-    try { const err = await reponse.json(); if (err.message) details = ` (${err.message})`; } catch (e) {}
-    throw new Error(`Échec de l'envoi de l'image${details}.`);
-  }
-
-  return chemin;
-}
-
-async function supprimerFichierGithub(chemin, token, messageCommit) {
-  const sha = await obtenirShaFichier(chemin, token);
-  if (!sha) return;
-  const url = urlContenuBDD(chemin);
-  const corps = { message: messageCommit || `Suppression de ${chemin}`, sha };
-  let reponse = await fetch(url, {
-    method: "DELETE",
-    headers: {
-      "Authorization": `Bearer ${token}`,
-      "Accept": "application/vnd.github+json"
-    },
-    body: JSON.stringify(corps)
-  });
-
-  // Le sha lu à l'instant ne correspond déjà plus (409/422) : on le relit une
-  // dernière fois et on retente, plutôt que de laisser le fichier orphelin
-  // sur le dépôt sans que personne ne le sache — un appelant qui compte sur
-  // la suppression (avant de renvoyer une nouvelle image au même chemin, par
-  // exemple) se retrouverait sinon bloqué sans explication.
-  if (!reponse.ok && (reponse.status === 409 || reponse.status === 422)) {
-    const shaFrais = await obtenirShaFichier(chemin, token).catch(() => null);
-    if (shaFrais) {
-      corps.sha = shaFrais;
-      reponse = await fetch(url, {
-        method: "DELETE",
-        headers: {
-          "Authorization": `Bearer ${token}`,
-          "Accept": "application/vnd.github+json"
-        },
-        body: JSON.stringify(corps)
-      });
-    }
-  }
-
-  if (!reponse.ok) {
-    throw new Error(`Impossible de supprimer "${chemin}" sur GitHub.`);
-  }
-}
-
+// ===== Images (Storage) =====
+// Les visuels du catalogue (droïdes, types) sont dans le bucket public
+// "droid-fortnite" : chaque ligne (droides.image, classes.image) porte déjà
+// l'URL publique complète, affichable directement dans un <img src>, sans
+// jeton ni requête d'authentification — contrairement au dépôt GitHub privé
+// d'avant, plus besoin de télécharger puis de fabriquer une URL locale.
 function mimeDepuisChemin(chemin) {
   const ext = (chemin.split(".").pop() || "").toLowerCase();
   if (ext === "png") return "image/png";
@@ -288,30 +76,53 @@ function mimeDepuisChemin(chemin) {
   return "image/jpeg";
 }
 
-async function obtenirUrlImage(chemin, token) {
-  const url = urlContenuBDD(chemin);
+function extraireExtensionDataUrl(dataUrl) {
+  const correspondance = /^data:image\/([a-zA-Z0-9.+-]+);base64,/.exec(dataUrl);
+  if (!correspondance) return "jpg";
+  let ext = correspondance[1].toLowerCase();
+  if (ext === "jpeg") ext = "jpg";
+  if (ext === "svg+xml") ext = "svg";
+  return ext;
+}
 
-  // Octets bruts, authentifiés par le token (le download_url d'un dépôt privé
-  // est une URL signée temporaire qui finit par expirer dans un <img>).
-  const reponse = await fetch(url, {
-    headers: { "Authorization": `Bearer ${token}`, "Accept": "application/vnd.github.raw" }
+// Envoie une image (data URL) dans le bucket "droid-fortnite", à l'emplacement
+// donné, et renvoie son URL publique. "x-upsert" écrase silencieusement un
+// fichier déjà présent au même chemin (remplacement d'image) — plus besoin de
+// gérer un sha ni de réessayer sur une réponse incohérente, l'API Storage n'a
+// pas ce problème.
+async function uploaderImageStorage(chemin, dataUrl) {
+  const virgule = dataUrl.indexOf(",");
+  if (virgule === -1) throw new Error("Format d'image invalide.");
+  const octets = atob(dataUrl.slice(virgule + 1));
+  const tampon = new Uint8Array(octets.length);
+  for (let i = 0; i < octets.length; i++) tampon[i] = octets.charCodeAt(i);
+
+  const reponse = await fetch(`${SUPABASE_URL}/storage/v1/object/droid-fortnite/${chemin}`, {
+    method: "POST",
+    headers: {
+      "apikey": SUPABASE_ANON_KEY,
+      "Authorization": `Bearer ${_jetonCourant()}`,
+      "Content-Type": mimeDepuisChemin(chemin),
+      "x-upsert": "true"
+    },
+    body: tampon
   });
-
-  if (reponse.ok) {
-    const brut = await reponse.blob();
-    const mime = mimeDepuisChemin(chemin);
-    const blob = (brut.type && brut.type.startsWith("image/")) ? brut : new Blob([brut], { type: mime });
-    return URL.createObjectURL(blob); // URL locale stable, sans expiration
+  if (!reponse.ok) {
+    const corps = await reponse.json().catch(() => null);
+    throw new Error(`Échec de l'envoi de l'image${corps && corps.message ? " (" + corps.message + ")" : ""}.`);
   }
+  return `${SUPABASE_URL}/storage/v1/object/public/droid-fortnite/${chemin}`;
+}
 
-  const reponseJson = await fetch(url, {
-    headers: { "Authorization": `Bearer ${token}`, "Accept": "application/vnd.github+json" }
+async function supprimerImageStorage(chemin) {
+  await fetch(`${SUPABASE_URL}/storage/v1/object/droid-fortnite/${chemin}`, {
+    method: "DELETE",
+    headers: {
+      "apikey": SUPABASE_ANON_KEY,
+      "Authorization": `Bearer ${_jetonCourant()}`
+    }
   });
-  if (!reponseJson.ok) throw new Error(`Impossible de charger l'image "${chemin}".`);
-  const data = await reponseJson.json();
-  if (data.content) return `data:${mimeDepuisChemin(chemin)};base64,${data.content.replace(/\n/g, "")}`;
-  if (data.download_url) return data.download_url;
-  throw new Error(`Image "${chemin}" introuvable.`);
+  // Volontairement silencieux en cas d'échec : ne doit pas bloquer le reste du flux.
 }
 
 // Redimensionne côté client avant envoi (identique à sites/ma-bibliotheque/collection.js),
@@ -357,53 +168,26 @@ function comprimerImage(fichier, maxDim = 700, quality = 0.82) {
 // ===== Visuels des droïdes (partagés entre suivi.js et admin.js) =====
 function classeRareteCss(rarete) {
   return (rarete || "")
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .normalize("NFD").replace(/[̀-ͯ]/g, "")
     .toLowerCase();
 }
 
-// La liste des classes (types de droide) est chargee depuis classes.json
-// (partagee, editable dans l'onglet Types du panneau admin) : on cherche
-// l'icone associee dans la variable globale "classes" (comme raretes/unites
-// ci-dessous), avec un repli generique si le type est inconnu.
+// La liste des classes (types de droide) est chargee depuis la table
+// classes (partagee, editable dans l'onglet Types du panneau admin) : on
+// cherche l'icone associee dans la variable globale "classes" (comme
+// raretes/unites ci-dessous), avec un repli generique si le type est inconnu.
 function iconeClasse(classe) {
   const liste = (classes && classes.length) ? classes : CLASSES_INITIALES;
   const trouve = liste.find((c) => c.nom === classe);
   return (trouve && trouve.icone) || "\u{1F916}";
 }
 
-// ----- Image d'un type de droïde, à la place de son icône -----
-//
-// Comme pour la photo d'un droïde, l'image d'un type vit dans le dépôt BDD
-// (qui peut être privé) : il faut donc l'URL, pas seulement le chemin. Mais
-// il n'y a jamais que quelques types — tout tient en mémoire d'un coup, pas
-// besoin du chargement à la demande utilisé pour les cent et quelques
-// cartes du Droidex.
-const classesImageUrls = new Map(); // nom du type -> URL locale (blob:)
-
-async function precacherImagesClasses(token) {
-  const nomsAvecImage = new Set();
-  await Promise.all((classes || []).map(async (c) => {
-    if (!c.image) return;
-    nomsAvecImage.add(c.nom);
-    try {
-      const url = await obtenirUrlImage(c.image, token);
-      classesImageUrls.set(c.nom, url);
-    } catch (e) { /* reste sur l'icône */ }
-  }));
-  // Un type qui a perdu son image (ou a été supprimé) ne doit pas garder
-  // l'URL d'une image qui n'existe plus.
-  [...classesImageUrls.keys()].forEach((nom) => {
-    if (!nomsAvecImage.has(nom)) classesImageUrls.delete(nom);
-  });
-}
-
-// Le rendu d'un type, partout où il s'affiche : son image si elle est
-// chargée, son icône (emoji) sinon. Renvoie du HTML (jamais du texte à
-// mettre dans un <option>, qui n'affiche pas les images — voir
-// remplirSelectClasses, qui continue d'utiliser l'icône seule).
+// Le rendu d'un type, partout où il s'affiche : son image si elle en a une
+// (URL publique directe, voir plus haut), son icône (emoji) sinon.
 function classeVisuelHtml(nomClasse) {
-  const url = classesImageUrls.get(nomClasse);
-  if (url) return `<img class="classe-glyphe" src="${url}" alt="">`;
+  const liste = (classes && classes.length) ? classes : CLASSES_INITIALES;
+  const trouve = liste.find((c) => c.nom === nomClasse);
+  if (trouve && trouve.image) return `<img class="classe-glyphe" src="${trouve.image}" alt="">`;
   return echapperTexte(iconeClasse(nomClasse));
 }
 
@@ -428,8 +212,8 @@ function couleurDroide(id) {
 // n'est qu'une commodité de saisie et d'affichage, redéduite à l'ouverture
 // du formulaire. Un seul nombre canonique, et tous les calculs restent justes.
 //
-// Liste éditable depuis le panneau admin (DroidFortnite/unites.json), pour
-// le jour où le jeu dépassera le billion.
+// Liste éditable depuis le panneau admin (table unites), pour le jour où le
+// jeu dépassera le billion.
 const UNITES_INITIALES = [
   { symbole: "K", facteur: 1e3 },
   { symbole: "M", facteur: 1e6 },
@@ -438,8 +222,8 @@ const UNITES_INITIALES = [
 ];
 
 // Symbole réservé au rendement des Iconiques, qui rapportent un pourcentage
-// du revenu total et non des crédits par seconde. Jamais dans unites.json :
-// ce n'est pas un facteur, c'est une autre nature de valeur.
+// du revenu total et non des crédits par seconde. Jamais dans la table
+// unites : ce n'est pas un facteur, c'est une autre nature de valeur.
 const UNITE_POURCENT = "%";
 
 let unites = UNITES_INITIALES;
@@ -562,9 +346,9 @@ function formaterBonus(d, palier) {
 
 // ===== Couleurs des raretés =====
 //
-// Éditables depuis le panneau admin (DroidFortnite/raretes.json) plutôt que
-// figées dans la feuille de style. Chaque rareté a un fond et une couleur de
-// texte : c'est le couple qui doit rester lisible, pas le fond seul.
+// Éditables depuis le panneau admin (table raretes) plutôt que figées dans
+// la feuille de style. Chaque rareté a un fond et une couleur de texte :
+// c'est le couple qui doit rester lisible, pas le fond seul.
 //
 // Les règles sont injectées dans un <style> plutôt qu'appliquées badge par
 // badge : elles valent ainsi partout où un badge apparaît — cartes du
@@ -858,10 +642,11 @@ function ligneChiffresHtml(d, palier) {
 }
 
 // Choisit le visuel de la carte, dans l'ordre :
-//   1. l'image ajoutée pour ce droïde depuis le panneau admin ;
+//   1. l'image ajoutée pour ce droïde depuis le panneau admin (URL publique
+//      directe, déjà résolue sur la ligne du droïde) ;
 //   2. l'image de la source externe, si elle est configurée ;
 //   3. la teinte générée et l'icône de classe, déjà en place dans le HTML.
-async function appliquerVisuelDroide(zone, d, palier) {
+function appliquerVisuelDroide(zone, d, palier) {
   if (!zone) return;
 
   // Une centaine de vignettes se chargent d'un coup sur l'onglet « Tous » :
@@ -896,17 +681,8 @@ async function appliquerVisuelDroide(zone, d, palier) {
   };
 
   if (d.image) {
-    try {
-      let url = cacheImages.get(d.image);
-      if (!url) {
-        url = await obtenirUrlImage(d.image, token);
-        cacheImages.set(d.image, url);
-      }
-      poser(url, REESSAIS_IMAGE);
-      return;
-    } catch (e) {
-      // On continue vers la source externe puis la teinte générée.
-    }
+    poser(d.image, REESSAIS_IMAGE);
+    return;
   }
 
   const externe = urlImageExterne(d.nom, palier);
@@ -917,124 +693,30 @@ async function appliquerVisuelDroide(zone, d, palier) {
 //
 // Le portail central mémorise sa session dans localStorage sous team53_*.
 // Ce site vivant sur la même origine (GitHub Pages), il y a accès
-// directement : inutile de se reconnecter en arrivant ici depuis un
-// signet, ou après avoir fermé le navigateur.
-//
-// La session propre au site passe d'abord — elle peut être plus récente,
-// si l'on s'est connecté ici directement — puis la session centrale.
-
-const CLES_SESSION = ["df_token", "df_login"];
-const CLES_CENTRALES = { df_token: "team53_token",
-                         df_login: "team53_login" };
-
-// Recopie la session centrale sous les clés de ce site, si la nôtre manque.
-function adopterSessionCentrale() {
-  if (localStorage.getItem("df_token")) return false;
-  if (!localStorage.getItem("team53_token")) return false;
-  for (const cle of CLES_SESSION) {
-    const valeur = localStorage.getItem(CLES_CENTRALES[cle]);
-    if (valeur !== null) localStorage.setItem(cle, valeur);
+// directement — pas de jeton propre à Droid Fortnite à part, pas de relais
+// à recopier : la même session Supabase sert partout.
+function exigerConnexion() {
+  const token = localStorage.getItem("team53_token");
+  if (!token) {
+    window.location.replace("../../connexion.html");
+    return null;
   }
-  return true;
+  return token;
 }
 
-adopterSessionCentrale();
-
-// ===== Connexion (comptes multiples) =====
-// Les identifiants vivent dans le fichier central Web/utilisateurs.json, avec
-// la liste des sites auxquels chaque compte a accès (voir aAccesAuSite).
-// Token + identité mémorisés sur l'appareil (localStorage), comme
-// ma-bibliotheque : usage personnel/familial sur un appareil déjà protégé.
-async function seConnecter() {
-  const login = document.getElementById("login").value.trim();
-  const password = document.getElementById("password").value;
-  const token = document.getElementById("token").value.trim();
-  const message = document.getElementById("message");
-
-  if (!login || !password || !token) {
-    message.textContent = "Merci de remplir tous les champs.";
-    return;
-  }
-
-  message.textContent = "Vérification en cours...";
-
-  try {
-    const { contenu, sha } = await lireFichierJSON(CHEMIN_UTILISATEURS, token);
-    const utilisateurs = Array.isArray(contenu) ? contenu : [];
-    const utilisateur = utilisateurs.find(u => u.login === login && u.password === password);
-
-    if (!utilisateur) {
-      message.textContent = "Identifiants incorrects.";
-      return;
-    }
-    if (!aAccesAuSite(utilisateur)) {
-      message.textContent = "Ce compte n'a pas accès à ce site. Demandez l'accès à un administrateur depuis le portail central.";
-      return;
-    }
-
-    localStorage.setItem("df_token", token);
-    localStorage.setItem("df_login", utilisateur.login);
-
-    try {
-      noterConnexion(utilisateur);
-      await ecrireFichierJSON(CHEMIN_UTILISATEURS, utilisateurs, sha, token,
-        `Dernière connexion de ${login} sur ${ID_SITE}`);
-    } catch (e) { /* la connexion se poursuit */ }
-
-    window.location.href = "suivi.html";
-  } catch (erreur) {
-    if (erreur.status === 404) {
-      message.textContent = "Aucun compte configuré : demandez à un administrateur de créer le vôtre depuis le portail central.";
-    } else {
-      message.textContent = erreur.message;
-    }
-  }
-}
-
-// La session est commune à tous les sites du portail : on la ferme donc
-// partout, sans quoi la session centrale reprendrait la main au
-// rechargement suivant.
 function seDeconnecter() {
-  for (const cle of CLES_SESSION) localStorage.removeItem(cle);
-  for (const cle of Object.values(CLES_CENTRALES)) localStorage.removeItem(cle);
+  localStorage.removeItem("team53_token");
+  localStorage.removeItem("team53_id");
+  localStorage.removeItem("team53_login");
   localStorage.removeItem("team53_role");
   localStorage.removeItem("team53_nom");
   localStorage.removeItem("team53_acces");
   window.location.replace("../../connexion.html");
 }
 
-function exigerConnexion() {
-  const token = localStorage.getItem("df_token");
-  const login = localStorage.getItem("df_login");
-  if (!token || !login) {
-    window.location.replace("connexion.html");
-    return null;
-  }
-  return token;
-}
-
-function slugifierLogin(login) {
-  return (login || "")
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // enlever les accents
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9_-]+/g, "_");
-}
-
-function cheminBibliothequeCourante() {
-  const login = localStorage.getItem("df_login");
-  return `bibliotheques/${slugifierLogin(login)}.json`;
-}
-
 // ===== Admin (réutilise le rôle du portail central) =====
-// sites/droid-fortnite/* et le portail central partagent la même origine
-// GitHub Pages, donc le même localStorage : team53_role posé par
-// ouvrirSessionCentrale() (script.js racine) est directement lisible ici,
-// sans rien ajouter au relais. Pas de rôle propre à Droid Fortnite : « admin »
-// = admin du portail central. Si ce compte n'est jamais passé par le portail
-// sur cet appareil, team53_role est absent -> traité comme non-admin
-// (échec sûr, cohérent avec le reste de l'app qui n'a aucune vraie
-// autorisation côté serveur de toute façon).
+// Pas de rôle propre à Droid Fortnite : « admin » = admin du portail
+// central, déjà dans team53_role (même origine, même localStorage).
 function estAdminCentral() {
   return localStorage.getItem("team53_role") === "admin";
 }
@@ -1050,87 +732,88 @@ function exigerAdminDroidFortnite() {
   return token;
 }
 
-// ===== Écriture avec fusion, pour les fichiers PARTAGÉS (catalogue.json,
-// renaissance.json) =====
-// Contrairement à un fichier personnel (un seul compte l'écrit jamais, donc
-// « relire le sha puis réécrire le tableau local » est sûr), ces deux
-// fichiers peuvent être modifiés par n'importe quel compte du site. Sur
-// conflit (409), on relit le contenu DISTANT (pas juste son sha) et on
-// fusionne : le tableau local (nos ajouts ET nos modifications) l'emporte
-// pour chaque id qu'il contient, et on ne reprend du distant que les id
-// qu'on ne connaît pas (ajoutés par quelqu'un d'autre entre-temps) — pour
-// ne jamais perdre ni un ajout concurrent, ni notre propre modification.
-async function sauvegarderAvecFusion(nomFichier, tableauLocal, sha, token, messageCommit) {
-  try {
-    return await ecrireFichierJSON(nomFichier, tableauLocal, sha, token, messageCommit);
-  } catch (e) {
-    if (!e.conflit) throw e;
-    const frais = await lireFichierJSON(nomFichier, token);
-    const distant = Array.isArray(frais.contenu) ? frais.contenu : [];
-    const idsLocaux = new Set(tableauLocal.map(x => x.id));
-    const fusion = distant.filter(x => !idsLocaux.has(x.id)).concat(tableauLocal);
-    return await ecrireFichierJSON(nomFichier, fusion, frais.sha, token, messageCommit);
-  }
-}
-
-// ===== Écriture simple (relire le sha, réécrire), pour un fichier partagé
-// mais admin-only comme paliers.json =====
-// Contrairement à catalogue.json/renaissance.json (modifiables par n'importe
-// quel compte, donc sujets à une vraie collision), paliers.json n'est édité
-// que par un admin, rarement, en général seul — un simple retry suffit, pas
-// besoin de la fusion (et ce tableau de chaînes n'a de toute façon pas
-// d'id sur lequel fusionner).
-async function sauvegarderAvecRetry(nomFichier, contenu, sha, token, messageCommit) {
-  try {
-    return await ecrireFichierJSON(nomFichier, contenu, sha, token, messageCommit);
-  } catch (e) {
-    if (!e.conflit) throw e;
-    const frais = await lireFichierJSON(nomFichier, token);
-    return await ecrireFichierJSON(nomFichier, contenu, frais.sha, token, messageCommit);
-  }
-}
-
-// ===== Amorçage paresseux d'un fichier partagé =====
-// Si le fichier n'existe pas encore (404), le crée avec les données de
-// départ fournies. Je n'ai aucun moyen d'écrire directement dans le dépôt
-// BDD moi-même (pas de token) : ce mécanisme, déclenché au premier chargement
-// authentifié par un compte quelconque, est la seule façon de les amorcer.
+// ===== Chargement du catalogue partagé =====
 //
-// Deux chargements peuvent démarrer l'amorçage en même temps (rechargement
-// de page pendant que la création précédente était encore en vol, deux
-// onglets ouverts...) : le second à écrire reçoit alors un 409 (le fichier a
-// été créé entre-temps par le premier). Dans ce cas précis, ce n'est pas une
-// vraie erreur — on relit simplement ce que l'autre vient de créer.
-async function chargerOuAmorcer(nomFichier, donneesInitiales, token, messageCommit) {
-  try {
-    const resultat = await lireFichierJSON(nomFichier, token);
-    if (Array.isArray(resultat.contenu) && resultat.contenu.length === 0) {
-      // Le fichier existe mais est vide (ex. laissé dans cet état par une
-      // précédente tentative d'amorçage interrompue en cours de route) :
-      // le repeupler avec les données de départ plutôt que de rester bloqué.
-      const sha = await ecrireFichierJSON(nomFichier, donneesInitiales, resultat.sha, token, messageCommit);
-      return { contenu: donneesInitiales, sha };
-    }
-    return resultat;
-  } catch (e) {
-    if (e.status !== 404) throw e;
-    try {
-      const sha = await ecrireFichierJSON(nomFichier, donneesInitiales, null, token, messageCommit);
-      return { contenu: donneesInitiales, sha };
-    } catch (e2) {
-      if (e2.conflit) return await lireFichierJSON(nomFichier, token);
-      throw e2;
-    }
-  }
+// Reconstruit exactement les mêmes formes en mémoire qu'avant (un objet par
+// droïde avec prix/rendements/vente/tempsFabrication/bonus indexés par nom
+// de palier) à partir des tables normalisées — pour que tout le reste du
+// code (affichage, filtres, escouade, renaissance...) n'ait rien à changer.
+// "ordre" est repris dans l'objet en mémoire (invisible du reste du code,
+// qui l'ignore) uniquement pour que l'admin puisse le renvoyer tel quel à
+// la moindre modification — Postgres exige une valeur pour une colonne
+// "not null" même sur la branche UPDATE d'un upsert ON CONFLICT.
+async function chargerCatalogueSupabase() {
+  const [droidesRows, paliersDroideRows] = await Promise.all([
+    requeteSupabase("droides?select=id,nom,classe,rarete,image,ordre&order=ordre"),
+    requeteSupabase("droide_paliers?select=*")
+  ]);
+  const parDroide = new Map();
+  paliersDroideRows.forEach((r) => {
+    if (!parDroide.has(r.droide_id)) parDroide.set(r.droide_id, []);
+    parDroide.get(r.droide_id).push(r);
+  });
+  return droidesRows.map((d) => {
+    const lignes = parDroide.get(d.id) || [];
+    const prix = {}, rendements = {}, vente = {}, tempsFabrication = {}, bonus = {};
+    lignes.forEach((r) => {
+      if (r.prix !== null) prix[r.palier] = Number(r.prix);
+      if (r.rendement !== null) rendements[r.palier] = Number(r.rendement);
+      else if (r.rendement_pourcentage !== null) rendements[r.palier] = String(r.rendement_pourcentage) + "%";
+      if (r.vente !== null) vente[r.palier] = Number(r.vente);
+      if (r.temps_fabrication !== null) tempsFabrication[r.palier] = r.temps_fabrication;
+      if (r.bonus !== null) bonus[r.palier] = r.bonus;
+    });
+    return { id: d.id, nom: d.nom, classe: d.classe, rarete: d.rarete, image: d.image, ordre: d.ordre,
+      prix, rendements, vente, tempsFabrication, bonus };
+  });
+}
+
+async function chargerClassesSupabase() {
+  const lignes = await requeteSupabase("classes?select=nom,icone,image,ordre&order=ordre");
+  return lignes.map((c) => (c.image ? c : { nom: c.nom, icone: c.icone, ordre: c.ordre }));
+}
+
+async function chargerPaliersSupabase() {
+  return requeteSupabase("paliers?select=nom,couleur&order=ordre");
+}
+
+async function chargerRaretesSupabase() {
+  const lignes = await requeteSupabase("raretes?select=nom,fond,texte,premier_palier_seulement&order=ordre");
+  return lignes.map((r) => ({
+    nom: r.nom, fond: r.fond, texte: r.texte, premierPalierSeulement: r.premier_palier_seulement
+  }));
+}
+
+async function chargerUnitesSupabase() {
+  return requeteSupabase("unites?select=symbole,facteur");
+}
+
+async function chargerFusionsSupabase() {
+  const [fusionsRows, ingredientsRows] = await Promise.all([
+    requeteSupabase("fusions?select=id,nom,classe,rarete,image,ordre&order=ordre"),
+    requeteSupabase("fusion_ingredients?select=*")
+  ]);
+  const parFusion = new Map();
+  ingredientsRows.forEach((i) => {
+    if (!parFusion.has(i.fusion_id)) parFusion.set(i.fusion_id, []);
+    parFusion.get(i.fusion_id).push({ nom: i.droide_nom, quantite: i.quantite });
+  });
+  return fusionsRows.map((f) => ({
+    id: f.id, resultat: f.nom, classe: f.classe, rarete: f.rarete, image: f.image, ordre: f.ordre,
+    ingredients: parFusion.get(f.id) || []
+  }));
+}
+
+async function chargerRenaissanceSupabase() {
+  return requeteSupabase("renaissance_niveaux?select=id,niveau,credits,elements&order=niveau");
 }
 
 // ===== Données de départ (catalogue + renaissance) =====
 // Sourcées du tracker communautaire open-source « Droidex »
 // (github.com/erikpeik/droidex, src/data/droids.ts et rebirths.ts) — PAS des
-// données officielles Epic Games. Volontairement modifiables dans l'outil
-// (voir suivi.js) : ajoute/corrige librement, ces listes ne sont qu'un point
-// de départ et le jeu évolue (ex. les paliers Galactique/Stellar observés en
-// jeu ne sont pas encore dans ce tracker au moment de l'écriture).
+// données officielles Epic Games. Ne servent plus qu'à amorcer un nouveau
+// catalogue vide depuis le panneau admin ; les vraies données vivent dans
+// Supabase (voir chargerCatalogueSupabase() ci-dessus).
 const CATALOGUE_INITIAL = [
   { id: "mouse", nom: "Mouse", classe: "Ouvrier", rarete: "Typique" },
   { id: "pit", nom: "Pit", classe: "Ouvrier", rarete: "Typique" },
@@ -1142,103 +825,18 @@ const CATALOGUE_INITIAL = [
   { id: "imperial-probe", nom: "Imperial Probe", classe: "Combat", rarete: "Typique" },
   { id: "b1-battle", nom: "B1 Battle", classe: "Combat", rarete: "Typique" },
   { id: "drk-1-probe", nom: "DRK-1 Probe", classe: "Combat", rarete: "Typique" },
-  { id: "id10", nom: "ID10", classe: "Combat", rarete: "Typique" },
-  { id: "bdx-explorer", nom: "BDX Explorer", classe: "Ouvrier", rarete: "Rare" },
-  { id: "arg", nom: "ARG", classe: "Ouvrier", rarete: "Rare" },
-  { id: "senate-hovercam", nom: "Senate Hovercam", classe: "Ouvrier", rarete: "Rare" },
-  { id: "bu-4d", nom: "BU-4D", classe: "Ouvrier", rarete: "Rare" },
-  { id: "bal-core", nom: "Bal-Core", classe: "Ouvrier", rarete: "Rare" },
-  { id: "roll-r", nom: "ROLL-R", classe: "Ouvrier", rarete: "Rare" },
-  { id: "2bb", nom: "2BB", classe: "Astromec", rarete: "Rare" },
-  { id: "a-lt", nom: "A-LT", classe: "Astromec", rarete: "Rare" },
-  { id: "r4", nom: "R4", classe: "Astromec", rarete: "Rare" },
-  { id: "r9", nom: "R9", classe: "Astromec", rarete: "Rare" },
-  { id: "b1-security", nom: "B1 Security", classe: "Combat", rarete: "Rare" },
-  { id: "nav-ex", nom: "NAV-EX", classe: "Combat", rarete: "Rare" },
-  { id: "vect-arm", nom: "VECT-Arm", classe: "Combat", rarete: "Rare" },
-  { id: "hov-r", nom: "HOV-R", classe: "Combat", rarete: "Rare" },
-  { id: "groundmech", nom: "Groundmech", classe: "Ouvrier", rarete: "Épique" },
-  { id: "lo", nom: "LO", classe: "Ouvrier", rarete: "Épique" },
-  { id: "amp-walker", nom: "AMP Walker", classe: "Ouvrier", rarete: "Épique" },
-  { id: "sen-tri", nom: "SEN-TRI", classe: "Ouvrier", rarete: "Épique" },
-  { id: "opti-pod", nom: "Opti-Pod", classe: "Ouvrier", rarete: "Épique" },
-  { id: "gunrunner", nom: "Gunrunner", classe: "Ouvrier", rarete: "Épique" },
-  { id: "bb", nom: "BB", classe: "Astromec", rarete: "Épique" },
-  { id: "r2", nom: "R2", classe: "Astromec", rarete: "Épique" },
-  { id: "r6", nom: "R6", classe: "Astromec", rarete: "Épique" },
-  { id: "trak-r", nom: "TRAK-R", classe: "Astromec", rarete: "Épique" },
-  { id: "orb-walker", nom: "ORB-Walker", classe: "Astromec", rarete: "Épique" },
-  { id: "util-tec", nom: "Util-Tec", classe: "Astromec", rarete: "Épique" },
-  { id: "b1-heavy", nom: "B1 Heavy", classe: "Combat", rarete: "Épique" },
-  { id: "b2-super", nom: "B2 Super", classe: "Combat", rarete: "Épique" },
-  { id: "b2-heavy", nom: "B2 Heavy", classe: "Combat", rarete: "Épique" },
-  { id: "strike-orb", nom: "Strike-Orb", classe: "Combat", rarete: "Épique" },
-  { id: "haul-r", nom: "Haul-R", classe: "Combat", rarete: "Épique" },
-  { id: "lng-shot", nom: "LNG-Shot", classe: "Combat", rarete: "Épique" },
-  { id: "proto-roller", nom: "Proto-Roller", classe: "Ouvrier", rarete: "Légendaire" },
-  { id: "mecha-droid", nom: "Mecha-Droid", classe: "Ouvrier", rarete: "Légendaire" },
-  { id: "mono-walker", nom: "Mono-WLKR", classe: "Ouvrier", rarete: "Légendaire" },
-  { id: "bb9", nom: "BB9", classe: "Astromec", rarete: "Légendaire" },
-  { id: "r7", nom: "R7", classe: "Astromec", rarete: "Légendaire" },
-  { id: "b2-rp", nom: "B2-RP", classe: "Combat", rarete: "Légendaire" },
-  { id: "cyclo-grav", nom: "Cyclo-Grav", classe: "Combat", rarete: "Légendaire" },
-  { id: "opti-strike", nom: "Opti-STRK", classe: "Combat", rarete: "Légendaire" },
-  { id: "snow-mouse", nom: "Snow Mouse", classe: "Ouvrier", rarete: "Mythique" },
-  { id: "ric", nom: "RIC", classe: "Ouvrier", rarete: "Mythique" },
-  { id: "loadlifter", nom: "Loadlifter", classe: "Ouvrier", rarete: "Mythique" },
-  { id: "lep", nom: "LEP", classe: "Ouvrier", rarete: "Mythique" },
-  { id: "ric-1200", nom: "RIC-1200", classe: "Ouvrier", rarete: "Mythique" },
-  { id: "drft-r", nom: "DRFT-R", classe: "Astromec", rarete: "Mythique" },
-  { id: "cyclens", nom: "CYCLENS", classe: "Astromec", rarete: "Mythique" },
-  { id: "mo-trak", nom: "MO-TRAK", classe: "Astromec", rarete: "Mythique" },
-  { id: "tri-tek", nom: "TRI-TEK", classe: "Astromec", rarete: "Mythique" },
-  { id: "ig", nom: "IG", classe: "Combat", rarete: "Mythique" },
-  { id: "kx", nom: "KX", classe: "Combat", rarete: "Mythique" },
-  { id: "bb8", nom: "BB-8", classe: "Astromec", rarete: "Iconique" },
-  { id: "mister-bones", nom: "Mister Bones", classe: "Combat", rarete: "Iconique" },
-  { id: "ig-11-marshal", nom: "IG-11 Marshal", classe: "Combat", rarete: "Iconique" },
-  { id: "dj-r3x", nom: "DJ R-3X", classe: "Ouvrier", rarete: "Iconique" },
-  { id: "cb-23", nom: "CB-23", classe: "Astromec", rarete: "Iconique" },
-  { id: "r2-d2", nom: "R2-D2", classe: "Astromec", rarete: "Iconique" },
-  { id: "c-3po", nom: "C-3PO", classe: "Ouvrier", rarete: "Iconique" }
+  { id: "id10", nom: "ID10", classe: "Combat", rarete: "Typique" }
 ];
 
 const RENAISSANCE_INITIALE = [
-  { id: "niveau-1", niveau: 1, credits: 10000, elements: "CB (Défaut), Pit (Défaut), DRK-1 Probe (Défaut)" },
-  { id: "niveau-2", niveau: 2, credits: 150000, elements: "BDX Explorer (Défaut), 2BB (Défaut), Bal-Core (Défaut)" },
-  { id: "niveau-3", niveau: 3, credits: 975000, elements: "A-LT (Défaut), BU-4D (Défaut), R9 (Or)" },
-  { id: "niveau-4", niveau: 4, credits: 2950000, elements: "ARG (Or), B1 Security (Or), Groundmech (Défaut)" },
-  { id: "niveau-5", niveau: 5, credits: 5350000, elements: "BU-4D (Or), HOV-R (Or), R9 (Diamant)" },
-  { id: "niveau-6", niveau: 6, credits: 9850000, elements: "Groundmech (Or), ARG (Diamant), A-LT (Diamant)" },
-  { id: "niveau-7", niveau: 7, credits: 14500000, elements: "BB (Or), B1 Security (Diamant), BU-4D (Diamant)" },
-  { id: "niveau-8", niveau: 8, credits: 36000000, elements: "Util-Tec (Or), LO (Or), HOV-R (Diamant)" },
-  { id: "niveau-9", niveau: 9, credits: 89000000, elements: "Groundmech (Arc-en-ciel), R6 (Or), TRAK-R (Or)" },
-  { id: "niveau-10", niveau: 10, credits: 220000000, elements: "LO (Arc-en-ciel), Haul-R (Arc-en-ciel), Strike-Orb (Or)" },
-  { id: "niveau-11", niveau: 11, credits: 550000000, elements: "AMP Walker (Arc-en-ciel), B1 Heavy (Arc-en-ciel), BB9 (Défaut)" },
-  { id: "niveau-12", niveau: 12, credits: 1360000000, elements: "Proto-Roller (Or), Mecha-Droid (Défaut), Mono-WLKR (Défaut)" },
-  { id: "niveau-13", niveau: 13, credits: 3400000000, elements: "R7 (Défaut), Cyclo-Grav (Défaut), B2-RP (Défaut)" },
-  { id: "niveau-14", niveau: 14, credits: 8450000000, elements: "Opti-STRK (Défaut), Mono-WLKR (Or), Mecha-Droid (Or)" },
-  { id: "niveau-15", niveau: 15, credits: 21000000000, elements: "B2-RP (Or), BB9 (Or), R7 (Or)" },
-  { id: "niveau-16", niveau: 16, credits: 52000000000, elements: "Opti-STRK (Or), Mono-WLKR (Diamant), Proto-Roller (Diamant)" },
-  { id: "niveau-17", niveau: 17, credits: 130000000000, elements: "B2-RP (Diamant), Cyclo-Grav (Diamant), Mecha-Droid (Diamant)" },
-  { id: "niveau-18", niveau: 18, credits: 325000000000, elements: "BB9 (Diamant), R7 (Diamant), Mono-WLKR (Arc-en-ciel)" },
-  { id: "niveau-19", niveau: 19, credits: 810000000000, elements: "B2-RP (Arc-en-ciel), Cyclo-Grav (Arc-en-ciel), Proto-Roller (Arc-en-ciel)" },
-  { id: "niveau-20", niveau: 20, credits: 2000000000000, elements: "R7 (Arc-en-ciel), Opti-STRK (Arc-en-ciel), Mecha-Droid (Arc-en-ciel)" },
-  { id: "niveau-21", niveau: 21, credits: 3000000000000, elements: "BB (Beskar), ORB-Walker (Beskar), Groundmech (Beskar)" },
-  { id: "niveau-22", niveau: 22, credits: 4500000000000, elements: "AMP Walker (Beskar), B1 Heavy (Beskar), Proto-Roller (Beskar)" },
-  { id: "niveau-23", niveau: 23, credits: 6000000000000, elements: "Opti-STRK (Beskar), Mono-WLKR (Beskar), R7 (Beskar)" },
-  { id: "niveau-24", niveau: 24, credits: 9000000000000, elements: "BB9 (Beskar), Cyclo-Grav (Beskar), MO-TRAK (Défaut)" },
-  { id: "niveau-25", niveau: 25, credits: 13500000000000, elements: "B2-RP (Beskar), IG (Défaut), DRFT-R (Or)" },
-  { id: "niveau-26", niveau: 26, credits: 21000000000000, elements: "CYCLENS (Or), Loadlifter (Diamant), RIC-1200 (Arc-en-ciel)" },
-  { id: "niveau-27", niveau: 27, credits: 32000000000000, elements: "KX (Diamant), TRI-TEK (Arc-en-ciel), Snow Mouse (Beskar)" }
+  { id: "niveau-1", niveau: 1, credits: 10000, elements: "CB (Défaut), Pit (Défaut), DRK-1 Probe (Défaut)" }
 ];
 
 // Paliers d'amélioration possibles pour un droïde possédé, du plus faible au
-// plus fort (confirmé par capture d'écran du jeu — au-delà de ce que le
-// tracker communautaire connaît encore, qui s'arrête à Beskar). Donnée de
-// départ uniquement : la vraie liste vit dans DroidFortnite/paliers.json
-// (partagée, éditable depuis admin.html — ajout/suppression/réordonnancement,
-// avec une couleur par palier qui teinte le contour des cartes du Droidex).
+// plus fort. Donnée de départ uniquement : la vraie liste vit dans la table
+// paliers (partagée, éditable depuis admin.html — ajout/suppression/
+// réordonnancement, avec une couleur par palier qui teinte le contour des
+// cartes du Droidex).
 const PALIERS_INITIAUX = [
   { nom: "Défaut", couleur: "#9ca3af" },
   { nom: "Or", couleur: "#eab308" },
@@ -1250,17 +848,11 @@ const PALIERS_INITIAUX = [
   { nom: "Stellar", couleur: "#f97316" }
 ];
 
-// Ordre d'affichage des raretés, du plus faible au plus fort (utilisé pour
-// trier la liste des droïdes dans le panneau admin).
-// L'ordre des raretés vient de raretes.json : il donne l'ordre des listes
-// déroulantes (du plus faible au plus fort). Les grilles, elles, suivent
-// l'ordre du catalogue — celui du jeu.
-
 // Types de droïde (Ouvrier/Astromec/Combat...) : point de départ pour
-// l'amorçage de classes.json (partagé, éditable dans l'onglet « Types » du
-// panneau admin — ex. ajouter « Espion » si le jeu introduit une nouvelle
+// l'amorçage de la table classes (partagée, éditable dans l'onglet « Types »
+// du panneau admin — ex. ajouter « Espion » si le jeu introduit une nouvelle
 // classe). Chaque type porte son icône (un émoji), affichée sur les cartes
-// tant qu'aucune photo perso n'est ajoutée.
+// tant qu'aucune image ne lui est ajoutée.
 const CLASSES_INITIALES = [
   { nom: "Ouvrier", icone: "\u{1F527}" },
   { nom: "Astromec", icone: "\u{1F4E1}" },
@@ -1268,7 +860,7 @@ const CLASSES_INITIALES = [
 ];
 
 // Variable globale, comme raretes/unites : réassignée par suivi.js/admin.js
-// une fois classes.json chargé, lue telle quelle par iconeClasse() ci-dessus
+// une fois la table classes chargée, lue telle quelle par iconeClasse() ci-dessus
 // et par le reste du code partagé (filtres, escouade...).
 let classes = CLASSES_INITIALES;
 
@@ -1299,9 +891,8 @@ function remplirSelectClasses(select, valeur, libelleVide) {
   if (choisi && classes.some((c) => c.nom === choisi)) select.value = choisi;
 }
 
-// paliers.json pouvait exister sous l'ancienne forme (tableau de chaînes,
-// avant l'ajout d'une couleur par palier) : on la reconnaît et la convertit
-// à la volée, sans rien casser pour qui l'a déjà utilisée.
+// Reconnaît l'ancienne forme (tableau de chaînes, avant l'ajout d'une
+// couleur par palier) et la convertit à la volée.
 function normaliserPaliers(bruts) {
   return (Array.isArray(bruts) ? bruts : []).map((p) => {
     if (typeof p === "string") return { nom: p, couleur: null };
@@ -1322,25 +913,8 @@ function normaliserPaliers(bruts) {
 //   { id, nom: "WHL-EX", classe: "Ouvrier", rarete: "Rare",
 //     ingredients: [ { nom: "Mouse", quantite: 2 }, { nom: "ARG", quantite: 1 } ] }
 //
-// Partagé (DroidFortnite/fusions.json), éditable depuis admin.html comme le
-// reste. Données de départ tirées de l'exemple fourni — à compléter/corriger
-// librement, ce ne sont qu'un point de départ.
-const FUSIONS_INITIALES = [
-  { id: "fus-whl-ex",   nom: "WHL-EX",   classe: "Ouvrier",  rarete: "Rare",
-    ingredients: [ { nom: "Mouse", quantite: 2 }, { nom: "ARG", quantite: 1 } ] },
-  { id: "fus-zro-tec",  nom: "ZRO-TEC",  classe: "Astromec", rarete: "Rare",
-    ingredients: [ { nom: "ID10", quantite: 2 }, { nom: "2BB", quantite: 1 } ] },
-  { id: "fus-btl-r",    nom: "BTL-R",    classe: "Combat",   rarete: "Rare",
-    ingredients: [ { nom: "B1 Battle", quantite: 1 }, { nom: "R9", quantite: 1 }, { nom: "BDX Explorer", quantite: 1 } ] },
-  { id: "fus-n-ul",     nom: "N-UL",     classe: "Ouvrier",  rarete: "Épique",
-    ingredients: [ { nom: "B1 Heavy", quantite: 1 }, { nom: "Gunrunner", quantite: 1 }, { nom: "BB", quantite: 1 } ] },
-  { id: "fus-scrp-r",   nom: "SCRP-R",   classe: "Astromec", rarete: "Épique",
-    ingredients: [ { nom: "Gonk", quantite: 1 }, { nom: "Groundmech", quantite: 1 }, { nom: "R6", quantite: 1 } ] },
-  { id: "fus-arm-core", nom: "ARM-CORE", classe: "Combat",   rarete: "Épique",
-    ingredients: [ { nom: "ARG", quantite: 2 }, { nom: "B2 Heavy", quantite: 1 } ] },
-  { id: "fus-opt-ar",   nom: "OPT-AR",   classe: "Combat",   rarete: "Épique",
-    ingredients: [ { nom: "R2", quantite: 2 }, { nom: "B2 Super", quantite: 1 } ] }
-];
+// Partagé (table fusions), éditable depuis admin.html comme le reste.
+const FUSIONS_INITIALES = [];
 
 // Rang d'une rareté : sa position dans la liste des raretés (du plus faible au
 // plus fort). Une rareté inconnue passe en dernier. Partagé (tri du catalogue).

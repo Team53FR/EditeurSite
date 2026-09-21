@@ -22,10 +22,15 @@
 -- Lecture publique (y compris visiteurs non connectés du Droidex), écriture
 -- réservée aux admins.
 
+-- "ordre" n'est PAS unique : seul l'ordre RELATIF compte (tri stable côté
+-- client, voir trierCatalogueParRarete/afficherFusionAdmin) — une valeur
+-- dupliquée ne casse rien, et ça évite d'avoir à échanger deux rangs en deux
+-- temps pour reordonner (un lot INSERT...ON CONFLICT ne peut pas poser
+-- temporairement deux lignes sur la même valeur unique).
 create table public.paliers (
   nom      text primary key,
   couleur  text[],   -- une seule couleur, ou plusieurs pour un dégradé (Arc-en-ciel)
-  ordre    integer not null unique
+  ordre    integer not null
 );
 
 create table public.unites (
@@ -38,14 +43,14 @@ create table public.raretes (
   fond                      text not null,
   texte                     text not null,
   premier_palier_seulement  boolean not null default false,
-  ordre                     integer not null unique
+  ordre                     integer not null
 );
 
 create table public.classes (
   nom     text primary key,
   icone   text not null,
   image   text,               -- chemin/URL du PNG transparent, optionnel (repli sur l'icône)
-  ordre   integer not null unique
+  ordre   integer not null
 );
 
 
@@ -57,7 +62,7 @@ create table public.droides (
   classe   text not null references public.classes(nom),
   rarete   text not null references public.raretes(nom),
   image    text,              -- photo perso ajoutée depuis l'admin, optionnelle
-  ordre    integer not null unique
+  ordre    integer not null
 );
 create index droides_classe_idx on public.droides(classe);
 create index droides_rarete_idx on public.droides(rarete);
@@ -88,7 +93,7 @@ create table public.fusions (
   classe  text not null references public.classes(nom),
   rarete  text not null references public.raretes(nom),
   image   text,
-  ordre   integer not null unique
+  ordre   integer not null
 );
 create index fusions_classe_idx on public.fusions(classe);
 create index fusions_rarete_idx on public.fusions(rarete);
@@ -108,7 +113,10 @@ create table public.renaissance_niveaux (
   id        text primary key,
   niveau    integer not null unique,
   credits   numeric not null check (credits >= 0),
-  elements  text   -- description libre ("CB (Défaut), Pit (Défaut)...")
+  -- Texte libre ("CB (Défaut), Pit (Défaut)...") OU objet {"0": "...", "1": "...", ...}
+  -- indexé par numéro de super renaissance (voir elementsParSuper() côté site) —
+  -- jsonb pour accepter les deux formes sans les confondre au chargement.
+  elements  jsonb
 );
 
 

@@ -20,23 +20,24 @@ envelopperAttente({
 
 // Panneau de gestion Droid Fortnite (réservé aux admins du portail central —
 // voir exigerAdminDroidFortnite() dans script.js).
+//
+// ===== Supabase : les tables « taxonomie » (paliers/unités/raretés/types/
+// droïdes/fusions) se sauvegardent comme l'était le fichier JSON d'avant :
+// on retraite le TABLEAU ENTIER à chaque modification (upsert de toutes ses
+// lignes, puis suppression de celles qui ont disparu) plutôt qu'une ligne à
+// la fois — ça reste simple, et ça élimine tout risque d'incohérence entre
+// deux sauvegardes partielles. Ces tables restent petites (une centaine de
+// droïdes tout au plus) : le coût d'un aller-retour complet est négligeable
+// pour une action d'admin, occasionnelle par nature.
 
 const token = exigerAdminDroidFortnite();
 
 let catalogue = [];
-let shaCatalogue = null;
 let paliers = [];
-let shaPaliers = null;
-let shaUnites = null;
-let shaRaretes = null;
-let shaClasses = null;
 let renaissance = [];
-let shaRenaissance = null;
 let fusions = [];
-let shaFusions = null;
 let superEdite = 0;   // super renaissance dont on edite les droides
 let modeEditionId = null; // id du droïde en cours de modification, ou null (mode ajout)
-const cacheImages = new Map(); // chemin GitHub -> URL locale (blob:)
 
 // État du formulaire pour l'icône, en attente d'enregistrement (pas encore
 // envoyée tant qu'on ne valide pas le formulaire).
@@ -79,6 +80,108 @@ function retirerImageAdmin() {
   document.getElementById("boutonSupprimerImageAdmin").style.display = "none";
 }
 
+// ===== Écriture des tables partagées =====
+
+// Chemin de stockage (dans le bucket droid-fortnite) à partir de l'URL
+// publique enregistrée sur une ligne — pour pouvoir supprimer l'ancien
+// fichier lors d'un remplacement ou d'un retrait.
+function cheminStorageDepuisUrl(url) {
+  const prefixe = `${SUPABASE_URL}/storage/v1/object/public/droid-fortnite/`;
+  return (url && url.startsWith(prefixe)) ? url.slice(prefixe.length) : null;
+}
+
+// Un nom de type (classe) ne peut pas servir tel quel dans un chemin de
+// fichier (espaces, accents) : réduit à des lettres/chiffres/tirets.
+function slugifier(texte) {
+  return String(texte || "")
+    .normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .toLowerCase().trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+async function upserterLignes(table, lignes, cleConflit) {
+  if (!lignes.length) return;
+  await requeteSupabase(`${table}?on_conflict=${cleConflit}`, {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify(lignes)
+  });
+}
+
+async function supprimerLignesSauf(table, cleConflit, valeursGardees) {
+  if (!valeursGardees.length) return;
+  const liste = valeursGardees
+    .map((v) => encodeURIComponent(`"${String(v).replace(/"/g, '\\"')}"`))
+    .join(",");
+  await requeteSupabase(`${table}?${cleConflit}=not.in.(${liste})`, {
+    method: "DELETE", headers: { Prefer: "return=minimal" }
+  });
+}
+
+// Remplace intégralement une table taxonomie par le nouveau tableau.
+// L'upsert passe AVANT la suppression : une ligne encore utilisée ailleurs
+// (classe/rareté d'un droïde, palier d'une progression...) refuse sa
+// suppression — voir messageErreurTaxonomie.
+async function remplacerTableEntiere(table, cle, lignes) {
+  await upserterLignes(table, lignes, cle);
+  await supprimerLignesSauf(table, cle, lignes.map((l) => l[cle]));
+}
+
+// Table « enfant » (droide_paliers, fusion_ingredients) : entièrement vidée
+// puis reconstruite, comme les lignes de la table parente auxquelles elle
+// se rapporte. filtreTout est un filtre toujours vrai (ex. "droide_id=not.is.null") :
+// PostgREST refuse un DELETE sans le moindre filtre.
+async function remplacerTableEnfant(table, filtreTout, lignes) {
+  await requeteSupabase(`${table}?${filtreTout}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
+  if (lignes.length) {
+    await requeteSupabase(table, {
+      method: "POST", headers: { Prefer: "return=minimal" },
+      body: JSON.stringify(lignes)
+    });
+  }
+}
+
+// Un message plus clair qu'un brut « violates foreign key constraint »
+// lorsqu'on tente de supprimer une entrée encore utilisée ailleurs.
+function messageErreurTaxonomie(e) {
+  if (/foreign key|viol/i.test(e.message || "")) {
+    return "Impossible : encore utilisé(e) ailleurs (un droïde, une fusion, une progression enregistrée...). Modifie-les d'abord.";
+  }
+  return e.message;
+}
+
+// Réécrit le catalogue entier (droides + droide_paliers), à partir du
+// tableau en mémoire — appelé après chaque ajout/modification/suppression/
+// import, exactement comme catalogue.json était réécrit en entier avant.
+async function enregistrerCatalogueComplet(copie) {
+  const lignesDroides = copie.map((d, index) => ({
+    id: d.id, nom: d.nom, classe: d.classe, rarete: d.rarete, image: d.image || null, ordre: index
+  }));
+  await remplacerTableEntiere("droides", "id", lignesDroides);
+
+  const lignesPaliers = [];
+  copie.forEach((d) => {
+    const tousLesPaliers = new Set([
+      ...Object.keys(d.prix || {}), ...Object.keys(d.rendements || {}), ...Object.keys(d.vente || {}),
+      ...Object.keys(d.tempsFabrication || {}), ...Object.keys(d.bonus || {})
+    ]);
+    tousLesPaliers.forEach((palier) => {
+      const rdt = valeurPalier(d.rendements, palier);
+      lignesPaliers.push({
+        droide_id: d.id, palier,
+        prix: valeurPalier(d.prix, palier),
+        vente: valeurPalier(d.vente, palier),
+        rendement: typeof rdt === "number" ? rdt : null,
+        rendement_pourcentage: (typeof rdt === "string" && /%$/.test(rdt)) ? parseFloat(rdt) : null,
+        temps_fabrication: valeurPalier(d.tempsFabrication, palier),
+        bonus: valeurPalier(d.bonus, palier)
+      });
+    });
+  });
+  await remplacerTableEnfant("droide_paliers", "droide_id=not.is.null", lignesPaliers);
+}
+
 // ===== Onglets (Droïdes / Ajouter / Paliers / Renaissance / Unités / Raretés / Types) =====
 let ongletAdminActif = "droides";
 
@@ -112,32 +215,24 @@ async function chargerDonnees() {
   const message = document.getElementById("messageDroideAdmin");
   try {
     const [rCatalogue, rPaliers, rUnites, rRaretes, rClasses, rRenaissance, rFusions] = await Promise.all([
-      chargerOuAmorcer("catalogue.json", CATALOGUE_INITIAL, token, "Amorçage du catalogue de droïdes"),
-      chargerOuAmorcer("paliers.json", PALIERS_INITIAUX, token, "Amorçage de la liste des paliers"),
-      chargerOuAmorcer("unites.json", UNITES_INITIALES, token, "Amorçage des unités de grandeur"),
-      chargerOuAmorcer("raretes.json", RARETES_INITIALES, token, "Amorçage des couleurs de rareté"),
-      chargerOuAmorcer("classes.json", CLASSES_INITIALES, token, "Amorçage des types de droïde"),
-      chargerOuAmorcer("renaissance.json", RENAISSANCE_INITIALE, token, "Amorçage des paliers de renaissance"),
-      chargerOuAmorcer("fusions.json", FUSIONS_INITIALES, token, "Amorçage des recettes de fusion")
+      chargerCatalogueSupabase(),
+      chargerPaliersSupabase(),
+      chargerUnitesSupabase(),
+      chargerRaretesSupabase(),
+      chargerClassesSupabase(),
+      chargerRenaissanceSupabase(),
+      chargerFusionsSupabase()
     ]);
-    catalogue = Array.isArray(rCatalogue.contenu) ? rCatalogue.contenu : [];
-    shaCatalogue = rCatalogue.sha;
-    const paliersCharges = normaliserPaliers(rPaliers.contenu);
+    catalogue = rCatalogue;
+    const paliersCharges = normaliserPaliers(rPaliers);
     paliers = paliersCharges.length ? paliersCharges : PALIERS_INITIAUX;
-    shaPaliers = rPaliers.sha;
-    const unitesChargees = normaliserUnites(rUnites.contenu);
+    const unitesChargees = normaliserUnites(rUnites);
     unites = unitesChargees.length ? unitesChargees : UNITES_INITIALES;
-    shaUnites = rUnites.sha;
-    raretes = normaliserRaretes(rRaretes.contenu);
-    shaRaretes = rRaretes.sha;
+    raretes = normaliserRaretes(rRaretes);
     appliquerCouleursRaretes();
-    classes = normaliserClasses(rClasses.contenu);
-    shaClasses = rClasses.sha;
-    await precacherImagesClasses(token);
-    renaissance = Array.isArray(rRenaissance.contenu) ? rRenaissance.contenu : [];
-    shaRenaissance = rRenaissance.sha;
-    fusions = Array.isArray(rFusions.contenu) ? rFusions.contenu : [];
-    shaFusions = rFusions.sha;
+    classes = normaliserClasses(rClasses);
+    renaissance = Array.isArray(rRenaissance) ? rRenaissance : [];
+    fusions = Array.isArray(rFusions) ? rFusions : [];
   } catch (e) {
     message.textContent = e.message;
     return;
@@ -333,7 +428,7 @@ function droideEnEdition() {
   return modeEditionId ? (catalogue.find((x) => x.id === modeEditionId) || null) : null;
 }
 
-async function editerDroide(id) {
+function editerDroide(id) {
   const d = catalogue.find((x) => x.id === id);
   if (!d) return;
   modeEditionId = id;
@@ -351,15 +446,10 @@ async function editerDroide(id) {
 
   const apercu = document.getElementById("apercuDroideAdmin");
   const boutonRetirer = document.getElementById("boutonSupprimerImageAdmin");
-  apercu.innerHTML = iconePlaceholderDroideAdmin();
+  // L'image est déjà une URL publique directe (Storage) : plus besoin de la
+  // récupérer via une requête à part, ni de la mettre en cache.
+  apercu.innerHTML = d.image ? `<img src="${d.image}" alt="">` : iconePlaceholderDroideAdmin();
   boutonRetirer.style.display = d.image ? "block" : "none";
-  if (d.image) {
-    try {
-      let url = cacheImages.get(d.image);
-      if (!url) { url = await obtenirUrlImage(d.image, token); cacheImages.set(d.image, url); }
-      if (modeEditionId === id) apercu.innerHTML = `<img src="${url}" alt="">`;
-    } catch (e) { /* reste sur le placeholder */ }
-  }
 
   changerOngletAdmin("ajout");
   document.getElementById("champNom").focus();
@@ -404,28 +494,27 @@ async function enregistrerDroideAdmin() {
 
   message.textContent = "Enregistrement...";
   try {
-    let cheminImage = ancien ? ancien.image || null : null;
+    let urlImage = ancien ? ancien.image || null : null;
     if (dataUrlImageAdmin) {
       const chemin = `images/${id}.${extraireExtensionDataUrl(dataUrlImageAdmin)}`;
-      await uploaderImageBase64(chemin, dataUrlImageAdmin, token, `Icône du droïde ${nom}`);
-      if (ancien && ancien.image && ancien.image !== chemin) {
-        supprimerFichierGithub(ancien.image, token, "Remplacement de l'icône").catch(() => {});
-      }
-      cacheImages.delete(chemin);
-      cheminImage = chemin;
+      urlImage = await uploaderImageStorage(chemin, dataUrlImageAdmin);
+      // Une image remplacée par une autre extension (PNG <-> JPEG) laisserait
+      // sinon l'ancien fichier orphelin dans le bucket.
+      const ancienChemin = ancien && ancien.image ? cheminStorageDepuisUrl(ancien.image) : null;
+      if (ancienChemin && ancienChemin !== chemin) supprimerImageStorage(ancienChemin).catch(() => {});
     } else if (imageSupprimeeAdmin) {
-      if (ancien && ancien.image) supprimerFichierGithub(ancien.image, token, "Suppression de l'icône").catch(() => {});
-      cheminImage = null;
+      const ancienChemin = ancien && ancien.image ? cheminStorageDepuisUrl(ancien.image) : null;
+      if (ancienChemin) supprimerImageStorage(ancienChemin).catch(() => {});
+      urlImage = null;
     }
 
-    const entree = { id, nom, classe, rarete };
-    if (cheminImage) entree.image = cheminImage;
+    const entree = { id, nom, classe, rarete, image: urlImage };
     const { prix, rendements, vente, tempsFabrication, bonus } = lireGrillePrixRendement();
-    if (Object.keys(prix).length) entree.prix = prix;
-    if (Object.keys(rendements).length) entree.rendements = rendements;
-    if (Object.keys(vente).length) entree.vente = vente;
-    if (Object.keys(tempsFabrication).length) entree.tempsFabrication = tempsFabrication;
-    if (Object.keys(bonus).length) entree.bonus = bonus;
+    entree.prix = prix;
+    entree.rendements = rendements;
+    entree.vente = vente;
+    entree.tempsFabrication = tempsFabrication;
+    entree.bonus = bonus;
 
     const copieBrute = modeEditionId
       ? catalogue.map((x) => x.id === modeEditionId ? entree : x)
@@ -435,14 +524,13 @@ async function enregistrerDroideAdmin() {
     // l'ordre du jeu est conservé à l'intérieur d'une même rareté.
     const copie = trierCatalogueParRarete(copieBrute);
 
-    shaCatalogue = await sauvegarderAvecFusion("catalogue.json", copie, shaCatalogue, token,
-      modeEditionId ? `Modification du droïde ${nom}` : `Ajout du droïde ${nom}`);
+    await enregistrerCatalogueComplet(copie);
     catalogue = copie;
     annulerEditionDroide();
     afficherDroides();
     changerOngletAdmin("droides");
   } catch (e) {
-    message.textContent = e.message;
+    message.textContent = messageErreurTaxonomie(e);
   }
 }
 
@@ -534,14 +622,10 @@ async function importerCatalogueJSON() {
   try {
     if (classesAjoutees.length) {
       const nouvellesClasses = classes.concat(classesAjoutees.map((nom) => ({ nom, icone: "\u{1F916}" })));
-      shaClasses = await sauvegarderAvecRetry("classes.json", nouvellesClasses, shaClasses, token,
-        "Ajout de type(s) via import : " + classesAjoutees.join(", "));
-      classes = nouvellesClasses;
-      remplirSelectClasses(document.getElementById("champClasse"));
+      await sauvegarderClasses(nouvellesClasses, "Ajout de type(s) via import : " + classesAjoutees.join(", "));
     }
 
-    shaCatalogue = await sauvegarderAvecFusion("catalogue.json", copie, shaCatalogue, token,
-      `Import de catalogue (${ajoutes} ajoutés, ${modifies} mis à jour)`);
+    await enregistrerCatalogueComplet(copie);
     catalogue = copie;
     afficherDroides();
     champ.value = "";
@@ -549,26 +633,29 @@ async function importerCatalogueJSON() {
     message.textContent = ajoutes + " droïde(s) ajouté(s), " + modifies + " mis à jour" +
       (classesAjoutees.length ? ", nouveau(x) type(s) : " + classesAjoutees.join(", ") : "") + ".";
   } catch (e) {
-    message.textContent = e.message;
+    message.textContent = messageErreurTaxonomie(e);
   }
 }
 
 async function supprimerDroide(id) {
   const d = catalogue.find((x) => x.id === id);
   if (!d) return;
-  if (!confirm(`Supprimer le droïde « ${d.nom} » du catalogue ?\n\n(La progression déjà enregistrée par les comptes qui le possédaient n'est pas supprimée, juste rendue invisible.)`)) return;
+  if (!confirm(`Supprimer le droïde « ${d.nom} » du catalogue ?\n\n(La progression déjà enregistrée par les comptes qui le possédaient — possession, escouade — est supprimée avec lui.)`)) return;
 
   const message = document.getElementById("messageDroideAdmin");
   const copie = catalogue.filter((x) => x.id !== id);
 
   try {
-    shaCatalogue = await sauvegarderAvecFusion("catalogue.json", copie, shaCatalogue, token, `Suppression du droïde ${d.nom}`);
+    await enregistrerCatalogueComplet(copie);
     catalogue = copie;
-    if (d.image) supprimerFichierGithub(d.image, token, "Suppression du droïde associé").catch(() => {});
+    if (d.image) {
+      const chemin = cheminStorageDepuisUrl(d.image);
+      if (chemin) supprimerImageStorage(chemin).catch(() => {});
+    }
     if (modeEditionId === id) annulerEditionDroide();
     afficherDroides();
   } catch (e) {
-    message.textContent = e.message;
+    message.textContent = messageErreurTaxonomie(e);
   }
 }
 
@@ -660,12 +747,16 @@ async function sauvegarderPaliers(copie, messageCommit) {
   const message = document.getElementById("messagePaliers");
   message.textContent = "Enregistrement...";
   try {
-    shaPaliers = await sauvegarderAvecRetry("paliers.json", copie, shaPaliers, token, messageCommit);
+    const lignes = copie.map((p, index) => {
+      const couleurs = couleursPalier(p.couleur);
+      return { nom: p.nom, couleur: couleurs.length ? couleurs : null, ordre: index };
+    });
+    await remplacerTableEntiere("paliers", "nom", lignes);
     paliers = copie;
     afficherPaliers();
     message.textContent = "";
   } catch (e) {
-    message.textContent = e.message;
+    message.textContent = messageErreurTaxonomie(e);
   }
 }
 
@@ -701,13 +792,13 @@ function deplacerPalier(index, direction) {
 
 function supprimerPalier(index) {
   const nom = paliers[index].nom;
-  if (!confirm(`Supprimer le palier « ${nom} » ?\n\nLa progression déjà enregistrée pour ce palier n'est pas supprimée, juste rendue invisible (elle réapparaîtrait si un palier du même nom est recréé).`)) return;
+  if (!confirm(`Supprimer le palier « ${nom} » ?\n\nSi des comptes ont enregistré une progression à ce palier (possession, escouade), la suppression sera refusée — modifie-les d'abord.`)) return;
   const copie = paliers.filter((_, i) => i !== index);
   sauvegarderPaliers(copie, `Suppression du palier ${nom}`);
 }
 
 // ===== Unités de grandeur =====
-// Partagées (unites.json), éditables par un admin : les montants du jeu
+// Partagées (table unites), éditables par un admin : les montants du jeu
 // grimpent, la liste doit pouvoir suivre sans toucher au code.
 
 function afficherUnites() {
@@ -744,7 +835,8 @@ async function sauvegarderUnites(nouvelles, messageCommit) {
   message.className = "message";
   message.textContent = "Enregistrement...";
   try {
-    shaUnites = await sauvegarderAvecRetry("unites.json", nouvelles, shaUnites, token, messageCommit);
+    const lignes = nouvelles.map((u) => ({ symbole: u.symbole, facteur: u.facteur }));
+    await remplacerTableEntiere("unites", "symbole", lignes);
     unites = nouvelles;
     afficherUnites();
     // La grille du formulaire propose ces unités : elle doit suivre.
@@ -752,7 +844,7 @@ async function sauvegarderUnites(nouvelles, messageCommit) {
     message.className = "message ok";
     message.textContent = "Enregistré.";
   } catch (e) {
-    message.textContent = e.message;
+    message.textContent = messageErreurTaxonomie(e);
   }
 }
 
@@ -791,7 +883,7 @@ function supprimerUnite(index) {
 }
 
 // ===== Couleurs des raretés =====
-// Partagées (raretes.json). Leur ORDRE est celui du plus faible au plus fort :
+// Partagées (table raretes). Leur ORDRE est celui du plus faible au plus fort :
 // il sert au tri du catalogue et à l'ordre des filtres. Ajout, suppression et
 // réordonnancement sont possibles ; le renommage ne l'est pas, car chaque
 // droïde stocke le NOM de sa rareté (même raison que pour les paliers).
@@ -901,9 +993,7 @@ function supprimerRarete(index, utilisee) {
     return;
   }
   const avertissement = utilisee
-    ? "\n\n" + utilisee + " droïde(s) portent cette rareté. Ils la garderont, mais elle " +
-      "n'aura plus de couleur et passera en dernier dans le tri. Modifie-les d'abord si tu " +
-      "veux éviter cela."
+    ? "\n\n" + utilisee + " droïde(s) portent cette rareté : la suppression sera refusée. Modifie-les d'abord."
     : "";
   if (!confirm("Supprimer la rareté « " + r.nom + " » ?" + avertissement)) return;
   sauvegarderRaretes(raretes.filter((_, i) => i !== index), "Suppression de la rareté " + r.nom);
@@ -919,7 +1009,11 @@ async function sauvegarderRaretes(nouvelles, messageCommit) {
   message.className = "message";
   message.textContent = "Enregistrement...";
   try {
-    shaRaretes = await sauvegarderAvecRetry("raretes.json", nouvelles, shaRaretes, token, messageCommit);
+    const lignes = nouvelles.map((r, index) => ({
+      nom: r.nom, fond: r.fond, texte: r.texte,
+      premier_palier_seulement: !!r.premierPalierSeulement, ordre: index
+    }));
+    await remplacerTableEntiere("raretes", "nom", lignes);
     raretes = nouvelles;
     appliquerCouleursRaretes();
     afficherRaretes();
@@ -928,7 +1022,7 @@ async function sauvegarderRaretes(nouvelles, messageCommit) {
     message.className = "message ok";
     message.textContent = "Enregistré.";
   } catch (e) {
-    message.textContent = e.message;
+    message.textContent = messageErreurTaxonomie(e);
   }
 }
 
@@ -995,19 +1089,18 @@ async function sauvegarderClasses(nouvelles, messageCommit) {
   message.className = "message";
   message.textContent = "Enregistrement...";
   try {
-    shaClasses = await sauvegarderAvecRetry("classes.json", nouvelles, shaClasses, token, messageCommit);
+    const lignes = nouvelles.map((c, index) => ({
+      nom: c.nom, icone: c.icone, image: c.image || null, ordre: index
+    }));
+    await remplacerTableEntiere("classes", "nom", lignes);
     classes = nouvelles;
-    // Rien qu'une poignée de types : autant relire les images à chaque
-    // enregistrement plutôt que de risquer d'oublier de le faire à un
-    // endroit — la nouvelle (ou l'ancienne, inchangée) est toujours à jour.
-    await precacherImagesClasses(token);
     afficherClasses();
     remplirSelectClasses(document.getElementById("champClasse"));
     afficherDroides();          // icônes (ou images) des cartes suivent
     message.className = "message ok";
     message.textContent = "Enregistré.";
   } catch (e) {
-    message.textContent = e.message;
+    message.textContent = messageErreurTaxonomie(e);
   }
 }
 
@@ -1032,15 +1125,16 @@ async function changerImageClasse(index, fichier) {
     // le PNG (et sa transparence) si l'image en a besoin, repasse en JPEG
     // sinon.
     const dataUrl = await comprimerImage(fichier, 300, 0.85);
-    const chemin = `images/classes/${slugifierLogin(c.nom)}.${extraireExtensionDataUrl(dataUrl)}`;
-    await uploaderImageBase64(chemin, dataUrl, token, `Image du type ${c.nom}`);
+    const chemin = `classes/${slugifier(c.nom)}.${extraireExtensionDataUrl(dataUrl)}`;
+    const url = await uploaderImageStorage(chemin, dataUrl);
     // Une image remplacée par une autre extension (PNG <-> JPEG) laisserait
-    // sinon l'ancien fichier orphelin dans le dépôt.
-    if (c.image && c.image !== chemin) {
-      supprimerFichierGithub(c.image, token, "Remplacement de l'image").catch(() => {});
+    // sinon l'ancien fichier orphelin dans le bucket.
+    if (c.image) {
+      const ancienChemin = cheminStorageDepuisUrl(c.image);
+      if (ancienChemin && ancienChemin !== chemin) supprimerImageStorage(ancienChemin).catch(() => {});
     }
     const copie = classes.slice();
-    copie[index] = Object.assign({}, c, { image: chemin });
+    copie[index] = Object.assign({}, c, { image: url });
     await sauvegarderClasses(copie, `Image du type ${c.nom}`);
   } catch (e) {
     message.textContent = e.message || "Impossible de charger cette image.";
@@ -1050,19 +1144,8 @@ async function changerImageClasse(index, fichier) {
 async function retirerImageClasse(index) {
   const c = classes[index];
   if (!c || !c.image) return;
-  const message = document.getElementById("messageClasses");
-  // Attendue, et son échec doit bloquer la suite (contrairement au
-  // remplacement d'image, où l'ancien fichier n'a plus d'importance dès que
-  // le nouveau est en place) : si l'on enregistre quand même le type comme
-  // "sans image" alors que le fichier est toujours là, un nouvel envoi au
-  // même chemin se heurte à un fichier orphelin que plus rien ne référence.
-  try {
-    await supprimerFichierGithub(c.image, token, `Retrait de l'image du type ${c.nom}`);
-  } catch (e) {
-    message.className = "message";
-    message.textContent = e.message || "Impossible de supprimer l'image.";
-    return;
-  }
+  const chemin = cheminStorageDepuisUrl(c.image);
+  if (chemin) await supprimerImageStorage(chemin);
   const copie = classes.slice();
   const sansImage = Object.assign({}, c);
   delete sansImage.image;
@@ -1113,9 +1196,8 @@ async function ajouterClasse() {
   const entree = { nom, icone };
   if (dataUrl) {
     try {
-      const chemin = `images/classes/${slugifierLogin(nom)}.${extraireExtensionDataUrl(dataUrl)}`;
-      await uploaderImageBase64(chemin, dataUrl, token, `Image du type ${nom}`);
-      entree.image = chemin;
+      const chemin = `classes/${slugifier(nom)}.${extraireExtensionDataUrl(dataUrl)}`;
+      entree.image = await uploaderImageStorage(chemin, dataUrl);
     } catch (e) {
       message.textContent = "Type ajouté, mais l'image n'a pas pu être envoyée : " + e.message;
     }
@@ -1131,8 +1213,7 @@ function supprimerClasse(index, utilisee) {
     return;
   }
   const avertissement = utilisee
-    ? "\n\n" + utilisee + " droïde(s) portent ce type. Ils le garderont, mais il " +
-      "n'aura plus d'icône propre. Modifie-les d'abord si tu veux éviter cela."
+    ? "\n\n" + utilisee + " droïde(s) portent ce type : la suppression sera refusée. Modifie-les d'abord."
     : "";
   if (!confirm(`Supprimer le type « ${c.nom} » ?${avertissement}`)) return;
   sauvegarderClasses(classes.filter((_, i) => i !== index), `Suppression du type ${c.nom}`);
@@ -1145,7 +1226,7 @@ function supprimerClasse(index, utilisee) {
 // vingt paliers à l'écran. On affiche donc trois EMPLACEMENTS : on clique une
 // case, on choisit le droïde puis son palier dans une feuille, et c'est tout.
 //
-// Le format ENREGISTRÉ ne change pas (« CB (Défaut), Pit (Or) »).
+// Le format ENREGISTRÉ ne change pas (« CB (Défaut), Pit (Défaut) »).
 
 const EMPLACEMENTS_RENAISSANCE = 3;
 
@@ -1313,8 +1394,8 @@ function afficherEtapePalier(droide) {
 }
 
 // ===== Paliers de renaissance =====
-// Partagés (renaissance.json), gérés ici et non plus depuis la page de suivi :
-// c'est du catalogue, pas de la progression personnelle.
+// Partagés (table renaissance_niveaux), gérés ici et non plus depuis la page
+// de suivi : c'est du catalogue, pas de la progression personnelle.
 
 // Sélecteur de super renaissance : on édite les droïdes d'une super
 // renaissance à la fois, les niveaux et les coûts étant communs à toutes.
@@ -1411,20 +1492,24 @@ function afficherRenaissanceAdmin() {
   });
 }
 
-// Fichier partagé, modifiable par n'importe quel admin : on fusionne plutôt
-// que d'écraser, comme pour le catalogue.
+// Table partagée, modifiable par n'importe quel admin : on retraite le
+// tableau entier à chaque sauvegarde (upsert + suppression de ce qui a
+// disparu), comme les autres taxonomies.
 async function sauvegarderRenaissanceAdmin(nouvelle, messageCommit) {
   const message = document.getElementById("messageRenaissanceAdmin");
   message.className = "message";
   message.textContent = "Enregistrement...";
   try {
-    shaRenaissance = await sauvegarderAvecFusion("renaissance.json", nouvelle, shaRenaissance, token, messageCommit);
+    const lignes = nouvelle.map((r) => ({
+      id: r.id, niveau: r.niveau, credits: r.credits, elements: elementsParSuper(r)
+    }));
+    await remplacerTableEntiere("renaissance_niveaux", "id", lignes);
     renaissance = nouvelle;
     afficherRenaissanceAdmin();
     message.className = "message ok";
     message.textContent = "Enregistré.";
   } catch (e) {
-    message.textContent = e.message;
+    message.textContent = messageErreurTaxonomie(e);
   }
 }
 
@@ -1454,8 +1539,7 @@ function ajouterRenaissanceAdmin() {
 
 function supprimerRenaissanceAdmin(id, niveau) {
   if (!confirm("Supprimer le palier de renaissance " + niveau + " ?\n\n" +
-      "La progression déjà enregistrée par les comptes qui l'avaient atteint n'est pas " +
-      "supprimée, juste rendue invisible.")) return;
+      "La progression déjà enregistrée par les comptes qui l'avaient atteint est supprimée avec lui.")) return;
   sauvegarderRenaissanceAdmin(renaissance.filter((r) => r.id !== id),
     "Suppression du palier de renaissance " + niveau);
 }
@@ -1469,10 +1553,11 @@ function preparerAjoutRenaissance() {
 }
 
 // ===== Fusions =====
-// Partagées (fusions.json), même schéma que les renaissances : des
-// emplacements où l'on choisit un droïde, mais ici avec une QUANTITÉ plutôt
-// qu'un palier. Le résultat (nom, type, rareté) est un droïde spécial qui
-// n'existe pas dans le catalogue : ses champs vivent dans la recette elle-même.
+// Partagées (table fusions + fusion_ingredients), même schéma que les
+// renaissances : des emplacements où l'on choisit un droïde, mais ici avec
+// une QUANTITÉ plutôt qu'un palier. Le résultat (nom, type, rareté) est un
+// droïde spécial qui n'existe pas dans le catalogue : ses champs vivent
+// dans la recette elle-même.
 
 const EMPLACEMENTS_FUSION = 3;
 
@@ -1707,8 +1792,7 @@ async function creerDroideDepuisFusion(f) {
   message.textContent = "Création du droïde " + nom + "...";
   try {
     const copie = trierCatalogueParRarete(catalogue.concat([entree]));
-    shaCatalogue = await sauvegarderAvecFusion("catalogue.json", copie, shaCatalogue, token,
-      "Ajout du droïde " + nom + " (résultat de fusion)");
+    await enregistrerCatalogueComplet(copie);
     catalogue = copie;
     afficherDroides();
     afficherFusionAdmin(); // la case résultat se résout désormais vers le droïde
@@ -1740,7 +1824,7 @@ function afficherFusionAdmin() {
     let ingredientsCourants = normaliserIngredients(f.ingredients);
     let resultatCourant = nomResultatFusion(f);
     const enregistrer = () => {
-      const entree = { id: f.id, resultat: resultatCourant, ingredients: ingredientsCourants };
+      const entree = Object.assign({}, f, { resultat: resultatCourant, ingredients: ingredientsCourants });
       const copie = fusions.map((x) => (x.id === f.id ? entree : x));
       sauvegarderFusionAdmin(copie, "Modification de la fusion " + (resultatCourant || f.id));
     };
@@ -1769,18 +1853,47 @@ function afficherFusionAdmin() {
   });
 }
 
+// Table partagée : on retraite l'ensemble des recettes à chaque sauvegarde,
+// comme les autres taxonomies. Le nom/classe/rareté enregistrés en base sont
+// systématiquement RÉSOLUS depuis le droïde résultat du catalogue (colonnes
+// obligatoires côté base, redondantes avec le catalogue mais nécessaires aux
+// clés étrangères) — avec un repli neutre si le résultat n'y figure pas
+// encore ("hors catalogue").
 async function sauvegarderFusionAdmin(nouvelle, messageCommit) {
   const message = document.getElementById("messageFusionAdmin");
   message.className = "message";
   message.textContent = "Enregistrement...";
   try {
-    shaFusions = await sauvegarderAvecFusion("fusions.json", nouvelle, shaFusions, token, messageCommit);
+    const lignes = nouvelle.map((f, index) => {
+      const resultat = nomResultatFusion(f);
+      const droideRes = droideParNom(resultat);
+      return {
+        id: f.id,
+        nom: resultat || f.id,
+        classe: (droideRes && droideRes.classe)
+          || (classes.some((c) => c.nom === f.classe) ? f.classe : (classes[0] && classes[0].nom)),
+        rarete: (droideRes && droideRes.rarete)
+          || (raretes.some((r) => r.nom === f.rarete) ? f.rarete : (raretes[0] && raretes[0].nom)),
+        image: droideRes ? (droideRes.image || null) : null,
+        ordre: index
+      };
+    });
+    await remplacerTableEntiere("fusions", "id", lignes);
+
+    const lignesIngredients = [];
+    nouvelle.forEach((f) => {
+      normaliserIngredients(f.ingredients).forEach((i) => {
+        lignesIngredients.push({ fusion_id: f.id, droide_nom: i.nom, quantite: i.quantite });
+      });
+    });
+    await remplacerTableEnfant("fusion_ingredients", "fusion_id=not.is.null", lignesIngredients);
+
     fusions = nouvelle;
     afficherFusionAdmin();
     message.className = "message ok";
     message.textContent = "Enregistré.";
   } catch (e) {
-    message.textContent = e.message;
+    message.textContent = messageErreurTaxonomie(e);
   }
 }
 
