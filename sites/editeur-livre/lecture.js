@@ -18,6 +18,7 @@ const FORMATS = {
   "105x148": { larg: 105, haut: 148, margeV: 14, margeH: 14 },
   "210x297": { larg: 210, haut: 297, margeV: 25, margeH: 25 },
   "kdp5585": { larg: 139.7, haut: 215.9, margeV: 18, margeH: 16 },
+  "kdp150210": { larg: 150, haut: 210, margeV: 20, margeH: 18 },
 };
 const PX_PAR_MM = 96 / 25.4;
 

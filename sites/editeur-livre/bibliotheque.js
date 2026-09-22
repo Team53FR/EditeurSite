@@ -129,7 +129,7 @@ function afficherListeLivres() {
     return;
   }
 
-  const labels = { "149x210": "14,9×21", "155x235": "15,5×23,5", "105x148": "Poche", "210x297": "A4", "kdp5585": "KDP" };
+  const labels = { "149x210": "14,9×21", "155x235": "15,5×23,5", "105x148": "Poche", "210x297": "A4", "kdp5585": "KDP 13,97×21,59", "kdp150210": "KDP 15×21" };
 
   bibliotheque.livres.forEach((livre) => {
     const nbPages = livre.nbPages || 0;
@@ -185,6 +185,7 @@ const FORMATS_VIGNETTE = {
   "105x148": { larg: 105, haut: 148 },
   "210x297": { larg: 210, haut: 297 },
   "kdp5585": { larg: 139.7, haut: 215.9 },
+  "kdp150210": { larg: 150, haut: 210 },
 };
 
 // Reproduit le calcul de taille de page de l'éditeur (appliquerFormatPage),

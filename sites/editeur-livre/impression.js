@@ -295,7 +295,7 @@ function ouvrirPanneauImpression() {
   // du sol au plafond, pour que rien de ce qui touche KDP ne puisse un jour
   // changer le comportement des autres formats — ni l'inverse.
   const livre = (typeof indexLivre === "number" && indexLivre !== -1) ? livreActuel() : null;
-  if (livre && livre.format === "kdp5585") {
+  if (livre && estFormatKDP(livre.format)) {
     ouvrirPanneauKDP();
     return;
   }
@@ -2522,8 +2522,21 @@ function ouvrirPanneauKDP() {
   });
 }
 
-// Le seul format que ce mode connaisse : imposé par Amazon pour un poche US.
-const FORMAT_KDP = { larg: 139.7, haut: 215.9 }; // 13,97 × 21,59 cm = 5,5 × 8,5 po
+// Les tailles Amazon KDP disponibles. Chacune partage exactement les mêmes
+// formules de fond perdu / marge de reliure / épaisseur de dos (imposées par
+// Amazon elle-même, indépendantes du format) — seule la taille rognée
+// change. `formatKDPDuLivre()` est le point d'entrée unique : tout le reste
+// de ce module lit le format du LIVRE plutôt qu'une taille figée.
+const FORMATS_KDP = {
+  kdp5585:   { larg: 139.7, haut: 215.9 }, // 13,97 × 21,59 cm = 5,5 × 8,5 po
+  kdp150210: { larg: 150,   haut: 210 }    // 15,0 × 21,0 cm
+};
+function estFormatKDP(formatKey) {
+  return Object.prototype.hasOwnProperty.call(FORMATS_KDP, formatKey);
+}
+function formatKDPDuLivre(livre) {
+  return FORMATS_KDP[livre && livre.format] || FORMATS_KDP.kdp5585;
+}
 
 const KDP_FOND_PERDU_MM     = 3.2;  // débord de la couverture (obligatoire)
 const KDP_MARGE_EXT_MM      = 6.4;  // haut, bas, petit fond — minimum exigé
@@ -2592,10 +2605,11 @@ function pagesEtMargeKDP(livre) {
   let pagesPro = null;
 
   try {
+    const fmt = formatKDPDuLivre(livre);
     if (mesure) mesure.classList.add("mesure-pro");
     PIED_PAGE_PX = PIED_PRO_PX;
-    f.larg = FORMAT_KDP.larg;
-    f.haut = FORMAT_KDP.haut;
+    f.larg = fmt.larg;
+    f.haut = fmt.haut;
     f.margeV = KDP_MARGE_EXT_MM;
 
     for (let i = 0; i < 5; i++) {
@@ -2622,11 +2636,11 @@ function pagesEtMargeKDP(livre) {
 function exporterKDP(cible) {
   flushSpread();
   const livre = livreActuel();
-  if (livre.format !== "kdp5585") {
-    alert("Ce format d'export est réglé sur le format Amazon KDP " +
-      "(13,97 × 21,59 cm). Changez d'abord le format du livre pour « Amazon KDP », " +
-      "dans le panneau de gauche, sans quoi les pages affichées à l'écran ne " +
-      "correspondront pas à ce que vous enverrez.");
+  if (!estFormatKDP(livre.format)) {
+    alert("Ce mode d'export attend un format Amazon KDP. Changez d'abord le " +
+      "format du livre pour l'un des formats « Amazon KDP » du panneau de " +
+      "gauche, sans quoi les pages affichées à l'écran ne correspondront pas " +
+      "à ce que vous enverrez.");
     return;
   }
 
@@ -2658,10 +2672,11 @@ function ouvrirControleKDP(cible, livre, pagesEcran, pagesPro, margeInt) {
   const nbPages = couverture ? pagesEcran : pagesPro.length;
   const papierDefaut = KDP_PAPIER_DEFAUT;
   const dos = epaisseurDosKDP(nbPages, papierDefaut);
+  const fmt = formatKDPDuLivre(livre);
 
   const conformes = [
     "Pages simples, jamais en planches" + (couverture ? " — sauf la couverture, fournie ouverte à plat, comme KDP l'exige" : ""),
-    "Format exact " + FORMAT_KDP.larg.toFixed(2).replace(".", ",") + " × " + FORMAT_KDP.haut.toFixed(2).replace(".", ",") + " mm, sans marge technique ni repère : c'est ce que KDP demande",
+    "Format exact " + fmt.larg.toFixed(2).replace(".", ",") + " × " + fmt.haut.toFixed(2).replace(".", ",") + " mm, sans marge technique ni repère : c'est ce que KDP demande",
     couverture
       ? "Fond perdu de " + KDP_FOND_PERDU_MM + " mm sur les quatre bords, couleur de fond comprise"
       : "Marge de reliure de " + margeInt.toFixed(1).replace(".", ",") + " mm (minimum KDP pour " + nbPages + " pages), " +
@@ -2695,7 +2710,7 @@ function ouvrirControleKDP(cible, livre, pagesEcran, pagesPro, margeInt) {
     " <a href=\"https://kdp.amazon.com/fr_FR/help/topic/G202145060\" target=\"_blank\" rel=\"noopener\">Aide KDP sur la mise en forme</a>.</p>";
 
   html += '<div class="ci-resume">' +
-    "<div><span>Format rogné</span><strong>" + FORMAT_KDP.larg.toFixed(2).replace(".", ",") + " × " + FORMAT_KDP.haut.toFixed(2).replace(".", ",") + " mm</strong></div>" +
+    "<div><span>Format rogné</span><strong>" + fmt.larg.toFixed(2).replace(".", ",") + " × " + fmt.haut.toFixed(2).replace(".", ",") + " mm</strong></div>" +
     "<div><span>Pages du fichier</span><strong>" + (couverture ? "1 planche" : nbPages + " pages") + "</strong></div>" +
     '<div><span>Nom à donner</span><strong class="ci-nom">' + nom + ".pdf</strong></div>" +
   "</div>";
@@ -2793,19 +2808,21 @@ function genererFichierKDP(cible, dosMm, livre, pagesPro, margeInt) {
       document.head.appendChild(stylePage);
     }
 
+    const fmt = formatKDPDuLivre(livre);
+
     if (cible === "couverture") {
       const planche = creerCouverturePlatKDP(livre, dosMm, promessesImages);
-      const largSupport = 2 * FORMAT_KDP.larg + dosMm + 2 * KDP_FOND_PERDU_MM;
-      const hautSupport = FORMAT_KDP.haut + 2 * KDP_FOND_PERDU_MM;
+      const largSupport = 2 * fmt.larg + dosMm + 2 * KDP_FOND_PERDU_MM;
+      const hautSupport = fmt.haut + 2 * KDP_FOND_PERDU_MM;
       stylePage.textContent = "@page { size: " + largSupport + "mm " + hautSupport + "mm; margin: 0; }";
       zone.appendChild(planche);
       return;
     }
 
-    stylePage.textContent = "@page { size: " + FORMAT_KDP.larg + "mm " + FORMAT_KDP.haut + "mm; margin: 0; }";
+    stylePage.textContent = "@page { size: " + fmt.larg + "mm " + fmt.haut + "mm; margin: 0; }";
     const margeExt = KDP_MARGE_EXT_MM;
     pagesPro.forEach((contenu, i) => {
-      zone.appendChild(creerPageKDP(contenu, i + 1, margeInt, margeExt));
+      zone.appendChild(creerPageKDP(contenu, i + 1, margeInt, margeExt, fmt));
     });
   };
 
@@ -2821,10 +2838,10 @@ function genererFichierKDP(cible, dosMm, livre, pagesPro, margeInt) {
 
 // Page intérieure KDP : le format rogné EST le support, sans marge
 // technique ni repère — voir l'en-tête du module pour pourquoi.
-function creerPageKDP(contenu, numero, margeInt, margeExt) {
+function creerPageKDP(contenu, numero, margeInt, margeExt, fmt) {
   const recto = numero % 2 === 1;
-  const feuille = creerFeuillePro(FORMAT_KDP.larg, FORMAT_KDP.haut, 0);
-  const zone = creerZoneRognePro(FORMAT_KDP.larg, FORMAT_KDP.haut, 0);
+  const feuille = creerFeuillePro(fmt.larg, fmt.haut, 0);
+  const zone = creerZoneRognePro(fmt.larg, fmt.haut, 0);
 
   zone.style.paddingTop = KDP_MARGE_EXT_MM + "mm";
   zone.style.paddingLeft = (recto ? margeInt : margeExt) + "mm";
@@ -2832,7 +2849,7 @@ function creerPageKDP(contenu, numero, margeInt, margeExt) {
 
   const texte = document.createElement("div");
   texte.className = "texte-impression";
-  texte.style.height = (FORMAT_KDP.haut - KDP_MARGE_EXT_MM - PIED_PRO_MM + TOLERANCE_PRO_MM) + "mm";
+  texte.style.height = (fmt.haut - KDP_MARGE_EXT_MM - PIED_PRO_MM + TOLERANCE_PRO_MM) + "mm";
   texte.innerHTML = contenu || "";
   zone.appendChild(texte);
 
@@ -2851,7 +2868,7 @@ function creerPageKDP(contenu, numero, margeInt, margeExt) {
 // ni de pli — KDP place le dos elle-même selon les cotes que ce fichier lui
 // donne déjà, et n'a besoin d'aucun trait pour le faire.
 function creerCouverturePlatKDP(livre, dosMm, promessesImages) {
-  const f = FORMAT_KDP;
+  const f = formatKDPDuLivre(livre);
   const largTrim = 2 * f.larg + dosMm;
   const feuille = creerFeuillePro(largTrim, f.haut, KDP_FOND_PERDU_MM);
   const zone = creerZoneRognePro(largTrim, f.haut, KDP_FOND_PERDU_MM);

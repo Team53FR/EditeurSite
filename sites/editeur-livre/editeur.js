@@ -51,11 +51,12 @@ const FORMATS = {
   "155x235": { larg: 155, haut: 235, margeV: 22, margeH: 20 },
   "105x148": { larg: 105, haut: 148, margeV: 14, margeH: 14 },
   "210x297": { larg: 210, haut: 297, margeV: 25, margeH: 25 },
-  // Format imposé par Amazon KDP pour un poche US : 13,97 × 21,59 cm
-  // (5,5 × 8,5 po). Les marges affichées ici sont celles d'un livre de
-  // taille moyenne ; l'export KDP (impression.js) recalcule la marge de
-  // reliure exacte à partir du nombre de pages réel, comme l'exige KDP.
-  "kdp5585": { larg: 139.7, haut: 215.9, margeV: 18, margeH: 16 },
+  // Formats imposés par Amazon KDP. Les marges affichées ici sont celles
+  // d'un livre de taille moyenne ; l'export KDP (impression.js) recalcule la
+  // marge de reliure exacte à partir du nombre de pages réel, comme l'exige
+  // KDP — voir FORMATS_KDP là-bas pour la liste des tailles disponibles.
+  "kdp5585": { larg: 139.7, haut: 215.9, margeV: 18, margeH: 16 },   // 13,97 × 21,59 cm (5,5 × 8,5 po)
+  "kdp150210": { larg: 150, haut: 210, margeV: 20, margeH: 18 },     // 15,0 × 21,0 cm (comme les éditions Solo Leveling)
 };
 
 // 96 ppp : 1 mm ≈ 3,7795 px. Les pages ont une taille LOGIQUE fixe (dérivée
