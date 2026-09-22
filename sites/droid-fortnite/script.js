@@ -697,8 +697,13 @@ function appliquerVisuelDroide(zone, d, palier) {
 // à recopier : la même session Supabase sert partout.
 function exigerConnexion() {
   const token = localStorage.getItem("team53_token");
-  if (!token) {
-    window.location.replace("../../connexion.html");
+  // Un token qui n'a pas la forme d'un JWT (trois segments séparés par des
+  // points) vient d'une session corrompue ou d'avant la bascule vers
+  // Supabase — l'envoyer tel quel à Supabase provoque une erreur cryptique
+  // ("Expected 3 parts in JWT; got 1") au lieu d'un renvoi propre vers la
+  // connexion. On le traite comme une absence de session.
+  if (!token || token.split(".").length !== 3) {
+    seDeconnecter();
     return null;
   }
   return token;
