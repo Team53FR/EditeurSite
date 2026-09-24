@@ -553,6 +553,230 @@ function appliquerTypoFormat(formatKey) {
   }
 }
 
+// =====================================================================
+//  Format personnalisé (KDP) — encodé dans sa propre clé
+//
+//  Les formats fixes sont des clés arbitraires ("149x210", "kdp5585"...),
+//  résolues par une table dans le fichier qui en a besoin. Un format tapé à
+//  la main par l'auteur (onglet KDP du panneau, voir plus bas) n'a pas sa
+//  place dans ces tables figées — plutôt que d'ajouter une colonne à part
+//  rien que pour lui, ses millimètres sont encodés directement dans sa clé :
+//  "kdpc-<largeur>x<hauteur>". Un livre existant garde ainsi un simple champ
+//  `format` texte, quel que soit le format choisi.
+// =====================================================================
+
+function dimensionsFormatPersonnalise(formatKey) {
+  const m = /^kdpc-([\d.]+)x([\d.]+)$/.exec(formatKey || "");
+  return m ? { larg: parseFloat(m[1]), haut: parseFloat(m[2]) } : null;
+}
+
+function formatPersonnaliseDepuisCm(largCm, hautCm) {
+  const arrondirMm = (cm) => Math.round(cm * 100) / 10; // cm -> mm, 1 décimale
+  return "kdpc-" + arrondirMm(largCm) + "x" + arrondirMm(hautCm);
+}
+
+// Résout un format vers ses dimensions (et marges d'écran, si la table en
+// porte), qu'il s'agisse d'une clé fixe de la table `table` (FORMATS /
+// FORMATS_VIGNETTE / FORMATS_KDP, selon le fichier appelant) ou d'un format
+// personnalisé. Un seul point de résolution, partagé par tout le site : sans
+// lui, chaque lecture de format ailleurs dans le code aurait dû réapprendre
+// à reconnaître un format personnalisé.
+function resoudreFormat(table, formatKey, repli) {
+  const perso = dimensionsFormatPersonnalise(formatKey);
+  if (perso) {
+    const gabarit = table[repli] || {};
+    return Object.assign({}, gabarit, {
+      larg: perso.larg, haut: perso.haut,
+      // Marges d'écran par défaut, proportionnelles à la page — un format
+      // personnalisé n'a pas de marges "connues" comme les formats fixes.
+      margeV: Math.round(perso.haut * 0.095),
+      margeH: Math.round(perso.larg * 0.12)
+    });
+  }
+  return table[formatKey] || table[repli];
+}
+
+// =====================================================================
+//  Panneau de choix du format du livre
+//
+//  Remplace l'ancien <select> par un panneau à onglets — un onglet par
+//  famille de formats (Standard, Amazon KDP...). ONGLETS_FORMAT est la seule
+//  chose à toucher pour ajouter un choix ou, plus tard, un onglet entier
+//  (typographie, marges...) : le reste du panneau (rendu, clic, fermeture)
+//  ne connaît que cette liste, jamais un format en particulier.
+// =====================================================================
+
+const ONGLETS_FORMAT = [
+  {
+    id: "standard",
+    nom: "Standard",
+    choix: [
+      { format: "149x210", nom: "Roman", dims: "14,9 × 21,0 cm" },
+      { format: "155x235", nom: "Grand roman", dims: "15,5 × 23,5 cm" },
+      { format: "105x148", nom: "Poche", dims: "10,5 × 14,8 cm" },
+      { format: "210x297", nom: "A4", dims: "21,0 × 29,7 cm" }
+    ]
+  },
+  {
+    id: "kdp",
+    nom: "Amazon KDP",
+    choix: [
+      { format: "kdp5585", nom: "Amazon KDP", dims: "13,97 × 21,59 cm" },
+      { format: "kdp150210", nom: "Amazon KDP", dims: "15,0 × 21,0 cm" }
+    ],
+    // Cet onglet propose en plus une taille saisie à la main — voir
+    // rendreContenuOngletFormat().
+    personnalise: true
+  }
+];
+
+// Le format par défaut de tout nouveau livre, et le repli si une clé
+// inconnue se présentait (livre corrompu, format retiré...).
+const FORMAT_PAR_DEFAUT = "149x210";
+
+function libelleFormat(formatKey) {
+  for (const onglet of ONGLETS_FORMAT) {
+    const c = onglet.choix.find((c) => c.format === formatKey);
+    if (c) return c.nom + " — " + c.dims;
+  }
+  const perso = dimensionsFormatPersonnalise(formatKey);
+  if (perso) return "KDP personnalisé — " + formaterMmEnCm(perso.larg) + " × " + formaterMmEnCm(perso.haut) + " cm";
+  return libelleFormat(FORMAT_PAR_DEFAUT);
+}
+
+function formaterMmEnCm(mm) {
+  return (mm / 10).toFixed(1).replace(".", ",");
+}
+
+// Version compacte de libelleFormat(), pour les listes où la place manque
+// (carte d'un livre dans la bibliothèque, page "Livres publiés"...).
+const LIBELLES_COURTS_FORMAT = {
+  "149x210": "14,9×21",
+  "155x235": "15,5×23,5",
+  "105x148": "Poche",
+  "210x297": "A4",
+  "kdp5585": "KDP 13,97×21,59",
+  "kdp150210": "KDP 15×21"
+};
+function libelleFormatCourt(formatKey) {
+  if (LIBELLES_COURTS_FORMAT[formatKey]) return LIBELLES_COURTS_FORMAT[formatKey];
+  const perso = dimensionsFormatPersonnalise(formatKey);
+  if (perso) return "KDP " + formaterMmEnCm(perso.larg) + "×" + formaterMmEnCm(perso.haut);
+  return LIBELLES_COURTS_FORMAT[FORMAT_PAR_DEFAUT];
+}
+
+let ongletFormatActif = "standard";
+
+// `formatActuel` présélectionne l'onglet et la carte correspondants ;
+// `onChoisir(formatKey)` est appelé une fois un format validé (le panneau
+// s'est déjà fermé à ce moment-là).
+function ouvrirPanneauFormat(formatActuel, onChoisir) {
+  fermerPanneauFormat();
+
+  const persoActuel = dimensionsFormatPersonnalise(formatActuel);
+  const ongletDuFormat = ONGLETS_FORMAT.find((o) =>
+    o.choix.some((c) => c.format === formatActuel) || (persoActuel && o.personnalise));
+  ongletFormatActif = (ongletDuFormat && ongletDuFormat.id) || "standard";
+
+  const fond = document.createElement("div");
+  fond.id = "panneauFormat";
+  fond.className = "modal-impression";
+  fond.addEventListener("click", (e) => { if (e.target === fond) fermerPanneauFormat(); });
+  document.body.appendChild(fond);
+
+  fond.innerHTML =
+    '<div class="modal-impression-carte pf-carte" role="dialog" aria-modal="true" aria-label="Choisir le format du livre">' +
+      '<button class="mi-fermer" aria-label="Fermer">&#10005;</button>' +
+      "<h3>Format du livre</h3>" +
+      '<p class="mi-intro">La taille des pages — vous pourrez en changer à tout moment, tout le texte se recompose automatiquement.</p>' +
+      '<div class="pf-onglets" role="tablist">' +
+        ONGLETS_FORMAT.map((o) =>
+          '<button type="button" class="pf-onglet" role="tab" data-onglet="' + o.id + '">' + o.nom + "</button>"
+        ).join("") +
+      "</div>" +
+      '<div class="pf-contenu"></div>' +
+    "</div>";
+
+  fond.querySelector(".mi-fermer").onclick = fermerPanneauFormat;
+
+  const appliquer = (formatKey) => {
+    fermerPanneauFormat();
+    onChoisir(formatKey);
+  };
+
+  fond.querySelectorAll(".pf-onglet").forEach((b) => {
+    b.onclick = () => {
+      ongletFormatActif = b.dataset.onglet;
+      rendreContenuOngletFormat(fond, formatActuel, appliquer);
+    };
+  });
+
+  rendreContenuOngletFormat(fond, formatActuel, appliquer);
+}
+
+function fermerPanneauFormat() {
+  const f = document.getElementById("panneauFormat");
+  if (f) f.remove();
+}
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") fermerPanneauFormat();
+});
+
+function rendreContenuOngletFormat(fond, formatActuel, appliquer) {
+  fond.querySelectorAll(".pf-onglet").forEach((b) =>
+    b.classList.toggle("actif", b.dataset.onglet === ongletFormatActif));
+
+  const onglet = ONGLETS_FORMAT.find((o) => o.id === ongletFormatActif) || ONGLETS_FORMAT[0];
+  const zone = fond.querySelector(".pf-contenu");
+
+  let html = '<div class="pf-choix">' +
+    onglet.choix.map((c) =>
+      '<button type="button" class="pf-carte-choix' + (c.format === formatActuel ? " actif" : "") + '" data-format="' + c.format + '">' +
+        '<span class="pf-choix-nom">' + c.nom + "</span>" +
+        '<span class="pf-choix-dims">' + c.dims + "</span>" +
+      "</button>"
+    ).join("") +
+  "</div>";
+
+  if (onglet.personnalise) {
+    const persoActuel = dimensionsFormatPersonnalise(formatActuel);
+    html +=
+      '<div class="pf-perso">' +
+        "<h4>Taille personnalisée</h4>" +
+        '<p class="pf-perso-aide">En centimètres. Vérifiez que cette taille figure bien dans le catalogue KDP avant d\'envoyer votre fichier à Amazon.</p>' +
+        '<div class="pf-perso-champs">' +
+          '<label>Largeur <input type="number" id="pfLarg" min="0" step="0.1" inputmode="decimal" value="' +
+            (persoActuel ? formaterMmEnCm(persoActuel.larg).replace(",", ".") : "") + '"> cm</label>' +
+          '<label>Hauteur <input type="number" id="pfHaut" min="0" step="0.1" inputmode="decimal" value="' +
+            (persoActuel ? formaterMmEnCm(persoActuel.haut).replace(",", ".") : "") + '"> cm</label>' +
+        "</div>" +
+        '<p class="pf-perso-message message"></p>' +
+        '<button type="button" class="pf-valider" id="pfValider">Valider ce format</button>' +
+      "</div>";
+  }
+
+  zone.innerHTML = html;
+
+  zone.querySelectorAll(".pf-carte-choix").forEach((b) => {
+    b.onclick = () => appliquer(b.dataset.format);
+  });
+
+  const btnValider = zone.querySelector("#pfValider");
+  if (btnValider) {
+    btnValider.onclick = () => {
+      const largCm = parseFloat(zone.querySelector("#pfLarg").value);
+      const hautCm = parseFloat(zone.querySelector("#pfHaut").value);
+      const message = zone.querySelector(".pf-perso-message");
+      if (!isFinite(largCm) || !isFinite(hautCm) || largCm <= 0 || hautCm <= 0) {
+        message.textContent = "Indiquez une largeur et une hauteur en centimètres.";
+        return;
+      }
+      appliquer(formatPersonnaliseDepuisCm(largCm, hautCm));
+    };
+  }
+}
+
 function styleTexteCouv(data, cle) {
   if (!data) return "";
   let css = "";

@@ -67,7 +67,7 @@ async function chargerLecture() {
 // ---------- Dimensionnement (comme l'éditeur, adapté au lecteur) ----------
 
 function appliquerFormatPage(formatKey) {
-  const f = FORMATS[formatKey] || FORMATS["149x210"];
+  const f = resoudreFormat(FORMATS, formatKey, "149x210");
   // La lecture compose comme l'éditeur : mêmes tailles, donc mêmes coupes
   // de page que celles enregistrées avec le livre.
   appliquerTypoFormat(formatKey);
@@ -273,7 +273,7 @@ function positionnerPageAnim(pageEl, left) {
 
 function animerFlip(direction, from, to) {
   const conteneur = document.getElementById("conteneurApercu");
-  const f = FORMATS[livre.format || "149x210"] || FORMATS["149x210"];
+  const f = resoudreFormat(FORMATS, livre.format || "149x210", "149x210");
   const largPx = Math.round(f.larg * PX_PAR_MM);
   const hautPx = Math.round(f.haut * PX_PAR_MM);
   const gap = 26;

@@ -82,7 +82,7 @@ function typoDuLivre() {
 }
 
 function appliquerFormatPage(formatKey) {
-  const f = FORMATS[formatKey] || FORMATS["149x210"];
+  const f = resoudreFormat(FORMATS, formatKey, "149x210");
   appliquerTypoFormat(formatKey);
 
   // --- Dimensions LOGIQUES fixes (indépendantes de la fenêtre) ---
@@ -271,7 +271,7 @@ async function chargerLivre() {
 
     appliquerFormatPage(formatCourant);
     const selFormat = document.getElementById("selectFormat");
-    if (selFormat) selFormat.value = formatCourant;
+    if (selFormat) selFormat.textContent = libelleFormat(formatCourant);
     window.addEventListener("resize", () => {
       // Lire le format courant du livre (il peut changer via le sélecteur)
       appliquerFormatPage(livreActuel().format || "149x210");
@@ -731,58 +731,6 @@ function pageSuivante() {
   indexSpread += 2;
   afficherSpread();
   afficherSommaire();
-}
-
-// Changer le format du livre existant : on ré-applique le format (nouvelles
-// dimensions de page) puis on re-paginate tout le texte, car la hauteur utile
-// d'une page change et le texte doit redéborder en conséquence.
-function changerFormat(nouveauFormat) {
-  if (!FORMATS[nouveauFormat]) return;
-  const livre = livreActuel();
-  const ancienFormat = livre.format || "149x210";
-  if (ancienFormat === nouveauFormat) return;
-
-  // Le recadrage de l'image de couverture (zoom + décalage) est réadapté par
-  // adapterCadrageImage() au prochain rendu de la couverture ou de l'aperçu.
-  // Pour que cette adaptation parte de la BONNE base même si la couverture
-  // n'a pas encore été affichée à ce format, on fixe dès maintenant sa taille
-  // de page de référence sur le format ACTUEL (avant changement), calculée
-  // directement depuis les mm (sans dépendre du DOM).
-  const fA = FORMATS[ancienFormat];
-  const baseW = Math.round(fA.larg * PX_PAR_MM);
-  const baseH = Math.round(fA.haut * PX_PAR_MM);
-  ["couverture", "quatrieme"].forEach(cle => {
-    const d = livre[cle];
-    if (d && d.imageChemin) { d.imgBaseW = baseW; d.imgBaseH = baseH; }
-  });
-
-  flushSpread();
-  livre.format = nouveauFormat;
-
-  // Met à jour hauteurTextePx et les dimensions du mesureur de pagination.
-  appliquerFormatPage(nouveauFormat);
-  // L'espace au-dessus des titres suit le format, tant que l'auteur n'a pas
-  // réglé le sien : un blanc de 65 px sur un poche mangerait la page.
-  initEspaceTitre();
-
-  // Repagination complète depuis la première page selon la nouvelle hauteur.
-  normaliserPagination(0);
-
-  // Se recaler sur une double-page valide (index pair, dans les bornes).
-  const pages = livre.pages;
-  if (indexSpread >= pages.length) {
-    indexSpread = Math.max(0, pages.length - 1);
-  }
-  indexSpread -= indexSpread % 2;
-
-  afficherSpread();
-  afficherSommaire();
-  majCompteurMots();
-  marquerModifie();
-  planifierBrouillon();
-
-  const selFormat = document.getElementById("selectFormat");
-  if (selFormat) selFormat.value = nouveauFormat;
 }
 
 // ----- Sauvegarde -----
@@ -1432,7 +1380,7 @@ function positionnerPageAnim(pageEl, left) {
 function animerFlip(direction, from, to) {
   const conteneur = document.getElementById("conteneurApercu");
   const livre = livreActuel();
-  const f = FORMATS[livre.format || "149x210"] || FORMATS["149x210"];
+  const f = resoudreFormat(FORMATS, livre.format || "149x210", "149x210");
   const largPx = Math.round(f.larg * PX_PAR_MM);
   const hautPx = Math.round(f.haut * PX_PAR_MM);
   const gap = 26;
@@ -3298,7 +3246,7 @@ function selectionnerDernierTitre() {
 // ----- Changement de format : on re-paginate tout le texte continu -----
 
 function changerFormat(nouveauFormat) {
-  if (!FORMATS[nouveauFormat]) return;
+  if (!FORMATS[nouveauFormat] && !dimensionsFormatPersonnalise(nouveauFormat)) return;
   const livre = livreActuel();
   const ancienFormat = livre.format || "149x210";
   if (ancienFormat === nouveauFormat) return;
@@ -3307,7 +3255,8 @@ function changerFormat(nouveauFormat) {
 
   // Les décalages de l'image de couverture sont en pixels relatifs à la taille
   // de page : on les met à l'échelle pour conserver le même cadrage.
-  const fA = FORMATS[ancienFormat], fN = FORMATS[nouveauFormat];
+  const fA = resoudreFormat(FORMATS, ancienFormat, "149x210");
+  const fN = resoudreFormat(FORMATS, nouveauFormat, "149x210");
   const ratioX = fN.larg / fA.larg, ratioY = fN.haut / fA.haut;
   ["couverture", "quatrieme"].forEach(cle => {
     const d = livre[cle];
@@ -3330,7 +3279,12 @@ function changerFormat(nouveauFormat) {
   planifierBrouillon();
 
   const sel = document.getElementById("selectFormat");
-  if (sel) sel.value = nouveauFormat;
+  if (sel) sel.textContent = libelleFormat(nouveauFormat);
+}
+
+function ouvrirChoixFormatEditeur() {
+  const livre = livreActuel();
+  ouvrirPanneauFormat(livre.format || "149x210", (formatKey) => changerFormat(formatKey));
 }
 
 // Retire les titres SANS TEXTE : coquilles laissées par la coupe des pages

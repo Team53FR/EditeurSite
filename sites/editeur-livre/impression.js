@@ -822,7 +822,7 @@ function exporterImpression(modeRectoVerso) {
   flushSpread();
   repaginerTout(); // découpage exact avant impression (flushSpread ne découpe pas)
   const livre = livreActuel();
-  const f = FORMATS[livre.format || "149x210"] || FORMATS["149x210"];
+  const f = resoudreFormat(FORMATS, livre.format || "149x210", "149x210");
 
   // Taille physique de la feuille (le PDF sortira exactement à ce format)
   let stylePage = document.getElementById("stylePageImpression");
@@ -892,7 +892,7 @@ function exporterLivret(modeRectoVerso) {
   flushSpread();
   repaginerTout(); // découpage exact avant impression (flushSpread ne découpe pas)
   const livre = livreActuel();
-  const f = FORMATS[livre.format || "149x210"] || FORMATS["149x210"];
+  const f = resoudreFormat(FORMATS, livre.format || "149x210", "149x210");
 
   let stylePage = document.getElementById("stylePageImpression");
   if (!stylePage) {
@@ -1485,7 +1485,7 @@ function exporterDeuxPages(mode) {
   flushSpread();
   repaginerTout();
   const livre = livreActuel();
-  const f = FORMATS[livre.format || "149x210"] || FORMATS["149x210"];
+  const f = resoudreFormat(FORMATS, livre.format || "149x210", "149x210");
 
   // « auto » et « passes » disent comment imprimer ; « court » dit comment la
   // feuille se retourne. Les deux se combinent (« passes-court »).
@@ -1579,7 +1579,7 @@ function exporterDeuxPages(mode) {
 // dos porte, écrit en toutes lettres, le réglage à choisir.
 function imprimerFeuilleEssai() {
   const livre = livreActuel();
-  const f = FORMATS[livre.format || "149x210"] || FORMATS["149x210"];
+  const f = resoudreFormat(FORMATS, livre.format || "149x210", "149x210");
 
   const aire = (pa) => (pa ? pa.larg * pa.haut : Infinity);
   const sansGouttiere = papierMinimal(2 * f.larg, f.haut, 2);
@@ -1688,7 +1688,7 @@ function creerFaceDeuxPages(demiGauche, demiDroite, f, margeInt, margeExt, goutt
 function exporterCouvertureSeule() {
   flushSpread();
   const livre = livreActuel();
-  const f = FORMATS[livre.format || "149x210"] || FORMATS["149x210"];
+  const f = resoudreFormat(FORMATS, livre.format || "149x210", "149x210");
   // Le nombre de pages à l'écran suffit à estimer le dos : inutile de relancer
   // la pagination imprimeur, qui coûte plusieurs secondes sur un gros livre et
   // ne changerait l'épaisseur que d'une fraction de millimètre.
@@ -1703,7 +1703,7 @@ function exporterCouvertureSeule() {
 function exporterCouvertureLivret() {
   flushSpread();
   const livre = livreActuel();
-  const f = FORMATS[livre.format || "149x210"] || FORMATS["149x210"];
+  const f = resoudreFormat(FORMATS, livre.format || "149x210", "149x210");
   ouvrirDialogueCouvertureSeule(livre, f, (livre.pages || []).length, true);
 }
 
@@ -2245,7 +2245,7 @@ function schemaPlancheHtml(f, dosMm, agrafe) {
 function exporterImprimeur(cible) {
   flushSpread();
   const livre = livreActuel();
-  const f = FORMATS[livre.format || "149x210"] || FORMATS["149x210"];
+  const f = resoudreFormat(FORMATS, livre.format || "149x210", "149x210");
   const pagesEcran = (livre.pages || []).length;
 
   // Une seule repagination : on en garde un INSTANTANÉ du contenu des pages,
@@ -2532,9 +2532,12 @@ const FORMATS_KDP = {
   kdp150210: { larg: 150,   haut: 210 }    // 15,0 × 21,0 cm
 };
 function estFormatKDP(formatKey) {
-  return Object.prototype.hasOwnProperty.call(FORMATS_KDP, formatKey);
+  return Object.prototype.hasOwnProperty.call(FORMATS_KDP, formatKey) ||
+    !!dimensionsFormatPersonnalise(formatKey);
 }
 function formatKDPDuLivre(livre) {
+  const perso = dimensionsFormatPersonnalise(livre && livre.format);
+  if (perso) return perso;
   return FORMATS_KDP[livre && livre.format] || FORMATS_KDP.kdp5585;
 }
 
@@ -3194,7 +3197,7 @@ function ouvrirTranche() {
   if (!livre.tranche) livre.tranche = {};
   const t = livre.tranche;
   const d = donneesTranche(livre);
-  const f = FORMATS[livre.format || "149x210"] || FORMATS["149x210"];
+  const f = resoudreFormat(FORMATS, livre.format || "149x210", "149x210");
 
   const ancien = document.getElementById("dialogueTranche");
   if (ancien) ancien.remove();

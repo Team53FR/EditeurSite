@@ -51,15 +51,13 @@ function afficherPublies() {
     return;
   }
 
-  const labels = { "149x210": "14,9×21", "155x235": "15,5×23,5", "105x148": "Poche", "210x297": "A4", "kdp5585": "KDP 13,97×21,59", "kdp150210": "KDP 15×21" };
-
   listePubliesData.forEach((entree) => {
     const couv = entree.couverture || {};
     const fond = couv.fond || "#1a1a2e";
     const couleurTexte = couv.texte || "#ffffff";
     const afficherTitre = couv.afficherTitre !== false;
     const afficherAuteur = couv.afficherAuteur !== false && entree.auteur;
-    const labelFormat = labels[entree.format] || "14,9×21";
+    const labelFormat = libelleFormatCourt(entree.format);
 
     const li = document.createElement("li");
     li.className = "livre-carte";

@@ -2122,6 +2122,121 @@ button.danger {
 .mi-reliures-pro .mi-reliure-dessin { width: 56px; height: 40px; }
 .mi-reliures-pro .mi-reliure-nom { font-size: 15px; }
 
+/* Panneau de choix du format (voir ouvrirPanneauFormat dans script.js) */
+.pf-onglets {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--s-line, #e6ddc9);
+  margin: 16px 0 18px;
+}
+.pf-onglet {
+  background: none;
+  color: var(--s-ink-soft, #6f6455);
+  padding: 8px 4px 10px;
+  margin: 0 14px 0 0;
+  border-radius: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  border-bottom: 2px solid transparent;
+  position: relative;
+  top: 1px;
+}
+.pf-onglet:hover { color: var(--s-ink, #2b2622); }
+.pf-onglet.actif {
+  color: var(--s-accent, #8a4b2a);
+  border-bottom-color: var(--s-accent, #8a4b2a);
+}
+
+.pf-choix {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+.pf-carte-choix {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 12px 14px;
+  border: 1px solid var(--s-line, #e6ddc9);
+  border-radius: 12px;
+  background: var(--s-paper, #fffdf8);
+  color: var(--s-ink, #2b2622);
+  text-align: left;
+  cursor: pointer;
+  margin: 0;
+  transition: border-color .15s, box-shadow .15s;
+}
+.pf-carte-choix:hover {
+  border-color: var(--s-accent, #8a4b2a);
+  box-shadow: 0 4px 14px rgba(60, 42, 20, .1);
+}
+.pf-carte-choix.actif {
+  border-color: var(--s-accent, #8a4b2a);
+  background: rgba(138, 75, 42, .07);
+}
+.pf-choix-nom { font-size: 14.5px; font-weight: 700; }
+.pf-choix-dims { font-size: 12.5px; color: var(--s-ink-soft, #6f6455); }
+
+.pf-perso {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--s-line, #e6ddc9);
+}
+.pf-perso h4 { margin: 0 0 4px; font-size: 14.5px; color: var(--s-ink, #2b2622); }
+.pf-perso-aide { font-size: 12.5px; color: var(--s-ink-soft, #6f6455); margin: 0 0 12px; line-height: 1.45; }
+.pf-perso-champs { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 10px; }
+.pf-perso-champs label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--s-ink-soft, #6f6455);
+}
+.pf-perso-champs input {
+  width: 90px;
+  padding: 8px 10px;
+  border: 1px solid var(--s-line, #e6ddc9);
+  border-radius: 9px;
+  font-size: 13.5px;
+  background: var(--s-cream, #f6f4ee);
+  color: var(--s-ink, #2b2622);
+}
+.pf-perso-message:empty { display: none; }
+.pf-valider {
+  background: #999;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 9px 16px;
+  font-size: 13px;
+  cursor: pointer;
+  margin: 0;
+}
+.pf-valider:hover { background: var(--s-accent, #8a4b38); }
+
+/* Bouton qui ouvre le panneau : remplace l'ancien <select> de format,
+   mêmes proportions pour ne pas décaler le reste du panneau de gauche. */
+.bouton-format {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--s-line);
+  border-radius: 9px;
+  font-size: 12.5px;
+  background: var(--s-cream);
+  color: var(--s-ink);
+  text-align: left;
+  cursor: pointer;
+  margin-top: 0;
+}
+.bouton-format:hover,
+.bouton-format:focus {
+  outline: none;
+  border-color: var(--s-accent);
+  box-shadow: 0 0 0 3px rgba(138,75,56,.14);
+}
+
 /* Étape 2 : un groupe de questions par décision. */
 .mi-retour {
   background: none; border: none; padding: 0 0 8px;

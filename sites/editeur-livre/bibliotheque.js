@@ -129,11 +129,9 @@ function afficherListeLivres() {
     return;
   }
 
-  const labels = { "149x210": "14,9×21", "155x235": "15,5×23,5", "105x148": "Poche", "210x297": "A4", "kdp5585": "KDP 13,97×21,59", "kdp150210": "KDP 15×21" };
-
   bibliotheque.livres.forEach((livre) => {
     const nbPages = livre.nbPages || 0;
-    const labelFormat = labels[livre.format] || "14,9×21";
+    const labelFormat = libelleFormatCourt(livre.format);
     const couv = livre.couverture || {};
     const fond = couv.fond || "#1a1a2e";
     const couleurTexte = couv.texte || "#ffffff";
@@ -191,7 +189,7 @@ const FORMATS_VIGNETTE = {
 // Reproduit le calcul de taille de page de l'éditeur (appliquerFormatPage),
 // car les décalages de l'image sont exprimés en pixels relatifs à cette taille.
 function dimensionsPageReference(formatKey) {
-  const f = FORMATS_VIGNETTE[formatKey] || FORMATS_VIGNETTE["149x210"];
+  const f = resoudreFormat(FORMATS_VIGNETTE, formatKey, "149x210");
   const ratio = f.haut / f.larg;
   const sommaireLarg = 240, margesH = 32, barresH = 56 + 52 + 10 + 32 + 10, gapPages = 26, margeV = 32;
   const dispoW = window.innerWidth - sommaireLarg - margesH;
@@ -259,11 +257,23 @@ function ouvrirLivre(id) {
   window.location.href = "editeur.html";
 }
 
+// Format retenu pour le prochain livre créé — le panneau (voir
+// ouvrirChoixFormatCreation) n'a rien à lire depuis le DOM, contrairement à
+// l'ancien <select>.
+let formatChoisiCreation = FORMAT_PAR_DEFAUT;
+
+function ouvrirChoixFormatCreation() {
+  ouvrirPanneauFormat(formatChoisiCreation, (formatKey) => {
+    formatChoisiCreation = formatKey;
+    document.getElementById("formatNouveauLivre").textContent = libelleFormat(formatKey);
+  });
+}
+
 async function creerLivre() {
   const message = document.getElementById("message");
   const champTitre = document.getElementById("titreNouveauLivre");
   const titre = champTitre.value.trim();
-  const format = document.getElementById("formatNouveauLivre").value;
+  const format = formatChoisiCreation;
 
   if (!titre) {
     message.textContent = "Merci de donner un titre au livre.";
