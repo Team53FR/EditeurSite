@@ -1873,9 +1873,14 @@ function allerMatch(direction) {
 function surlignerMatch(match) {
   const longueur = document.getElementById("champRecherche").value.length;
   if (!longueur) return;
+  surlignerPosition(match.page, match.offset, longueur);
+}
 
+// Va chercher un passage du livre et le sélectionne : la recherche s'en sert
+// pour ses résultats, la vérification des espaces pour ses signalements.
+function surlignerPosition(page, offset, longueur) {
   // Naviguer vers la double-page contenant le résultat
-  const spreadCible = match.page - (match.page % 2);
+  const spreadCible = page - (page % 2);
   if (spreadCible !== indexSpread) {
     flushSpread();
     indexSpread = spreadCible;
@@ -1883,11 +1888,11 @@ function surlignerMatch(match) {
     afficherSommaire();
   }
 
-  const pageEl = (match.page % 2 === 0)
+  const pageEl = (page % 2 === 0)
     ? document.getElementById("pageGauche")
     : document.getElementById("pageDroite");
 
-  const pos = positionDansElement(pageEl, match.offset, longueur);
+  const pos = positionDansElement(pageEl, offset, longueur);
   if (!pos) return;
 
   const range = document.createRange();
@@ -1898,7 +1903,7 @@ function surlignerMatch(match) {
   sel.removeAllRanges();
   sel.addRange(range);
   pageEl.focus();
-  coteActif = (match.page % 2 === 0) ? "gauche" : "droite";
+  coteActif = (page % 2 === 0) ? "gauche" : "droite";
 
   const rectParent = pageEl.getBoundingClientRect();
   const rectSel = range.getBoundingClientRect();
@@ -2023,6 +2028,261 @@ function remplacerTout() {
     ? `${total} remplacement${total > 1 ? "s" : ""} effectué${total > 1 ? "s" : ""}.`
     : "Aucune occurrence trouvée.";
   setTimeout(() => { if (message.textContent.includes("remplacement") || message.textContent.includes("occurrence")) message.textContent = ""; }, 3000);
+}
+
+// =====================================================================
+//  Espaces manquants après un point
+//
+//  « lui-même.Dégager le » au lieu de « lui-même. Dégager le ». La faute se
+//  voit mal à l'écran — le point se perd entre deux lettres — et un livre
+//  entier peut en porter des dizaines sans qu'on en remarque une seule.
+//
+//  Ce qu'on signale : une ponctuation de FIN DE PHRASE (. ! ?) immédiatement
+//  suivie d'une MAJUSCULE. C'est ce couple qui ne s'écrit jamais collé en
+//  français, et c'est lui qui rend le repérage sûr : chercher tous les points
+//  suivis d'une lettre quelconque ramènerait « fichier.txt », « 3.14 » ou
+//  « exemple.com » à chaque ligne, et la liste deviendrait inutilisable.
+// =====================================================================
+
+// La ponctuation qui ferme une phrase, collée à la majuscule suivante.
+const COLLAGE_PONCTUATION = /[.!?](?=\p{Lu})/gu;
+
+// « J.R.R. Tolkien », « U.S.A. », « M.Dupont » : un point qui suit une
+// capitale ISOLÉE est une initiale, pas une fin de phrase. On les laisse
+// tranquilles — écarter quelques vrais oublis coûte moins cher que de couper
+// un sigle ou un nom propre en deux, ce qu'aucune relecture ne rattraperait.
+function estInitiale(texte, i) {
+  if (texte[i] !== ".") return false;           // ! et ? ne forment pas d'initiales
+  const avant = texte[i - 1];
+  if (!avant || !/\p{Lu}/u.test(avant)) return false;
+  const avantAvant = texte[i - 2];
+  // Capitale isolée : début du texte, ou précédée d'autre chose qu'une lettre
+  // (l'espace de « J.R », ou le point de « J.R.R »).
+  return !avantAvant || !/\p{L}/u.test(avantAvant);
+}
+
+// Position de chaque ponctuation collée, dans l'ordre du texte.
+function trouverCollages(texte) {
+  const positions = [];
+  const balayeur = new RegExp(COLLAGE_PONCTUATION.source, "gu");
+  let m;
+  while ((m = balayeur.exec(texte)) !== null) {
+    if (!estInitiale(texte, m.index)) positions.push(m.index);
+  }
+  return positions;
+}
+
+// Ce qu'on montre dans la liste : de quoi reconnaître le passage sans ouvrir
+// la page. Coupé aux mots, pour ne pas trancher au milieu d'un mot.
+function extraitCollage(texte, off) {
+  const debutBrut = Math.max(0, off - 34);
+  const finBrut = Math.min(texte.length, off + 1 + 34);
+  let avant = texte.slice(debutBrut, off + 1);
+  let apres = texte.slice(off + 1, finBrut);
+  if (debutBrut > 0) avant = "…" + avant.replace(/^\S*\s/, "");
+  if (finBrut < texte.length) apres = apres.replace(/\s\S*$/, "") + "…";
+  return { avant, apres };
+}
+
+// Les éléments qui font un paragraphe à eux seuls. Leur contenu ne se
+// prolonge pas dans le suivant : entre deux, il y a une rupture, pas un
+// enchaînement de phrase.
+const BLOCS_TEXTE = /^(P|H1|H2|H3|H4|H5|H6|LI|BLOCKQUOTE|DIV|TD|TH|SECTION|ARTICLE|FIGCAPTION|PRE)$/;
+
+function blocParent(noeud, racine) {
+  let el = noeud.parentElement;
+  while (el && el !== racine && !BLOCS_TEXTE.test(el.tagName)) el = el.parentElement;
+  return el || racine;
+}
+
+// Relève les collages d'un fragment, en offsets sur son texte entier.
+//
+// Deux précautions, et elles tirent en sens contraire :
+//
+//  - On examine le texte CONCATÉNÉ, pas chaque nœud isolément : une mise en
+//    forme peut couper le passage en deux (« <em>lui-même.</em>Dégager »), et
+//    le collage serait invisible de chaque côté pris à part.
+//  - Mais on ne concatène QUE DANS UN MÊME BLOC. Sans cela, la fin d'un
+//    paragraphe toucherait le début du suivant : « …il partit. » suivi d'un
+//    « Le lendemain… » formerait un faux « partit.Le », et l'outil signalerait
+//    chaque fin de paragraphe du livre pour y coller une espace inutile.
+//
+// Les offsets rendus portent sur le texte complet du fragment (celui que rend
+// textContent), pour que la liste et la correction désignent le même endroit.
+function collagesDansFragment(conteneur) {
+  const noeuds = [];
+  const walker = document.createTreeWalker(conteneur, NodeFilter.SHOW_TEXT);
+  while (walker.nextNode()) noeuds.push(walker.currentNode);
+
+  const offsets = [];
+  let global = 0;
+  let i = 0;
+  while (i < noeuds.length) {
+    const bloc = blocParent(noeuds[i], conteneur);
+    const debutDuBloc = global;
+    let texte = "";
+    while (i < noeuds.length && blocParent(noeuds[i], conteneur) === bloc) {
+      texte += noeuds[i].textContent;
+      global += noeuds[i].textContent.length;
+      i++;
+    }
+    trouverCollages(texte).forEach((off) => offsets.push(debutDuBloc + off));
+  }
+  return { noeuds, offsets };
+}
+
+// Insère les espaces manquantes dans un fragment, et rend leur nombre.
+function insererEspacesManquants(conteneur) {
+  const { noeuds, offsets } = collagesDansFragment(conteneur);
+
+  // De la fin vers le début : une espace insérée ne décale alors aucune des
+  // positions qu'il reste à traiter.
+  for (let k = offsets.length - 1; k >= 0; k--) {
+    const cible = offsets[k] + 1;            // juste après la ponctuation
+    let debut = 0;
+    for (const noeud of noeuds) {
+      const fin = debut + noeud.textContent.length;
+      if (cible <= fin) {
+        const dans = cible - debut;
+        noeud.textContent = noeud.textContent.slice(0, dans) + " " + noeud.textContent.slice(dans);
+        break;
+      }
+      debut = fin;
+    }
+  }
+  return offsets.length;
+}
+
+// ----- La vue -----
+
+function ouvrirVerificationEspaces() {
+  if (modeApercu || modeCouverture) return;
+  flushSpread();
+  assurerPagesAJour();
+
+  // Le relevé se fait sur les PAGES : c'est ce que l'auteur a sous les yeux,
+  // et cela donne à chaque signalement son numéro de page et son passage.
+  // Même fonction de relevé que la correction — sans quoi la liste montrerait
+  // des passages que le bouton ne touche pas, ou l'inverse.
+  const trouvailles = [];
+  livreActuel().pages.forEach((p, iPage) => {
+    const boite = document.createElement("div");
+    boite.innerHTML = p.contenu || "";
+    const texte = boite.textContent || "";
+    collagesDansFragment(boite).offsets.forEach((off) => {
+      trouvailles.push(Object.assign({ page: iPage, offset: off }, extraitCollage(texte, off)));
+    });
+  });
+
+  ouvrirDialogueEspaces(trouvailles);
+}
+
+function fermerDialogueEspaces() {
+  const d = document.getElementById("dialogueEspaces");
+  if (d) d.remove();
+}
+
+function ouvrirDialogueEspaces(trouvailles) {
+  fermerDialogueEspaces();
+
+  const n = trouvailles.length;
+  let html = '<div class="modal-impression-carte ci-carte" role="dialog" aria-modal="true">' +
+    '<button class="mi-fermer" aria-label="Fermer">&#10005;</button>' +
+    "<h3>Espaces après les points</h3>";
+
+  if (!n) {
+    html += '<p class="mi-intro">Aucun point collé au mot suivant : tout est en ordre.</p>' +
+      '<div class="ci-actions"><button class="ci-annuler">Fermer</button></div></div>';
+  } else {
+    html += '<p class="mi-intro">' + n + " passage" + (n > 1 ? "s où une ponctuation est collée" : " où une ponctuation est collée") +
+      " au mot suivant. Cliquez sur une ligne pour aller la corriger à la main, " +
+      "ou ajoutez toutes les espaces d&rsquo;un coup.</p>" +
+      '<div class="renom-outils">' +
+        '<span class="renom-compte">Les initiales (J.R.R., U.S.A.) sont volontairement ignorées.</span>' +
+      "</div>" +
+      '<div class="renom-liste esp-liste">';
+
+    trouvailles.forEach((t, i) => {
+      html += '<button type="button" class="esp-ligne" data-i="' + i + '" ' +
+        'title="Aller à ce passage">' +
+        '<span class="renom-page">p.' + (t.page + 1) + "</span>" +
+        '<span class="esp-extrait">' +
+          '<span class="esp-avant">' + echapperTitre(t.avant) + "</span>" +
+          '<span class="esp-trou" aria-label="espace manquante">&#9251;</span>' +
+          '<span class="esp-apres">' + echapperTitre(t.apres) + "</span>" +
+        "</span>" +
+      "</button>";
+    });
+
+    html += "</div>" +
+      '<div class="ci-actions">' +
+        '<button class="ci-annuler">Fermer</button>' +
+        '<button class="ci-generer">Ajouter les ' + n + " espaces</button>" +
+      "</div>";
+  }
+  html += "</div>";
+
+  const fond = document.createElement("div");
+  fond.id = "dialogueEspaces";
+  fond.className = "modal-impression";
+  fond.innerHTML = html;
+  fond.addEventListener("click", (e) => { if (e.target === fond) fermerDialogueEspaces(); });
+  document.body.appendChild(fond);
+
+  fond.querySelector(".mi-fermer").onclick = fermerDialogueEspaces;
+  fond.querySelector(".ci-annuler").onclick = fermerDialogueEspaces;
+
+  fond.querySelectorAll(".esp-ligne").forEach((b) => {
+    b.onclick = () => {
+      const t = trouvailles[Number(b.dataset.i)];
+      fermerDialogueEspaces();
+      // La ponctuation ET la majuscule collée : on voit ce qui manque entre
+      // les deux, et taper l'espace remplace directement la sélection.
+      surlignerPosition(t.page, t.offset, 2);
+    };
+  });
+
+  const bouton = fond.querySelector(".ci-generer");
+  if (bouton) bouton.onclick = () => { fermerDialogueEspaces(); corrigerTousLesCollages(); };
+}
+
+// ----- La correction en bloc -----
+//
+// Elle travaille sur les DOUBLES-PAGES (la source), jamais sur les pages :
+// celles-ci sont dérivées et seraient recalculées par-dessus, comme le fait
+// déjà « Tout remplacer ».
+function corrigerTousLesCollages() {
+  flushSpread();
+
+  const spreads = spreadsLivre();
+  let total = 0;
+  for (let i = 0; i < spreads.length; i++) {
+    const conteneur = document.createElement("div");
+    conteneur.innerHTML = spreads[i] || "";
+    const n = insererEspacesManquants(conteneur);
+    if (n > 0) { spreads[i] = conteneur.innerHTML; total += n; }
+  }
+
+  // Le texte s'allonge : le livre se redécoupe.
+  if (total > 0) repaginerTout();
+
+  afficherSpread();
+  afficherSommaire();
+  majCompteurMots();
+
+  if (total > 0) {
+    marquerModifie();
+    planifierBrouillon();
+  }
+
+  const message = document.getElementById("message");
+  if (message) {
+    message.textContent = total > 0
+      ? total + " espace" + (total > 1 ? "s ajoutées" : " ajoutée") + "."
+      : "Aucun point collé au mot suivant.";
+    const pose = message.textContent;
+    setTimeout(() => { if (message.textContent === pose) message.textContent = ""; }, 3000);
+  }
 }
 
 // Remplacement insensible à la casse dans une chaîne, avec comptage

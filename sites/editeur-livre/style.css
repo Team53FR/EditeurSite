@@ -1863,6 +1863,43 @@ button.danger {
   border-color: var(--s-accent, #8a4b38);
 }
 
+/* ----- Espaces manquants après un point ----- */
+/* Chaque ligne est un bouton : elle mène au passage dans le texte. */
+.esp-ligne {
+  display: grid;
+  grid-template-columns: 3.2rem minmax(0, 1fr);
+  align-items: baseline;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.4rem 0.45rem;
+  border: 1px solid transparent; border-radius: 8px;
+  background: none; color: inherit; font: inherit;
+  text-align: left; cursor: pointer;
+}
+.esp-ligne:hover, .esp-ligne:focus-visible {
+  border-color: var(--s-accent, #8a4b38);
+  background: rgba(138, 75, 56, .05);
+}
+/* Le passage tient sur une ligne : la liste reste balayable d'un coup d'œil,
+   et c'est le trou signalé qu'on cherche, pas la phrase entière. */
+.esp-extrait {
+  min-width: 0;
+  font-size: 0.82rem; line-height: 1.5;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.esp-avant { color: var(--s-ink-soft, #6f6455); }
+.esp-apres { color: var(--s-ink-soft, #6f6455); }
+/* Le trou lui-même : c'est la seule chose à voir sur la ligne. */
+.esp-trou {
+  display: inline-block;
+  margin: 0 0.1rem;
+  padding: 0 0.18rem;
+  border-radius: 3px;
+  background: rgba(217, 164, 65, .3);
+  color: #8a4b38;
+  font-weight: 700;
+}
+
 .renom-liste {
   display: flex; flex-direction: column; gap: 0.3rem;
   max-height: 52vh; overflow-y: auto;
