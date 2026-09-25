@@ -1878,7 +1878,9 @@ function surlignerMatch(match) {
 
 // Va chercher un passage du livre et le sélectionne : la recherche s'en sert
 // pour ses résultats, la vérification des espaces pour ses signalements.
-function surlignerPosition(page, offset, longueur) {
+// `eclairer` ajoute un clignotement par-dessus : sur deux caractères au milieu
+// d'une page pleine, la seule sélection se remarque à peine.
+function surlignerPosition(page, offset, longueur, eclairer) {
   // Naviguer vers la double-page contenant le résultat
   const spreadCible = page - (page % 2);
   if (spreadCible !== indexSpread) {
@@ -1911,6 +1913,55 @@ function surlignerPosition(page, offset, longueur) {
     const noeudParent = pos.debutNoeud.parentElement;
     if (noeudParent && noeudParent.scrollIntoView) noeudParent.scrollIntoView({ block: "nearest" });
   }
+
+  // Après le défilement seulement : mesuré avant, le passage serait repéré à
+  // l'endroit qu'il occupait juste avant de bouger.
+  if (eclairer) requestAnimationFrame(() => eclairerRange(range));
+}
+
+// ----- Montrer du doigt un passage, sans y toucher -----
+//
+// On ne peut PAS envelopper le passage dans un <mark> : le texte du livre
+// serait modifié, la double-page marquée comme sale, et la balise finirait
+// enregistrée avec le manuscrit. On superpose donc un calque, posé aux
+// coordonnées de la sélection et retiré tout seul — le texte, lui, ne bouge
+// jamais d'un octet.
+function effacerEclats() {
+  document.querySelectorAll(".eclat-passage").forEach((e) => e.remove());
+}
+
+function eclairerRange(range) {
+  effacerEclats();
+
+  // Un rectangle par ligne : le passage peut être coupé par un retour à la
+  // ligne (le point en fin de ligne, la majuscule au début de la suivante).
+  //
+  // Largeur ET hauteur : un curseur replié a bien une hauteur de ligne, et
+  // signalerait alors un passage large de rien du tout.
+  const rects = [...range.getClientRects()].filter((r) => r.width > 0 && r.height > 0);
+  if (!rects.length) return;
+
+  const calques = rects.map((r) => {
+    const el = document.createElement("div");
+    el.className = "eclat-passage";
+    // Deux pixels de marge : sur deux caractères, un cadre au ras du texte se
+    // confond avec le texte lui-même.
+    el.style.left = (r.left - 2) + "px";
+    el.style.top = (r.top - 2) + "px";
+    el.style.width = (r.width + 4) + "px";
+    el.style.height = (r.height + 4) + "px";
+    document.body.appendChild(el);
+    return el;
+  });
+
+  const retirer = () => {
+    calques.forEach((el) => el.remove());
+    window.removeEventListener("scroll", retirer, true);
+  };
+  // Le calque est posé en coordonnées d'écran : au moindre défilement il ne
+  // désignerait plus le bon endroit. Mieux vaut qu'il disparaisse.
+  window.addEventListener("scroll", retirer, true);
+  setTimeout(retirer, 2600);
 }
 
 // Convertit un offset texte (+ longueur) en positions de nœuds pour un Range
@@ -2271,7 +2322,7 @@ function ouvrirDialogueEspaces(trouvailles) {
       fermerDialogueEspaces();
       // La ponctuation ET la majuscule collée : on voit ce qui manque entre
       // les deux, et taper l'espace remplace directement la sélection.
-      surlignerPosition(t.page, t.offset, 2);
+      surlignerPosition(t.page, t.offset, 2, true);
     };
   });
 

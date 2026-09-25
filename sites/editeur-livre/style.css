@@ -1863,6 +1863,42 @@ button.danger {
   border-color: var(--s-accent, #8a4b38);
 }
 
+/* ----- Le passage qu'on vient d'aller chercher ----- */
+/* Posé PAR-DESSUS le texte, jamais dedans : le manuscrit ne doit pas garder
+   la trace d'un repère d'affichage. D'où la position fixe, en coordonnées
+   d'écran, et pointer-events:none pour ne pas gêner la frappe qui suit. */
+.eclat-passage {
+  position: fixed;
+  z-index: 9000;
+  pointer-events: none;
+  border-radius: 3px;
+  background: rgba(217, 164, 65, .5);
+  box-shadow: 0 0 0 2px rgba(138, 75, 56, .55), 0 0 12px rgba(217, 164, 65, .8);
+  animation: eclat-passage 2.6s ease-out forwards;
+}
+/* Trois battements, puis on s'efface : assez pour attraper l'œil même si le
+   regard était ailleurs au moment du saut, assez court pour ne pas gêner la
+   correction qu'on vient faire. */
+@keyframes eclat-passage {
+  0%   { opacity: 0;   transform: scale(1.35); }
+  6%   { opacity: 1;   transform: scale(1); }
+  22%  { opacity: .25; }
+  38%  { opacity: 1; }
+  54%  { opacity: .25; }
+  70%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+/* Un clignotement peut gêner, voire déclencher un malaise. Quand le système
+   demande moins d'animation, le repère se contente de rester là puis de
+   s'effacer. */
+@media (prefers-reduced-motion: reduce) {
+  .eclat-passage { animation: eclat-passage-sobre 2.6s ease-out forwards; }
+  @keyframes eclat-passage-sobre {
+    0%, 75% { opacity: 1; transform: none; }
+    100%    { opacity: 0; transform: none; }
+  }
+}
+
 /* ----- Espaces manquants après un point ----- */
 /* Chaque ligne est un bouton : elle mène au passage dans le texte. */
 .esp-ligne {
