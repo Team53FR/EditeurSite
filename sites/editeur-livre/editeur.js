@@ -1870,17 +1870,14 @@ function allerMatch(direction) {
   majCompteurRecherche();
 }
 
-function surlignerMatch(match) {
-  const longueur = document.getElementById("champRecherche").value.length;
-  if (!longueur) return;
-  surlignerPosition(match.page, match.offset, longueur);
-}
-
 // Va chercher un passage du livre et le sélectionne : la recherche s'en sert
 // pour ses résultats, la vérification des espaces pour ses signalements.
 // `eclairer` ajoute un clignotement par-dessus : sur deux caractères au milieu
 // d'une page pleine, la seule sélection se remarque à peine.
 function surlignerPosition(page, offset, longueur, eclairer) {
+  // Les offsets sont comptés sur les pages : elles doivent être à jour.
+  assurerPagesAJour();
+
   // Naviguer vers la double-page contenant le résultat
   const spreadCible = page - (page % 2);
   if (spreadCible !== indexSpread) {
@@ -1890,11 +1887,23 @@ function surlignerPosition(page, offset, longueur, eclairer) {
     afficherSommaire();
   }
 
-  const pageEl = (page % 2 === 0)
-    ? document.getElementById("pageGauche")
-    : document.getElementById("pageDroite");
+  // L'éditeur n'a qu'UNE zone de texte par double-page — deux colonnes CSS,
+  // pas deux éléments. Les « pageGauche » / « pageDroite » d'autrefois ont
+  // disparu avec la réécriture : les chercher rendait null, et le passage
+  // n'était ni sélectionné ni montré (la recherche en souffrait aussi).
+  //
+  // Un offset de PAGE se rejoue donc sur le texte du SPREAD : tel quel pour
+  // une page de gauche, décalé de toute la page de gauche pour celle de
+  // droite — les deux pages étant la partition du même texte.
+  const ed = editeurEl();
+  if (!ed) return;
 
-  const pos = positionDansElement(pageEl, offset, longueur);
+  const pages = livreActuel().pages;
+  const decalage = (page % 2 === 1 && pages[page - 1])
+    ? texteBrutPage(pages[page - 1].contenu).length
+    : 0;
+
+  const pos = positionDansElement(ed, decalage + offset, longueur);
   if (!pos) return;
 
   const range = document.createRange();
@@ -1904,10 +1913,9 @@ function surlignerPosition(page, offset, longueur, eclairer) {
   const sel = window.getSelection();
   sel.removeAllRanges();
   sel.addRange(range);
-  pageEl.focus();
-  coteActif = (page % 2 === 0) ? "gauche" : "droite";
+  ed.focus();
 
-  const rectParent = pageEl.getBoundingClientRect();
+  const rectParent = ed.getBoundingClientRect();
   const rectSel = range.getBoundingClientRect();
   if (rectSel.bottom > rectParent.bottom || rectSel.top < rectParent.top) {
     const noeudParent = pos.debutNoeud.parentElement;
@@ -3743,36 +3751,15 @@ function majCompteurMots() {
 
 // ----- Recherche : positionner dans la zone unique -----
 
+// Le calcul d'offset et la navigation vivent dans surlignerPosition — une
+// seule fois. Ils y étaient recopiés à l'identique, et deux copies d'une même
+// arithmétique finissent toujours par diverger : c'est ainsi que la
+// vérification des espaces a longtemps visé des « pageGauche » / « pageDroite »
+// qui n'existent plus depuis la réécriture de l'éditeur.
 function surlignerMatch(match) {
   const longueur = document.getElementById("champRecherche").value.length;
   if (!longueur) return;
-  assurerPagesAJour();
-  const pages = livreActuel().pages;
-
-  const spreadCible = match.page - (match.page % 2);
-  if (spreadCible !== indexSpread) {
-    flushSpread();
-    indexSpread = spreadCible;
-    afficherSpread();
-    afficherSommaire();
-  }
-
-  // Offset dans la double-page = (page gauche complète si le résultat est à droite) + offset
-  let offset = match.offset;
-  if (match.page % 2 === 1) {
-    offset += texteBrutPage(pages[match.page - 1] ? pages[match.page - 1].contenu : "").length;
-  }
-
-  const ed = editeurEl();
-  const pos = positionDansElement(ed, offset, longueur);
-  if (!pos) return;
-  const range = document.createRange();
-  range.setStart(pos.debutNoeud, pos.debutOffset);
-  range.setEnd(pos.finNoeud, pos.finOffset);
-  const sel = window.getSelection();
-  sel.removeAllRanges();
-  sel.addRange(range);
-  ed.focus();
+  surlignerPosition(match.page, match.offset, longueur);
 }
 
 // ----- Sauvegarde : on régénère les pages dérivées avant d'écrire -----
