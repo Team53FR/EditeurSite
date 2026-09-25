@@ -1938,29 +1938,67 @@ function eclairerRange(range) {
   //
   // Largeur ET hauteur : un curseur replié a bien une hauteur de ligne, et
   // signalerait alors un passage large de rien du tout.
-  const rects = [...range.getClientRects()].filter((r) => r.width > 0 && r.height > 0);
+  const rectangles = () =>
+    [...range.getClientRects()].filter((r) => r.width > 0 && r.height > 0);
+
+  const rects = rectangles();
   if (!rects.length) return;
 
-  const calques = rects.map((r) => {
+  const calques = rects.map(() => {
     const el = document.createElement("div");
     el.className = "eclat-passage";
-    // Deux pixels de marge : sur deux caractères, un cadre au ras du texte se
-    // confond avec le texte lui-même.
-    el.style.left = (r.left - 2) + "px";
-    el.style.top = (r.top - 2) + "px";
-    el.style.width = (r.width + 4) + "px";
-    el.style.height = (r.height + 4) + "px";
     document.body.appendChild(el);
     return el;
   });
 
+  // Deux pixels de marge : sur deux caractères, un cadre au ras du texte se
+  // confond avec le texte lui-même.
+  const poser = (liste) => liste.forEach((r, i) => {
+    const el = calques[i];
+    if (!el) return;
+    el.style.left = (r.left - 2) + "px";
+    el.style.top = (r.top - 2) + "px";
+    el.style.width = (r.width + 4) + "px";
+    el.style.height = (r.height + 4) + "px";
+  });
+  poser(rects);
+
+  let fini = false;
   const retirer = () => {
+    if (fini) return;
+    fini = true;
     calques.forEach((el) => el.remove());
-    window.removeEventListener("scroll", retirer, true);
+    window.removeEventListener("scroll", suivre, true);
+    window.removeEventListener("resize", suivre);
   };
-  // Le calque est posé en coordonnées d'écran : au moindre défilement il ne
-  // désignerait plus le bon endroit. Mieux vaut qu'il disparaisse.
-  window.addEventListener("scroll", retirer, true);
+
+  // Le calque est posé en coordonnées d'ÉCRAN : dès que la page bouge, il
+  // faut le reposer, sinon il désigne un endroit que le texte a quitté.
+  //
+  // Une première version l'effaçait au moindre défilement. C'était une
+  // mauvaise réponse : aller au passage fait justement défiler la page
+  // (focus, scrollIntoView), si bien que le repère s'effaçait à l'instant où
+  // il aurait dû se voir — et le moindre coup de molette le faisait
+  // disparaître avant qu'on l'ait trouvé. On le suit, donc.
+  let enAttente = false;
+  const suivre = () => {
+    if (fini || enAttente) return;
+    enAttente = true;
+    requestAnimationFrame(() => {
+      enAttente = false;
+      if (fini) return;
+      const maj = rectangles();
+      // Plus de rectangle, ou pas le même découpage : le texte a été réécrit
+      // ou la page a changé. Le repère n'a plus rien à désigner.
+      if (maj.length !== calques.length) { retirer(); return; }
+      poser(maj);
+    });
+  };
+
+  // En capture : un défilement ne remonte pas, et c'est la zone de texte qui
+  // défile, pas la fenêtre.
+  window.addEventListener("scroll", suivre, true);
+  window.addEventListener("resize", suivre);
   setTimeout(retirer, 2600);
 }
 
