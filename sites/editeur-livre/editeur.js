@@ -37,7 +37,6 @@ let moiCentralEditeur = null;
 let livreId = null;
 let indexLivre = -1;
 let indexSpread = 0;
-let coteActif = "gauche";
 let selectionSauvegardee = null;
 let modeCouverture = null; // 'couverture' | 'quatrieme' | null
 let hauteurTextePx = 0;    // hauteur utile d'une page de texte (px), pour la pagination continue
@@ -357,39 +356,6 @@ function gererCollage(e) {
   surSaisie({ inputType: "insertFromPaste" });
 }
 
-// Saisie dans une page : pagination continue, historique, brouillon, compteur, état modifié
-function surSaisie(e) {
-  const actif = coteActif === "droite"
-    ? document.getElementById("pageDroite")
-    : document.getElementById("pageGauche");
-
-  const deborde = actif && actif.scrollHeight > actif.clientHeight + 1;
-  const suppression = e && e.inputType && e.inputType.indexOf("delete") !== -1;
-
-  let doitReflow = deborde;
-  if (!doitReflow && suppression && actif && contenuSuivantNonVide()) {
-    // Suppression : on tente toujours de faire remonter le texte des pages
-    // suivantes. Si rien ne peut remonter, la repagination s'arrête aussitôt.
-    doitReflow = true;
-  }
-
-  if (doitReflow) reflowEtCurseur();
-
-  planifierHistorique();
-  planifierBrouillon();
-  planifierCompteurMots();
-  marquerModifie();
-}
-
-// Y a-t-il du texte sur une page située après la page en cours d'édition ?
-function contenuSuivantNonVide() {
-  const pages = livreActuel().pages;
-  const idxActive = coteActif === "droite" ? indexSpread + 1 : indexSpread;
-  for (let k = idxActive + 1; k < pages.length; k++) {
-    if (texteBrutPage(pages[k].contenu).trim() !== "") return true;
-  }
-  return false;
-}
 
 // Raccourcis clavier globaux de l'éditeur (mode texte uniquement)
 function raccourcisClavier(e) {
@@ -487,25 +453,6 @@ function appliquerPolice(police) {
   marquerModifie();
 }
 
-// Interligne appliqué aux paragraphes touchés par la sélection (#7)
-function appliquerInterligne(valeur) {
-  restaurerSelection();
-  const conteneur = coteActif === "droite"
-    ? document.getElementById("pageDroite")
-    : document.getElementById("pageGauche");
-  const sel = window.getSelection();
-  let cibles = [];
-  if (sel && sel.rangeCount > 0) {
-    const range = sel.getRangeAt(0);
-    conteneur.querySelectorAll("p, h2, h3, li").forEach(bloc => {
-      if (range.intersectsNode(bloc)) cibles.push(bloc);
-    });
-  }
-  if (cibles.length === 0) cibles = [conteneur];
-  cibles.forEach(bloc => { bloc.style.lineHeight = valeur; });
-  enregistrerHistorique();
-  marquerModifie();
-}
 
 function sauvegarderSelection() {
   const sel = window.getSelection();
@@ -557,215 +504,14 @@ function appliquerTaille(pt) {
   marquerModifie();
 }
 
-function lireTailleCourrante() {
-  const input = document.getElementById("inputTaille");
-  // Ne pas écraser l'input si l'utilisateur est en train de le modifier
-  if (input && document.activeElement === input) return;
-
-  const sel = window.getSelection();
-  if (!sel || sel.rangeCount === 0) return;
-  let noeud = sel.anchorNode;
-  if (noeud && noeud.nodeType === Node.TEXT_NODE) noeud = noeud.parentElement;
-  while (noeud) {
-    const fs = window.getComputedStyle(noeud).fontSize;
-    if (fs) {
-      const pt = Math.round(parseFloat(fs) / 1.333);
-      if (input) input.value = pt;
-      return;
-    }
-    noeud = noeud.parentElement;
-  }
-}
-
-function intercepterEntree(e) {
-  if (e.key !== "Enter" || e.shiftKey) return;
-  e.preventDefault();
-  document.execCommand("insertLineBreak");
-}
 
 // ----- Affichage -----
 
-function assurerPageExiste(i) {
-  const pages = livreActuel().pages;
-  while (pages.length <= i) {
-    pages.push({ id: "p" + (pages.length + 1) + "_" + Date.now(), contenu: "" });
-  }
-}
 
-function flushSpread() {
-  assurerPageExiste(indexSpread);
-  assurerPageExiste(indexSpread + 1);
-  livreActuel().pages[indexSpread].contenu = document.getElementById("pageGauche").innerHTML;
-  livreActuel().pages[indexSpread + 1].contenu = document.getElementById("pageDroite").innerHTML;
-}
 
-function afficherSpread() {
-  assurerPageExiste(indexSpread);
-  const pages = livreActuel().pages;
-  document.getElementById("pageGauche").innerHTML = pages[indexSpread] ? pages[indexSpread].contenu : "";
-  document.getElementById("pageDroite").innerHTML = pages[indexSpread + 1] ? pages[indexSpread + 1].contenu : "";
-  document.getElementById("numeroGauche").textContent = indexSpread + 1;
-  document.getElementById("numeroDroite").textContent = pages[indexSpread + 1] ? indexSpread + 2 : "";
-  // L'historique annuler/rétablir est propre à chaque double-page affichée
-  reinitialiserHistorique();
-}
-
-function afficherSommaire() {
-  const pages = livreActuel().pages;
-  const liste = document.getElementById("listePages");
-  liste.innerHTML = "";
-
-  pages.forEach((page, i) => {
-    const li = document.createElement("li");
-    li.className = (i === indexSpread || i === indexSpread + 1) ? "actif" : "";
-    li.draggable = true;
-    li.dataset.index = i;
-
-    const poignee = document.createElement("span");
-    poignee.className = "poignee-page";
-    poignee.textContent = "⠿";
-    poignee.title = "Glisser pour réorganiser";
-    li.appendChild(poignee);
-
-    const libelle = document.createElement("span");
-    libelle.textContent = "Page " + (i + 1);
-    libelle.className = "libelle-page";
-    libelle.onclick = () => allerAPage(i);
-    li.appendChild(libelle);
-
-    if (pages.length > 1) {
-      const btnSuppr = document.createElement("span");
-      btnSuppr.textContent = "✕";
-      btnSuppr.className = "supprimer-page";
-      btnSuppr.title = "Supprimer cette page";
-      btnSuppr.onclick = (e) => { e.stopPropagation(); supprimerPage(i); };
-      li.appendChild(btnSuppr);
-    }
-
-    li.addEventListener("dragstart", (e) => {
-      indexPageGlissee = i;
-      li.classList.add("en-deplacement");
-      e.dataTransfer.effectAllowed = "move";
-    });
-    li.addEventListener("dragend", () => {
-      li.classList.remove("en-deplacement");
-      liste.querySelectorAll("li").forEach(el => el.classList.remove("glisse-dessus"));
-    });
-    li.addEventListener("dragover", (e) => {
-      e.preventDefault();
-      e.dataTransfer.dropEffect = "move";
-      li.classList.add("glisse-dessus");
-    });
-    li.addEventListener("dragleave", () => li.classList.remove("glisse-dessus"));
-    li.addEventListener("drop", (e) => {
-      e.preventDefault();
-      li.classList.remove("glisse-dessus");
-      deplacerPage(indexPageGlissee, i);
-    });
-
-    liste.appendChild(li);
-  });
-}
-
-// Réorganisation des pages par glisser-déposer (#10)
-let indexPageGlissee = null;
-
-function deplacerPage(depuis, vers) {
-  if (depuis === null || depuis === vers) return;
-  flushSpread();
-  const pages = livreActuel().pages;
-  if (depuis < 0 || depuis >= pages.length || vers < 0 || vers >= pages.length) return;
-  const [page] = pages.splice(depuis, 1);
-  pages.splice(vers, 0, page);
-  // Se recaler sur la double-page contenant la page déplacée
-  indexSpread = vers - (vers % 2);
-  afficherSpread();
-  afficherSommaire();
-  marquerModifie();
-  planifierBrouillon();
-}
-
-function supprimerPage(i) {
-  const pages = livreActuel().pages;
-  if (pages.length <= 1) return;
-  if (!confirm(`Supprimer la page ${i + 1} ? Cette action est irréversible.`)) return;
-
-  flushSpread();
-  pages.splice(i, 1);
-
-  // Recalculer indexSpread sur une paire valide
-  if (indexSpread >= pages.length) {
-    indexSpread = Math.max(0, pages.length - 1 - ((pages.length - 1) % 2));
-  } else if (i <= indexSpread && indexSpread > 0) {
-    indexSpread = Math.max(0, indexSpread - 1 - ((indexSpread - 1) % 2));
-  }
-  // Toujours commencer sur un index pair
-  indexSpread = indexSpread - (indexSpread % 2);
-
-  afficherSpread();
-  afficherSommaire();
-  marquerModifie();
-  planifierBrouillon();
-}
-
-function allerAPage(i) {
-  flushSpread();
-  indexSpread = i - (i % 2);
-  afficherSpread();
-  afficherSommaire();
-}
-
-function pagePrecedente() {
-  flushSpread();
-  if (indexSpread - 2 >= 0) {
-    indexSpread -= 2;
-    afficherSpread();
-    afficherSommaire();
-  }
-}
-
-function pageSuivante() {
-  flushSpread();
-  // Créer la nouvelle page si besoin
-  assurerPageExiste(indexSpread + 2);
-  indexSpread += 2;
-  afficherSpread();
-  afficherSommaire();
-}
 
 // ----- Sauvegarde -----
 
-async function sauvegarder() {
-  const message = document.getElementById("message");
-
-  flushSpread();
-
-  // Le cache de pagination part avec le livre : la lecture et l'impression le
-  // lisent sans pouvoir le recalculer (voir supabase/schema.sql). Il doit donc
-  // être à jour AVANT d'écrire, pas à la prochaine mesure.
-  assurerPagesAJour();
-
-  // Nettoyer les pages vides en fin de livre (sauf la première)
-  const pages = livreActuel().pages;
-  while (pages.length > 1 && !pages[pages.length - 1].contenu.replace(/<[^>]+>/g, "").trim()) {
-    pages.pop();
-  }
-  if (indexSpread >= pages.length) {
-    indexSpread = Math.max(0, pages.length - 1 - ((pages.length - 1) % 2));
-  }
-  afficherSpread();
-  afficherSommaire();
-
-  try {
-    majLeConnu = await enregistrerLivreDistant(livreActuel(), majLeConnu);
-    message.textContent = "Sauvegardé avec succès.";
-    marquerSauvegarde();
-    effacerBrouillon();
-  } catch (erreur) {
-    if (erreur.conflit) { gererConflitSauvegarde(); return; }
-    message.textContent = erreur.message;
-  }
-}
 
 // Résolution d'un conflit d'écriture (le livre a été modifié ailleurs) (#3)
 async function gererConflitSauvegarde() {
@@ -1275,19 +1021,6 @@ function nombreSpreadsApercu() {
   return Math.max(1, Math.ceil(pages.length / 2));
 }
 
-function ouvrirApercu() {
-  flushSpread();
-  modeApercu = true;
-  animationEnCours = false;
-  indexApercu = 0;
-
-  document.getElementById("vueEditeur").style.display = "none";
-  document.getElementById("vueCouverture").style.display = "none";
-  document.getElementById("vueApercu").style.display = "flex";
-  document.querySelector(".sommaire").style.display = "none";
-
-  afficherApercu();
-}
 
 function fermerApercu() {
   modeApercu = false;
@@ -1693,81 +1426,7 @@ function verifierBrouillon() {
 // =====================================================================
 
 let historique = { undo: [], redo: [] };
-let dernierSnapshot = { g: "", d: "" };
-let timerHisto = null;
 
-function snapshotActuel() {
-  return {
-    g: document.getElementById("pageGauche").innerHTML,
-    d: document.getElementById("pageDroite").innerHTML
-  };
-}
-
-function reinitialiserHistorique() {
-  historique = { undo: [], redo: [] };
-  dernierSnapshot = snapshotActuel();
-  if (timerHisto) { clearTimeout(timerHisto); timerHisto = null; }
-}
-
-function planifierHistorique() {
-  clearTimeout(timerHisto);
-  timerHisto = setTimeout(() => { timerHisto = null; enregistrerHistorique(); }, 500);
-}
-
-function enregistrerHistorique() {
-  const actuel = snapshotActuel();
-  if (actuel.g === dernierSnapshot.g && actuel.d === dernierSnapshot.d) return;
-  historique.undo.push(dernierSnapshot);
-  if (historique.undo.length > 100) historique.undo.shift();
-  historique.redo = [];
-  dernierSnapshot = actuel;
-}
-
-function flushHistorique() {
-  if (timerHisto) { clearTimeout(timerHisto); timerHisto = null; }
-  enregistrerHistorique();
-}
-
-function annuler() {
-  if (modeApercu || modeCouverture) return;
-  flushHistorique();
-  if (historique.undo.length === 0) return;
-  historique.redo.push(dernierSnapshot);
-  const precedent = historique.undo.pop();
-  restaurerSnapshot(precedent);
-  dernierSnapshot = precedent;
-  marquerModifie();
-  planifierBrouillon();
-  planifierCompteurMots();
-}
-
-function retablir() {
-  if (modeApercu || modeCouverture) return;
-  if (historique.redo.length === 0) return;
-  historique.undo.push(dernierSnapshot);
-  const suivant = historique.redo.pop();
-  restaurerSnapshot(suivant);
-  dernierSnapshot = suivant;
-  marquerModifie();
-  planifierBrouillon();
-  planifierCompteurMots();
-}
-
-function restaurerSnapshot(etat) {
-  const pageGauche = document.getElementById("pageGauche");
-  const pageDroite = document.getElementById("pageDroite");
-  pageGauche.innerHTML = etat.g;
-  pageDroite.innerHTML = etat.d;
-  // Replacer le curseur en fin de la page active
-  const cible = coteActif === "droite" ? pageDroite : pageGauche;
-  cible.focus();
-  const range = document.createRange();
-  range.selectNodeContents(cible);
-  range.collapse(false);
-  const sel = window.getSelection();
-  sel.removeAllRanges();
-  sel.addRange(range);
-}
 
 // =====================================================================
 //  Compteur de mots (#10)
@@ -1780,20 +1439,6 @@ function planifierCompteurMots() {
   timerCompteur = setTimeout(majCompteurMots, 600);
 }
 
-function majCompteurMots() {
-  if (indexLivre === -1) return;
-  flushSpread();
-  const pages = livreActuel().pages;
-  let mots = 0;
-  const tmp = document.createElement("div");
-  pages.forEach(p => {
-    tmp.innerHTML = p.contenu || "";
-    const txt = (tmp.textContent || "").trim();
-    if (txt) mots += txt.split(/\s+/).length;
-  });
-  const el = document.getElementById("compteurMots");
-  if (el) el.textContent = `${mots} mot${mots > 1 ? "s" : ""} · ${pages.length} page${pages.length > 1 ? "s" : ""}`;
-}
 
 // =====================================================================
 //  Recherche et remplacement (#5)
@@ -2480,200 +2125,6 @@ function placerCaretAOffset(conteneur, offset) {
   sel.addRange(range);
 }
 
-// Scinde un contenu HTML pour qu'il tienne dans la hauteur d'une page.
-// Renvoie { garde, deborde }. Le découpage se fait UNIQUEMENT par
-// extractContents, qui préserve toute la mise en forme (italique, gras,
-// tailles, polices…) en clonant les balises de part et d'autre de la coupe.
-function mesurerScinder(html) {
-  const mes = document.getElementById("mesureCachee");
-  if (!mes || !hauteurTextePx) return { garde: html, deborde: "" };
-
-  mes.style.height = "auto";
-  mes.innerHTML = html || "";
-
-  if (mes.scrollHeight <= hauteurTextePx + 1) {
-    mes.innerHTML = "";
-    return { garde: html, deborde: "" };
-  }
-
-  const coupure = trouverCoupure(mes);
-  if (!coupure) { mes.innerHTML = ""; return { garde: html, deborde: "" }; }
-
-  const range = document.createRange();
-  range.setStart(coupure.node, coupure.offset);
-  range.setEnd(mes, mes.childNodes.length);
-  const frag = range.extractContents();
-
-  const boite = document.createElement("div");
-  boite.appendChild(frag);
-
-  const deborde = boite.innerHTML;
-  const garde = mes.innerHTML;
-  mes.innerHTML = "";
-  return { garde, deborde };
-}
-
-// Position (noeud texte, offset) du premier mot qui déborde la hauteur utile.
-// Trouvée par dichotomie sur la hauteur RÉELLE du contenu conservé (boîtes de
-// ligne comprises), sans jamais déplacer de texte : la coupe est ensuite faite
-// par extractContents, donc les styles sont intégralement préservés.
-function trouverCoupure(conteneur) {
-  // Positions de début de chaque mot, dans l'ordre du document
-  const positions = [];
-  const walker = document.createTreeWalker(conteneur, NodeFilter.SHOW_TEXT);
-  let noeud;
-  while ((noeud = walker.nextNode())) {
-    const texte = noeud.textContent;
-    const regex = /\S+/g;
-    let m;
-    while ((m = regex.exec(texte))) positions.push({ node: noeud, offset: m.index });
-  }
-  if (positions.length <= 1) return null; // rien à couper proprement
-
-  const haut = conteneur.getBoundingClientRect().top;
-  const limite = hauteurTextePx + 1;
-
-  // Le contenu situé AVANT positions[k] tient-il dans la hauteur ?
-  function tient(k) {
-    const r = document.createRange();
-    r.setStart(conteneur, 0);
-    r.setEnd(positions[k].node, positions[k].offset);
-    return (r.getBoundingClientRect().bottom - haut) <= limite;
-  }
-
-  // Plus grand k tel que les mots 0..k-1 tiennent ; on coupe alors au mot k.
-  let lo = 1, hi = positions.length - 1, kMax = 0;
-  while (lo <= hi) {
-    const mid = (lo + hi) >> 1;
-    if (tient(mid)) { kMax = mid; lo = mid + 1; }
-    else hi = mid - 1;
-  }
-  if (kMax === 0) return null; // même le 1er mot ne tient pas
-  return positions[kMax];
-}
-
-// Concatène deux contenus HTML comme un flux continu, en fusionnant les blocs
-// de bordure de même nature (ex. deux <p> => un seul paragraphe qui continue).
-function fusionnerHTML(a, b) {
-  if (!a) return b || "";
-  if (!b) return a || "";
-
-  const da = document.createElement("div"); da.innerHTML = a;
-  const db = document.createElement("div"); db.innerHTML = b;
-
-  const dernier = da.lastElementChild;
-  const premier = db.firstElementChild;
-  const fusionnable = ["P", "H2", "H3", "DIV", "UL", "OL", "BLOCKQUOTE"];
-
-  if (dernier && premier && dernier.tagName === premier.tagName && fusionnable.includes(dernier.tagName)) {
-    // Éviter de coller deux mots pour les blocs de texte (pas pour les listes)
-    if (["P", "H2", "H3", "DIV", "BLOCKQUOTE"].includes(dernier.tagName)) {
-      const finTexte = dernier.textContent;
-      const debutTexte = premier.textContent;
-      if (finTexte && debutTexte && /\w$/.test(finTexte) && /^\w/.test(debutTexte)) {
-        dernier.appendChild(document.createTextNode(" "));
-      }
-    }
-    while (premier.firstChild) dernier.appendChild(premier.firstChild);
-    db.removeChild(premier);
-    while (db.firstChild) da.appendChild(db.firstChild);
-    return da.innerHTML;
-  }
-  return a + b;
-}
-
-// Recompose la pagination à partir de la page iDebut : chaque page est remplie
-// au maximum, le surplus part sur la suivante, en cascade.
-function normaliserPagination(iDebut) {
-  const pages = livreActuel().pages;
-  let i = Math.max(0, iDebut);
-  let securite = 0;
-
-  while (i < pages.length && securite < 2000) {
-    securite++;
-    const contenuI = pages[i].contenu || "";
-    const contenuSuiv = (i + 1 < pages.length) ? (pages[i + 1].contenu || "") : "";
-    const combine = fusionnerHTML(contenuI, contenuSuiv);
-
-    const { garde, deborde } = mesurerScinder(combine);
-
-    pages[i].contenu = garde;
-    const resteNonVide = deborde && deborde.trim() !== "";
-
-    if (resteNonVide) {
-      assurerPageExiste(i + 1);
-      pages[i + 1].contenu = deborde;
-    } else if (i + 1 < pages.length) {
-      pages[i + 1].contenu = "";
-    }
-
-    // Stabilité : rien n'a bougé sur cette paire. On ne s'arrête que si la page
-    // suivante ne déborde pas elle-même (sinon la cascade doit continuer).
-    if (garde === contenuI && (deborde || "") === contenuSuiv) {
-      if (i + 1 >= pages.length) break;
-      const suiv = mesurerScinder(pages[i + 1].contenu);
-      if (!suiv.deborde || suiv.deborde.trim() === "") break;
-    }
-
-    i++;
-  }
-
-  // Supprimer les pages vides en fin de livre (garder au moins une page)
-  while (pages.length > 1 && !texteBrutPage(pages[pages.length - 1].contenu).trim()) {
-    pages.pop();
-  }
-}
-
-// Applique la pagination continue puis replace le curseur au bon endroit
-function reflowEtCurseur() {
-  const pages = livreActuel().pages;
-  const cote = coteActif;
-  const idxActive = cote === "droite" ? indexSpread + 1 : indexSpread;
-  const actif = cote === "droite"
-    ? document.getElementById("pageDroite")
-    : document.getElementById("pageGauche");
-
-  // Offset absolu du curseur (depuis le début du livre), invariant par le reflow
-  const local = actif ? offsetCaret(actif) : null;
-  flushSpread();
-
-  let absOffset = null;
-  if (local !== null) {
-    absOffset = 0;
-    for (let k = 0; k < idxActive; k++) absOffset += texteBrutPage(pages[k].contenu).length;
-    absOffset += local;
-  }
-
-  normaliserPagination(indexSpread);
-
-  if (absOffset === null) {
-    afficherSpread();
-    afficherSommaire();
-    majCompteurMots();
-    return;
-  }
-
-  // Retrouver la page + offset local correspondant à l'offset absolu
-  let acc = 0, cible = 0, localCible = 0;
-  for (let k = 0; k < pages.length; k++) {
-    const len = texteBrutPage(pages[k].contenu).length;
-    if (absOffset <= acc + len) { cible = k; localCible = absOffset - acc; break; }
-    acc += len; cible = k; localCible = len;
-  }
-
-  indexSpread = cible - (cible % 2);
-  afficherSpread();
-  afficherSommaire();
-
-  const cibleEl = (cible % 2 === 0)
-    ? document.getElementById("pageGauche")
-    : document.getElementById("pageDroite");
-  cibleEl.focus();
-  coteActif = (cible % 2 === 0) ? "gauche" : "droite";
-  placerCaretAOffset(cibleEl, localCible);
-
-  majCompteurMots();
-}
 
 // Relancer la recherche quand on tape dans le champ (script chargé en fin de body :
 // l'élément existe déjà, on branche directement)
@@ -3034,10 +2485,6 @@ function gererFlux() {
 // point d'accroche : les fonctions de formatage l'appellent déjà, on s'en sert
 // pour planifier l'enregistrement du texte.
 
-function snapshotActuel() { const ed = editeurEl(); return { g: ed ? ed.innerHTML : "", d: "" }; }
-function reinitialiserHistorique() {}
-function planifierHistorique() {}
-function flushHistorique() {}
 function enregistrerHistorique() {
   clearTimeout(timerFlux);
   timerFlux = setTimeout(gererFlux, 350);
