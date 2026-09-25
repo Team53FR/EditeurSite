@@ -1784,14 +1784,9 @@ function remplacerTout() {
 //  s'y ferait rogner dès qu'elle passerait le bas du panneau.
 // =====================================================================
 
-// L'état survit au rechargement : rouvrir le livre ne redéplie pas un panneau
-// qu'on avait refermé, et ne referme pas celui qu'on laisse ouvert.
-const CLE_OUTILS_OUVERTS = "editeur_outils_ouverts";
-
-function outilsLivreOuverts() {
-  try { return localStorage.getItem(CLE_OUTILS_OUVERTS) === "1"; } catch (e) { return false; }
-}
-
+// Toujours replié en arrivant : on ouvre ce tiroir quand on en a besoin, et
+// le retrouver déplié à chaque ouverture du livre rendrait au sommaire
+// l'encombrement qu'on venait d'en retirer. L'état n'est donc pas mémorisé.
 function appliquerEtatOutilsLivre(ouvert) {
   const bouton = document.getElementById("btnOutilsLivre");
   const liste = document.getElementById("listeOutilsLivre");
@@ -1799,7 +1794,6 @@ function appliquerEtatOutilsLivre(ouvert) {
   liste.hidden = !ouvert;
   bouton.setAttribute("aria-expanded", ouvert ? "true" : "false");
   bouton.classList.toggle("ouvert", ouvert);
-  try { localStorage.setItem(CLE_OUTILS_OUVERTS, ouvert ? "1" : "0"); } catch (e) {}
 }
 
 function basculerOutilsLivre() {
@@ -1829,7 +1823,7 @@ function lancerOutilLivre(outil) {
   const bouton = document.getElementById("btnOutilsLivre");
   if (!liste || !bouton) return;
 
-  appliquerEtatOutilsLivre(outilsLivreOuverts());
+  appliquerEtatOutilsLivre(false);
 
   liste.addEventListener("keydown", (e) => {
     const outils = [...liste.querySelectorAll(".outil")];

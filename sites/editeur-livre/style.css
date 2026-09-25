@@ -1864,7 +1864,9 @@ button.danger {
 }
 
 /* ----- Les outils de relecture, repliés sous un seul bouton ----- */
-.bloc-outils { display: flex; flex-direction: column; }
+/* Le même écart que sous « + Chapitre », plus un cheveu : c'est la fin des
+   actions, la liste des pages commence juste après et ne doit pas s'y coller. */
+.bloc-outils { display: flex; flex-direction: column; margin-bottom: 10px; }
 
 /* Le bouton garde l'allure des autres du sommaire ; seul le chevron dit
    qu'il en cache d'autres. */
