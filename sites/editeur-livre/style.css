@@ -1878,6 +1878,12 @@ button.danger {
 }
 .btn-outils.ouvert .chevron-outils { transform: rotate(180deg); }
 
+/* Cette règle-ci doit venir AVANT le display de la liste, et surtout exister :
+   « display: flex » sur une classe l'emporte sur le « [hidden] {display:none} »
+   du navigateur, et l'attribut hidden n'a plus aucun effet — le panneau reste
+   ouvert en permanence pendant que le bouton bascule une propriété invisible. */
+.liste-outils[hidden] { display: none; }
+
 .liste-outils {
   display: flex; flex-direction: column; gap: 0.2rem;
   margin: 0.25rem 0 0 0.5rem;

@@ -279,26 +279,6 @@ a { color: var(--primaire); }
 
 .separateur-form { height: 1px; background: var(--bordure); margin: 1.3rem 0; }
 
-/* ===== Encart « Installer l'application » (tableau de bord) ===== */
-.encart-app {
-  display: flex;
-  align-items: center;
-  gap: 0.9rem;
-  background: var(--carte);
-  border: 1px solid var(--bordure);
-  border-radius: var(--rayon);
-  padding: 0.9rem 1rem;
-  margin-bottom: 1.1rem;
-  box-shadow: var(--ombre);
-}
-.encart-app[hidden] { display: none; }
-.encart-app img { border-radius: 12px; flex-shrink: 0; }
-.encart-app-texte { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.15rem; }
-.encart-app-texte strong { font-size: 0.95rem; }
-.encart-app-texte span { font-size: 0.82rem; color: var(--texte-att); line-height: 1.4; }
-.encart-app .btn { padding: 0.6rem 1rem; font-size: 0.9rem; flex-shrink: 0; }
-.encart-app #btn-fermer-encart { padding: 0.6rem 0.7rem; }
-
 @media (max-width: 560px) {
   .encart-app { flex-wrap: wrap; }
   .encart-app-texte { flex-basis: calc(100% - 4rem); }
@@ -601,6 +581,14 @@ a { color: var(--primaire); }
 }
 
 /* ----- L'invitation à installer : une note en bas de page, pas une bannière ----- */
+/* Sans cette règle, le « display: flex » ci-dessous l'emporte sur le
+   « [hidden] {display:none} » du navigateur : installation.js pose bien
+   encart.hidden = true, mais la note reste à l'écran — le bouton « fermer »
+   ne fermait rien, et la note s'affichait même sur un portail déjà installé.
+   Le garde-fou existait, sous le nom .encart-app, resté en place après le
+   renommage de la classe. */
+.tdb-note-app[hidden] { display: none; }
+
 .tdb-note-app {
   display: flex;
   align-items: center;
