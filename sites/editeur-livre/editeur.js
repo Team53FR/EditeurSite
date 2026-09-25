@@ -2089,6 +2089,14 @@ function extraitCollage(texte, off) {
 // enchaînement de phrase.
 const BLOCS_TEXTE = /^(P|H1|H2|H3|H4|H5|H6|LI|BLOCKQUOTE|DIV|TD|TH|SECTION|ARTICLE|FIGCAPTION|PRE)$/;
 
+// Éléments qui rompent la ligne sans porter de texte. Ils comptent autant
+// qu'un changement de paragraphe : ce livre sépare justement ses paragraphes
+// par « <br><br> » à l'intérieur d'un même <p>, si bien que le texte d'avant
+// et celui d'après se suivent sans rien entre eux. Sans cette rupture, la fin
+// d'un paragraphe (« …cris de guerre. ») toucherait le début du suivant
+// (« Il y a plus d'un siècle… ») et formerait un faux « guerre.Il ».
+const RUPTURES_TEXTE = /^(BR|HR)$/;
+
 function blocParent(noeud, racine) {
   let el = noeud.parentElement;
   while (el && el !== racine && !BLOCS_TEXTE.test(el.tagName)) el = el.parentElement;
@@ -2102,32 +2110,57 @@ function blocParent(noeud, racine) {
 //  - On examine le texte CONCATÉNÉ, pas chaque nœud isolément : une mise en
 //    forme peut couper le passage en deux (« <em>lui-même.</em>Dégager »), et
 //    le collage serait invisible de chaque côté pris à part.
-//  - Mais on ne concatène QUE DANS UN MÊME BLOC. Sans cela, la fin d'un
-//    paragraphe toucherait le début du suivant : « …il partit. » suivi d'un
-//    « Le lendemain… » formerait un faux « partit.Le », et l'outil signalerait
-//    chaque fin de paragraphe du livre pour y coller une espace inutile.
+//  - Mais on ne concatène QUE JUSQU'À LA PROCHAINE RUPTURE — changement de
+//    bloc, ou simple <br>. Sans cela, la fin d'un paragraphe toucherait le
+//    début du suivant : « …il partit. » suivi d'un « Le lendemain… »
+//    formerait un faux « partit.Le », et l'outil signalerait chaque fin de
+//    paragraphe du livre pour y coller une espace inutile.
 //
 // Les offsets rendus portent sur le texte complet du fragment (celui que rend
 // textContent), pour que la liste et la correction désignent le même endroit.
 function collagesDansFragment(conteneur) {
   const noeuds = [];
-  const walker = document.createTreeWalker(conteneur, NodeFilter.SHOW_TEXT);
-  while (walker.nextNode()) noeuds.push(walker.currentNode);
-
   const offsets = [];
-  let global = 0;
-  let i = 0;
-  while (i < noeuds.length) {
-    const bloc = blocParent(noeuds[i], conteneur);
-    const debutDuBloc = global;
-    let texte = "";
-    while (i < noeuds.length && blocParent(noeuds[i], conteneur) === bloc) {
-      texte += noeuds[i].textContent;
-      global += noeuds[i].textContent.length;
-      i++;
+  let global = 0;                 // offset dans le texte entier du fragment
+
+  let texteCourant = "";          // texte accumulé depuis la dernière rupture
+  let debutCourant = 0;           // son offset de départ
+  let blocCourant = null;
+
+  // Le texte accumulé forme un passage continu : on y cherche les collages,
+  // puis on repart à zéro.
+  const cloturer = () => {
+    if (texteCourant) {
+      trouverCollages(texteCourant).forEach((off) => offsets.push(debutCourant + off));
+      texteCourant = "";
     }
-    trouverCollages(texte).forEach((off) => offsets.push(debutDuBloc + off));
+  };
+
+  // Éléments ET texte : les <br> n'apparaîtraient pas dans un parcours limité
+  // aux nœuds de texte, et c'est précisément eux qu'il faut voir passer.
+  const walker = document.createTreeWalker(conteneur,
+    NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
+
+  while (walker.nextNode()) {
+    const n = walker.currentNode;
+
+    if (n.nodeType === 1) {
+      if (RUPTURES_TEXTE.test(n.tagName) || BLOCS_TEXTE.test(n.tagName)) cloturer();
+      continue;                   // une balise en elle-même ne porte pas de texte
+    }
+
+    // Changement de bloc sans balise de rupture rencontrée (sortie d'un <p>
+    // vers du texte nu, par exemple).
+    const bloc = blocParent(n, conteneur);
+    if (bloc !== blocCourant) { cloturer(); blocCourant = bloc; }
+
+    if (!texteCourant) debutCourant = global;
+    texteCourant += n.textContent;
+    noeuds.push(n);
+    global += n.textContent.length;
   }
+  cloturer();
+
   return { noeuds, offsets };
 }
 
