@@ -58,8 +58,28 @@
 
       <div class="sommaire-section">Chapitres</div>
       <button onclick="ajouterChapitre()" class="secondaire petit btn-chapitre" title="Ajouter un chapitre (démarre sur une nouvelle page)">+ Chapitre</button>
-      <button onclick="ouvrirRenommageChapitres()" class="secondaire petit btn-renommer" title="Renommer les chapitres l'un après l'autre, sans quitter la page">✎ Renommer les chapitres</button>
-      <button onclick="ouvrirVerificationEspaces()" class="secondaire petit btn-espaces" title="Repérer les points collés au mot suivant (« lui-même.Dégager ») et ajouter les espaces manquantes">␣ Espaces après les points</button>
+
+      <!-- Les outils qui relisent le livre entier sont regroupés : ils servent
+           de loin en loin, et leur nombre est appelé à grandir. « + Chapitre »
+           reste dehors, lui : on s'en sert en écrivant. -->
+      <div class="bloc-outils">
+        <button type="button" id="btnOutilsLivre" class="secondaire petit btn-outils"
+                aria-expanded="false" aria-controls="listeOutilsLivre"
+                onclick="basculerOutilsLivre()">
+          <span>🔍 Relecture</span>
+          <span class="chevron-outils" aria-hidden="true">▾</span>
+        </button>
+        <div class="liste-outils" id="listeOutilsLivre" hidden>
+          <button type="button" class="outil" onclick="lancerOutilLivre(ouvrirRenommageChapitres)">
+            <strong>✎ Renommer les chapitres</strong>
+            <small>Tous les titres du livre, à corriger d'affilée</small>
+          </button>
+          <button type="button" class="outil" onclick="lancerOutilLivre(ouvrirVerificationEspaces)">
+            <strong>␣ Espaces après les points</strong>
+            <small>Repérer « lui-même.Dégager » et ajouter les espaces</small>
+          </button>
+        </div>
+      </div>
 
       <ul id="listePages"></ul>
 

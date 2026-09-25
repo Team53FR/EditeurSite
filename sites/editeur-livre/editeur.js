@@ -1773,6 +1773,82 @@ function remplacerTout() {
 }
 
 // =====================================================================
+//  Les outils de relecture, repliés sous un seul bouton
+//
+//  Ils balaient le livre entier et ne servent que de loin en loin : les
+//  laisser en vrac dans le sommaire, c'était le remplir de boutons qu'on
+//  regarde sans les lire. « + Chapitre » reste dehors — celui-là sert en
+//  écrivant.
+//
+//  Replié plutôt que flottant : le sommaire défile, et une liste flottante
+//  s'y ferait rogner dès qu'elle passerait le bas du panneau.
+// =====================================================================
+
+// L'état survit au rechargement : rouvrir le livre ne redéplie pas un panneau
+// qu'on avait refermé, et ne referme pas celui qu'on laisse ouvert.
+const CLE_OUTILS_OUVERTS = "editeur_outils_ouverts";
+
+function outilsLivreOuverts() {
+  try { return localStorage.getItem(CLE_OUTILS_OUVERTS) === "1"; } catch (e) { return false; }
+}
+
+function appliquerEtatOutilsLivre(ouvert) {
+  const bouton = document.getElementById("btnOutilsLivre");
+  const liste = document.getElementById("listeOutilsLivre");
+  if (!bouton || !liste) return;
+  liste.hidden = !ouvert;
+  bouton.setAttribute("aria-expanded", ouvert ? "true" : "false");
+  bouton.classList.toggle("ouvert", ouvert);
+  try { localStorage.setItem(CLE_OUTILS_OUVERTS, ouvert ? "1" : "0"); } catch (e) {}
+}
+
+function basculerOutilsLivre() {
+  const liste = document.getElementById("listeOutilsLivre");
+  if (!liste) return;
+  const ouvre = liste.hidden;
+  appliquerEtatOutilsLivre(ouvre);
+  if (ouvre) {
+    const premier = liste.querySelector(".outil");
+    if (premier) premier.focus();
+  }
+}
+
+// Un outil ouvre sa propre fenêtre : le panneau n'a plus de raison de rester
+// déplié derrière, et le retrouver ouvert au retour serait une surprise.
+function lancerOutilLivre(outil) {
+  appliquerEtatOutilsLivre(false);
+  const bouton = document.getElementById("btnOutilsLivre");
+  if (bouton) bouton.focus();
+  outil();
+}
+
+// Échap referme, les flèches parcourent : un panneau qui ne se pilote qu'à la
+// souris est un panneau dont on sort mal.
+(function brancherOutilsLivre() {
+  const liste = document.getElementById("listeOutilsLivre");
+  const bouton = document.getElementById("btnOutilsLivre");
+  if (!liste || !bouton) return;
+
+  appliquerEtatOutilsLivre(outilsLivreOuverts());
+
+  liste.addEventListener("keydown", (e) => {
+    const outils = [...liste.querySelectorAll(".outil")];
+    const i = outils.indexOf(document.activeElement);
+    if (e.key === "Escape") {
+      e.preventDefault();
+      appliquerEtatOutilsLivre(false);
+      bouton.focus();
+    } else if (e.key === "ArrowDown" && i !== -1) {
+      e.preventDefault();
+      outils[(i + 1) % outils.length].focus();
+    } else if (e.key === "ArrowUp" && i !== -1) {
+      e.preventDefault();
+      outils[(i - 1 + outils.length) % outils.length].focus();
+    }
+  });
+})();
+
+// =====================================================================
 //  Espaces manquants après un point
 //
 //  « lui-même.Dégager le » au lieu de « lui-même. Dégager le ». La faute se

@@ -1863,6 +1863,54 @@ button.danger {
   border-color: var(--s-accent, #8a4b38);
 }
 
+/* ----- Les outils de relecture, repliés sous un seul bouton ----- */
+.bloc-outils { display: flex; flex-direction: column; }
+
+/* Le bouton garde l'allure des autres du sommaire ; seul le chevron dit
+   qu'il en cache d'autres. */
+.btn-outils {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 0.5rem; width: 100%; text-align: left;
+}
+.chevron-outils {
+  font-size: 0.7em; line-height: 1;
+  transition: transform .18s ease;
+}
+.btn-outils.ouvert .chevron-outils { transform: rotate(180deg); }
+
+.liste-outils {
+  display: flex; flex-direction: column; gap: 0.2rem;
+  margin: 0.25rem 0 0 0.5rem;
+  padding-left: 0.5rem;
+  /* Un filet à gauche rattache visuellement les outils à leur bouton : sans
+     lui, la liste dépliée flotte au milieu du sommaire sans qu'on sache de
+     quoi elle dépend. */
+  border-left: 2px solid var(--s-line, #e6ddc9);
+}
+
+.outil {
+  display: flex; flex-direction: column; gap: 0.1rem;
+  padding: 0.4rem 0.45rem;
+  border: 1px solid transparent; border-radius: 8px;
+  background: none; color: inherit; font: inherit;
+  text-align: left; cursor: pointer;
+}
+.outil:hover, .outil:focus-visible {
+  border-color: var(--s-accent, #8a4b38);
+  background: rgba(138, 75, 56, .05);
+}
+.outil strong { font-size: 0.8rem; font-weight: 600; }
+/* La ligne d'explication : c'est elle qui évite d'avoir à cliquer pour
+   découvrir ce que fait l'outil. */
+.outil small {
+  font-size: 0.71rem; line-height: 1.35;
+  color: var(--s-ink-soft, #6f6455);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chevron-outils { transition: none; }
+}
+
 /* ----- Le passage qu'on vient d'aller chercher ----- */
 /* Posé PAR-DESSUS le texte, jamais dedans : le manuscrit ne doit pas garder
    la trace d'un repère d'affichage. D'où la position fixe, en coordonnées
