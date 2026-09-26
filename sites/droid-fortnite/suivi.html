@@ -121,7 +121,9 @@
       <!-- Les couleurs du palier analysé, quand il appartient à une famille. -->
       <div class="onglets-variante" id="ongletsVarianteAnalyse" role="tablist" style="display:none"></div>
       <div class="ligne-multiplicateur">
-        <label for="champBudget">Argent disponible</label>
+        <!-- L'intitulé suit la monnaie du palier analysé : comparer des
+             cristaux à un budget en crédits n'aurait aucun sens. -->
+        <label for="champBudget" id="libelleBudget">Argent disponible</label>
         <div class="champ-multiplicateur champ-budget">
           <input type="text" id="champBudget" inputmode="decimal" placeholder="ex. 60" oninput="afficherAnalyse()" aria-label="Argent disponible">
           <select id="uniteBudget" onchange="afficherAnalyse()" aria-label="Unité"></select>

@@ -308,8 +308,42 @@ function formaterValeurSaisie(v) {
   return formaterCredits(n);
 }
 
+// ===== Monnaies =====
+//
+// Tout s'achète en crédits, sauf les évolutions du Kyber, qui se paient en
+// CRISTAUX. Seul le PRIX change de monnaie : la revente et le rendement
+// restent en crédits, puisqu'ils décrivent ce que le droïde rapporte — c'est
+// ce qui permet au total de l'escouade et au classement de l'Analyse de
+// continuer à comparer des choses comparables.
+//
+// Les crédits n'affichent AUCUNE marque : ils sont le cas courant, et coller
+// un symbole sur chaque prix du catalogue n'apprendrait rien. Seuls les
+// cristaux se signalent, parce qu'eux sont l'exception.
+const MONNAIES = {
+  credits:  { nom: "crédits",  marque: "" },
+  cristaux: { nom: "cristaux", marque: "\u{1F48E}" }
+};
+
+function monnaieDuPalier(palierNom) {
+  const liste = (typeof paliers !== "undefined" && Array.isArray(paliers)) ? paliers : [];
+  const p = liste.find((x) => x.nom === palierNom);
+  const cle = (p && p.monnaie) || "credits";
+  return MONNAIES[cle] ? cle : "credits";
+}
+
+function marqueMonnaie(palierNom) {
+  return MONNAIES[monnaieDuPalier(palierNom)].marque;
+}
+
+function nomMonnaie(palierNom) {
+  return MONNAIES[monnaieDuPalier(palierNom)].nom;
+}
+
 function formaterPrix(d, palier) {
-  return formaterValeurSaisie(valeurPalier(d.prix, palier));
+  const valeur = formaterValeurSaisie(valeurPalier(d.prix, palier));
+  if (valeur === null) return null;
+  const marque = marqueMonnaie(palier);
+  return marque ? valeur + " " + marque : valeur;
 }
 
 function formaterRendement(d, palier) {
@@ -779,7 +813,7 @@ async function chargerClassesSupabase() {
 }
 
 async function chargerPaliersSupabase() {
-  return requeteSupabase("paliers?select=nom,couleur,groupe,variante&order=ordre");
+  return requeteSupabase("paliers?select=nom,couleur,groupe,variante,monnaie&order=ordre");
 }
 
 async function chargerRaretesSupabase() {
@@ -900,7 +934,7 @@ function remplirSelectClasses(select, valeur, libelleVide) {
 // couleur par palier) et la convertit à la volée.
 function normaliserPaliers(bruts) {
   return (Array.isArray(bruts) ? bruts : []).map((p) => {
-    if (typeof p === "string") return { nom: p, couleur: null, groupe: null, variante: null };
+    if (typeof p === "string") return { nom: p, couleur: null, groupe: null, variante: null, monnaie: "credits" };
     // couleur peut être une chaîne (une teinte) ou un tableau (un dégradé).
     const couleurs = couleursPalier(p && p.couleur);
     return {
@@ -908,7 +942,9 @@ function normaliserPaliers(bruts) {
       couleur: couleurs.length > 1 ? couleurs : (couleurs[0] || null),
       // Un palier isolé n'a pas de groupe : c'est le cas de tous, sauf le Kyber.
       groupe: (p && p.groupe) || null,
-      variante: (p && p.variante) || null
+      variante: (p && p.variante) || null,
+      // Les crédits sont le défaut : un palier sans monnaie déclarée s'y range.
+      monnaie: (p && p.monnaie) || "credits"
     };
   });
 }

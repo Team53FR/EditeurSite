@@ -40,12 +40,18 @@
 --
 -- Dans un groupe, `ordre` place la forme de base en premier ; entre les
 -- évolutions, il n'est qu'un ordre d'affichage, pas une progression.
+-- `monnaie` ne concerne QUE le prix d'achat. La vente et le rendement restent
+-- en crédits : ce sont eux qui disent ce que le droïde rapporte, et les mêler
+-- à une autre monnaie fausserait le total de l'escouade comme le classement de
+-- l'onglet Analyse.
 create table public.paliers (
   nom       text primary key,
   couleur   text[],   -- une seule couleur, ou plusieurs pour un dégradé (Arc-en-ciel)
   ordre     integer not null,
   groupe    text,     -- famille affichée sous un seul onglet ; nul = palier isolé
-  variante  text      -- libellé court dans la famille (« Blanc », « Bleu »…)
+  variante  text,     -- libellé court dans la famille (« Blanc », « Bleu »…)
+  monnaie   text not null default 'credits'
+              check (monnaie in ('credits', 'cristaux'))
 );
 
 create table public.unites (

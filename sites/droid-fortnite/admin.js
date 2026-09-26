@@ -353,12 +353,20 @@ function construireGrillePrixRendement(d) {
         '<span class="pastille-palier" style="background:' + fondPalier(p.couleur) + '"></span>' +
         echapper(p.nom) +
       "</span>" +
+      // Le prix est la seule valeur qui change de monnaie : on le signale ici
+      // et nulle part ailleurs, pour ne pas laisser croire que la revente ou
+      // le rendement suivraient.
       '<span class="duo-valeur">' +
         '<input type="text" inputmode="decimal" data-palier="' + echapper(p.nom) + '" data-champ="prix" ' +
-          'value="' + echapper(prix.valeur) + '" placeholder="—" aria-label="Prix au palier ' + echapper(p.nom) + '">' +
+          'value="' + echapper(prix.valeur) + '" placeholder="—" aria-label="Prix au palier ' +
+          echapper(p.nom) + ', en ' + echapper(nomMonnaie(p.nom)) + '">' +
         '<select data-palier="' + echapper(p.nom) + '" data-unite="prix" aria-label="Unité du prix au palier ' + echapper(p.nom) + '">' +
           optionsUnite(prix.unite, false) +
         "</select>" +
+        (marqueMonnaie(p.nom)
+          ? '<span class="marque-monnaie" title="Ce prix se paie en ' + echapper(nomMonnaie(p.nom)) +
+            '">' + marqueMonnaie(p.nom) + "</span>"
+          : "") +
       "</span>" +
       '<span class="duo-valeur">' +
         '<input type="text" inputmode="decimal" data-palier="' + echapper(p.nom) + '" data-champ="rendement" ' +
@@ -707,6 +715,23 @@ function afficherPaliers() {
     champVariante.addEventListener("change", () => changerGroupePalier(index, null, champVariante.value));
     zoneGroupe.appendChild(champVariante);
 
+    // La monnaie du PRIX à ce palier. La revente et le rendement restent en
+    // crédits quoi qu'il arrive : ce sont eux qui disent ce que le droïde
+    // rapporte, et les mêler à une autre monnaie fausserait tous les totaux.
+    const champMonnaie = document.createElement("select");
+    champMonnaie.className = "champ-groupe";
+    champMonnaie.title = "Monnaie du prix d'achat à ce palier. " +
+      "La revente et le rendement restent en crédits.";
+    Object.keys(MONNAIES).forEach((cle) => {
+      const o = document.createElement("option");
+      o.value = cle;
+      o.textContent = (MONNAIES[cle].marque ? MONNAIES[cle].marque + " " : "") + MONNAIES[cle].nom;
+      champMonnaie.appendChild(o);
+    });
+    champMonnaie.value = p.monnaie || "credits";
+    champMonnaie.addEventListener("change", () => changerMonnaiePalier(index, champMonnaie.value));
+    zoneGroupe.appendChild(champMonnaie);
+
     // Un sélecteur par couleur : à partir de deux, le contour devient un
     // dégradé (c'est ainsi qu'« Arc-en-ciel » en porte plusieurs).
     const couleurs = couleursPalier(p.couleur);
@@ -777,9 +802,10 @@ async function sauvegarderPaliers(copie, messageCommit) {
   const message = document.getElementById("messagePaliers");
   message.textContent = "Enregistrement...";
   try {
-    // `groupe` et `variante` repartent avec le reste : cette écriture
-    // REMPLACE la table entière, et les omettre suffirait à disloquer le
-    // Kyber en quatre paliers sans lien — au premier changement de couleur.
+    // `groupe`, `variante` et `monnaie` repartent avec le reste : cette
+    // écriture REMPLACE la table entière, et en omettre une suffirait à
+    // disloquer le Kyber ou à rendre ses évolutions payables en crédits —
+    // au premier changement de couleur, sans le moindre avertissement.
     const lignes = copie.map((p, index) => {
       const couleurs = couleursPalier(p.couleur);
       return {
@@ -787,7 +813,8 @@ async function sauvegarderPaliers(copie, messageCommit) {
         couleur: couleurs.length ? couleurs : null,
         ordre: index,
         groupe: p.groupe || null,
-        variante: p.variante || null
+        variante: p.variante || null,
+        monnaie: p.monnaie || "credits"
       };
     });
     await remplacerTableEntiere("paliers", "nom", lignes);
@@ -822,6 +849,14 @@ function changerGroupePalier(index, groupe, variante) {
     variante: variante === null ? (avant.variante || null) : (variante.trim() || null)
   });
   sauvegarderPaliers(copie, `Famille du palier ${avant.nom}`);
+}
+
+function changerMonnaiePalier(index, monnaie) {
+  const copie = paliers.slice();
+  copie[index] = Object.assign({}, copie[index], {
+    monnaie: MONNAIES[monnaie] ? monnaie : "credits"
+  });
+  sauvegarderPaliers(copie, `Monnaie du palier ${copie[index].nom}`);
 }
 
 function ajouterPalier() {

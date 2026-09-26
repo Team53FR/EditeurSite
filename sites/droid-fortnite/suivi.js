@@ -1713,20 +1713,42 @@ function budgetAnalyse() {
   return (typeof v === "number" && isFinite(v) && v > 0) ? v : 0;
 }
 
-// Tri : à budget donné, les droïdes ABORDABLES passent devant, puis on trie
-// chaque groupe par la métrique (rapport ou rendement).
-function trierAnalyse(lignes, budget, metrique) {
+// Tri : les droïdes ABORDABLES passent devant, puis ceux dont on ne peut rien
+// dire (prix dans une autre monnaie que le budget), puis les trop chers. Dans
+// chaque groupe, on trie par la métrique.
+//
+// L'abordabilité est calculée en amont, une fois par ligne : elle dépend de la
+// MONNAIE autant que du montant, et comparer ici « prix <= budget » jugerait
+// un prix en cristaux à l'aune d'une réserve de crédits.
+const RANG_BUDGET = { true: 0, null: 1, false: 2 };
+
+function trierAnalyse(lignes, metrique) {
   return lignes.slice().sort((a, b) => {
-    if (budget > 0) {
-      const aa = a.prix <= budget, ba = b.prix <= budget;
-      if (aa !== ba) return aa ? -1 : 1;
-    }
+    const ra = RANG_BUDGET[String(a.abordable)], rb = RANG_BUDGET[String(b.abordable)];
+    if (ra !== rb) return ra - rb;
     return metrique(b) - metrique(a);
   });
 }
 
+// Le budget porte sur le PRIX, et le prix change de monnaie selon le palier.
+// L'intitulé le dit donc, plutôt que de laisser comparer en silence des
+// cristaux à une réserve de crédits.
+//
+// Sur « Tous paliers », deux monnaies se côtoient : on garde l'intitulé
+// neutre, et la note sous le graphe prévient que le budget ne filtre que ce
+// qui s'achète en crédits.
+function majLibelleBudget() {
+  const el = document.getElementById("libelleBudget");
+  if (!el) return;
+  const cristaux = palierAnalyse !== TOUS_PALIERS && monnaieDuPalier(palierAnalyse) === "cristaux";
+  el.textContent = cristaux ? "Cristaux disponibles" : "Argent disponible";
+  const champ = document.getElementById("champBudget");
+  if (champ) champ.setAttribute("aria-label", el.textContent);
+}
+
 function afficherAnalyse() {
   construireOngletsPalierAnalyse();
+  majLibelleBudget();
 
   const classe = document.getElementById("filtreClasseAnalyse").value;
   const sansFusion = document.getElementById("analyseSansFusion").checked;
@@ -1746,20 +1768,32 @@ function afficherAnalyse() {
       if (prix === null || rdt === null || prix <= 0 || rdt <= 0) return;
       lignes.push({
         droide: d, palier: pnom, prix, rdt,
+        monnaie: monnaieDuPalier(pnom),
         possede: perso.droidesPossedes.includes(clePossession(d.id, pnom))
       });
     });
   });
 
-  if (budget > 0 && budgetSeul) lignes = lignes.filter((l) => l.prix <= budget);
+  // Le budget n'a rien à dire d'un prix libellé dans une AUTRE monnaie que la
+  // sienne. Sur un palier donné, il prend celle de ce palier ; sur « Tous »,
+  // où deux monnaies se côtoient, il reste en crédits et laisse les prix en
+  // cristaux non jugés — plutôt que de les déclarer à tort trop chers.
+  const monnaieBudget = tousPaliers ? "credits" : monnaieDuPalier(palierAnalyse);
+  lignes.forEach((l) => {
+    l.abordable = (budget > 0 && l.monnaie === monnaieBudget) ? (l.prix <= budget) : null;
+  });
 
-  const parRdt = trierAnalyse(lignes, budget, (l) => l.rdt).slice(0, 20);
+  // « Seulement dans mon budget » n'écarte que ce qu'on sait trop cher : une
+  // ligne qu'on ne peut pas juger reste affichée, et se signale comme telle.
+  if (budgetSeul) lignes = lignes.filter((l) => l.abordable !== false);
+
+  const parRdt = trierAnalyse(lignes, (l) => l.rdt).slice(0, 20);
 
   rendreBarres("graphRendement", parRdt, (l) => l.rdt,
-    (l) => formaterCredits(arrondirCredits(l.rdt)) + "/s", tousPaliers, budget);
+    (l) => formaterCredits(arrondirCredits(l.rdt)) + "/s", tousPaliers);
 }
 
-function rendreBarres(idZone, lignes, valeurFn, labelFn, montrerPalier, budget) {
+function rendreBarres(idZone, lignes, valeurFn, labelFn, montrerPalier) {
   const zone = document.getElementById(idZone);
   if (!zone) return;
   zone.innerHTML = "";
@@ -1772,9 +1806,16 @@ function rendreBarres(idZone, lignes, valeurFn, labelFn, montrerPalier, budget) 
     const pct = Math.max(4, (valeurFn(l) / max) * 100);
     const rar = raretes.find((r) => r.nom === l.droide.rarete);
     const couleur = (rar && rar.texte) || "var(--primaire)";
-    const horsBudget = budget > 0 && l.prix > budget;
+    const horsBudget = l.abordable === false;
+    // Le prix porte sa monnaie : sans elle, « 250 » à côté de « 4.2 M » ne
+    // voudrait rien dire. Et l'on précise « autre monnaie » quand un budget
+    // est posé mais ne s'applique pas à cette ligne, plutôt que de la laisser
+    // passer pour abordable.
+    const marque = marqueMonnaie(l.palier);
     const sousLigne = (montrerPalier ? echapperHTML(l.palier) + " · " : "") +
-      formaterCredits(arrondirCredits(l.prix)) + (horsBudget ? " · trop cher" : "");
+      formaterCredits(arrondirCredits(l.prix)) + (marque ? " " + marque : "") +
+      (horsBudget ? " · trop cher" : "") +
+      (l.abordable === null && budgetAnalyse() > 0 ? " · autre monnaie" : "");
     const rangee = document.createElement("div");
     rangee.className = "barre-rangee" + (l.possede ? " possede" : "") + (horsBudget ? " hors-budget" : "");
     rangee.innerHTML =

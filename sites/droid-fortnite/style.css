@@ -263,6 +263,10 @@ a { color: var(--primaire); }
 }
 .onglet-palier.actif { background: var(--primaire); border-color: var(--primaire); color: var(--sur-primaire); box-shadow: 0 0 12px -2px var(--primaire); }
 
+/* Marque de monnaie à côté d'un prix (admin) : seuls les cristaux en portent
+   une, les crédits étant le cas courant. */
+.marque-monnaie { font-size: 0.85rem; flex-shrink: 0; }
+
 /* ----- Admin : la famille d'un palier ----- */
 .groupe-palier { display: flex; gap: 0.3rem; flex-wrap: wrap; }
 .champ-groupe {
