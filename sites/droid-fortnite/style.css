@@ -263,6 +263,73 @@ a { color: var(--primaire); }
 }
 .onglet-palier.actif { background: var(--primaire); border-color: var(--primaire); color: var(--sur-primaire); box-shadow: 0 0 12px -2px var(--primaire); }
 
+/* ----- Admin : la famille d'un palier ----- */
+.groupe-palier { display: flex; gap: 0.3rem; flex-wrap: wrap; }
+.champ-groupe {
+  width: 6.5rem; min-width: 0;
+  padding: 0.3rem 0.45rem;
+  border-radius: 8px;
+  border: 1px solid var(--bordure);
+  background: var(--fond);
+  color: var(--texte);
+  font-size: 0.78rem;
+}
+/* Rappelle, à côté du nom, à quelle famille ce palier appartient. */
+.etiquette-groupe {
+  display: inline-block;
+  margin-left: 0.35rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  background: var(--fond);
+  border: 1px solid var(--bordure);
+  color: var(--texte-att);
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+/* ===== Les couleurs d'un palier qui se décline (Kyber) ===== */
+/* Une seconde barre, plus discrète que celle des paliers : c'est un choix
+   À L'INTÉRIEUR de l'onglet allumé au-dessus, pas un onglet de même rang. */
+.onglets-variante {
+  display: flex;
+  gap: 0.35rem;
+  overflow-x: auto;
+  margin-top: 0.4rem;
+  padding-left: 0.9rem;
+  scrollbar-width: none;
+  /* Le filet rattache la sous-barre à l'onglet dont elle dépend. */
+  border-left: 2px solid var(--bordure);
+}
+.onglets-variante::-webkit-scrollbar { display: none; }
+.onglet-variante {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+  white-space: nowrap;
+  padding: 0.3rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid var(--bordure);
+  background: var(--fond);
+  color: var(--texte-att);
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+.onglet-variante.actif {
+  border-color: var(--primaire);
+  color: var(--texte);
+  background: var(--carte);
+}
+/* La pastille porte la teinte de la couleur : on reconnaît un bleu d'un vert
+   sans lire son nom. Le contour la garde visible sur un fond de même ton —
+   un Kyber blanc sur un thème clair, typiquement. */
+.pastille-variante {
+  width: 0.7rem; height: 0.7rem;
+  border-radius: 50%;
+  border: 1px solid var(--bordure);
+  flex-shrink: 0;
+}
+
 /* ===== Filtres (classe / rareté / possédé) ===== */
 .filtres { display: flex; gap: 0.4rem; margin-top: 0.6rem; flex-wrap: wrap; }
 .filtres select {

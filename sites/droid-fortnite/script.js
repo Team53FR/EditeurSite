@@ -779,7 +779,7 @@ async function chargerClassesSupabase() {
 }
 
 async function chargerPaliersSupabase() {
-  return requeteSupabase("paliers?select=nom,couleur&order=ordre");
+  return requeteSupabase("paliers?select=nom,couleur,groupe,variante&order=ordre");
 }
 
 async function chargerRaretesSupabase() {
@@ -900,11 +900,74 @@ function remplirSelectClasses(select, valeur, libelleVide) {
 // couleur par palier) et la convertit à la volée.
 function normaliserPaliers(bruts) {
   return (Array.isArray(bruts) ? bruts : []).map((p) => {
-    if (typeof p === "string") return { nom: p, couleur: null };
+    if (typeof p === "string") return { nom: p, couleur: null, groupe: null, variante: null };
     // couleur peut être une chaîne (une teinte) ou un tableau (un dégradé).
     const couleurs = couleursPalier(p && p.couleur);
-    return { nom: p.nom, couleur: couleurs.length > 1 ? couleurs : (couleurs[0] || null) };
+    return {
+      nom: p.nom,
+      couleur: couleurs.length > 1 ? couleurs : (couleurs[0] || null),
+      // Un palier isolé n'a pas de groupe : c'est le cas de tous, sauf le Kyber.
+      groupe: (p && p.groupe) || null,
+      variante: (p && p.variante) || null
+    };
   });
+}
+
+// ===== Paliers qui se déclinent en variantes =====
+//
+// Le Kyber ne se débloque pas d'un bloc : on obtient d'abord sa forme de base
+// (blanc), puis on la fait évoluer vers UNE des autres couleurs. Chaque
+// couleur a ses propres prix et rendements, mais toutes restent du Kyber.
+//
+// Elles restent des paliers ORDINAIRES — une ligne chacune, leur propre nom,
+// leur propre possession. Seul l'affichage les replie sous un même onglet.
+// C'est ce qui permet à « id::palier », aux prix, à l'escouade et au reste de
+// continuer à fonctionner sans rien changer.
+
+// Le nom sous lequel un palier s'affiche dans la barre : son groupe s'il en a
+// un, lui-même sinon.
+function groupeDuPalier(p) {
+  return (p && p.groupe) || (p && p.nom) || "";
+}
+
+// Les paliers, repliés : une entrée par groupe, dans l'ordre de la liste.
+// Chaque entrée porte ses variantes — une seule pour un palier isolé.
+function groupesDePaliers(liste) {
+  const groupes = [];
+  const parNom = new Map();
+  (Array.isArray(liste) ? liste : []).forEach((p) => {
+    const nom = groupeDuPalier(p);
+    if (!parNom.has(nom)) {
+      const g = { nom, variantes: [] };
+      parNom.set(nom, g);
+      groupes.push(g);
+    }
+    parNom.get(nom).variantes.push(p);
+  });
+  return groupes;
+}
+
+// Un groupe a-t-il plusieurs formes ? (Un palier isolé n'en a qu'une, et ne
+// doit alors afficher aucune sous-barre.)
+function aDesVariantes(groupe) {
+  return !!groupe && groupe.variantes.length > 1;
+}
+
+// Le libellé court d'une variante dans sa famille : « Blanc » plutôt que
+// « Kyber blanc », qui répéterait l'onglet au-dessus.
+function libelleVariante(p) {
+  if (p && p.variante) return p.variante;
+  if (!p || !p.groupe) return (p && p.nom) || "";
+  // Sans libellé explicite, on retire le nom du groupe : « Kyber bleu » -> « bleu ».
+  const reste = String(p.nom).slice(String(p.groupe).length).trim();
+  return reste || p.nom;
+}
+
+// La forme de BASE d'un groupe : la première de la liste, celle dont partent
+// les évolutions (le Kyber blanc). Entre les autres, l'ordre n'est qu'un ordre
+// d'affichage — on évolue du blanc vers l'une OU l'autre, pas en chaîne.
+function palierDeBase(groupe) {
+  return groupe && groupe.variantes[0];
 }
 
 // ===== Fusions =====

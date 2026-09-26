@@ -27,10 +27,25 @@
 -- dupliquée ne casse rien, et ça évite d'avoir à échanger deux rangs en deux
 -- temps pour reordonner (un lot INSERT...ON CONFLICT ne peut pas poser
 -- temporairement deux lignes sur la même valeur unique).
+-- Un palier peut se décliner en VARIANTES : le Kyber s'obtient d'abord sous sa
+-- forme de base (blanc), qu'on fait ensuite évoluer vers UNE des autres
+-- couleurs, chacune avec ses propres prix et rendements.
+--
+-- Ces variantes restent des paliers ORDINAIRES — une ligne, un nom, leur
+-- propre possession. Seule la colonne `groupe` les réunit, et c'est
+-- l'affichage qui les replie sous un onglet unique. Ajouter une dimension
+-- « variante » dans la clé de droide_paliers / droides_possedes /
+-- escouade_places aurait changé la clé primaire de trois tables et tout le
+-- code qui manipule un palier, pour exactement le même résultat visible.
+--
+-- Dans un groupe, `ordre` place la forme de base en premier ; entre les
+-- évolutions, il n'est qu'un ordre d'affichage, pas une progression.
 create table public.paliers (
-  nom      text primary key,
-  couleur  text[],   -- une seule couleur, ou plusieurs pour un dégradé (Arc-en-ciel)
-  ordre    integer not null
+  nom       text primary key,
+  couleur   text[],   -- une seule couleur, ou plusieurs pour un dégradé (Arc-en-ciel)
+  ordre     integer not null,
+  groupe    text,     -- famille affichée sous un seul onglet ; nul = palier isolé
+  variante  text      -- libellé court dans la famille (« Blanc », « Bleu »…)
 );
 
 create table public.unites (

@@ -671,11 +671,41 @@ function afficherPaliers() {
     li.className = "ligne-item";
     li.innerHTML =
       `<div class="ligne-info">` +
-        `<div class="ligne-titre">${index + 1}. ${echapper(p.nom)}</div>` +
+        `<div class="ligne-titre">${index + 1}. ${echapper(p.nom)}` +
+          (p.groupe ? ` <span class="etiquette-groupe">${echapper(p.groupe)}` +
+                      (p.variante ? ` · ${echapper(p.variante)}` : "") + `</span>` : "") +
+        `</div>` +
         `<div class="apercu-palier" style="background:${fondPalier(p.couleur)}"></div>` +
       `</div>` +
       `<div class="couleurs-palier"></div>` +
+      `<div class="groupe-palier"></div>` +
       `<div class="ligne-actions"></div>`;
+
+    // À quelle famille ce palier appartient-il ?
+    //
+    // Deux paliers qui portent le même groupe se replient sous un seul onglet
+    // dans le Droidex (c'est ainsi que les quatre couleurs de Kyber n'en font
+    // qu'un). Laisser vide = un palier isolé, comme l'Or ou le Diamant.
+    const zoneGroupe = li.querySelector(".groupe-palier");
+    const champGroupe = document.createElement("input");
+    champGroupe.type = "text";
+    champGroupe.className = "champ-groupe";
+    champGroupe.value = p.groupe || "";
+    champGroupe.placeholder = "Famille";
+    champGroupe.title = "Paliers réunis sous un même onglet (ex. « Kyber »). " +
+      "Vide : palier isolé.";
+    champGroupe.addEventListener("change", () => changerGroupePalier(index, champGroupe.value, null));
+    zoneGroupe.appendChild(champGroupe);
+
+    const champVariante = document.createElement("input");
+    champVariante.type = "text";
+    champVariante.className = "champ-groupe";
+    champVariante.value = p.variante || "";
+    champVariante.placeholder = "Couleur";
+    champVariante.title = "Le nom court affiché dans la famille (ex. « Bleu »). " +
+      "Sans lui, c'est le nom du palier moins celui de la famille.";
+    champVariante.addEventListener("change", () => changerGroupePalier(index, null, champVariante.value));
+    zoneGroupe.appendChild(champVariante);
 
     // Un sélecteur par couleur : à partir de deux, le contour devient un
     // dégradé (c'est ainsi qu'« Arc-en-ciel » en porte plusieurs).
@@ -747,9 +777,18 @@ async function sauvegarderPaliers(copie, messageCommit) {
   const message = document.getElementById("messagePaliers");
   message.textContent = "Enregistrement...";
   try {
+    // `groupe` et `variante` repartent avec le reste : cette écriture
+    // REMPLACE la table entière, et les omettre suffirait à disloquer le
+    // Kyber en quatre paliers sans lien — au premier changement de couleur.
     const lignes = copie.map((p, index) => {
       const couleurs = couleursPalier(p.couleur);
-      return { nom: p.nom, couleur: couleurs.length ? couleurs : null, ordre: index };
+      return {
+        nom: p.nom,
+        couleur: couleurs.length ? couleurs : null,
+        ordre: index,
+        groupe: p.groupe || null,
+        variante: p.variante || null
+      };
     });
     await remplacerTableEntiere("paliers", "nom", lignes);
     paliers = copie;
@@ -769,6 +808,20 @@ function changerCouleursPalier(index, couleurs) {
     couleur: nettoyees.length > 1 ? nettoyees : (nettoyees[0] || null)
   });
   sauvegarderPaliers(copie, `Couleurs du palier ${copie[index].nom}`);
+}
+
+// Change la famille d'un palier, ou son nom court. On ne passe qu'un des
+// deux : `null` veut dire « ne touche pas à celui-là », alors qu'une chaîne
+// vide veut dire « efface-le » — les confondre viderait le champ qu'on ne
+// modifiait pas.
+function changerGroupePalier(index, groupe, variante) {
+  const copie = paliers.slice();
+  const avant = copie[index];
+  copie[index] = Object.assign({}, avant, {
+    groupe: groupe === null ? (avant.groupe || null) : (groupe.trim() || null),
+    variante: variante === null ? (avant.variante || null) : (variante.trim() || null)
+  });
+  sauvegarderPaliers(copie, `Famille du palier ${avant.nom}`);
 }
 
 function ajouterPalier() {

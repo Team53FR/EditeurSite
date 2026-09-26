@@ -126,30 +126,80 @@ async function chargerTout() {
 // prend un caractère qu'un nom ne contiendra jamais.
 const TOUS_PALIERS = "*";
 
+// Le palier montré est toujours un palier RÉEL (« Kyber bleu »). Un groupe
+// qui se décline — le Kyber — n'est donc pas un onglet sélectionnable : le
+// choisir revient à choisir sa forme de base, et ses couleurs s'offrent
+// juste en dessous.
 function construireOngletsPalier() {
   const zone = document.getElementById("ongletsPalier");
   zone.innerHTML = "";
 
-  const ajouter = (valeur, libelle) => {
+  const ajouter = (valeur, libelle, groupe) => {
     const bouton = document.createElement("button");
     bouton.type = "button";
-    bouton.className = "onglet-palier" + (valeur === palierActif ? " actif" : "");
+    // Un groupe reste allumé quelle que soit celle de ses couleurs qu'on
+    // regarde : sans quoi l'onglet Kyber s'éteindrait dès qu'on choisit le
+    // bleu, et l'on ne saurait plus où l'on se trouve.
+    const actif = valeur === palierActif ||
+      (groupe && groupe.variantes.some((v) => v.nom === palierActif));
+    bouton.className = "onglet-palier" + (actif ? " actif" : "");
     bouton.dataset.palier = valeur;
     bouton.textContent = libelle;
     bouton.addEventListener("click", () => changerPalierActif(valeur));
     zone.appendChild(bouton);
   };
 
-  ajouter(TOUS_PALIERS, "Tous");
-  paliers.forEach((p) => ajouter(p.nom, p.nom));
+  ajouter(TOUS_PALIERS, "Tous", null);
+  groupesDePaliers(paliers).forEach((g) => {
+    // Cliquer sur « Kyber » amène sur sa forme de base ; les autres couleurs
+    // se choisissent dans la sous-barre.
+    const cible = aDesVariantes(g) ? palierDeBase(g).nom : g.variantes[0].nom;
+    ajouter(cible, g.nom, g);
+  });
+
+  construireOngletsVariante();
+}
+
+// La sous-barre des couleurs : elle n'apparaît que lorsqu'on regarde un
+// palier qui appartient à une famille, et disparaît partout ailleurs —
+// une barre vide en permanence occuperait la place pour rien.
+function construireOngletsVariante() {
+  const zone = document.getElementById("ongletsVariante");
+  if (!zone) return;
+  zone.innerHTML = "";
+
+  const courant = paliers.find((p) => p.nom === palierActif);
+  const groupe = courant && groupesDePaliers(paliers).find((g) => g.nom === groupeDuPalier(courant));
+  if (!aDesVariantes(groupe)) { zone.style.display = "none"; return; }
+
+  zone.style.display = "";
+  groupe.variantes.forEach((p, i) => {
+    const bouton = document.createElement("button");
+    bouton.type = "button";
+    bouton.className = "onglet-variante" + (p.nom === palierActif ? " actif" : "");
+    bouton.dataset.palier = p.nom;
+    // La pastille porte la couleur de la variante : c'est ce qui distingue
+    // un blanc d'un bleu plus vite que son nom.
+    const pastille = document.createElement("span");
+    pastille.className = "pastille-variante";
+    pastille.style.background = fondPalier(p.couleur);
+    bouton.appendChild(pastille);
+    bouton.appendChild(document.createTextNode(libelleVariante(p)));
+    // La forme de base est le point de départ : on le dit, plutôt que de
+    // laisser croire à quatre choix équivalents.
+    bouton.title = i === 0
+      ? libelleVariante(p) + " — la forme de base, dont partent les évolutions"
+      : libelleVariante(p) + " — une évolution de " + libelleVariante(groupe.variantes[0]).toLowerCase();
+    bouton.addEventListener("click", () => changerPalierActif(p.nom));
+    zone.appendChild(bouton);
+  });
 }
 
 function changerPalierActif(nom) {
   palierActif = nom;
-  // Comparaison sur dataset et non sur le libellé : « Tous » n'est pas un
-  // nom de palier.
-  document.querySelectorAll(".onglet-palier").forEach((b) =>
-    b.classList.toggle("actif", b.dataset.palier === nom));
+  // Les onglets se refont : un groupe peut s'allumer ou s'éteindre, et la
+  // sous-barre des couleurs apparaître ou disparaître.
+  construireOngletsPalier();
   afficherDroidex();
 }
 
