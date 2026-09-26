@@ -1632,6 +1632,10 @@ function valeurNumerique(v) {
 }
 
 
+// Même repliement que le Droidex : une famille ne prend qu'un onglet, et ses
+// couleurs se choisissent dans la sous-barre. On y compare des achats palier
+// par palier — chaque couleur gardant ses propres prix, elles restent
+// choisissables une à une, mais sans manger toute la barre.
 function construireOngletsPalierAnalyse() {
   const zone = document.getElementById("ongletsPalierAnalyse");
   if (!zone) return;
@@ -1640,16 +1644,54 @@ function construireOngletsPalierAnalyse() {
     palierAnalyse = TOUS_PALIERS;   // par défaut, tous les paliers confondus
   }
   zone.innerHTML = "";
-  const ajouter = (valeur, libelle) => {
+
+  const ajouter = (valeur, libelle, groupe) => {
     const b = document.createElement("button");
     b.type = "button";
-    b.className = "onglet-palier" + (valeur === palierAnalyse ? " actif" : "");
+    // Une famille reste allumée quelle que soit celle de ses couleurs qu'on
+    // analyse.
+    const actif = valeur === palierAnalyse ||
+      (groupe && groupe.variantes.some((v) => v.nom === palierAnalyse));
+    b.className = "onglet-palier" + (actif ? " actif" : "");
     b.textContent = libelle;
     b.addEventListener("click", () => { palierAnalyse = valeur; afficherAnalyse(); });
     zone.appendChild(b);
   };
-  ajouter(TOUS_PALIERS, "Tous");
-  paliers.forEach((p) => ajouter(p.nom, p.nom));
+
+  ajouter(TOUS_PALIERS, "Tous", null);
+  groupesDePaliers(paliers).forEach((g) => {
+    const cible = aDesVariantes(g) ? palierDeBase(g).nom : g.variantes[0].nom;
+    ajouter(cible, g.nom, g);
+  });
+
+  construireOngletsVarianteAnalyse();
+}
+
+function construireOngletsVarianteAnalyse() {
+  const zone = document.getElementById("ongletsVarianteAnalyse");
+  if (!zone) return;
+  zone.innerHTML = "";
+
+  const courant = paliers.find((p) => p.nom === palierAnalyse);
+  const groupe = courant && groupesDePaliers(paliers).find((g) => g.nom === groupeDuPalier(courant));
+  if (!aDesVariantes(groupe)) { zone.style.display = "none"; return; }
+
+  zone.style.display = "";
+  groupe.variantes.forEach((p, i) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "onglet-variante" + (p.nom === palierAnalyse ? " actif" : "");
+    const pastille = document.createElement("span");
+    pastille.className = "pastille-variante";
+    pastille.style.background = fondPalier(p.couleur);
+    b.appendChild(pastille);
+    b.appendChild(document.createTextNode(libelleVariante(p)));
+    b.title = i === 0
+      ? libelleVariante(p) + " — la forme de base, dont partent les évolutions"
+      : libelleVariante(p) + " — une évolution de " + libelleVariante(groupe.variantes[0]).toLowerCase();
+    b.addEventListener("click", () => { palierAnalyse = p.nom; afficherAnalyse(); });
+    zone.appendChild(b);
+  });
 }
 
 // Options du menu d'unités du budget (sur mobile, le clavier décimal n'a pas
