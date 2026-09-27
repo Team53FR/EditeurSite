@@ -387,16 +387,71 @@ function construireGrillePrixRendement(d) {
         '<input type="text" data-palier="' + echapper(p.nom) + '" data-champ="temps" ' +
           'value="' + echapper(temps) + '" placeholder="ex. 0:00:33" aria-label="Temps de fabrication au palier ' + echapper(p.nom) + '">' +
       "</span>" +
+      // Un palier peut n'avoir aucun bonus de compagnon (le Kyber blanc) :
+      // le champ est alors neutralisé et le dit, plutôt que de rester vide
+      // en laissant croire qu'il reste à remplir.
       '<span class="champ-libelle">' +
         '<span class="libelle-mobile">Bonus de compagnon</span>' +
         '<input type="text" data-palier="' + echapper(p.nom) + '" data-champ="bonus" ' +
-          'value="' + echapper(bonusPalier) + '" placeholder="ex. 20% Vitesse de Fabrication" aria-label="Bonus de compagnon au palier ' + echapper(p.nom) + '">' +
+          'value="' + echapper(palierSansBonus(p) ? "" : bonusPalier) + '"' +
+          (palierSansBonus(p)
+            ? ' disabled placeholder="aucun à ce palier" title="Ce palier n\'a pas de bonus de compagnon."'
+            : ' placeholder="ex. 20% Vitesse de Fabrication"') +
+          ' aria-label="Bonus de compagnon au palier ' + echapper(p.nom) + '">' +
       "</span>";
     grille.appendChild(ligne);
   });
 
+  brancherPartageGrille();
+
   const note = document.getElementById("noteIconique");
   if (note) note.style.display = iconique ? "" : "none";
+}
+
+// ===== Valeurs communes à une famille de paliers =====
+//
+// Les quatre Kyber se revendent au même prix ; les trois évolutions partagent
+// leur prix en cristaux et leur bonus. Saisir ces valeurs quatre fois, c'est
+// autant d'occasions de les faire diverger pour aucune information nouvelle :
+// ce qu'on tape sur l'une se recopie donc sur ses sœurs, sous les yeux.
+//
+// Quels champs, et vers quels paliers : ce sont les DONNÉES qui le disent
+// (colonne `partage`), pas une règle écrite en dur sur le nom « Kyber ».
+function brancherPartageGrille() {
+  const grille = document.getElementById("grillePrixRendement");
+  if (!grille || grille.dataset.partageBranche === "1") return;
+  grille.dataset.partageBranche = "1";
+
+  const recopier = (champ, palierSource, valeur, unite) => {
+    paliersQuiPartagent(paliers, palierSource, champ).forEach((p) => {
+      const cible = grille.querySelector(
+        'input[data-palier="' + CSS.escape(p.nom) + '"][data-champ="' + champ + '"]');
+      if (cible && !cible.disabled && cible.value !== valeur) cible.value = valeur;
+      if (unite === null) return;
+      const selCible = grille.querySelector(
+        'select[data-palier="' + CSS.escape(p.nom) + '"][data-unite="' + champ + '"]');
+      // L'unité suit la valeur : recopier « 1 » sans son « K » donnerait mille
+      // fois moins, et personne ne verrait la différence à l'écran.
+      if (selCible && selCible.value !== unite) selCible.value = unite;
+    });
+  };
+
+  grille.addEventListener("input", (e) => {
+    const champ = e.target.dataset && e.target.dataset.champ;
+    if (!champ || e.target.tagName !== "INPUT") return;
+    const sel = grille.querySelector(
+      'select[data-palier="' + CSS.escape(e.target.dataset.palier) + '"][data-unite="' + champ + '"]');
+    recopier(champ, e.target.dataset.palier, e.target.value, sel ? sel.value : null);
+  });
+
+  // Changer l'unité sans toucher au nombre doit se propager aussi.
+  grille.addEventListener("change", (e) => {
+    const champ = e.target.dataset && e.target.dataset.unite;
+    if (!champ || e.target.tagName !== "SELECT") return;
+    const saisie = grille.querySelector(
+      'input[data-palier="' + CSS.escape(e.target.dataset.palier) + '"][data-champ="' + champ + '"]');
+    recopier(champ, e.target.dataset.palier, saisie ? saisie.value : "", e.target.value);
+  });
 }
 
 // Relit la grille : une table indexée par nom de palier pour chaque
@@ -814,7 +869,9 @@ async function sauvegarderPaliers(copie, messageCommit) {
         ordre: index,
         groupe: p.groupe || null,
         variante: p.variante || null,
-        monnaie: p.monnaie || "credits"
+        monnaie: p.monnaie || "credits",
+        partage: Array.isArray(p.partage) ? p.partage : [],
+        sans_bonus: !!p.sansBonus
       };
     });
     await remplacerTableEntiere("paliers", "nom", lignes);

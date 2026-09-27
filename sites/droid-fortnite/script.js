@@ -813,7 +813,8 @@ async function chargerClassesSupabase() {
 }
 
 async function chargerPaliersSupabase() {
-  return requeteSupabase("paliers?select=nom,couleur,groupe,variante,monnaie&order=ordre");
+  return requeteSupabase(
+    "paliers?select=nom,couleur,groupe,variante,monnaie,partage,sans_bonus&order=ordre");
 }
 
 async function chargerRaretesSupabase() {
@@ -934,7 +935,10 @@ function remplirSelectClasses(select, valeur, libelleVide) {
 // couleur par palier) et la convertit à la volée.
 function normaliserPaliers(bruts) {
   return (Array.isArray(bruts) ? bruts : []).map((p) => {
-    if (typeof p === "string") return { nom: p, couleur: null, groupe: null, variante: null, monnaie: "credits" };
+    if (typeof p === "string") {
+      return { nom: p, couleur: null, groupe: null, variante: null,
+               monnaie: "credits", partage: [], sansBonus: false };
+    }
     // couleur peut être une chaîne (une teinte) ou un tableau (un dégradé).
     const couleurs = couleursPalier(p && p.couleur);
     return {
@@ -944,7 +948,10 @@ function normaliserPaliers(bruts) {
       groupe: (p && p.groupe) || null,
       variante: (p && p.variante) || null,
       // Les crédits sont le défaut : un palier sans monnaie déclarée s'y range.
-      monnaie: (p && p.monnaie) || "credits"
+      monnaie: (p && p.monnaie) || "credits",
+      // Champs dont la valeur est commune à la famille (voir champsPartages).
+      partage: Array.isArray(p && p.partage) ? p.partage.slice() : [],
+      sansBonus: !!(p && p.sans_bonus)
     };
   });
 }
@@ -1004,6 +1011,41 @@ function libelleVariante(p) {
 // d'affichage — on évolue du blanc vers l'une OU l'autre, pas en chaîne.
 function palierDeBase(groupe) {
   return groupe && groupe.variantes[0];
+}
+
+// ===== Valeurs communes à une famille =====
+//
+// Le jeu impose des égalités à l'intérieur d'une famille : les quatre Kyber se
+// revendent au même prix, et les trois évolutions partagent leur prix en
+// cristaux comme leur bonus de compagnon. Les saisir une à une, c'est neuf
+// occasions de se tromper pour aucune information nouvelle.
+//
+// Chaque palier déclare les champs qu'il partage. La propagation ne touche que
+// ceux qui déclarent LE MÊME champ : le Kyber blanc ne déclarant ni prix ni
+// bonus, il reste naturellement à l'écart des deux — sans qu'aucune règle
+// n'ait à nommer « blanc » ni « Kyber » nulle part.
+function champsPartages(p) {
+  return (p && Array.isArray(p.partage)) ? p.partage : [];
+}
+
+function palierPartage(p, champ) {
+  return champsPartages(p).indexOf(champ) !== -1;
+}
+
+// Les autres paliers qui reçoivent la valeur saisie sur celui-ci.
+// Liste vide : ce champ ne se partage pas, ou ce palier n'a pas de famille.
+function paliersQuiPartagent(liste, nomPalier, champ) {
+  const tous = Array.isArray(liste) ? liste : [];
+  const source = tous.find((p) => p.nom === nomPalier);
+  if (!source || !source.groupe || !palierPartage(source, champ)) return [];
+  return tous.filter((p) =>
+    p.nom !== source.nom && p.groupe === source.groupe && palierPartage(p, champ));
+}
+
+// Ce palier a-t-il un bonus de compagnon ? Le Kyber blanc n'en a aucun : lui
+// offrir le champ laisserait croire qu'il reste à remplir.
+function palierSansBonus(p) {
+  return !!(p && p.sansBonus);
 }
 
 // ===== Fusions =====

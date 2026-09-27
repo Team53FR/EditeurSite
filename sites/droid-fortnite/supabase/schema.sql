@@ -51,7 +51,18 @@ create table public.paliers (
   groupe    text,     -- famille affichée sous un seul onglet ; nul = palier isolé
   variante  text,     -- libellé court dans la famille (« Blanc », « Bleu »…)
   monnaie   text not null default 'credits'
-              check (monnaie in ('credits', 'cristaux'))
+              check (monnaie in ('credits', 'cristaux')),
+  -- Le jeu impose des égalités DANS une famille : les quatre Kyber se
+  -- revendent au même prix, et les trois évolutions partagent leur prix en
+  -- cristaux comme leur bonus de compagnon. Un palier déclare ici les champs
+  -- dont la valeur est commune ; la saisie ne les recopie que vers les paliers
+  -- de la même famille qui déclarent LE MÊME champ. Le Kyber blanc ne
+  -- déclarant ni prix ni bonus reste donc à l'écart des deux, sans qu'aucune
+  -- règle n'ait à le nommer.
+  partage    text[] not null default '{}',
+  -- Ce palier n'a pas de bonus de compagnon du tout (le Kyber blanc) : le
+  -- champ est neutralisé, au lieu de rester vide comme s'il restait à remplir.
+  sans_bonus boolean not null default false
 );
 
 create table public.unites (
