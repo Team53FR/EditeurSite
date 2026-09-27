@@ -814,7 +814,7 @@ async function chargerClassesSupabase() {
 
 async function chargerPaliersSupabase() {
   return requeteSupabase(
-    "paliers?select=nom,couleur,groupe,variante,monnaie,partage,sans_bonus&order=ordre");
+    "paliers?select=nom,couleur,groupe,variante,monnaie,partage,champs_absents&order=ordre");
 }
 
 async function chargerRaretesSupabase() {
@@ -937,7 +937,7 @@ function normaliserPaliers(bruts) {
   return (Array.isArray(bruts) ? bruts : []).map((p) => {
     if (typeof p === "string") {
       return { nom: p, couleur: null, groupe: null, variante: null,
-               monnaie: "credits", partage: [], sansBonus: false };
+               monnaie: "credits", partage: [], champsAbsents: [] };
     }
     // couleur peut être une chaîne (une teinte) ou un tableau (un dégradé).
     const couleurs = couleursPalier(p && p.couleur);
@@ -951,7 +951,8 @@ function normaliserPaliers(bruts) {
       monnaie: (p && p.monnaie) || "credits",
       // Champs dont la valeur est commune à la famille (voir champsPartages).
       partage: Array.isArray(p && p.partage) ? p.partage.slice() : [],
-      sansBonus: !!(p && p.sans_bonus)
+      // Champs qui n'existent pas du tout à ce palier (voir palierNaPas).
+      champsAbsents: Array.isArray(p && p.champs_absents) ? p.champs_absents.slice() : []
     };
   });
 }
@@ -1042,10 +1043,36 @@ function paliersQuiPartagent(liste, nomPalier, champ) {
     p.nom !== source.nom && p.groupe === source.groupe && palierPartage(p, champ));
 }
 
-// Ce palier a-t-il un bonus de compagnon ? Le Kyber blanc n'en a aucun : lui
-// offrir le champ laisserait croire qu'il reste à remplir.
-function palierSansBonus(p) {
-  return !!(p && p.sansBonus);
+// Ce champ existe-t-il à ce palier ? Le Kyber blanc n'a pas de bonus de
+// compagnon, ses trois évolutions n'ont pas de temps de fabrication : offrir
+// la case laisserait croire qu'elle reste à remplir.
+//
+// Une liste plutôt qu'un drapeau par cas : la deuxième règle du genre est
+// arrivée deux jours après la première, et la troisième ne demandera qu'une
+// valeur de plus dans le tableau.
+function palierNaPas(p, champ) {
+  return !!(p && Array.isArray(p.champsAbsents) && p.champsAbsents.indexOf(champ) !== -1);
+}
+
+// La valeur d'un champ à un palier, complétée par sa famille.
+//
+// La recopie à la frappe ne vaut que pour ce qu'on tape : tout ce qui a été
+// saisi AVANT que la règle existe garde ses trous — une vente renseignée sur
+// le Kyber bleu et nulle part ailleurs. À l'ouverture du formulaire, un champ
+// partagé vide se remplit donc de ce que ses sœurs connaissent déjà.
+//
+// On ne complète JAMAIS une valeur existante : si deux paliers divergent, ce
+// qui est écrit fait foi et reste sous les yeux, plutôt que d'être écrasé en
+// silence par celui qui passait en premier.
+function valeurAvecPartage(table, liste, nomPalier, champ) {
+  const propre = valeurPalier(table, nomPalier);
+  if (propre !== null) return propre;
+  const voisins = paliersQuiPartagent(liste, nomPalier, champ);
+  for (let i = 0; i < voisins.length; i++) {
+    const v = valeurPalier(table, voisins[i].nom);
+    if (v !== null) return v;
+  }
+  return null;
 }
 
 // ===== Fusions =====

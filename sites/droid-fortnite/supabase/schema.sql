@@ -60,9 +60,12 @@ create table public.paliers (
   -- déclarant ni prix ni bonus reste donc à l'écart des deux, sans qu'aucune
   -- règle n'ait à le nommer.
   partage    text[] not null default '{}',
-  -- Ce palier n'a pas de bonus de compagnon du tout (le Kyber blanc) : le
-  -- champ est neutralisé, au lieu de rester vide comme s'il restait à remplir.
-  sans_bonus boolean not null default false
+  -- Champs qui n'existent PAS à ce palier : le Kyber blanc n'a pas de bonus de
+  -- compagnon, ses trois évolutions n'ont pas de temps de fabrication. Ils sont
+  -- neutralisés à la saisie, au lieu de rester vides comme s'il restait à les
+  -- remplir. Une liste plutôt qu'un drapeau par cas (sans_bonus, sans_temps…) :
+  -- une règle de plus ne demande qu'une valeur, pas une colonne.
+  champs_absents text[] not null default '{}'
 );
 
 create table public.unites (

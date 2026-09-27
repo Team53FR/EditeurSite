@@ -335,18 +335,29 @@ function construireGrillePrixRendement(d) {
   lignes.forEach((p) => {
     const ligne = document.createElement("div");
     ligne.className = "ligne-palier";
-    const prix = decomposerPourFormulaire(d ? valeurPalier(d.prix, p.nom) : null);
+    // Les champs communs à une famille se complètent de ce que les paliers
+    // sœurs connaissent déjà : la recopie à la frappe ne rattrape pas ce qui a
+    // été saisi avant que la règle existe (voir valeurAvecPartage).
+    // Un prix en cristaux se compte en unités (1, 2, 4) : le menu K/M/B/T n'y
+    // sert à rien. On garde donc le nombre BRUT, sans le décomposer — sinon un
+    // jour « 2000 cristaux » s'afficherait « 2 » avec un « K » qu'aucun menu
+    // ne montrerait plus, et l'enregistrement le perdrait en silence.
+    const enCristaux = monnaieDuPalier(p.nom) === "cristaux";
+    const prixBrut = d ? valeurAvecPartage(d.prix, paliers, p.nom, "prix") : null;
+    const prix = enCristaux
+      ? { valeur: prixBrut === null ? "" : String(prixBrut), unite: "" }
+      : decomposerPourFormulaire(prixBrut);
     // Les Iconiques rapportent un pourcentage du revenu total : c'est l'unité
     // qu'on leur propose d'emblée.
     const rdt = decomposerPourFormulaire(d ? valeurPalier(d.rendements, p.nom) : null);
     if (iconique && !rdt.unite) rdt.unite = UNITE_POURCENT;
     // Le prix de revente se saisit comme le prix d'achat (mêmes unités).
-    const vente = decomposerPourFormulaire(d ? valeurPalier(d.vente, p.nom) : null);
+    const vente = decomposerPourFormulaire(d ? valeurAvecPartage(d.vente, paliers, p.nom, "vente") : null);
     // Le temps de fabrication n'est pas un montant : texte libre, « 0:00:33 ».
     const temps = d ? (valeurPalier(d.tempsFabrication, p.nom) || "") : "";
     // Le bonus de compagnon non plus — et il grandit avec le palier
     // (« 20% Vitesse de Fabrication » à Défaut, « 140% » à Stellar).
-    const bonusPalier = d ? (valeurPalier(d.bonus, p.nom) || "") : "";
+    const bonusPalier = d ? (valeurAvecPartage(d.bonus, paliers, p.nom, "bonus") || "") : "";
 
     ligne.innerHTML =
       '<span class="nom-palier">' +
@@ -360,9 +371,13 @@ function construireGrillePrixRendement(d) {
         '<input type="text" inputmode="decimal" data-palier="' + echapper(p.nom) + '" data-champ="prix" ' +
           'value="' + echapper(prix.valeur) + '" placeholder="—" aria-label="Prix au palier ' +
           echapper(p.nom) + ', en ' + echapper(nomMonnaie(p.nom)) + '">' +
-        '<select data-palier="' + echapper(p.nom) + '" data-unite="prix" aria-label="Unité du prix au palier ' + echapper(p.nom) + '">' +
-          optionsUnite(prix.unite, false) +
-        "</select>" +
+        // Pas de menu d'unité pour les cristaux : sans sélecteur, la lecture
+        // prend la valeur telle quelle (composerValeur sans symbole = ×1).
+        (enCristaux
+          ? ""
+          : '<select data-palier="' + echapper(p.nom) + '" data-unite="prix" aria-label="Unité du prix au palier ' + echapper(p.nom) + '">' +
+              optionsUnite(prix.unite, false) +
+            "</select>") +
         (marqueMonnaie(p.nom)
           ? '<span class="marque-monnaie" title="Ce prix se paie en ' + echapper(nomMonnaie(p.nom)) +
             '">' + marqueMonnaie(p.nom) + "</span>"
@@ -385,16 +400,21 @@ function construireGrillePrixRendement(d) {
       '<span class="champ-libelle">' +
         '<span class="libelle-mobile">Temps de fabrication</span>' +
         '<input type="text" data-palier="' + echapper(p.nom) + '" data-champ="temps" ' +
-          'value="' + echapper(temps) + '" placeholder="ex. 0:00:33" aria-label="Temps de fabrication au palier ' + echapper(p.nom) + '">' +
+          'value="' + echapper(palierNaPas(p, "temps") ? "" : temps) + '"' +
+          (palierNaPas(p, "temps")
+            ? ' disabled placeholder="aucun à ce palier" title="Ce palier n\'a pas de temps de fabrication."'
+            : ' placeholder="ex. 0:00:33"') +
+          ' aria-label="Temps de fabrication au palier ' + echapper(p.nom) + '">' +
       "</span>" +
-      // Un palier peut n'avoir aucun bonus de compagnon (le Kyber blanc) :
-      // le champ est alors neutralisé et le dit, plutôt que de rester vide
-      // en laissant croire qu'il reste à remplir.
+      // Un champ peut ne pas exister à ce palier (pas de bonus pour le Kyber
+      // blanc, pas de temps de fabrication pour ses évolutions) : il est alors
+      // neutralisé et le dit, plutôt que de rester vide en laissant croire
+      // qu'il reste à remplir.
       '<span class="champ-libelle">' +
         '<span class="libelle-mobile">Bonus de compagnon</span>' +
         '<input type="text" data-palier="' + echapper(p.nom) + '" data-champ="bonus" ' +
-          'value="' + echapper(palierSansBonus(p) ? "" : bonusPalier) + '"' +
-          (palierSansBonus(p)
+          'value="' + echapper(palierNaPas(p, "bonus") ? "" : bonusPalier) + '"' +
+          (palierNaPas(p, "bonus")
             ? ' disabled placeholder="aucun à ce palier" title="Ce palier n\'a pas de bonus de compagnon."'
             : ' placeholder="ex. 20% Vitesse de Fabrication"') +
           ' aria-label="Bonus de compagnon au palier ' + echapper(p.nom) + '">' +
@@ -871,7 +891,7 @@ async function sauvegarderPaliers(copie, messageCommit) {
         variante: p.variante || null,
         monnaie: p.monnaie || "credits",
         partage: Array.isArray(p.partage) ? p.partage : [],
-        sans_bonus: !!p.sansBonus
+        champs_absents: Array.isArray(p.champsAbsents) ? p.champsAbsents : []
       };
     });
     await remplacerTableEntiere("paliers", "nom", lignes);
