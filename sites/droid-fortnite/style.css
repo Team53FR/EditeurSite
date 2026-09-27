@@ -567,6 +567,49 @@ a { color: var(--primaire); }
 /* Reste pleinement visible même sur une carte non possédée. */
 .carte-droide:not(.possede) .dx-fusion { opacity: 1; }
 
+/* Repère « fiche à compléter » (panneau admin) : le nombre de cases encore
+   vides, en face du repère de fusion. Ambre plein plutôt que rouge : c'est
+   du travail en attente, pas une erreur. */
+.dx-incomplet {
+  position: absolute; top: 21px; right: 3px; z-index: 4;
+  min-width: 18px; height: 18px; padding: 0 4px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 4px;
+  background: #f59e0b;
+  color: #1c1917;
+  font-size: 0.58rem; font-weight: 800; line-height: 1;
+  border: 1px solid rgba(255, 255, 255, .55);
+  box-shadow: 0 0 9px rgba(245, 158, 11, .9), 0 1px 3px rgba(0, 0, 0, .55);
+  cursor: help;
+}
+/* En admin, la carte ne porte pas de contour de palier (aucune couleur ne lui
+   est passée) : la bordure est donc libre pour signaler la fiche de loin. */
+.carte-droide.incomplet { border-color: #f59e0b; }
+
+/* La barre au-dessus de la grille : le compte, et de quoi n'afficher que les
+   fiches à finir. */
+.barre-incomplets {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem;
+  margin: -0.5rem 0 0.9rem;
+}
+/* Sur la carte, le fond est toujours sombre : l'ambre y est fixe. Hors de la
+   carte, il doit suivre le thème — #f59e0b sur fond crème est illisible.
+   Rappel : .btn-mini est déclaré PLUS BAS dans ce fichier ; à spécificité
+   égale il l'emporterait et le bouton reprendrait la couleur du texte. D'où
+   `.btn-mini.filtre-incomplets`. */
+:root { --incomplet: #b45309; }
+@media (prefers-color-scheme: dark) { :root { --incomplet: #fbbf24; } }
+
+.btn-mini.filtre-incomplets { border-color: var(--incomplet); color: var(--incomplet); }
+.btn-mini.filtre-incomplets:hover { background: rgba(245, 158, 11, .14); }
+.btn-mini.filtre-incomplets.actif { background: #f59e0b; border-color: #f59e0b; color: #1c1917; }
+/* Garde-fou : le jour où une de ces règles poserait un `display`, elle
+   l'emporterait sur l'attribut hidden et le bouton resterait affiché, inerte
+   — le piège s'est déjà refermé deux fois ailleurs dans le projet. */
+.btn-mini.filtre-incomplets[hidden] { display: none; }
+.compte-incomplets { font-size: 0.85rem; color: var(--texte-att); }
+.compte-incomplets.rien-a-completer { color: var(--succes); }
+
 /* Zone du visuel : occupe toute la carte, le pied se pose par-dessus */
 .dx-visuel {
   position: absolute; inset: 0;

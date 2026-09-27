@@ -252,6 +252,88 @@ async function chargerDonnees() {
   afficherFusionAdmin();
 }
 
+// ===== Stats manquantes : repérer les fiches à finir =====
+//
+// Six colonnes par palier et une bonne dizaine de paliers : un trou ne se
+// voyait qu'en ouvrant la fiche, une par une. La carte le dit donc d'elle-même.
+//
+// Ce qui compte comme « manquant » suit EXACTEMENT ce que le formulaire
+// propose, sans quoi l'indicateur réclamerait des cases qui n'existent pas :
+//   — les paliers indisponibles pour cette rareté (un Iconique n'existe qu'au
+//     premier) ne sont pas comptés ;
+//   — les champs absents d'un palier non plus (pas de bonus de compagnon au
+//     Kyber blanc, pas de temps de fabrication sur ses évolutions) : la case
+//     est verrouillée, elle ne peut pas être « vide » ;
+//   — une valeur héritée de la famille compte comme PRÉSENTE, puisque c'est
+//     elle que le formulaire affiche et enregistrera (voir valeurAvecPartage).
+const CHAMPS_STATS = [
+  { champ: "prix",      table: "prix",             libelle: "prix" },
+  { champ: "rendement", table: "rendements",       libelle: "rendement" },
+  { champ: "vente",     table: "vente",            libelle: "vente" },
+  { champ: "temps",     table: "tempsFabrication", libelle: "temps de fabrication" },
+  { champ: "bonus",     table: "bonus",            libelle: "bonus de compagnon" }
+];
+
+// Les trous d'une fiche : combien de cases attendues sont vides, et
+// lesquelles, palier par palier.
+function statsManquantes(d) {
+  const details = [];
+  let attendus = 0;
+  let manquants = 0;
+  paliers.filter((p) => estDisponibleAuPalier(d, p.nom)).forEach((p) => {
+    const vides = [];
+    CHAMPS_STATS.forEach((c) => {
+      if (palierNaPas(p, c.champ)) return;   // la case n'existe pas à ce palier
+      attendus++;
+      if (valeurAvecPartage(d[c.table], paliers, p.nom, c.champ) === null) {
+        manquants++;
+        vides.push(c.libelle);
+      }
+    });
+    if (vides.length) details.push({ palier: p.nom, champs: vides });
+  });
+  return { attendus: attendus, manquants: manquants, details: details };
+}
+
+// L'infobulle du repère : la liste des trous, un palier par ligne. Un palier
+// entièrement vide se résume ainsi plutôt que d'énumérer ses cinq colonnes.
+function resumeStatsManquantes(etat) {
+  const entete = etat.manquants + (etat.manquants > 1 ? " valeurs manquantes" : " valeur manquante");
+  const lignes = etat.details.map((x) =>
+    "• " + x.palier + " : " +
+    (x.champs.length === CHAMPS_STATS.length ? "rien de renseigné" : x.champs.join(", ")));
+  return entete + "\n" + lignes.join("\n");
+}
+
+// Ne montrer que les fiches à compléter. Volontairement non mémorisé : c'est
+// un coup de projecteur le temps de finir une série, pas un réglage — revenir
+// sur la page et n'y voir qu'un tiers du catalogue serait déroutant.
+let filtreIncomplets = false;
+
+function basculerFiltreIncomplets() {
+  filtreIncomplets = !filtreIncomplets;
+  afficherDroides();
+}
+
+function majBarreIncomplets(nb) {
+  const compte = document.getElementById("compteIncomplets");
+  if (compte) {
+    compte.textContent = nb === 0
+      ? "Toutes les fiches sont complètes."
+      : nb + (nb > 1 ? " fiches à compléter" : " fiche à compléter") +
+        " sur " + catalogue.length + ".";
+    compte.classList.toggle("rien-a-completer", nb === 0);
+  }
+  const bouton = document.getElementById("filtreIncomplets");
+  if (!bouton) return;
+  // Rien à filtrer : le bouton s'efface plutôt que de rester là sans effet.
+  // Il reste en revanche visible tant que le filtre est actif, sinon on ne
+  // pourrait plus l'éteindre après avoir complété la dernière fiche.
+  bouton.hidden = nb === 0 && !filtreIncomplets;
+  bouton.setAttribute("aria-pressed", filtreIncomplets ? "true" : "false");
+  bouton.classList.toggle("actif", filtreIncomplets);
+}
+
 // ===== Droïdes =====
 // Petites cartes (comme le Droidex de suivi.html) plutôt qu'une longue
 // liste : avec ~70 droïdes, une liste verticale devient vite illisible.
@@ -262,10 +344,22 @@ function afficherDroides() {
   const grille = document.getElementById("listeDroides");
   grille.innerHTML = "";
 
+  const etats = new Map();
+  catalogue.forEach((d) => etats.set(d.id, statsManquantes(d)));
+  const incomplets = catalogue.filter((d) => etats.get(d.id).manquants > 0);
+  majBarreIncomplets(incomplets.length);
+
+  const liste = filtreIncomplets ? incomplets : catalogue;
+  if (!liste.length) {
+    grille.innerHTML = '<p class="sous-titre">' +
+      (filtreIncomplets ? "Plus rien à compléter." : "Aucun droïde dans le catalogue.") + "</p>";
+    return;
+  }
+
   // Ordre du catalogue, tel quel : c'est celui du jeu, donc celui que le
   // Droidex affiche. Retrier par rareté puis par nom donnait une grille qui
   // ne ressemblait à rien de ce qu'on voit en jouant.
-  catalogue.forEach((d) => {
+  liste.forEach((d) => {
     // Le palier « Défaut » sert de référence en admin : c'est celui dont les
     // visuels existent toujours, quel que soit l'avancement d'un compte.
     const carte = construireCarteDroide(d, { admin: true, palier: "Défaut" });
@@ -276,6 +370,18 @@ function afficherDroides() {
       e.stopPropagation();
       supprimerDroide(d.id);
     });
+
+    // Le repère des trous : le NOMBRE, pas un simple point — « 2 » et « 37 »
+    // n'appellent pas le même empressement, et l'infobulle dit lesquels.
+    const etat = etats.get(d.id);
+    if (etat.manquants) {
+      carte.classList.add("incomplet");
+      const repere = document.createElement("span");
+      repere.className = "dx-incomplet";
+      repere.textContent = etat.manquants;
+      repere.title = resumeStatsManquantes(etat);
+      carte.appendChild(repere);
+    }
 
     grille.appendChild(carte);
   });
@@ -897,6 +1003,10 @@ async function sauvegarderPaliers(copie, messageCommit) {
     await remplacerTableEntiere("paliers", "nom", lignes);
     paliers = copie;
     afficherPaliers();
+    // Ajouter un palier, ou verrouiller un de ses champs, change le nombre de
+    // cases attendues : sans ce rappel, les repères « à compléter » de l'autre
+    // onglet resteraient sur l'ancien compte jusqu'au rechargement.
+    afficherDroides();
     message.textContent = "";
   } catch (e) {
     message.textContent = messageErreurTaxonomie(e);
