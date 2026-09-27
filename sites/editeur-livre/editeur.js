@@ -2268,21 +2268,79 @@ function seuilsColonnes(el) {
 }
 
 // Premier caractère (en ordre du document) situé au-delà d'un seuil horizontal.
+//
+// Les colonnes se remplissent DANS L'ORDRE DU TEXTE : une fois le seuil
+// franchi, tout ce qui suit est au-delà. La réponse est donc une frontière, et
+// une frontière se trouve par dichotomie — une douzaine de mesures au lieu
+// d'une par caractère. La version précédente en faisait 1439 sur une
+// double-page pleine, chacune forçant un calcul de mise en page ; c'est ce qui
+// rendait la frappe poussive, puisque tout ici passe par cette fonction.
+//
+// IMPORTANT : le seuil doit tomber dans une GOUTTIÈRE, entre deux colonnes —
+// c'est ce que produit seuilsColonnes, et rien d'autre n'appelle cette
+// fonction. Un seuil planté au milieu d'une colonne ne sépare pas un avant
+// d'un après : chaque ligne y repart à gauche puis va à droite, si bien que
+// « au-delà » alterne d'une ligne à l'autre et qu'aucune frontière n'existe.
+//
+// Quelques caractères n'ont aucune boîte (espace replié en fin de ligne,
+// blanc entre deux blocs). L'ancienne version les sautait ; la dichotomie fait
+// de même, en cherchant le premier caractère MESURABLE à partir du point
+// sondé. À document égal, elle rend exactement le même point de coupe — c'est
+// vérifié caractère par caractère par les tests.
 function pointCoupe(el, seuilX) {
+  // Les nœuds de texte mis bout à bout, pour raisonner en index global.
+  const morceaux = [];
   const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
-  let n;
+  let n, total = 0;
   while ((n = walker.nextNode())) {
     const len = n.textContent.length;
-    for (let i = 0; i < len; i++) {
-      const r = document.createRange();
-      r.setStart(n, i);
-      r.setEnd(n, i + 1);
+    if (!len) continue;
+    morceaux.push({ node: n, debut: total });
+    total += len;
+  }
+  if (!total) return null;
+
+  // Index global -> (nœud, position dans le nœud). Recherche binaire aussi,
+  // mais sans mesure : elle ne coûte rien.
+  const situer = (i) => {
+    let lo = 0, hi = morceaux.length - 1;
+    while (lo < hi) {
+      const m = (lo + hi + 1) >> 1;
+      if (morceaux[m].debut <= i) lo = m; else hi = m - 1;
+    }
+    return { node: morceaux[lo].node, offset: i - morceaux[lo].debut };
+  };
+
+  const r = document.createRange();
+  // Le premier caractère mesurable de [debut, fin[, avec son bord gauche.
+  const sonder = (debut, fin) => {
+    for (let i = debut; i < fin; i++) {
+      const p = situer(i);
+      r.setStart(p.node, p.offset);
+      r.setEnd(p.node, p.offset + 1);
       const rect = r.getBoundingClientRect();
       if (rect.width === 0 && rect.height === 0) continue;
-      if (rect.left >= seuilX - 0.5) return { node: n, offset: i };
+      return { index: i, point: p, gauche: rect.left };
+    }
+    return null;
+  };
+
+  // Invariant : s'il existe un point de coupe meilleur que `trouve`, son index
+  // est dans [lo, hi[.
+  let lo = 0, hi = total, trouve = null;
+  while (lo < hi) {
+    const milieu = (lo + hi) >> 1;
+    const s = sonder(milieu, hi);
+    if (!s) {
+      hi = milieu;                 // rien de mesurable par ici : chercher avant
+    } else if (s.gauche >= seuilX - 0.5) {
+      trouve = s.point;
+      hi = s.index;                // celui-ci convient ; en existe-t-il un plus tôt ?
+    } else {
+      lo = s.index + 1;            // mesurable et en deçà : la coupe est après
     }
   }
-  return null;
+  return trouve;
 }
 
 function blocAncetre(node) {
@@ -2309,6 +2367,23 @@ function htmlEntre(el, a, b, marquerSuite) {
   if (b) r.setEnd(b.node, b.offset);   else r.setEnd(el, el.childNodes.length);
   const d = document.createElement("div");
   d.appendChild(r.cloneContents());
+
+  // Quand les DEUX bornes tombent dans le même nœud de texte, cloneContents
+  // rend le texte nu : le paragraphe qui le portait n'est pas « partiellement
+  // sélectionné » au sens de la spécification, donc pas recopié. Le morceau
+  // perdait alors sa balise — et sans balise, la marque « suite » ci-dessous
+  // n'a nulle part où se poser : les morceaux ne se recollent plus, et le
+  // texte se réordonne au recollage. (Invisible tant qu'on ne coupait qu'avec
+  // une borne au bord du conteneur, comme le faisait calculerPartition.)
+  if (a && d.firstChild && d.firstChild.nodeType === Node.TEXT_NODE) {
+    const bloc = blocAncetre(a.node);
+    if (bloc && bloc !== el) {
+      const enveloppe = bloc.cloneNode(false);
+      while (d.firstChild) enveloppe.appendChild(d.firstChild);
+      d.appendChild(enveloppe);
+    }
+  }
+
   if (marquerSuite && a && !estDebutDeBloc(a.node, a.offset) && d.firstElementChild) {
     d.firstElementChild.setAttribute("data-suite", "1");
   }
@@ -2347,6 +2422,71 @@ function calculerPartition(html) {
   };
   mes.innerHTML = "";
   return res;
+}
+
+// Découpe un texte continu en doubles-pages, en UNE SEULE mise en page.
+//
+// La façon évidente — rappeler calculerPartition sur tout le reste du livre,
+// tour après tour — fait recevoir au mesureur 90 000 caractères, puis 87 000,
+// puis 84 000… trente fois. Le coût monte avec le CARRÉ de la longueur, et
+// c'est ce que payait repaginerTout à chaque aperçu, impression, changement
+// de format ou retour du manuscrit.
+//
+// Or le navigateur sait déjà tout faire d'un coup : posé dans le mesureur, le
+// livre entier se répartit en colonnes qui débordent vers la droite, deux par
+// double-page. Il ne reste qu'à relever les frontières — une dichotomie
+// chacune, sur une mise en page calculée une fois pour toutes.
+function decouperEnDoublesPages(html) {
+  const mes = mesureEl();
+  if (!mes || !geomEdition) return [html || ""];
+  mes.innerHTML = html || "";
+
+  const g = geomEdition;
+  const pas = g.largeurColonne + g.gouttiere;   // d'une colonne à la suivante
+  const gauche = mes.getBoundingClientRect().left;
+  // Frontière au début de la double-page s : juste avant la colonne 2s+1,
+  // au milieu de la gouttière (voir seuilsColonnes, même arithmétique).
+  const seuil = (s) => gauche + 2 * s * pas - g.gouttiere / 2;
+
+  const points = [];
+  for (let s = 1; s <= 5000; s++) {
+    const p = pointCoupe(mes, seuil(s));
+    if (!p) break;
+    points.push(p);
+  }
+
+  const morceaux = [];
+  for (let i = 0; i <= points.length; i++) {
+    // Chaque morceau sauf le premier prolonge le précédent : on le marque,
+    // comme le fait calculerPartition, pour ne pas inventer de paragraphe.
+    morceaux.push(retirerTitresVides(htmlEntre(
+      mes, i === 0 ? null : points[i - 1], i === points.length ? null : points[i], i > 0)));
+  }
+  mes.innerHTML = "";
+
+  // Une passe de rattrapage, et elle n'est pas facultative.
+  //
+  // Tout ce qui précède suppose qu'un morceau, remis SEUL dans le mesureur,
+  // occupe la place qu'il occupait au sein du flux continu. C'est vrai du
+  // texte courant, mais pas d'un bloc à marge haute — titre, citation, liste —
+  // qui tombe pile à la frontière : la marge, escamotée à la coupe de colonne,
+  // reparaît en tête du morceau isolé et peut le faire déborder d'une ligne.
+  // Or une double-page trop pleine perd sa dernière ligne à l'impression.
+  //
+  // On repasse donc derrière, en reportant ce qui dépasse — le mécanisme de
+  // gererFlux, mais sur un découpage déjà presque juste : en pratique deux ou
+  // trois morceaux sur des dizaines sont touchés.
+  for (let i = 0; i < morceaux.length && i < 5000; i++) {
+    const part = calculerPartition(morceaux[i]);
+    if (!part.overflow || !texteBrutPage(part.overflow).trim()) continue;
+    morceaux[i] = retirerTitresVides(part.garde);
+    const suite = fusionnerSuite(part.overflow, morceaux[i + 1] || "");
+    if (i + 1 < morceaux.length) morceaux[i + 1] = suite;
+    else morceaux.push(suite);
+  }
+
+  while (morceaux.length > 1 && !texteBrutPage(morceaux[morceaux.length - 1]).trim()) morceaux.pop();
+  return morceaux.length ? morceaux : [""];
 }
 
 // Découpe (lecture seule) d'une double-page en ses deux pages.
@@ -2512,7 +2652,6 @@ function gererFlux() {
   spreads[s] = retirerTitresVides(part.garde);
   assurerSpread(s + 1);
   spreads[s + 1] = fusionnerSuite(part.overflow, spreads[s + 1] || "");
-  pagesObsoletes = true;
 
   // Le report peut à son tour déborder (collage de plusieurs pages d'un coup) :
   // on poursuit la cascade jusqu'à ce que tout tienne. Sans cela, les
@@ -2528,6 +2667,13 @@ function gererFlux() {
     spreads[k + 1] = fusionnerSuite(suite.overflow, spreads[k + 1] || "");
     k++;
   }
+
+  // Seules les doubles-pages s..k ont bougé. Marquer TOUT le livre obsolète
+  // obligeait le sommaire, juste après, à redécouper les soixante pages —
+  // à chaque frappe, alors que taper au bas d'une page pleine fait déborder
+  // à chaque caractère.
+  const derniere = Math.min(k, spreads.length - 1);
+  for (let i = s; i <= derniere; i++) regenererPagesSpread(i);
 
   const longueurGarde = texteBrutPage(part.garde).length;
   if (offset !== null && offset > longueurGarde) {
@@ -2652,7 +2798,12 @@ function listerChapitres() {
   const chapitres = [];
   const boite = document.createElement("div");
   pages.forEach((page, i) => {
-    boite.innerHTML = (page && page.contenu) || "";
+    const html = (page && page.contenu) || "";
+    // La quasi-totalité des pages n'a pas de titre : un test de chaîne évite
+    // d'en analyser le contenu pour rien. Sur un livre, cela fait une page
+    // examinée sur dix.
+    if (html.indexOf("<h2") === -1) return;
+    boite.innerHTML = html;
     boite.querySelectorAll("h2").forEach(h => {
       const titre = (h.textContent || "").trim();
       // Un titre vide = fragment laissé par la coupe entre deux pages : on l'ignore.
@@ -2663,12 +2814,29 @@ function listerChapitres() {
   return chapitres;
 }
 
+// Ce qui distingue deux sommaires à l'écran : les titres, leurs pages, et
+// celui qui est en surbrillance. Rien d'autre n'est affiché.
+function signatureSommaire(chapitres) {
+  return indexSpread + "|" + chapitres.map((c) => c.page + ":" + c.titre).join("\u0001");
+}
+
+let signatureSommaireAffichee = null;
+
 function afficherSommaire() {
   const liste = document.getElementById("listePages");
   if (!liste) return;
-  liste.innerHTML = "";
 
   const chapitres = listerChapitres();
+
+  // Le sommaire est redemandé à chaque frappe, mais il ne change qu'en
+  // ajoutant, renommant ou déplaçant un chapitre. Le reconstruire pour rien
+  // trois fois par seconde jetait aussi le survol et la position de
+  // défilement du panneau.
+  const signature = signatureSommaire(chapitres);
+  if (signature === signatureSommaireAffichee && liste.childElementCount) return;
+  signatureSommaireAffichee = signature;
+
+  liste.innerHTML = "";
 
   if (chapitres.length === 0) {
     const li = document.createElement("li");
@@ -3218,19 +3386,10 @@ function repaginerTout() {
   for (const s of spreads) tout = fusionnerSuite(tout, s);
   tout = retirerTitresVides(tout);   // pas de coquilles reportées d'un découpage à l'autre
 
-  const nouveaux = [];
-  let reste = tout;
-  let securite = 0;
-  while (texteBrutPage(reste).trim() !== "" && securite < 5000) {
-    securite++;
-    const part = calculerPartition(reste);
-    // Chaque coupe peut laisser un titre vide en fin de page : on nettoie
-    // le morceau produit, sinon les coquilles se multiplient à chaque
-    // repagination (et redeviennent des chapitres fantômes).
-    nouveaux.push(retirerTitresVides(part.garde));
-    reste = part.overflow || "";
-    if (texteBrutPage(reste).trim() === "") break;
-  }
+  // Chaque coupe peut laisser un titre vide en fin de page : decouperEnDoublesPages
+  // nettoie chaque morceau, sinon les coquilles se multiplient à chaque
+  // repagination (et redeviennent des chapitres fantômes).
+  const nouveaux = texteBrutPage(tout).trim() ? decouperEnDoublesPages(tout) : [];
   livre.spreads = nouveaux.length ? nouveaux : [""];
   pagesObsoletes = true;
   regenererToutesPages();
