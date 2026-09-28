@@ -64,8 +64,18 @@ alter table public.livre_spreads enable row level security;
 -- Une seule politique de lecture (propriétaire OU publié) : deux politiques
 -- permissives distinctes seraient chacune évaluée à chaque lecture, pour le
 -- même effet.
+--
+-- « publié » veut dire lisible par les autres COMPTES, pas par tout Internet.
+-- D'où le « auth.uid() is not null » : sans lui, un visiteur anonyme échouait
+-- bien sur le premier terme, mais le second suffisait à lui ouvrir le livre
+-- — avec la seule clé publishable, qui est dans le JS servi à tout le monde.
+-- publies.html et lecture.html exigent de toute façon une session, la
+-- condition ne retire donc rien à l'usage normal.
 create policy "livres : lecture (soi-même ou publié)" on public.livres
-  for select using ((select auth.uid()) = user_id or publie);
+  for select using (
+    (select auth.uid()) = user_id
+    or (publie and (select auth.uid()) is not null)
+  );
 create policy "livres : écriture (soi-même)" on public.livres
   for insert with check ((select auth.uid()) = user_id);
 create policy "livres : modification (soi-même)" on public.livres
@@ -73,10 +83,15 @@ create policy "livres : modification (soi-même)" on public.livres
 create policy "livres : suppression (soi-même)" on public.livres
   for delete using ((select auth.uid()) = user_id);
 
+-- Même règle que pour `livres` : le texte suit l'accès à sa fiche, et un
+-- livre publié se lit avec un compte, pas sans.
 create policy "livre_spreads : lecture (soi-même ou publié)" on public.livre_spreads
   for select using (
     (select auth.uid()) = (select user_id from public.livres l where l.id = livre_id)
-    or (select publie from public.livres l where l.id = livre_id)
+    or (
+      (select publie from public.livres l where l.id = livre_id)
+      and (select auth.uid()) is not null
+    )
   );
 create policy "livre_spreads : écriture (soi-même)" on public.livre_spreads
   for insert with check ((select auth.uid()) = (select user_id from public.livres l where l.id = livre_id));

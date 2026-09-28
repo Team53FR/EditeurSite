@@ -213,6 +213,48 @@ supprimer un compte purge automatiquement ses données personnelles sur les
 trois sites, via des clés étrangères `on delete cascade` — plus besoin d'un
 outil de purge manuel comme du temps des fichiers JSON.
 
+## Sécurité : où passe vraiment la frontière
+
+Le dépôt `Team53FR/EditeurSite` est **public**, et le resterait-il pas que cela
+ne changerait rien : un site statique livre son code au navigateur de chaque
+visiteur. La clé `sb_publishable_…` présente dans le JS est faite pour être
+publique. **Rien de ce qui est envoyé au navigateur ne protège quoi que ce
+soit.** La seule frontière est côté serveur : RLS, droits de colonne, et les
+contrôles internes des fonctions `security definer`.
+
+Ce que cela implique, concrètement :
+
+- **Tout ce qui doit rester privé doit l'être par une policy**, jamais par
+  l'interface. Une page qui « ne montre pas » un bouton ne protège rien.
+- **Une fonction `security definer` est une porte dans le mur.** Elle doit soit
+  vérifier `est_admin()` / `auth.uid()` dans son corps (c'est le cas de
+  `admin_creer_compte`, `admin_definir_mot_de_passe`, `changer_mon_mot_de_passe`),
+  soit n'être accordée à personne. Un `grant … to anon` sur une telle fonction
+  est une décision de sécurité, pas un détail de confort.
+- **Révoquer à `anon` ne suffit pas** : Postgres accorde `EXECUTE` à `PUBLIC`
+  par défaut sur toute fonction. Il faut `revoke … from public` aussi.
+- **`auth.uid()` vaut NULL pour un visiteur anonyme**, et `NULL` n'est pas
+  `false`. Une condition du genre `auth.uid() = user_id or publie` laisse donc
+  passer l'anonyme dès que `publie` est vrai : c'est exactement le défaut qui a
+  rendu les livres publiés lisibles par tout Internet. Toute branche d'une
+  policy qui ne compare pas `auth.uid()` doit porter son propre
+  `auth.uid() is not null`.
+
+Deux garde-fous posés après audit, à ne pas défaire sans le vouloir :
+
+| Règle | Pourquoi |
+|---|---|
+| `inscription()` n'est accordée à personne | Les comptes se créent par `admin_creer_compte()`. Ouverte à `anon`, elle laissait n'importe qui s'ouvrir un compte — et, devenu « connecté », déposer des fichiers dans le Storage. |
+| Un livre publié exige une session pour être lu | « Publié » veut dire lisible par les autres **comptes**, ce que promettent les conditions d'utilisation — pas par tout Internet. |
+
+Points connus, non corrigés à ce jour : `connexion()` n'a **aucune limitation
+de tentatives** (force brute possible), et les buckets Storage n'ont **ni
+taille maximale ni type de fichier imposé**.
+
+Après toute migration, relancer les analyseurs Supabase (`get_advisors`,
+sécurité) : ils repèrent les tables sans RLS et les fonctions `definer`
+exposées.
+
 ## Sauvegarde automatique
 
 Le dépôt `Team53FR/BDD` reste utile comme **filet de sécurité**, même s'il

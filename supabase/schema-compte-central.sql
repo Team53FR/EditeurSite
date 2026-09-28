@@ -205,7 +205,20 @@ begin
 end;
 $$;
 
-revoke execute on function public.inscription(text, text, text) from public, authenticated;
-grant execute on function public.inscription(text, text, text) to anon;
+-- inscription() n'est accordée à PERSONNE, et c'est voulu.
+--
+-- Les comptes se créent par admin_creer_compte(), gardée par est_admin() :
+-- le site n'appelle jamais inscription(). Elle est restée un temps ouverte
+-- à « anon », ce qui permettait à n'importe qui sur Internet de s'ouvrir un
+-- compte sur le portail d'une seule requête — et, devenu « connecté », de
+-- déposer des fichiers dans le Storage. La fonction est conservée pour le
+-- jour où une inscription libre serait voulue ; il suffira alors de lui
+-- rendre le droit, en sachant ce que cela ouvre.
+--
+-- La révocation vise aussi PUBLIC : Postgres accorde EXECUTE à PUBLIC par
+-- défaut sur toute fonction, et ne retirer le droit qu'à « anon » laisserait
+-- la porte ouverte par cet héritage.
+revoke execute on function public.inscription(text, text, text) from public, anon, authenticated;
+
 revoke execute on function public.connexion(text, text) from public, authenticated;
 grant execute on function public.connexion(text, text) to anon;
