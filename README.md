@@ -462,6 +462,34 @@ passe par `insertHTML` pour rester annulable par Ctrl+Z ; il nettoie ensuite le
 `font-size` que le navigateur ajoute parfois de lui-même, en ne touchant qu'aux
 éléments absents avant le collage.
 
+**Le trou d'une page blanche** : `gererFlux()` ne savait que POUSSER le
+trop-plein vers la double-page suivante. Rien ne RAPATRIAIT le texte quand une
+double-page se creusait, et une page blanche restait alors en place pour de
+bon — seule une repagination complète (aperçu, impression, changement de
+format) la refermait.
+
+Le cas qui le déclenche : un titre de chapitre porte `break-before: column`.
+Précédé de la fin du chapitre d'avant, ce saut le renvoie en page droite et la
+double-page est pleine. Que ce qui le précédait s'en aille, et le titre se
+retrouve en tête : le saut n'a plus rien à franchir, il est ignoré, le titre
+remonte en page gauche — **une page entière de capacité se libère d'un coup**,
+sans le moindre débordement à signaler. Une suppression de texte produit le
+même effet, en moins visible.
+
+`compacterDepuis()` remonte donc ce que la suivante peut céder, en s'arrêtant à
+la première double-page qui ne gagne rien. Deux précautions :
+
+- **Un garde-fou d'abord** (`placeLibreDans`), qui ne relève que l'endroit où
+  le texte s'arrête : cent fois moins cher qu'une partition, il évite de
+  mesurer à chaque frappe. Il tolère une ligne — une page pleine s'arrête
+  toujours un peu avant le bas, et sans cette marge toute page remplie serait
+  déclarée creuse.
+- **La zone d'édition n'est réécrite que si quelque chose a bougé.** Sinon la
+  frappe ordinaire perdrait son annuler/rétablir natif à chaque caractère.
+  C'est aussi pourquoi `compacterDepuis` repasse jusqu'à ce que plus rien ne
+  bouge : une passe s'arrête à la première double-page qui ne gagne rien, et
+  la remontée peut en vider une plus loin.
+
 Le découpage passe par un élément de mesure caché (`#mesureCachee`) dimensionné
 comme une page réelle. `repaginerTout()` recolle tout le livre puis le redécoupe
 — coûteux (~1,7 s pour 143 pages), donc réservé aux moments qui l'exigent ;

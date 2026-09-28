@@ -2619,6 +2619,108 @@ function surSaisie() {
   timerFlux = setTimeout(gererFlux, 350);
 }
 
+// ----- Le trou : une double-page qui se vide sans que rien ne déborde -----
+//
+// Un titre de chapitre porte « break-before: column ». Tant qu'il est précédé
+// de la fin du chapitre d'avant, ce saut le renvoie en page DROITE et la
+// double-page est pleine. Le jour où ce qui le précédait s'en va, le titre se
+// retrouve en tête : le saut forcé n'a plus rien à franchir, il est ignoré, le
+// titre remonte en page GAUCHE — et une page entière de capacité se libère
+// d'un coup. Une suppression de texte produit le même effet, en plus discret.
+//
+// gererFlux ne savait que POUSSER le trop-plein vers l'avant. Sans débordement
+// il ne voyait rien, et la page blanche restait là pour de bon : seule une
+// repagination complète (aperçu, impression, changement de format) la
+// refermait. D'où cette remontée.
+
+// Reste-t-il de la place dans la double-page affichée ?
+//
+// On ne mesure pas la hauteur du contenu — en colonnes, elle ne veut rien
+// dire — mais l'endroit où le texte S'ARRÊTE : s'il n'atteint pas le bas de la
+// page de droite, la place est libre. Un simple relevé de rectangles, cent
+// fois moins cher qu'une partition, pour que la frappe courante n'en pâtisse
+// pas : c'est ce test qui décide s'il vaut la peine d'aller plus loin.
+function placeLibreDans(ed) {
+  const r = document.createRange();
+  r.selectNodeContents(ed);
+  const rects = r.getClientRects();
+  if (!rects.length) return true;
+
+  const bas = ed.getBoundingClientRect().bottom;
+  const col2 = seuilsColonnes(ed).col2;
+  let basDroite = -Infinity, ligne = 0;
+  for (const x of rects) {
+    if (x.left < col2 - 0.5) continue;        // page de gauche : sans intérêt ici
+    basDroite = Math.max(basDroite, x.bottom);
+    ligne = Math.max(ligne, x.height);        // hauteur d'une ligne de texte
+  }
+  if (basDroite === -Infinity) return true;   // la page de droite est vide
+
+  // Une page PLEINE s'arrête toujours un peu avant le bas : sa dernière ligne
+  // y laisse forcément un reste. Il n'y a donc de la place que s'il en reste
+  // assez pour une ligne de plus — sans cette tolérance, toute page remplie
+  // serait déclarée creuse et la compaction tournerait à chaque frappe.
+  return bas - basDroite >= (ligne || 20);
+}
+
+// Remonte dans chaque double-page ce que la suivante peut lui céder.
+//
+// On s'arrête dès qu'une double-page ne gagne rien : elle était pleine, donc
+// toutes celles d'après le sont aussi. Rend l'index de la dernière
+// double-page touchée, ou -1 si rien n'a bougé.
+function unePasseDeCompaction(s) {
+  const spreads = spreadsLivre();
+  let derniere = -1;
+
+  for (let i = s, securite = 0; i + 1 < spreads.length && securite < 2000; i++, securite++) {
+    if (!texteBrutPage(spreads[i + 1]).trim()) continue;   // rien à remonter
+
+    const part = calculerPartition(fusionnerSuite(spreads[i], spreads[i + 1]));
+    const garde = retirerTitresVides(part.garde);
+
+    // Comparaison sur le TEXTE et non sur le HTML : repasser par le mesureur
+    // réécrit le balisage (nœuds clonés, suites marquées) sans rien déplacer,
+    // et une comparaison de chaînes y verrait un mouvement à chaque frappe.
+    if (texteBrutPage(garde).length <= texteBrutPage(spreads[i]).length) break;
+
+    spreads[i] = garde;
+    spreads[i + 1] = part.overflow || "";
+    derniere = i + 1;
+  }
+
+  // Une double-page vidée par la remontée n'a plus lieu d'être.
+  while (spreads.length > 1 && !texteBrutPage(spreads[spreads.length - 1]).trim()) {
+    spreads.pop();
+    derniere = Math.min(derniere === -1 ? spreads.length : derniere, spreads.length - 1);
+  }
+  return derniere;
+}
+
+function compacterDepuis(s) {
+  // Une passe ne suffit pas toujours : elle s'arrête à la première
+  // double-page qui ne gagne rien, et la remontée peut en vider une plus loin
+  // qui ne sera absorbée qu'au tour suivant. On repasse donc jusqu'à ce que
+  // plus rien ne bouge — en pratique une passe, deux au plus. Sans cela,
+  // gererFlux relancerait le mouvement à la frappe suivante et réécrirait la
+  // zone d'édition pour rien, emportant l'annuler/rétablir natif avec elle.
+  let derniere = -1;
+  for (let passe = 0; passe < 4; passe++) {
+    const bougee = unePasseDeCompaction(s);
+    if (bougee === -1) break;
+    derniere = Math.max(derniere, bougee);
+  }
+
+  // Les pages dérivées d'une double-page disparue traîneraient dans le
+  // sommaire et le compteur.
+  const livre = livreActuel();
+  const spreads = spreadsLivre();
+  if (Array.isArray(livre.pages) && livre.pages.length > 2 * spreads.length) {
+    livre.pages.length = 2 * spreads.length;
+  }
+  if (derniere >= spreads.length) derniere = spreads.length - 1;
+  return derniere;
+}
+
 function gererFlux() {
   const ed = editeurEl();
   if (!ed || indexLivre === -1) return;
@@ -2630,6 +2732,27 @@ function gererFlux() {
   // natif et la position du curseur sont donc intacts.
   if (ed.scrollWidth <= ed.clientWidth + 2) {
     spreads[s] = ed.innerHTML;
+
+    // ... sauf si la double-page s'est creusée : il faut alors rapatrier la
+    // suite. On ne réécrit la zone d'édition que si quelque chose a
+    // effectivement remonté, pour que la frappe ordinaire garde son
+    // annuler/rétablir natif intact.
+    const derniere = placeLibreDans(ed) ? compacterDepuis(s) : -1;
+    if (derniere !== -1) {
+      const offset = offsetCaret(ed);
+      for (let i = s; i <= derniere && i < spreads.length; i++) regenererPagesSpread(i);
+      afficherSpread();
+      // La remontée n'ajoute qu'à la FIN de la double-page : ce qui précède le
+      // curseur n'a pas bougé, son offset reste donc valable.
+      if (offset !== null) {
+        const cible = editeurEl();
+        cible.focus();
+        placerCaretAOffset(cible, offset);
+      }
+      afficherSommaire();
+      return;
+    }
+
     // Seule cette double-page a changé : on régénère SES pages uniquement.
     // (Marquer tout le livre obsolète forcerait un recalcul complet à chaque
     //  frappe — ~190 ms sur un livre de 60 pages, d'où les ralentissements.)
