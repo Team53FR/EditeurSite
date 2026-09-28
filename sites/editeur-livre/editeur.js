@@ -315,30 +315,24 @@ async function chargerLivre() {
   }
 }
 
-// Collage : on force le TEXTE BRUT (sans les polices/tailles/couleurs de la
-// source, ex. Google Docs), pour que le texte collé prenne le style du livre.
-// Les sauts de ligne deviennent des <br>, comme la touche Entrée. On insère des
-// nœuds texte à la main (pas execCommand, qui ajoute des <span> de style).
+// Collage : le texte prend la typographie du livre — ni police, ni taille, ni
+// couleur venues de la source (Google Docs, Word...) — mais il GARDE ses
+// italiques, ses gras et ses soulignés, qui appartiennent au texte lui-même
+// (voir fragmentDepuisPressePapiers, script.js). Les sauts de ligne deviennent
+// des <br>, comme la touche Entrée. On insère le fragment à la main plutôt que
+// par execCommand, qui ajoute des <span> de style.
 function gererCollage(e) {
   e.preventDefault();
   const donnees = e.clipboardData || window.clipboardData;
   if (!donnees) return;
 
-  let texte = donnees.getData("text/plain");
-  if (texte == null || texte === "") return;
-  texte = texte.replace(/\r\n?/g, "\n");
+  const frag = fragmentDepuisPressePapiers(donnees);
+  if (!frag) return;
 
   const sel = window.getSelection();
   if (!sel || sel.rangeCount === 0) return;
   const range = sel.getRangeAt(0);
   range.deleteContents(); // remplacer la sélection éventuelle
-
-  const frag = document.createDocumentFragment();
-  const lignes = texte.split("\n");
-  lignes.forEach((ligne, i) => {
-    if (i > 0) frag.appendChild(document.createElement("br"));
-    if (ligne) frag.appendChild(document.createTextNode(ligne));
-  });
 
   const dernier = frag.lastChild;
   range.insertNode(frag);

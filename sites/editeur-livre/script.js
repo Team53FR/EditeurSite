@@ -777,6 +777,182 @@ function rendreContenuOngletFormat(fond, formatActuel, appliquer) {
   }
 }
 
+// ----- Collage : garder l'emphase, laisser l'habillage de la source -----
+//
+// Coller depuis Word, Google Docs ou une page web apporte tout l'habillage
+// d'origine : polices, tailles en pixels, couleurs, interlignes, classes.
+// Posé tel quel dans une page, ce texte cesserait de suivre la typographie
+// du livre et ressortirait à l'impression — c'est pourquoi le collage a
+// longtemps été ramené au texte brut.
+//
+// Mais l'italique d'un titre d'œuvre, d'un mot étranger ou d'une pensée
+// n'est pas de l'habillage : il fait partie du texte, et le retaper à la
+// main après chaque import est un travail perdu. On garde donc exactement
+// les trois emphases que la barre d'outils sait elle-même poser — italique,
+// gras, souligné — et on jette tout le reste, attributs compris.
+
+// Balises qui passent à la ligne ; le reste du contenu est rendu en ligne.
+const BLOCS_COLLAGE =
+  /^(ADDRESS|ARTICLE|ASIDE|BLOCKQUOTE|DD|DIV|DL|DT|FIGCAPTION|FIGURE|FOOTER|FORM|H[1-6]|HEADER|HR|LI|MAIN|NAV|OL|P|PRE|SECTION|TABLE|TD|TH|TR|UL)$/;
+
+// Balises dont le contenu n'est pas du texte lisible. Sans cela, la feuille
+// de style que Word glisse en tête du presse-papiers serait collée telle
+// quelle, sous forme de plusieurs pages de règles CSS.
+const IGNORES_COLLAGE = /^(HEAD|LINK|META|NOSCRIPT|SCRIPT|STYLE|TITLE)$/;
+
+// Emphase portée par un élément, à partir de celle héritée de ses parents.
+//
+// Le style en ligne l'emporte sur la balise, et il le faut : Google Docs
+// enveloppe TOUT le presse-papiers dans un « <b style="font-weight:normal"> »,
+// qui mettrait sinon le passage entier en gras.
+function emphaseElement(el, herite) {
+  let { ital, gras, soul } = herite;
+
+  const nom = el.nodeName;
+  if (nom === "I" || nom === "EM" || nom === "CITE" || nom === "VAR") ital = true;
+  if (nom === "B" || nom === "STRONG") gras = true;
+  if (nom === "U" || nom === "INS") soul = true;
+
+  const style = el.style || {};
+
+  const fonte = (style.fontStyle || "").toLowerCase();
+  if (fonte === "italic" || fonte === "oblique") ital = true;
+  else if (fonte === "normal") ital = false;
+
+  // « bold » / « bolder » / un nombre : au-delà de 600, on considère que
+  // l'auteur a voulu du gras, comme le fait le navigateur lui-même.
+  const graisse = (style.fontWeight || "").toLowerCase();
+  if (graisse) {
+    const n = parseInt(graisse, 10);
+    if (graisse === "bold" || graisse === "bolder" || n >= 600) gras = true;
+    else if (graisse === "normal" || graisse === "lighter" || n > 0) gras = false;
+  }
+
+  const trait = (style.textDecorationLine || style.textDecoration || "").toLowerCase();
+  if (trait.includes("underline")) soul = true;
+  else if (trait.includes("none")) soul = false;
+
+  return { ital, gras, soul };
+}
+
+// Découpe le HTML du presse-papiers en une suite de passages
+// { texte, ital, gras, soul } et de sauts de ligne { saut: true }.
+function morceauxCollage(html) {
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const morceaux = [];
+  const dernier = () => morceaux[morceaux.length - 1];
+
+  // Ni saut en tête, ni sauts en rafale : une pile de <div> imbriqués
+  // fermerait autant de lignes qu'elle compte de niveaux.
+  const ajouterSaut = () => {
+    if (morceaux.length && !dernier().saut) morceaux.push({ saut: true });
+  };
+
+  // Deux passages voisins de même emphase forment un seul morceau : sans
+  // cela, une phrase découpée en vingt <span> par la source donnerait vingt
+  // balises imbriquées pour rien.
+  const ajouterTexte = (texte, e) => {
+    const d = dernier();
+    if (d && !d.saut && d.ital === e.ital && d.gras === e.gras && d.soul === e.soul) {
+      d.texte += texte;
+      return;
+    }
+    morceaux.push({ texte, ital: e.ital, gras: e.gras, soul: e.soul });
+  };
+
+  (function parcourir(noeud, herite) {
+    for (const enfant of noeud.childNodes) {
+      if (enfant.nodeType === 3) {
+        // Les retours à la ligne de l'indentation du HTML ne sont pas du
+        // texte : le navigateur les rend comme une espace unique.
+        const texte = enfant.nodeValue.replace(/[\t\n\r ]+/g, " ");
+        if (!texte) continue;
+
+        if (!texte.trim()) {
+          // Espace entre deux balises : elle ne compte que si elle sépare
+          // vraiment deux passages d'une même ligne.
+          const d = dernier();
+          if (d && !d.saut && !/ $/.test(d.texte)) ajouterTexte(" ", herite);
+          continue;
+        }
+        ajouterTexte(texte, herite);
+        continue;
+      }
+      if (enfant.nodeType !== 1) continue;      // commentaires, etc.
+
+      const nom = enfant.nodeName;
+      if (IGNORES_COLLAGE.test(nom)) continue;
+      if (nom === "BR") { ajouterSaut(); continue; }
+
+      const bloc = BLOCS_COLLAGE.test(nom);
+      if (bloc) ajouterSaut();
+      parcourir(enfant, emphaseElement(enfant, herite));
+      if (bloc) ajouterSaut();
+    }
+  })(doc.body, { ital: false, gras: false, soul: false });
+
+  while (morceaux.length && dernier().saut) morceaux.pop();
+  return morceaux;
+}
+
+// Les mêmes morceaux, à partir d'un texte sans mise en forme.
+function morceauxTexteBrut(texte) {
+  const morceaux = [];
+  texte.replace(/\r\n?/g, "\n").split("\n").forEach((ligne, i) => {
+    if (i > 0) morceaux.push({ saut: true });
+    if (ligne) morceaux.push({ texte: ligne, ital: false, gras: false, soul: false });
+  });
+  return morceaux;
+}
+
+function envelopperEmphase(balise, noeud) {
+  const el = document.createElement(balise);
+  el.appendChild(noeud);
+  return el;
+}
+
+// Reconstruit le passage collé : du texte, des <br> pour les lignes, et les
+// seules balises d'emphase — sans le moindre attribut, donc sans aucun style
+// rapporté de la source.
+function fragmentCollage(morceaux) {
+  const frag = document.createDocumentFragment();
+  morceaux.forEach((m) => {
+    if (m.saut) { frag.appendChild(document.createElement("br")); return; }
+    let noeud = document.createTextNode(m.texte);
+    if (m.soul) noeud = envelopperEmphase("u", noeud);
+    if (m.gras) noeud = envelopperEmphase("strong", noeud);
+    if (m.ital) noeud = envelopperEmphase("em", noeud);
+    frag.appendChild(noeud);
+  });
+  return frag;
+}
+
+// Ce qu'il faut insérer pour un collage, ou null s'il n'y a rien à coller.
+// Le presse-papiers porte presque toujours les deux formats : on préfère le
+// HTML, qui seul connaît les italiques, et on retombe sur le texte brut
+// quand la source n'en propose pas (un éditeur de texte simple, par exemple).
+function fragmentDepuisPressePapiers(donnees) {
+  const html = donnees.getData("text/html");
+  if (html && html.trim()) {
+    const morceaux = morceauxCollage(html);
+    if (morceaux.length) return fragmentCollage(morceaux);
+  }
+  const texte = donnees.getData("text/plain");
+  if (!texte) return null;
+  const morceaux = morceauxTexteBrut(texte);
+  return morceaux.length ? fragmentCollage(morceaux) : null;
+}
+
+// Même contenu, rendu en HTML : pour les zones qui insèrent par
+// « insertHTML » afin de rester annulables par Ctrl+Z.
+function htmlDepuisPressePapiers(donnees) {
+  const frag = fragmentDepuisPressePapiers(donnees);
+  if (!frag) return null;
+  const boite = document.createElement("div");
+  boite.appendChild(frag);
+  return boite.innerHTML;
+}
+
 function styleTexteCouv(data, cle) {
   if (!data) return "";
   let css = "";

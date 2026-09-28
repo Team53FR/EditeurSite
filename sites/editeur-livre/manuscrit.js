@@ -143,16 +143,36 @@ function ouvrirManuscrit(indexChapitre) {
   }
 }
 
-// Coller conserve les retours à la ligne mais pas la mise en forme du site
-// d'origine : « insertText » laisse le navigateur créer des paragraphes
-// propres, et reste annulable par Ctrl+Z.
+// Coller conserve les retours à la ligne et les emphases du texte (italique,
+// gras, souligné), mais rien de l'habillage de la source — même tri que dans
+// la double-page (fragmentDepuisPressePapiers, script.js). « insertHTML »
+// plutôt qu'une insertion à la main : le collage reste annulable par Ctrl+Z,
+// et les boutons Annuler/Rétablir de la barre s'appuient dessus.
 function collerDansManuscrit(e) {
   const donnees = e.clipboardData || window.clipboardData;
   if (!donnees) return;
-  const texte = donnees.getData("text/plain");
-  if (texte == null || texte === "") return;
+  const html = htmlDepuisPressePapiers(donnees);
+  if (!html) return;
   e.preventDefault();
-  document.execCommand("insertText", false, texte.replace(/\r\n?/g, "\n"));
+
+  // Selon le contexte, le navigateur habille parfois ce qu'il insère d'un
+  // « font-size » repris de l'endroit où l'on colle. Figée dans le texte,
+  // cette taille survivrait à un changement de format et le passage collé
+  // garderait seul l'ancienne — le même mal que nettoyerTaillesManuscrit
+  // corrige ailleurs. On relève donc ce qui est déjà stylé pour ne défaire
+  // que ce que le collage vient d'ajouter.
+  const zone = document.getElementById("manuscritTexte");
+  const dejaStyles = zone ? new Set(zone.querySelectorAll("[style]")) : null;
+
+  document.execCommand("insertHTML", false, html);
+
+  if (zone) {
+    zone.querySelectorAll("[style]").forEach((el) => {
+      if (dejaStyles.has(el) || !el.style.fontSize) return;
+      el.style.fontSize = "";
+      if (!el.getAttribute("style")) el.removeAttribute("style");
+    });
+  }
   majMotsManuscrit();
 }
 
