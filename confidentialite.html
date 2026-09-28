@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#4f46e5">
+<title>Politique de confidentialité — Team53FR</title>
+<link rel="stylesheet" href="polices/polices.css">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="legal.css">
+<link rel="icon" href="icone-192.png">
+</head>
+<body>
+<main class="legal">
+  <nav class="legal-retour"><a href="index.html">&#8592; Retour au portail</a></nav>
+
+  <h1>Politique de confidentialité</h1>
+  <p class="legal-maj">Dernière mise à jour : 28 septembre 2026</p>
+
+  <p>
+    Cette page décrit les données personnelles que le site traite, pourquoi, où
+    elles sont conservées et comment en reprendre la main. Elle vaut pour le
+    portail Team53FR et pour les trois sites auxquels il donne accès : Mon Éditeur
+    de Livre, Ma Bibliothèque et Droid Fortnite, qui partagent un même compte et
+    une même base de données.
+  </p>
+
+  <div class="legal-encart">
+    <p><strong>L'essentiel en quatre points :</strong></p>
+    <ul>
+      <li>Aucune publicité, aucun traceur, aucune mesure d'audience, aucun profilage.</li>
+      <li>Aucune donnée n'est vendue, louée ni transmise à un tiers à des fins commerciales.</li>
+      <li>Vos manuscrits et vos listes ne sont lisibles que par vous — l'administrateur du portail lui-même ne peut pas y accéder par le site.</li>
+      <li>Les données sont stockées en Irlande, dans l'Union européenne.</li>
+    </ul>
+  </div>
+
+  <h2>Qui est responsable du traitement</h2>
+  <p>
+    Le responsable du traitement est l'éditeur du site, personne physique agissant
+    à titre non professionnel, dont les conditions d'identification sont précisées
+    dans les <a href="mentions-legales.html">mentions légales</a>.
+  </p>
+  <p>
+    Pour toute demande :
+    <a href="mailto:agsr.contact@gmail.com">agsr.contact@gmail.com</a>
+  </p>
+
+  <h2>Quelles données sont traitées</h2>
+
+  <h3>Données de compte</h3>
+  <p>
+    Les comptes ne s'ouvrent pas librement : ils sont créés à la main par
+    l'administrateur, qui choisit l'identifiant et les sites auxquels le compte
+    donne accès.
+  </p>
+  <table class="legal-table">
+    <thead><tr><th>Donnée</th><th>Précision</th></tr></thead>
+    <tbody>
+      <tr><td>Identifiant de connexion</td><td>Choisi par l'administrateur, ce n'est pas une adresse e-mail.</td></tr>
+      <tr><td>Mot de passe</td><td>Jamais conservé en clair : seule une empreinte <code>bcrypt</code> est stockée, dans une colonne que le site n'a pas le droit de lire.</td></tr>
+      <tr><td>Nom d'affichage</td><td>Le nom montré dans l'interface. Modifiable depuis « Mon compte ».</td></tr>
+      <tr><td>Rôle et sites autorisés</td><td>Ce que le compte a le droit d'ouvrir.</td></tr>
+      <tr><td>Dates</td><td>Création du compte et dernière connexion.</td></tr>
+      <tr><td>Tutoriels déjà vus</td><td>Deux indicateurs, pour ne pas réafficher une aide déjà lue.</td></tr>
+    </tbody>
+  </table>
+  <p>
+    <strong>Ne sont demandés ni collectés :</strong> adresse e-mail, nom réel,
+    numéro de téléphone, adresse postale, date de naissance, coordonnées
+    bancaires, position géographique.
+  </p>
+
+  <h3>Contenus que vous créez</h3>
+  <ul>
+    <li><strong>Mon Éditeur de Livre</strong> : titre, auteur, format, texte du manuscrit, réglages et images de couverture, de quatrième et de tranche, état publié ou non.</li>
+    <li><strong>Ma Bibliothèque</strong> : livres et séries de votre collection, tomes possédés, saisons et épisodes vus, images de couverture déposées.</li>
+    <li><strong>Droid Fortnite</strong> : votre progression (droïdes obtenus, paliers, escouade, renaissance).</li>
+  </ul>
+  <p>
+    Ces contenus vous appartiennent. Le site les conserve pour vous les restituer,
+    et pour rien d'autre.
+  </p>
+
+  <h3>Journaux techniques des hébergeurs</h3>
+  <p>
+    Comme tout site, celui-ci laisse des traces de connexion chez ses hébergeurs :
+    adresse IP, date, page demandée. Ces journaux sont produits et conservés par
+    GitHub et Supabase pour leur propre exploitation et leur sécurité. L'éditeur
+    n'en fait aucune exploitation statistique ; il ne les consulte qu'en cas
+    d'incident.
+  </p>
+
+  <h2>Pourquoi, et à quel titre</h2>
+  <table class="legal-table">
+    <thead><tr><th>Finalité</th><th>Base légale (RGPD)</th></tr></thead>
+    <tbody>
+      <tr><td>Ouvrir une session et donner accès aux sites autorisés</td><td>Exécution du service demandé (art. 6.1.b)</td></tr>
+      <tr><td>Conserver et restituer vos créations</td><td>Exécution du service demandé (art. 6.1.b)</td></tr>
+      <tr><td>Sécuriser les comptes et prévenir les accès indus</td><td>Intérêt légitime (art. 6.1.f)</td></tr>
+      <tr><td>Sauvegarder la base pour pouvoir la restaurer</td><td>Intérêt légitime (art. 6.1.f)</td></tr>
+    </tbody>
+  </table>
+  <p>
+    Il n'y a <strong>aucune prise de décision automatisée</strong> ni aucun
+    profilage.
+  </p>
+
+  <h2>Qui peut voir quoi</h2>
+  <p>
+    La base applique des règles de sécurité au niveau de chaque ligne
+    (<abbr title="Row Level Security">RLS</abbr>) : ce n'est pas l'interface qui
+    décide de ce que vous pouvez lire, mais le serveur lui-même.
+  </p>
+  <ul>
+    <li><strong>Vous</strong> : vos données de compte et vos contenus.</li>
+    <li><strong>Les autres comptes</strong> : rien de ce qui vous appartient — sauf un livre que vous avez explicitement publié, qui devient lisible par les comptes ayant accès à l'éditeur de livre.</li>
+    <li><strong>L'administrateur, par le site</strong> : la liste des comptes (identifiant, nom, rôle, accès, dates) afin de les gérer. Il ne peut lire ni vos manuscrits, ni votre bibliothèque, ni votre progression.</li>
+  </ul>
+  <div class="legal-encart">
+    <p>
+      <strong>Une limite à connaître.</strong> L'éditeur du site détient les clés
+      techniques de la base : il a donc matériellement les moyens d'accéder à
+      l'ensemble des données, comme l'administrateur de n'importe quel serveur. Il
+      s'interdit de consulter le contenu des comptes, en dehors de ce qu'exige une
+      opération technique — restauration après incident, correction d'un défaut,
+      vérification d'une sauvegarde. Aucune technique ne peut supprimer cette
+      possibilité ; autant l'écrire plutôt que de laisser croire le contraire.
+    </p>
+  </div>
+
+  <h2>Sous-traitants et destinataires</h2>
+  <p>Aucune donnée n'est cédée, vendue ou louée. Deux prestataires techniques interviennent :</p>
+  <dl>
+    <dt>SUPABASE PTE. LTD. — base de données et stockage des images</dt>
+    <dd>Données hébergées dans la région <code>eu-west-1</code> (Irlande, Union européenne).</dd>
+    <dd>La société est singapourienne : un accès depuis un pays tiers ne peut être exclu. Il est encadré par l'accord de sous-traitance et les clauses contractuelles types de la Commission européenne.</dd>
+  </dl>
+  <dl>
+    <dt>GitHub, Inc. — hébergement des pages et des sauvegardes</dt>
+    <dd>Société américaine, avec un établissement dans l'Union européenne (GitHub B.V., Amsterdam), également encadrée par les clauses contractuelles types.</dd>
+  </dl>
+
+  <h3>Services tiers appelés pendant votre navigation</h3>
+  <p>
+    Quand vous <strong>cherchez un livre ou une série</strong> dans Ma
+    Bibliothèque, votre navigateur interroge directement des catalogues publics.
+    Chacun reçoit alors votre adresse IP et les mots de votre recherche :
+  </p>
+  <ul>
+    <li>Google Books, Open Library (et ses couvertures), la BnF, Wikidata et openBD, pour les livres ;</li>
+    <li>TVmaze et AniList, pour les séries et les animés.</li>
+  </ul>
+  <p>
+    Le <strong>scanner de code-barres</strong>, lui, charge sa bibliothèque
+    logicielle depuis le réseau de diffusion jsDelivr, qui reçoit votre adresse IP
+    à cette occasion. Il n'est chargé que si vous ouvrez le scanner.
+  </p>
+  <p>
+    En dehors de ces actions que vous déclenchez vous-même, le site n'appelle
+    aucun serveur tiers. Les polices de caractères, en particulier, sont servies
+    par le site lui-même et non par Google.
+  </p>
+
+  <h2>Combien de temps</h2>
+  <ul>
+    <li><strong>Compte et contenus</strong> : conservés tant que le compte existe. Sa suppression entraîne celle de toutes les données rattachées — livres, pages, bibliothèque, progression, images.</li>
+    <li><strong>Sauvegardes</strong> : une copie de la base est écrite chaque semaine dans un dépôt privé, pour pouvoir restaurer les données après une fausse manœuvre ou une panne. Ces copies s'accumulent dans l'historique du dépôt.</li>
+  </ul>
+  <div class="legal-encart">
+    <p>
+      <strong>Ce que cela implique pour un effacement.</strong> Supprimer un
+      compte le retire immédiatement de la base active, et les sauvegardes
+      suivantes ne le contiendront plus. Les copies déjà écrites, en revanche,
+      en gardent la trace. Si vous demandez un effacement complet, l'historique
+      des sauvegardes est purgé également : précisez-le dans votre demande.
+    </p>
+  </div>
+
+  <h2>Sécurité</h2>
+  <ul>
+    <li>Tous les échanges passent par HTTPS.</li>
+    <li>Les mots de passe sont hachés avec <code>bcrypt</code> ; la colonne qui les contient n'est lisible par aucun compte, pas même administrateur.</li>
+    <li>Chaque session repose sur un jeton signé côté serveur, qui porte votre identité et sur lequel s'appuient les règles de sécurité de la base.</li>
+    <li>Les autorisations sont appliquées par le serveur de base de données, ligne par ligne, et non par l'interface.</li>
+  </ul>
+
+  <h2>Vos droits</h2>
+  <p>
+    Vous disposez des droits d'accès, de rectification, d'effacement, de
+    limitation, d'opposition et de portabilité prévus par le RGPD.
+  </p>
+  <p>
+    Plusieurs s'exercent directement depuis le site : la page « Mon compte »
+    permet de changer votre nom d'affichage, votre mot de passe et de supprimer
+    votre compte. Pour le reste — obtenir une copie de vos données, demander la
+    purge des sauvegardes —, écrivez à
+    <a href="mailto:agsr.contact@gmail.com">agsr.contact@gmail.com</a>. Il vous
+    sera répondu dans un délai d'un mois.
+  </p>
+  <p>
+    Si la réponse ne vous satisfait pas, vous pouvez saisir la Commission
+    nationale de l'informatique et des libertés :
+    CNIL, 3 place de Fontenoy, TSA 80715, 75334 Paris Cedex 07 —
+    <a href="https://www.cnil.fr" rel="noopener noreferrer" target="_blank">cnil.fr</a>.
+  </p>
+
+  <h2>Cookies et stockage local</h2>
+  <p>
+    Le site ne dépose aucun cookie. Il se sert du stockage local de votre
+    navigateur, uniquement pour ce qui est nécessaire à son fonctionnement. Le
+    détail figure sur la page <a href="cookies.html">Cookies</a>.
+  </p>
+
+  <h2>Mineurs</h2>
+  <p>
+    Le site ne s'adresse pas particulièrement aux mineurs et ne collecte aucune
+    donnée permettant de connaître l'âge de ses utilisateurs. Les comptes étant
+    créés à la main, il revient à l'administrateur de s'assurer, pour un compte
+    ouvert à un mineur, de l'accord du titulaire de l'autorité parentale.
+  </p>
+
+  <h2>Modifications</h2>
+  <p>
+    Cette politique peut évoluer si le site change. La date de mise à jour en
+    tête de page indique la version en vigueur.
+  </p>
+
+  <nav class="legal-voisines">
+    <a href="mentions-legales.html">Mentions légales</a>
+    <a href="cookies.html">Cookies</a>
+    <a href="conditions-utilisation.html">Conditions d'utilisation</a>
+  </nav>
+</main>
+</body>
+</html>

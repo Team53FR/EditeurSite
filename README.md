@@ -14,6 +14,16 @@ EditeurSite/
 ├── script.js / admin.js / style.css   # logique + style du portail central
 ├── manifest.json / sw.js   # app installable (portée = tout le dépôt)
 ├── icone-192.png / icone-512.png
+├── mentions-legales.html      # \
+├── confidentialite.html       #  | pages légales, communes aux 4 propriétés
+├── cookies.html               #  | (voir « Pages légales » plus bas)
+├── conditions-utilisation.html#  |
+├── legal.css                  # /  leur mise en page
+├── pied-legal.js           # pose les liens légaux en bas des autres pages
+├── polices/                # EB Garamond + Orbitron servies par le site
+│   ├── polices.css         # les @font-face
+│   ├── *.woff2
+│   └── LICENCE-*.txt       # SIL OFL 1.1, à conserver avec les fichiers
 ├── supabase/
 │   └── schema-compte-central.sql   # table users, connexion()/inscription()/est_admin()
 ├── sites/
@@ -65,6 +75,70 @@ indépendamment sans rien casser.
 Servi via GitHub Pages depuis la racine du dépôt. Chaque site est donc
 accessible sous `https://<utilisateur>.github.io/EditeurSite/sites/<nom-du-site>/`,
 et le portail racine sous `https://<utilisateur>.github.io/EditeurSite/`.
+
+## Pages légales
+
+Quatre pages à la racine, communes au portail et aux trois sites :
+`mentions-legales.html`, `confidentialite.html`, `cookies.html` et
+`conditions-utilisation.html`. Un seul texte à tenir à jour plutôt qu'un jeu
+par site.
+
+`pied-legal.js` pose les liens vers ces pages en bas de toutes les autres.
+Il déduit le chemin de la racine de sa propre adresse (`document.currentScript`),
+ce qui lui évite des `../../` codés en dur, et emporte son propre style : les
+quatre sites n'ont aucune variable de couleur en commun, donc le pied
+s'appuie sur `color: inherit` et une opacité pour s'accorder à chacun.
+
+Pour ajouter le pied à une nouvelle page, une ligne avant `</body>` :
+
+```html
+<script src="../../pied-legal.js"></script>
+```
+
+Deux pages seulement ne l'appellent pas : `editeur.html` et `lecture.html`,
+qui occupent toute la fenêtre et n'ont pas de bas de page où le poser. Les
+quatre pages légales ne l'appellent pas non plus — elles portent déjà leurs
+liens les unes vers les autres. Une page qui reçoit le script mais n'en veut
+pas peut aussi porter `data-sans-pied` sur son `<body>`.
+
+Trois points de fond, à garder en tête si le site change :
+
+- **L'éditeur reste anonyme**, ce que la LCEN (art. 6, III, 2°) autorise pour
+  un éditeur non professionnel **à la condition** que son identité ait été
+  communiquée à l'hébergeur. Si cette condition cesse d'être remplie, les
+  mentions légales doivent nommer l'éditeur.
+- **Aucun cookie, aucun traceur** : d'où l'absence de bandeau de consentement.
+  Ajouter une mesure d'audience ou un bouton de réseau social changerait cela
+  et rendrait un bandeau obligatoire.
+- **Aucun appel à un tiers hors action de l'utilisateur.** Les polices sont
+  servies par le site (voir plus bas) ; les seuls appels extérieurs sont les
+  catalogues de livres et de séries, déclenchés par une recherche, et le CDN
+  du scanner de code-barres. Tous sont listés dans `confidentialite.html` :
+  en ajouter un suppose de l'y déclarer.
+
+## Polices
+
+EB Garamond (les trois sites « papier ») et Orbitron (Droid Fortnite) sont
+servies depuis `polices/` et non depuis Google Fonts. Charger une police
+depuis `fonts.gstatic.com` envoie l'adresse IP du visiteur à Google à chaque
+page, sans consentement possible : c'est un transfert de donnée personnelle
+vers un tiers, et il a déjà valu des condamnations en Europe.
+
+Les deux familles sont sous licence SIL Open Font License 1.1, qui autorise
+cette redistribution ; les fichiers `LICENCE-*.txt` doivent rester à côté des
+`.woff2`.
+
+Une page qui a besoin d'une police ajoute, **avant** sa propre feuille de
+style :
+
+```html
+<link rel="stylesheet" href="../../polices/polices.css">
+```
+
+Les fichiers sont dédoublonnés : ce sont des polices variables, une même
+ressource sert donc plusieurs graisses. Les déclarations `@font-face`, elles,
+restent découpées par graisse comme chez Google, pour un rendu identique.
+Seuls les sous-ensembles `latin` et `latin-ext` sont repris.
 
 ## Stockage : Supabase
 
@@ -289,6 +363,25 @@ vit en `localStorage`, partagée avec le portail et les deux autres sites (voir
 « Connexion centrale »). Seul `livre_id` — quel livre est ouvert — reste en
 `sessionStorage` : c'est l'état d'un onglet, pas une session, et le déplacer
 ferait que deux onglets sur deux livres différents se marcheraient dessus.
+
+**Collage** : `fragmentDepuisPressePapiers()` (dans `script.js`, partagé par la
+double-page et le manuscrit) ne retient du presse-papiers que l'italique, le
+gras et le souligné — les trois emphases que la barre d'outils sait poser. Tout
+le reste est jeté : police, taille, couleur, classes, attributs. Une taille en
+pixels venue de Google Docs, figée dans le texte, survivrait à un changement de
+format et le passage collé garderait seul l'ancienne typographie.
+
+Le tri se fait sur `text/html`, avec repli sur `text/plain` quand la source n'en
+propose pas. Deux pièges à ne pas réintroduire : le style en ligne doit primer
+sur la balise — Google Docs enveloppe tout le presse-papiers dans un
+`<b style="font-weight:normal">` qui mettrait sinon le passage entier en gras —
+et le contenu de `<style>` doit être ignoré, sans quoi la feuille de style que
+Word glisse en tête serait collée comme du texte.
+
+La double-page insère le fragment à la main (`range.insertNode`), le manuscrit
+passe par `insertHTML` pour rester annulable par Ctrl+Z ; il nettoie ensuite le
+`font-size` que le navigateur ajoute parfois de lui-même, en ne touchant qu'aux
+éléments absents avant le collage.
 
 Le découpage passe par un élément de mesure caché (`#mesureCachee`) dimensionné
 comme une page réelle. `repaginerTout()` recolle tout le livre puis le redécoupe

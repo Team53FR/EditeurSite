@@ -19,7 +19,11 @@
 
 // v2 : changement de nom et d'icone de l'app — sans ce renommage,
 // l'ancienne icone resterait servie depuis le cache deja installe.
-const CACHE_NOM = "site-guide-v2";
+// v3 : les polices ne viennent plus de Google mais du dépôt. Sans ce
+// renommage, les appareils où l'app est installée continueraient de servir
+// depuis leur cache un HTML qui appelle fonts.googleapis.com — le transfert
+// d'adresse IP que l'on vient justement de supprimer.
+const CACHE_NOM = "site-guide-v3";
 
 // Seule la coquille du portail est préchargée. Les pages des sites se
 // mettent en cache à mesure qu'on les visite (voir le gestionnaire fetch) :
@@ -35,7 +39,14 @@ const FICHIERS_COQUILLE = [
   "./script.js",
   "./manifest.json",
   "./icone-192.png",
-  "./icone-512.png"
+  "./icone-512.png",
+  // Les polices sont maintenant servies par le site : à la différence de
+  // Google, on peut les mettre en cache, et la typographie tient donc aussi
+  // hors ligne. Seul le latin est préchargé — le latin-ext, quatre fois plus
+  // lourd, se chargera au besoin par le gestionnaire fetch.
+  "./polices/polices.css",
+  "./polices/eb-garamond-normal-latin.woff2",
+  "./polices/eb-garamond-italique-latin.woff2"
 ];
 
 self.addEventListener("install", (event) => {
@@ -63,7 +74,7 @@ self.addEventListener("fetch", (event) => {
   // Les écritures ne se rejouent pas depuis un cache.
   if (requete.method !== "GET") return;
 
-  // Jamais d'interception hors de notre origine (API GitHub, polices...).
+  // Jamais d'interception hors de notre origine (Supabase, couvertures...).
   const url = new URL(requete.url);
   if (url.origin !== self.location.origin) return;
 

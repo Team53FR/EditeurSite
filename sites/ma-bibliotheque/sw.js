@@ -19,7 +19,11 @@
 // réécrits). Sans ce changement de nom, le cache aurait continué de servir
 // l'ancien script.js — qui interroge un dépôt GitHub dont le site ne se sert
 // plus — et la collection serait restée vide sans erreur visible.
-const CACHE_NOM = "ma-bibliotheque-v4";
+// v5 : les polices ne viennent plus de Google mais du dépôt. Sans ce
+// renommage, le cache continuerait de servir un HTML qui appelle
+// fonts.googleapis.com — le transfert d'adresse IP que l'on vient
+// justement de supprimer.
+const CACHE_NOM = "ma-bibliotheque-v5";
 const FICHIERS_COQUILLE = [
   "./",
   "./index.html",
@@ -31,7 +35,12 @@ const FICHIERS_COQUILLE = [
   "./retour-portail.js",
   "./manifest.json",
   "./icone-192.png",
-  "./icone-512.png"
+  "./icone-512.png",
+  // Servies par le site depuis le portail : contrairement à Google, on peut
+  // les mettre en cache, et la typographie tient donc aussi hors ligne.
+  "../../polices/polices.css",
+  "../../polices/eb-garamond-normal-latin.woff2",
+  "../../polices/eb-garamond-italique-latin.woff2"
 ];
 
 self.addEventListener("install", (event) => {

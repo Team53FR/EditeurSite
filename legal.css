@@ -1,0 +1,129 @@
+/* Pages légales et pied de page qui y mène.
+ *
+ * Ces pages n'ont qu'un travail : être lues. Elles reprennent donc les
+ * couleurs du portail (style.css) mais pas sa mise en page en cartes —
+ * une colonne de texte, large comme un paragraphe confortable, et rien
+ * d'autre. Elles doivent aussi rester lisibles sans être connecté : ce
+ * sont les seules pages du site dans ce cas.
+ */
+
+.legal {
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: 24px 16px calc(64px + var(--safe-bottom));
+  color: var(--texte);
+  line-height: 1.65;
+}
+
+.legal-retour {
+  margin-bottom: 28px;
+}
+
+.legal-retour a {
+  color: var(--texte-att);
+  text-decoration: none;
+  font-size: 14px;
+}
+
+.legal-retour a:hover { color: var(--primaire); }
+
+.legal h1 {
+  font-size: 30px;
+  line-height: 1.2;
+  margin: 0 0 6px;
+}
+
+.legal-maj {
+  margin: 0 0 32px;
+  color: var(--texte-att);
+  font-size: 13.5px;
+}
+
+.legal h2 {
+  font-size: 19px;
+  margin: 38px 0 10px;
+  padding-top: 20px;
+  border-top: 1px solid var(--bordure);
+}
+
+.legal h2:first-of-type { border-top: 0; padding-top: 0; }
+
+.legal h3 {
+  font-size: 15.5px;
+  margin: 24px 0 6px;
+}
+
+.legal p, .legal li { font-size: 15px; }
+
+.legal ul, .legal ol { padding-left: 22px; }
+
+.legal li { margin: 6px 0; }
+
+.legal a { color: var(--primaire); }
+
+.legal dl { margin: 12px 0; }
+.legal dt { font-weight: 600; margin-top: 14px; }
+.legal dd { margin: 2px 0 0; color: var(--texte-att); }
+
+/* Un encadré pour ce qui compte plus que le reste : qui contacter, ce que
+ * le site ne fait pas, la marche à suivre pour effacer ses données. */
+.legal-encart {
+  background: var(--carte);
+  border: 1px solid var(--bordure);
+  border-radius: var(--rayon);
+  padding: 16px 18px;
+  margin: 22px 0;
+  box-shadow: var(--ombre);
+}
+
+.legal-encart > :first-child { margin-top: 0; }
+.legal-encart > :last-child { margin-bottom: 0; }
+
+/* Le tableau des données stockées : sur téléphone, il passe en liste
+ * plutôt qu'en colonnes illisibles. */
+.legal-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  font-size: 14.5px;
+}
+
+.legal-table th,
+.legal-table td {
+  text-align: left;
+  vertical-align: top;
+  padding: 9px 12px 9px 0;
+  border-bottom: 1px solid var(--bordure);
+}
+
+.legal-table th { font-weight: 600; }
+
+.legal-table code {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 13px;
+  background: var(--primaire-clair);
+  border-radius: 5px;
+  padding: 1px 5px;
+}
+
+@media (max-width: 560px) {
+  .legal-table, .legal-table tbody, .legal-table tr, .legal-table td { display: block; width: 100%; }
+  .legal-table thead { display: none; }
+  .legal-table tr { border-bottom: 1px solid var(--bordure); padding: 10px 0; }
+  .legal-table td { border: 0; padding: 2px 0; }
+  .legal-table td:first-child { font-weight: 600; }
+}
+
+/* Liens entre les quatre pages, répétés en bas de chacune. */
+.legal-voisines {
+  margin-top: 46px;
+  padding-top: 20px;
+  border-top: 1px solid var(--bordure);
+  font-size: 14px;
+}
+
+.legal-voisines a { margin-right: 18px; display: inline-block; }
+
+/* Le pied de page qui mène ici depuis les autres pages n'est PAS défini
+ * ici : il doit tenir sur les quatre sites, dont les palettes n'ont aucune
+ * variable en commun. Il emporte donc son propre style, voir pied-legal.js. */
