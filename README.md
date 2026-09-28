@@ -372,11 +372,20 @@ pixels venue de Google Docs, figée dans le texte, survivrait à un changement d
 format et le passage collé garderait seul l'ancienne typographie.
 
 Le tri se fait sur `text/html`, avec repli sur `text/plain` quand la source n'en
-propose pas. Deux pièges à ne pas réintroduire : le style en ligne doit primer
-sur la balise — Google Docs enveloppe tout le presse-papiers dans un
-`<b style="font-weight:normal">` qui mettrait sinon le passage entier en gras —
-et le contenu de `<style>` doit être ignoré, sans quoi la feuille de style que
-Word glisse en tête serait collée comme du texte.
+propose pas. Trois pièges à ne pas réintroduire :
+
+- **Le style en ligne prime sur la balise.** Google Docs enveloppe tout le
+  presse-papiers dans un `<b style="font-weight:normal">` qui mettrait sinon le
+  passage entier en gras.
+- **Le contenu de `<style>` est ignoré**, sans quoi la feuille de style que Word
+  glisse en tête du presse-papiers serait collée comme du texte.
+- **Une frontière de bloc vaut DEUX retours, un `<br>` un seul.** Le livre
+  sépare ses paragraphes par une ligne blanche (`<br><br>`) ; coller un chapitre
+  de Wattpad, où chaque paragraphe est un `<p>`, rendait sinon un pavé compact
+  dont tous les blancs avaient disparu. Les sauts sont mis en attente et posés
+  devant le texte suivant, en prenant le plus grand des deux et non leur somme :
+  une pile de `<div>` imbriqués ne produit donc toujours qu'un seul saut de
+  paragraphe, et rien ne traîne en tête ni en queue du collage.
 
 La double-page insère le fragment à la main (`range.insertNode`), le manuscrit
 passe par `insertHTML` pour rester annulable par Ctrl+Z ; il nettoie ensuite le

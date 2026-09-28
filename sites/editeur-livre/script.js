@@ -835,23 +835,47 @@ function emphaseElement(el, herite) {
   return { ital, gras, soul };
 }
 
+// Un changement de paragraphe vaut DEUX retours, pas un : le livre sépare
+// ses paragraphes par une ligne blanche (« <br><br> » à l'intérieur d'un
+// même <p>, voir RUPTURES_TEXTE dans editeur.js). Coller un chapitre de
+// Wattpad, où chaque paragraphe est un <p>, donnait sinon un texte compact
+// dont tous les blancs avaient disparu.
+const SAUT_PARAGRAPHE = 2;
+
+// Garde-fou : un document mal formé peut empiler les blocs vides, et la
+// page collée commencerait par vingt lignes blanches.
+const SAUT_MAX = 4;
+
 // Découpe le HTML du presse-papiers en une suite de passages
-// { texte, ital, gras, soul } et de sauts de ligne { saut: true }.
+// { texte, ital, gras, soul } et de sauts { saut: nombre de retours }.
 function morceauxCollage(html) {
   const doc = new DOMParser().parseFromString(html, "text/html");
   const morceaux = [];
   const dernier = () => morceaux[morceaux.length - 1];
 
-  // Ni saut en tête, ni sauts en rafale : une pile de <div> imbriqués
-  // fermerait autant de lignes qu'elle compte de niveaux.
-  const ajouterSaut = () => {
-    if (morceaux.length && !dernier().saut) morceaux.push({ saut: true });
+  // Les sauts sont mis EN ATTENTE et posés seulement devant le texte
+  // suivant. C'est ce qui permet de distinguer les deux sortes de rupture
+  // sans compter les balises : un <br> ajoute un retour, une frontière de
+  // bloc en exige deux, et une pile de <div> imbriqués n'en produit toujours
+  // que deux puisqu'on prend le plus grand des deux et non leur somme. Ce
+  // qui reste en attente à la fin n'est jamais posé : pas de lignes vides
+  // en queue de collage.
+  let attente = 0;
+  const finDeBloc = () => { attente = Math.max(attente, SAUT_PARAGRAPHE); };
+  const retourSimple = () => { attente += 1; };
+
+  const poserAttente = () => {
+    if (attente && morceaux.length) {
+      morceaux.push({ saut: Math.min(attente, SAUT_MAX) });
+    }
+    attente = 0;                    // en tête de collage, on le jette
   };
 
   // Deux passages voisins de même emphase forment un seul morceau : sans
   // cela, une phrase découpée en vingt <span> par la source donnerait vingt
   // balises imbriquées pour rien.
   const ajouterTexte = (texte, e) => {
+    poserAttente();
     const d = dernier();
     if (d && !d.saut && d.ital === e.ital && d.gras === e.gras && d.soul === e.soul) {
       d.texte += texte;
@@ -870,9 +894,10 @@ function morceauxCollage(html) {
 
         if (!texte.trim()) {
           // Espace entre deux balises : elle ne compte que si elle sépare
-          // vraiment deux passages d'une même ligne.
+          // vraiment deux passages d'une même ligne — jamais au bord d'un
+          // saut, où elle ouvrirait la ligne suivante par un blanc.
           const d = dernier();
-          if (d && !d.saut && !/ $/.test(d.texte)) ajouterTexte(" ", herite);
+          if (!attente && d && !d.saut && !/ $/.test(d.texte)) ajouterTexte(" ", herite);
           continue;
         }
         ajouterTexte(texte, herite);
@@ -882,25 +907,29 @@ function morceauxCollage(html) {
 
       const nom = enfant.nodeName;
       if (IGNORES_COLLAGE.test(nom)) continue;
-      if (nom === "BR") { ajouterSaut(); continue; }
+      if (nom === "BR") { retourSimple(); continue; }
 
       const bloc = BLOCS_COLLAGE.test(nom);
-      if (bloc) ajouterSaut();
+      if (bloc) finDeBloc();
       parcourir(enfant, emphaseElement(enfant, herite));
-      if (bloc) ajouterSaut();
+      if (bloc) finDeBloc();
     }
   })(doc.body, { ital: false, gras: false, soul: false });
 
-  while (morceaux.length && dernier().saut) morceaux.pop();
   return morceaux;
 }
 
-// Les mêmes morceaux, à partir d'un texte sans mise en forme.
+// Les mêmes morceaux, à partir d'un texte sans mise en forme : là, chaque
+// retour est déjà écrit, il n'y a qu'à les compter.
 function morceauxTexteBrut(texte) {
   const morceaux = [];
+  let attente = 0;
   texte.replace(/\r\n?/g, "\n").split("\n").forEach((ligne, i) => {
-    if (i > 0) morceaux.push({ saut: true });
-    if (ligne) morceaux.push({ texte: ligne, ital: false, gras: false, soul: false });
+    if (i > 0) attente += 1;
+    if (!ligne) return;
+    if (attente && morceaux.length) morceaux.push({ saut: Math.min(attente, SAUT_MAX) });
+    attente = 0;
+    morceaux.push({ texte: ligne, ital: false, gras: false, soul: false });
   });
   return morceaux;
 }
@@ -917,7 +946,10 @@ function envelopperEmphase(balise, noeud) {
 function fragmentCollage(morceaux) {
   const frag = document.createDocumentFragment();
   morceaux.forEach((m) => {
-    if (m.saut) { frag.appendChild(document.createElement("br")); return; }
+    if (m.saut) {
+      for (let i = 0; i < m.saut; i++) frag.appendChild(document.createElement("br"));
+      return;
+    }
     let noeud = document.createTextNode(m.texte);
     if (m.soul) noeud = envelopperEmphase("u", noeud);
     if (m.gras) noeud = envelopperEmphase("strong", noeud);
