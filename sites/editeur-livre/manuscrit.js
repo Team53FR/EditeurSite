@@ -47,6 +47,120 @@ function htmlDesNoeuds(noeuds) {
   return boite.innerHTML;
 }
 
+// =====================================================================
+//  Choisir le chapitre à ouvrir
+//
+//  Le crayon du sommaire mène déjà ici, mais encore faut-il savoir qu'il
+//  existe : c'est un caractère large comme une lettre, sur une ligne qu'on
+//  ne voit qu'en la survolant. La même porte est donc ouverte depuis le
+//  panneau « Relecture », là où l'on va chercher ce qui travaille le livre
+//  entier — et cette fois avec son nom écrit en toutes lettres.
+//
+//  Le dialogue montre aussi la taille de chaque chapitre : sur un livre de
+//  trente titres, c'est souvent ce qui permet de reconnaître celui qu'on
+//  cherche quand les titres se ressemblent.
+// =====================================================================
+
+function ouvrirChoixChapitreManuscrit() {
+  if (modeApercu || modeCouverture || manuscrit) return;
+
+  // Sans ce vidage, la frappe en cours ne serait pas encore dans le livre :
+  // la liste compterait les mots d'une version périmée.
+  flushSpread();
+
+  // La MÊME liste que celle dont ouvrirManuscrit() attend l'index : elle en
+  // vient, plutôt que d'être refaite de son côté, pour que le rang choisi
+  // dans le dialogue désigne bien le chapitre ouvert ensuite.
+  const { avecTitre } = trancheChapitre();
+
+  if (!avecTitre.length) {
+    alert("Aucun chapitre à ouvrir.\n\n" +
+      "Ce livre n'a pas encore de titre de chapitre : ajoutez-en un avec « + Chapitre ».");
+    return;
+  }
+
+  // Les numéros de page viennent du sommaire. Si les deux comptes divergent
+  // — un titre coupé entre deux pages, par exemple —, on préfère n'afficher
+  // aucun numéro plutôt qu'un numéro faux.
+  const duSommaire = listerChapitres();
+  const pages = duSommaire.length === avecTitre.length ? duSommaire : null;
+
+  ouvrirDialogueChoixChapitre(avecTitre.map((t, i) => ({
+    titre: t.titre,
+    page: pages ? pages[i].page + 1 : null,
+    // Même règle de comptage que le compteur du sommaire : sans quoi la
+    // somme des chapitres ne tomberait pas sur le total du livre.
+    mots: compterMots(htmlDesNoeuds(t.noeuds))
+  })));
+}
+
+function ouvrirDialogueChoixChapitre(lignes) {
+  const ancien = document.getElementById("dialogueChoixChapitre");
+  if (ancien) ancien.remove();
+
+  let html = '<div class="modal-impression-carte ci-carte" role="dialog" aria-modal="true">' +
+    '<button class="mi-fermer" aria-label="Fermer">&#10005;</button>' +
+    "<h3>Écrire un chapitre entier</h3>" +
+    '<p class="mi-intro">Le chapitre s&rsquo;ouvre d&rsquo;une seule coulée, sur une feuille ' +
+    "sans fin : plus de pages à gérer, plus de curseur qui saute d&rsquo;une page à " +
+    "l&rsquo;autre dès qu&rsquo;on ajoute une phrase au début. En enregistrant, le livre se " +
+    "recompose et la pagination se refait.</p>" +
+    '<div class="choix-chap-liste">';
+
+  lignes.forEach((l, i) => {
+    const detail = (l.page ? "p." + l.page + " &middot; " : "") +
+      l.mots.toLocaleString("fr-FR") + " mot" + (l.mots > 1 ? "s" : "");
+    html += '<button type="button" class="choix-chap" data-i="' + i + '">' +
+      '<span class="choix-chap-titre">' + echapperTitre(l.titre) + "</span>" +
+      '<span class="choix-chap-detail">' + detail + "</span>" +
+    "</button>";
+  });
+
+  html += "</div>" +
+    '<div class="ci-actions"><button class="ci-annuler">Annuler</button></div>' +
+    "</div>";
+
+  const fond = document.createElement("div");
+  fond.id = "dialogueChoixChapitre";
+  fond.className = "modal-impression";
+  fond.innerHTML = html;
+  document.body.appendChild(fond);
+
+  const choix = [...fond.querySelectorAll(".choix-chap")];
+
+  const fermer = () => {
+    document.removeEventListener("keydown", surTouche, true);
+    fond.remove();
+  };
+
+  // Échap referme, les flèches parcourent : même conduite que le panneau
+  // d'outils d'où l'on vient.
+  const surTouche = (e) => {
+    if (!document.getElementById("dialogueChoixChapitre")) return;
+    if (e.key === "Escape") {
+      e.preventDefault(); e.stopPropagation(); fermer(); return;
+    }
+    const i = choix.indexOf(document.activeElement);
+    if (i === -1) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault(); choix[(i + 1) % choix.length].focus();
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault(); choix[(i - 1 + choix.length) % choix.length].focus();
+    }
+  };
+  document.addEventListener("keydown", surTouche, true);
+
+  fond.addEventListener("click", (e) => { if (e.target === fond) fermer(); });
+  fond.querySelector(".mi-fermer").onclick = fermer;
+  fond.querySelector(".ci-annuler").onclick = fermer;
+
+  choix.forEach((b, i) => {
+    b.onclick = () => { fermer(); ouvrirManuscrit(i); };
+  });
+
+  if (choix[0]) choix[0].focus();
+}
+
 function ouvrirManuscrit(indexChapitre) {
   if (modeApercu || modeCouverture || manuscrit) return;
 
@@ -218,8 +332,7 @@ function majMotsManuscrit() {
   const zone = document.getElementById("manuscritTexte");
   const compteur = document.getElementById("msMots");
   if (!zone || !compteur) return;
-  const texte = (zone.textContent || "").trim();
-  const n = texte ? texte.split(/\s+/).length : 0;
+  const n = compterMots(zone);
   compteur.textContent = n + " mot" + (n > 1 ? "s" : "");
 }
 

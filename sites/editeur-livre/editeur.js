@@ -2917,11 +2917,12 @@ function supprimerChapitre(indexChapitre) {
   const cible = avecTitre[indexChapitre];
   if (!cible) return;
 
-  // Compter ce qui va disparaître, pour une confirmation honnête.
+  // Compter ce qui va disparaître, pour une confirmation honnête — d'où
+  // compterMots et non textContent : annoncer un chapitre plus court qu'il
+  // ne l'est, juste avant de le supprimer, c'est le contraire du but.
   const boite = document.createElement("div");
   cible.noeuds.forEach(n => boite.appendChild(n.cloneNode(true)));
-  const texte = (boite.textContent || "").trim();
-  const mots = texte ? texte.split(/\s+/).length : 0;
+  const mots = compterMots(boite);
 
   if (!confirm(
       "Supprimer le chapitre « " + cible.titre + " » ?\n\n" +
@@ -3399,6 +3400,34 @@ function repaginerTout() {
 
 // ----- Compteur de mots (sur le texte continu) -----
 
+// Le texte d'un passage tel qu'on le LIT, et non tel que textContent le rend.
+//
+// textContent recolle ce que les balises séparaient : « <h2>Introduction</h2>
+// <p>Un monde » devient « IntroductionUn monde », et le livre entier, dont les
+// paragraphes sont séparés par « <br><br> », perdait ainsi un mot à chaque
+// changement de paragraphe. On rend donc aux ruptures l'espace qu'elles
+// occupent à l'écran.
+//
+// Le remplacement se fait sur le HTML, avant l'analyse, et non sur le DOM
+// ensuite : ce compteur tourne à chaque frappe sur toutes les doubles-pages,
+// et insérer un nœud après chaque <br> d'un livre de trois cents pages s'y
+// verrait. Une balise citée dans un attribut fausserait le compte d'un mot —
+// pour un compteur, c'est sans conséquence.
+const RUPTURES_MOTS = /<(?:br|hr)\b[^>]*>|<\/(?:p|div|li|h[1-6]|blockquote|pre|tr|td|th|figcaption)\s*>/gi;
+
+function texteAvecRuptures(source) {
+  const html = typeof source === "string" ? (source || "")
+    : (source && source.innerHTML) || "";
+  const boite = document.createElement("div");
+  boite.innerHTML = html.replace(RUPTURES_MOTS, " ");
+  return boite.textContent || "";
+}
+
+function compterMots(source) {
+  const texte = texteAvecRuptures(source).trim();
+  return texte ? texte.split(/\s+/).length : 0;
+}
+
 function majCompteurMots() {
   if (indexLivre === -1) return;
   flushSpread();
@@ -3407,12 +3436,7 @@ function majCompteurMots() {
   // régénérer toutes les pages dérivées juste pour un compteur coûtait ~180 ms
   // sur un livre de 60 pages, à chaque frappe.
   let mots = 0;
-  const tmp = document.createElement("div");
-  spreadsLivre().forEach(html => {
-    tmp.innerHTML = html || "";
-    const txt = (tmp.textContent || "").trim();
-    if (txt) mots += txt.split(/\s+/).length;
-  });
+  spreadsLivre().forEach(html => { mots += compterMots(html); });
 
   const nbPages = (livreActuel().pages || []).length;
   const el = document.getElementById("compteurMots");

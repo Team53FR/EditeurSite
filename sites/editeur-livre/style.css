@@ -2048,6 +2048,68 @@ button.danger {
   .renom-avant { grid-column: 1; }
 }
 
+/* ----- Choisir le chapitre à ouvrir d'un seul tenant ----- */
+/* Même liste défilante que le renommage : sur un livre de trente chapitres,
+   le dialogue ne doit pas pousser ses boutons hors de l'écran. */
+.choix-chap-liste {
+  display: flex; flex-direction: column; gap: 0.3rem;
+  max-height: 52vh; overflow-y: auto;
+  margin: 0 0 1rem;
+  padding-right: 0.3rem;
+}
+
+/* Le titre à gauche, sa taille à droite : c'est le titre qu'on lit, le
+   nombre de mots ne sert qu'à départager deux titres qui se ressemblent. */
+.choix-chap {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 0.6rem;
+  width: 100%;
+  margin: 0;
+  padding: 0.55rem 0.7rem;
+  text-align: left;
+  border: 1px solid var(--s-line, #e6ddc9);
+  border-radius: 8px;
+  background: var(--s-paper, #fffdf8);
+  color: var(--s-ink, #2b2622);
+  cursor: pointer;
+}
+
+.choix-chap:hover {
+  border-color: var(--s-accent, #8a4b38);
+  background: rgba(138, 75, 56, .05);
+}
+
+.choix-chap:focus-visible {
+  outline: 2px solid var(--s-accent, #8a4b38);
+  outline-offset: 1px;
+}
+
+.choix-chap-titre {
+  font-family: var(--s-serif, Georgia, serif);
+  font-size: 0.95rem;
+  /* Un titre à rallonge ne doit pas repousser le compte de mots hors de la
+     carte : il se coupe, la colonne de droite garde sa place. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.choix-chap-detail {
+  font-size: 0.74rem;
+  color: var(--s-ink-soft, #6f6455);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+@media (max-width: 620px) {
+  /* À l'étroit, le compte passe sous le titre plutôt que de le réduire à
+     deux mots suivis de points de suspension. */
+  .choix-chap { grid-template-columns: minmax(0, 1fr); gap: 0.15rem; }
+  .choix-chap-titre { white-space: normal; }
+}
+
 /* Avertissement du dialogue « Imprimer la couverture » */
 .dc-alerte { color: #b45309; font-weight: 600; }
 

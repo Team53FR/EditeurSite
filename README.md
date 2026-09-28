@@ -364,6 +364,34 @@ vit en `localStorage`, partagée avec le portail et les deux autres sites (voir
 `sessionStorage` : c'est l'état d'un onglet, pas une session, et le déplacer
 ferait que deux onglets sur deux livres différents se marcheraient dessus.
 
+**Écrire un chapitre d'un seul tenant** (`manuscrit.js`) : l'éditeur compose en
+doubles-pages, ce qu'il faut pour voir tomber la mise en page — mais pour
+écrire, la page gêne : on ajoute une phrase au début, tout se décale, le
+curseur saute d'une page à l'autre. Le manuscrit ouvre donc un chapitre, un
+seul, sur une feuille sans fin. À l'enregistrement, le chapitre reprend sa
+place dans le texte continu et la pagination se refait d'un bloc.
+
+Deux portes y mènent, et c'est voulu : le crayon `✎` de chaque ligne du
+sommaire, pour le chapitre qu'on a sous les yeux, et **« 📖 Écrire un chapitre
+entier »** dans le panneau Relecture, qui ouvre un sélecteur. La première est
+rapide mais invisible tant qu'on ne survole pas la ligne ; la seconde porte son
+nom en toutes lettres, là où l'on cherche ce qui travaille le livre entier.
+
+Le sélecteur (`ouvrirChoixChapitreManuscrit`) tire sa liste de
+`trancheChapitre()`, c'est-à-dire de la source même dont `ouvrirManuscrit()`
+attend l'index : la refaire de son côté, c'était prendre le risque qu'un rang
+désigne un autre chapitre. Les numéros de page viennent du sommaire, et ne sont
+affichés que si les deux comptes concordent.
+
+**Compter les mots** : `compterMots()` passe par `texteAvecRuptures()`, qui rend
+aux `<br>` et aux fins de bloc l'espace qu'ils occupent à l'écran. Sans cela,
+`textContent` recolle ce que les balises séparaient — « `<h2>Introduction</h2>`
+`<p>Un monde` » donnait « IntroductionUn », un mot au lieu de deux. Comme le
+livre sépare ses paragraphes par `<br><br>`, le compteur perdait un mot à chaque
+changement de paragraphe : 2 611 sur Aeran'Kael, soit près de 4 %. Le
+remplacement se fait sur le HTML avant l'analyse, et non sur le DOM ensuite —
+ce compteur tourne à chaque frappe sur toutes les doubles-pages.
+
 **Collage** : `fragmentDepuisPressePapiers()` (dans `script.js`, partagé par la
 double-page et le manuscrit) ne retient du presse-papiers que l'italique, le
 gras et le souligné — les trois emphases que la barre d'outils sait poser. Tout
