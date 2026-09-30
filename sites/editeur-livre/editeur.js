@@ -1011,8 +1011,7 @@ let modeApercu = false;
 let indexApercu = 0; // 0 = couverture ; 1..nbSpreads = pages intérieures ; nbSpreads+1 = 4e de couverture
 
 function nombreSpreadsApercu() {
-  const pages = livreActuel().pages;
-  return Math.max(1, Math.ceil(pages.length / 2));
+  return Math.max(1, Math.ceil(feuilletsDuLivre(livreActuel()).length / 2));
 }
 
 
@@ -1051,14 +1050,17 @@ function typeVueApercu(idx) {
 
 // Pages gauche/droite (et leurs numéros) d'une double-page intérieure
 function donneesInterieur(idx) {
-  const pages = livreActuel().pages;
+  // Les gardes comprises : elles se feuillettent comme le reste, simplement
+  // blanches et sans folio (voir feuilletsDuLivre, script.js).
+  const feuillets = feuilletsDuLivre(livreActuel());
   const iGauche = (idx - 1) * 2;
-  const iDroite = iGauche + 1;
+  const fG = feuillets[iGauche] || null;
+  const fD = feuillets[iGauche + 1] || null;
   return {
-    gauche: pages[iGauche] || null,
-    droite: pages[iDroite] || null,
-    numG: iGauche + 1,
-    numD: pages[iDroite] ? iDroite + 1 : ""
+    gauche: fG ? fG.page : null,
+    droite: fD ? fD.page : null,
+    numG: fG ? fG.numero : "",
+    numD: fD ? fD.numero : ""
   };
 }
 
@@ -1218,10 +1220,13 @@ function afficherApercu() {
   } else if (indexApercu === derniere) {
     indicateur.textContent = "4e de couverture";
   } else {
-    const iGauche = (indexApercu - 1) * 2;
-    const iDroite = iGauche + 1;
-    const pages = livre.pages;
-    indicateur.textContent = pages[iDroite] ? `Pages ${iGauche + 1} - ${iDroite + 1}` : `Page ${iGauche + 1}`;
+    // Une garde n'a pas de folio : l'indicateur ne nomme que les pages qui
+    // en portent un, et dit « Page de garde » quand il n'y en a aucune.
+    const d = donneesInterieur(indexApercu);
+    const nums = [d.numG, d.numD].filter((n) => n !== "" && n != null);
+    indicateur.textContent = nums.length === 2 ? `Pages ${nums[0]} - ${nums[1]}`
+      : nums.length === 1 ? `Page ${nums[0]}`
+      : "Page de garde";
   }
 
   // Toujours deux pages : la couverture occupe un côté, une page de garde
@@ -3612,6 +3617,108 @@ function ouvrirApercu() {
   document.querySelector(".sommaire").style.display = "none";
 
   afficherApercu();
+}
+
+// =====================================================================
+//  Pages de garde
+//
+//  Des feuillets blancs et NON FOLIOTÉS, au début et à la fin du livre.
+//  Comme dans un livre relié : on ouvre la couverture et l'on tombe sur une
+//  page blanche avant le texte.
+//
+//  Elles ne touchent pas à la pagination — le premier texte reste la page 1
+//  — mais ce sont de vraies feuilles : elles s'impriment, elles épaississent
+//  le dos, et chacune fait basculer de l'autre côté tout ce qui la suit
+//  (voir feuilletsDuLivre dans script.js, qui distingue le rang physique du
+//  folio imprimé).
+//
+//  Comme le format ou l'interligne, le réglage est posé en mémoire et part
+//  avec la prochaine sauvegarde. Surtout PAS de mettreAJourLivre() ici : il
+//  changerait `maj_le` dans le dos de l'éditeur, et la sauvegarde suivante
+//  croirait le livre modifié ailleurs.
+// =====================================================================
+
+function ouvrirPagesDeGarde() {
+  if (modeApercu || modeCouverture) return;
+  const modal = document.getElementById("modalGardes");
+  if (!modal) return;
+
+  const livre = livreActuel();
+  document.getElementById("gardesDebut").value = nombreGardes(livre.gardesDebut);
+  document.getElementById("gardesFin").value = nombreGardes(livre.gardesFin);
+
+  ["gardesDebut", "gardesFin"].forEach((id) => {
+    document.getElementById(id).oninput = rafraichirApercuGardes;
+  });
+  rafraichirApercuGardes();
+
+  modal.style.display = "flex";
+  document.addEventListener("keydown", surEchapGardes, true);
+  document.getElementById("gardesDebut").focus();
+}
+
+function fermerPagesDeGarde() {
+  const modal = document.getElementById("modalGardes");
+  if (modal) modal.style.display = "none";
+  document.removeEventListener("keydown", surEchapGardes, true);
+}
+
+function surEchapGardes(e) {
+  const modal = document.getElementById("modalGardes");
+  if (e.key === "Escape" && modal && modal.style.display !== "none") {
+    e.preventDefault();
+    e.stopPropagation();
+    fermerPagesDeGarde();
+  }
+}
+
+// Dire en toutes lettres ce que le réglage va changer : un nombre de pages
+// blanches ne parle pas, « le texte commencera sur une page de gauche » si.
+function rafraichirApercuGardes() {
+  const zone = document.getElementById("gardesApercu");
+  if (!zone) return;
+  const debut = nombreGardes(document.getElementById("gardesDebut").value);
+  const fin = nombreGardes(document.getElementById("gardesFin").value);
+
+  if (!debut && !fin) {
+    zone.textContent = "Aucune garde : la couverture s'ouvre directement sur la page 1.";
+    return;
+  }
+
+  const bouts = [];
+  if (debut) bouts.push(debut + (debut > 1 ? " feuillets blancs" : " feuillet blanc") + " avant le texte");
+  if (fin) bouts.push(fin + (fin > 1 ? " feuillets blancs" : " feuillet blanc") + " après");
+
+  // Chaque feuillet ajouté au début fait changer de côté tout le livre : à
+  // l'impression, la page 1 passe de droite à gauche et inversement. Autant
+  // le dire ici plutôt que de le laisser découvrir sur le papier.
+  const cote = debut % 2 === 0 ? "à droite, comme dans un livre imprimé"
+    : "à gauche — un nombre impair de gardes fait basculer tout le livre";
+  zone.textContent = bouts.join(", ") + ". À l'impression, la page 1 tombera " + cote + ".";
+}
+
+function enregistrerPagesDeGarde() {
+  const livre = livreActuel();
+  const debut = nombreGardes(document.getElementById("gardesDebut").value);
+  const fin = nombreGardes(document.getElementById("gardesFin").value);
+
+  const change = debut !== nombreGardes(livre.gardesDebut) || fin !== nombreGardes(livre.gardesFin);
+  livre.gardesDebut = debut;
+  livre.gardesFin = fin;
+  fermerPagesDeGarde();
+
+  if (!change) return;
+  marquerModifie();
+  planifierBrouillon();
+
+  const message = document.getElementById("message");
+  if (message) {
+    const total = debut + fin;
+    message.textContent = total
+      ? total + (total > 1 ? " pages de garde posées." : " page de garde posée.")
+      : "Pages de garde retirées.";
+    setTimeout(() => { if (message.textContent.includes("garde")) message.textContent = ""; }, 3000);
+  }
 }
 
 // =====================================================================

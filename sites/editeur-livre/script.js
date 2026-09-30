@@ -226,6 +226,8 @@ function versLivreMemoire(r) {
     espaceTitre: r.espace_titre == null ? undefined : Number(r.espace_titre),
     serieId: r.serie_id || null,
     tome: r.tome == null ? null : Number(r.tome),
+    gardesDebut: Number(r.gardes_debut) || 0,
+    gardesFin: Number(r.gardes_fin) || 0,
     publie: !!r.publie,
     publieLe: r.publie_le || null,
     couverture: r.couverture || undefined,
@@ -256,6 +258,8 @@ function versLigneLivre(livre, horodatage) {
     // dans la branche « ON CONFLICT UPDATE ».
     serie_id: livre.serieId || null,
     tome: (typeof livre.tome === "number") ? livre.tome : null,
+    gardes_debut: Number(livre.gardesDebut) || 0,
+    gardes_fin: Number(livre.gardesFin) || 0,
     publie: !!livre.publie,
     publie_le: livre.publieLe || null,
     couverture: livre.couverture || null,
@@ -277,7 +281,7 @@ function versLigneLivre(livre, horodatage) {
 // pagination, et la bibliothèque affichait alors « 0 p. ».
 const CHAMPS_LIVRE_META =
   "id,titre,auteur,format,espace_titre,publie,publie_le,couverture,quatrieme,tranche,nb_pages,cree_le,maj_le," +
-  "serie_id,tome,livre_spreads(count)";
+  "serie_id,tome,gardes_debut,gardes_fin,livre_spreads(count)";
 
 async function chargerBibliothequeMeta() {
   const lignes = await requeteSupabase(
@@ -426,7 +430,8 @@ const CHAMPS_MODIFIABLES_LIVRE = {
   titre: "titre", auteur: "auteur", format: "format",
   espaceTitre: "espace_titre", couverture: "couverture",
   quatrieme: "quatrieme", tranche: "tranche",
-  serieId: "serie_id", tome: "tome"
+  serieId: "serie_id", tome: "tome",
+  gardesDebut: "gardes_debut", gardesFin: "gardes_fin"
 };
 
 async function mettreAJourLivre(id, champs) {
@@ -855,6 +860,46 @@ function rendreContenuOngletFormat(fond, formatActuel, appliquer) {
       appliquer(formatPersonnaliseDepuisCm(largCm, hautCm));
     };
   }
+}
+
+// ----- Les feuillets du livre, gardes comprises -----
+//
+// Une page de garde est un vrai feuillet : elle occupe une place dans le
+// livre relié, elle épaissit le dos, et elle décide de quel côté tombe la
+// suivante. Mais elle ne porte pas de numéro — dans un livre imprimé, les
+// gardes ne sont jamais foliotées.
+//
+// D'où deux notions qu'il ne faut surtout pas confondre :
+//
+//   `position` — le rang PHYSIQUE dans le livre (1, 2, 3…). C'est lui, et
+//                lui seul, qui dit si la page est un recto (impair, à
+//                droite, reliure à gauche) ou un verso. Ajouter UNE garde au
+//                début fait donc basculer tout le livre de l'autre côté.
+//   `numero`   — le folio IMPRIMÉ. Vide pour une garde ; la première page
+//                écrite reste la page 1, quoi qu'on mette devant.
+//
+// Toute sortie du livre — aperçu, impression page à page, livret, export
+// KDP, calcul du dos — passe par ici, pour que les gardes n'existent pas à
+// moitié.
+const MAX_GARDES = 20;
+
+function nombreGardes(valeur) {
+  const n = Math.round(Number(valeur) || 0);
+  return Math.max(0, Math.min(MAX_GARDES, n));
+}
+
+function feuilletsDuLivre(livre) {
+  const pages = (livre && livre.pages) || [];
+  const debut = nombreGardes(livre && livre.gardesDebut);
+  const fin = nombreGardes(livre && livre.gardesFin);
+
+  const feuillets = [];
+  for (let i = 0; i < debut; i++) feuillets.push({ page: null, numero: "", garde: true });
+  pages.forEach((page, i) => feuillets.push({ page, numero: i + 1, garde: false }));
+  for (let i = 0; i < fin; i++) feuillets.push({ page: null, numero: "", garde: true });
+
+  feuillets.forEach((f, i) => { f.position = i + 1; });
+  return feuillets;
 }
 
 // ----- Compter les mots d'un passage -----

@@ -861,9 +861,11 @@ function exporterImpression(modeRectoVerso) {
   // souvent chez un copiste — et « Couverture seule » les sort ouvertes à
   // plat : les intercaler ici gâchait deux feuilles et forçait à les extraire
   // de la pile avant l'encollage.
-  const pages = livre.pages || [];
-  pages.forEach((page, i) => {
-    ajouterPage(creerPageTexteImpression(page, i + 1, f, margeInt, margeExt));
+  // Les gardes sont de vraies feuilles : elles s'impriment (blanches) et
+  // décalent le recto-verso de tout ce qui suit.
+  feuilletsDuLivre(livre).forEach((feuillet) => {
+    ajouterPage(creerPageTexteImpression(
+      feuillet.page, feuillet.numero, f, margeInt, margeExt, feuillet.position));
   });
 
   // Un nombre impair laisserait le dernier verso à imprimer dans le vide :
@@ -928,11 +930,7 @@ function exporterLivret(modeRectoVerso) {
   // Suite logique du livret : chaque entrée = une demi-feuille.
   // Position 1 = couverture, position 2 = son verso blanc, puis le texte,
   // des blanches de complément (total multiple de 4), et la 4e en dernier.
-  const suite = [];
-  (livre.pages || []).forEach((page, i) => suite.push({ type: "texte", page, numero: i + 1 }));
-  // Un cahier plié se compte par quatre : on complète par des blanches, qui
-  // se retrouvent à la fin du livret.
-  while (suite.length % 4 !== 0) suite.push({ type: "blanche" });
+  const suite = suiteDemiFeuilles(livre);
 
   const total = suite.length;
 
@@ -1025,7 +1023,40 @@ function creerFaceLivret(demiGauche, demiDroite, f, margeInt, margeExt) {
 function creerDemiPageLivret(demi, f, margeInt, margeExt) {
   if (!demi || demi.type === "blanche") return creerPageBlancheImpression(f);
   if (demi.type === "essai") return creerDemiEssai(demi, f);
-  return creerPageTexteImpression(demi.page, demi.numero, f, margeInt, margeExt);
+  return creerPageTexteImpression(demi.page, demi.numero, f, margeInt, margeExt, demi.position);
+}
+
+// Les feuillets d'un export « imprimeur », où les pages ne sont plus des
+// objets mais le CONTENU déjà repaginé (voir avecPaginationImprimeur, qui
+// compose avec la hauteur de folio du fichier final). On y replace les
+// gardes, que cette repagination ne connaît pas.
+function feuilletsProAvecGardes(livre, pagesPro) {
+  const debut = nombreGardes(livre.gardesDebut);
+  const fin = nombreGardes(livre.gardesFin);
+  const feuillets = [];
+  for (let i = 0; i < debut; i++) feuillets.push({ contenu: "", numero: "" });
+  pagesPro.forEach((contenu, i) => feuillets.push({ contenu, numero: i + 1 }));
+  for (let i = 0; i < fin; i++) feuillets.push({ contenu: "", numero: "" });
+  feuillets.forEach((f, i) => { f.position = i + 1; });
+  return feuillets;
+}
+
+// La suite des demi-feuilles, dans l'ordre de lecture : les feuillets du
+// livre — pages de garde comprises, elles s'impriment blanches — complétée
+// par des blanches jusqu'à un multiple de quatre, puisqu'un cahier plié se
+// compte par quatre. La position retenue est la position PHYSIQUE : c'est
+// elle qui décide du côté de la reliure.
+function suiteDemiFeuilles(livre) {
+  const suite = feuilletsDuLivre(livre).map((feuillet) => ({
+    type: feuillet.garde ? "blanche" : "texte",
+    page: feuillet.page,
+    numero: feuillet.numero,
+    position: feuillet.position
+  }));
+  while (suite.length % 4 !== 0) {
+    suite.push({ type: "blanche", position: suite.length + 1 });
+  }
+  return suite;
 }
 
 // Une demi-feuille d'essai : une grande marque et, dessous, ce qu'elle veut
@@ -1051,8 +1082,14 @@ function creerPageBlancheImpression(f) {
   return div;
 }
 
-function creerPageTexteImpression(page, numero, f, margeInt, margeExt) {
-  const recto = numero % 2 === 1;
+// `position` est le rang PHYSIQUE du feuillet, `numero` le folio imprimé.
+// Les deux diffèrent dès qu'il y a des pages de garde : une garde occupe une
+// place sans porter de numéro, et c'est la place — pas le folio — qui dit de
+// quel côté tombe la reliure. Sans ce paramètre, ajouter une seule garde
+// mettait toutes les marges intérieures du mauvais côté.
+function creerPageTexteImpression(page, numero, f, margeInt, margeExt, position) {
+  const rang = typeof position === "number" ? position : numero;
+  const recto = rang % 2 === 1;
   const div = document.createElement("div");
   div.className = "page-impression";
   div.style.width = f.larg + "mm";
@@ -1525,11 +1562,7 @@ function exporterDeuxPages(mode) {
 
   // Les faces, dans l'ordre de lecture — le texte seul, les couvertures
   // s'imprimant à part.
-  const suite = [];
-  (livre.pages || []).forEach((page, i) => suite.push({ type: "texte", page, numero: i + 1 }));
-  // Une feuille porte quatre faces : le compte doit tomber juste, sinon la
-  // coupe décale tout le second tas.
-  while (suite.length % 4 !== 0) suite.push({ type: "blanche" });
+  const suite = suiteDemiFeuilles(livre);
 
   const moitie = suite.length / 2;
 
@@ -1692,7 +1725,9 @@ function exporterCouvertureSeule() {
   // Le nombre de pages à l'écran suffit à estimer le dos : inutile de relancer
   // la pagination imprimeur, qui coûte plusieurs secondes sur un gros livre et
   // ne changerait l'épaisseur que d'une fraction de millimètre.
-  const nbPages = (livre.pages || []).length;
+  // Les pages de garde sont du papier comme le reste : elles épaississent le
+  // dos. Les oublier donnerait une couverture trop étroite pour le livre.
+  const nbPages = feuilletsDuLivre(livre).length;
   ouvrirDialogueCouvertureSeule(livre, f, nbPages, false);
 }
 
@@ -1704,7 +1739,7 @@ function exporterCouvertureLivret() {
   flushSpread();
   const livre = livreActuel();
   const f = resoudreFormat(FORMATS, livre.format || "149x210", "149x210");
-  ouvrirDialogueCouvertureSeule(livre, f, (livre.pages || []).length, true);
+  ouvrirDialogueCouvertureSeule(livre, f, feuilletsDuLivre(livre).length, true);
 }
 
 // Papiers courants pour les PAGES INTÉRIEURES. C'est leur épaisseur qui fait
@@ -2824,8 +2859,11 @@ function genererFichierKDP(cible, dosMm, livre, pagesPro, margeInt) {
 
     stylePage.textContent = "@page { size: " + fmt.larg + "mm " + fmt.haut + "mm; margin: 0; }";
     const margeExt = KDP_MARGE_EXT_MM;
-    pagesPro.forEach((contenu, i) => {
-      zone.appendChild(creerPageKDP(contenu, i + 1, margeInt, margeExt, fmt));
+    // Les gardes partent aussi chez KDP : ce sont des pages du fichier, et
+    // leur nombre a déjà servi à calculer le dos.
+    feuilletsProAvecGardes(livre, pagesPro).forEach((feuillet) => {
+      zone.appendChild(creerPageKDP(
+        feuillet.contenu, feuillet.numero, margeInt, margeExt, fmt, feuillet.position));
     });
   };
 
@@ -2841,8 +2879,12 @@ function genererFichierKDP(cible, dosMm, livre, pagesPro, margeInt) {
 
 // Page intérieure KDP : le format rogné EST le support, sans marge
 // technique ni repère — voir l'en-tête du module pour pourquoi.
-function creerPageKDP(contenu, numero, margeInt, margeExt, fmt) {
-  const recto = numero % 2 === 1;
+// Comme creerPageTexteImpression : `position` est le rang physique du
+// feuillet (il décide du recto-verso), `numero` le folio imprimé — vide pour
+// une page de garde, qui n'est jamais foliotée.
+function creerPageKDP(contenu, numero, margeInt, margeExt, fmt, position) {
+  const rang = typeof position === "number" ? position : numero;
+  const recto = rang % 2 === 1;
   const feuille = creerFeuillePro(fmt.larg, fmt.haut, 0);
   const zone = creerZoneRognePro(fmt.larg, fmt.haut, 0);
 

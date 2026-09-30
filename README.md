@@ -406,6 +406,33 @@ vit en `localStorage`, partagée avec le portail et les deux autres sites (voir
 `sessionStorage` : c'est l'état d'un onglet, pas une session, et le déplacer
 ferait que deux onglets sur deux livres différents se marcheraient dessus.
 
+**Pages de garde** (`livres.gardes_debut` / `gardes_fin`) : des feuillets
+blancs et **non foliotés**, au début et à la fin du livre — comme en ouvrant un
+livre relié. Le bouton « ▭ Pages de garde » du sommaire les règle.
+
+Tout tient dans une distinction que `feuilletsDuLivre()` (script.js) rend
+explicite, et qu'il ne faut jamais confondre :
+
+| | |
+|---|---|
+| `position` | le rang **physique** dans le livre. C'est lui, et lui seul, qui dit si la page est un recto (impair, à droite, reliure à gauche). |
+| `numero` | le **folio imprimé**. Vide pour une garde ; le premier texte reste la page 1, quoi qu'on mette devant. |
+
+Conséquence à connaître : **une garde en plus au début fait basculer tout le
+livre de l'autre côté**. C'est pourquoi la fenêtre annonce en clair de quel
+côté la page 1 tombera, plutôt que de le laisser découvrir sur le papier.
+
+Toute sortie du livre passe par `feuilletsDuLivre()` — aperçu, impression page
+à page, livret, deux-pages-par-feuille, export KDP — et le calcul du dos
+compte les gardes, qui sont du papier comme le reste. `creerPageTexteImpression`
+et `creerPageKDP` reçoivent la position à part du folio : sans cela, une seule
+garde mettait toutes les marges de reliure du mauvais côté.
+
+Le réglage est posé en mémoire et part avec la sauvegarde suivante, comme le
+format ou l'interligne — surtout pas par `mettreAJourLivre()`, qui changerait
+`maj_le` dans le dos de l'éditeur et ferait croire à la sauvegarde suivante que
+le livre a été modifié ailleurs.
+
 **Renommer un livre** : le titre ne se changeait que dans l'éditeur de
 couverture, une fois le livre ouvert — autant dire nulle part. Le crayon ✎ de
 chaque carte de la bibliothèque le fait désormais, par `mettreAJourLivre()` :

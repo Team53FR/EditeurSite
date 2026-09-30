@@ -53,6 +53,14 @@ create table public.livres (
   -- des livres sans série.
   serie_id      text references public.series(id) on delete set null,
   tome          integer,
+  -- Pages de garde : feuillets BLANCS et NON FOLIOTÉS au début et à la fin.
+  -- Elles ne décalent pas la pagination (le premier texte reste la page 1)
+  -- mais ce sont de vraies feuilles : elles s'impriment, elles épaississent
+  -- le dos, et chacune fait basculer de côté tout ce qui la suit. Bornées :
+  -- au-delà d'une vingtaine ce n'est plus une garde, et une valeur aberrante
+  -- fausserait le calcul du dos.
+  gardes_debut  integer not null default 0 check (gardes_debut between 0 and 20),
+  gardes_fin    integer not null default 0 check (gardes_fin   between 0 and 20),
   publie        boolean not null default false,
   publie_le     timestamptz,
   couverture    jsonb,   -- {fond, imageChemin, texte, afficherTitre, afficherAuteur, imgZoom, imgOffsetX/Y, imgBaseW/H, ...}
