@@ -415,8 +415,16 @@ toute façon pas en mémoire (`enregistrerLivreDistant` le refuserait).
 **Séries** (table `series` + colonnes `livres.serie_id` / `livres.tome`) :
 plusieurs tomes d'une même histoire, avec le résumé d'ensemble et l'ordre de
 lecture. Une série n'est qu'un **classement** — chaque tome reste listé dans
-« Mes livres » et s'ouvre, s'imprime et se publie exactement comme avant. Deux
-conséquences voulues :
+« Mes livres » et s'ouvre, s'imprime et se publie exactement comme avant.
+
+La bibliothèque est en **deux onglets**, « Mes livres » et « Mes séries », qui
+tiennent lieu de titres de section. Empilées, les deux listes ne tenaient pas :
+un résumé de série fait plusieurs paragraphes et poussait la grille des livres
+hors de l'écran. L'onglet choisi est mémorisé (`el_ongletBiblio`), mais un
+onglet « séries » mémorisé alors qu'il n'y a plus aucune série renvoie aux
+livres — arriver sur une page vide donne l'impression d'avoir tout perdu.
+
+Deux conséquences voulues du modèle :
 
 - La clé étrangère est en `on delete set null`, jamais `cascade` : supprimer
   une série ne doit pas emporter les manuscrits qu'elle rangeait. Les tomes

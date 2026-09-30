@@ -392,9 +392,18 @@ main.contenu { padding-top: 40px; padding-bottom: 60px; }
 }
 .livre-couv .c-titre { font-family: var(--serif); font-weight: 600; font-size: calc(15px * var(--mult-titre, 1)); line-height: 1.2; word-break: break-word; }
 .livre-couv .c-auteur { font-family: var(--serif); font-size: calc(11px * var(--mult-auteur, 1)); letter-spacing: .08em; text-transform: uppercase; opacity: .85; margin-top: 6px; }
-.livre-meta { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-.livre-meta .l-titre { font-family: var(--serif); font-weight: 600; font-size: 16px; color: var(--ink); cursor: pointer; }
-.livre-meta .l-detail { font-size: 12px; color: var(--ink-soft); white-space: nowrap; }
+/* Le titre AU-DESSUS du format, et non à côté : côte à côte, un titre long
+   (« Aeran'Kael : L'Héritage Brisé ») se repliait sur trois lignes contre le
+   « KDP 15×21 · 359 p. » qui, lui, refuse de se couper. Les deux se
+   serraient sans qu'aucun ne soit lisible. */
+.livre-meta { display: flex; flex-direction: column; gap: 3px; }
+.livre-meta .l-titre {
+  font-family: var(--serif); font-weight: 600; font-size: 16px;
+  line-height: 1.25; color: var(--ink); cursor: pointer;
+}
+/* La largeur du texte seulement : en bloc, toute la ligne deviendrait
+   cliquable jusqu'au bord de la carte, curseur compris. */
+.livre-meta .l-detail { font-size: 12px; color: var(--ink-soft); align-self: flex-start; }
 .livre-suppr {
   position: absolute; top: 10px; right: 10px;
   width: 28px; height: 28px; border-radius: 50%;
@@ -424,12 +433,49 @@ main.contenu { padding-top: 40px; padding-bottom: 60px; }
 .livre-carte:hover .livre-renommer { opacity: 1; }
 .livre-renommer:hover { background: var(--accent); color: #fff; }
 
+/* ---------- Les deux onglets ----------
+   Ils tiennent lieu de titres de section : « Mes livres » et « Mes séries »
+   ne sont plus empilés, on passe de l'un à l'autre. Un résumé de série tient
+   plusieurs paragraphes, et la grille des livres se retrouvait sinon poussée
+   hors de l'écran. */
+.onglets-biblio {
+  display: flex; gap: 4px; flex-wrap: wrap;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 26px;
+}
+
+.onglet-biblio {
+  border: none; background: none; cursor: pointer;
+  font-family: var(--serif); font-size: 21px; font-weight: 600;
+  color: var(--ink-soft);
+  padding: 6px 14px 12px;
+  /* La bordure existe déjà à l'état inactif, en transparent : sans elle, le
+     texte sauterait de deux pixels au changement d'onglet. */
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.onglet-biblio:hover { color: var(--ink); }
+.onglet-biblio.actif { color: var(--ink); border-bottom-color: var(--accent); }
+
+.onglet-compte {
+  display: inline-block;
+  font-family: var(--sans); font-size: 12px; font-weight: 700;
+  color: var(--ink-soft);
+  background: var(--cream);
+  border-radius: 999px;
+  padding: 2px 8px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+.onglet-biblio.actif .onglet-compte { background: rgba(138,75,56,.12); color: var(--accent-deep); }
+
+.barre-series { display: flex; justify-content: flex-end; margin-bottom: 18px; }
+
 /* ---------- Séries ----------
    Une série RANGE des livres, elle ne les contient pas : ses tomes restent
    listés dans « Mes livres ». D'où une carte en largeur, qui présente le
    résumé de l'histoire et l'ordre de lecture, et non une grille de
-   couvertures qui ferait doublon avec la liste du dessous. */
-.section-series { margin-bottom: 34px; }
+   couvertures qui ferait doublon avec l'autre onglet. */
 
 .liste-series { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 16px; }
 

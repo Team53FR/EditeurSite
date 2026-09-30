@@ -54,33 +54,44 @@
   <!-- ===== Contenu ===== -->
   <main class="contenu">
 
-    <!-- Séries : plusieurs tomes d'une même histoire. Une série ne fait que
-         RANGER des livres — chaque tome reste listé dans « Mes livres » et
-         s'ouvre comme n'importe quel autre. -->
-    <section id="sectionSeries" class="section-series" hidden>
-      <div class="barre-section">
-        <h2>Mes séries</h2>
+    <!-- Deux onglets plutôt qu'une pile : un résumé de série tient plusieurs
+         paragraphes, et la liste des livres se retrouvait poussée hors de
+         l'écran. Les onglets servent aussi de titres de section. -->
+    <div class="onglets-biblio" role="tablist" aria-label="Bibliothèque">
+      <button type="button" id="ongletLivres" class="onglet-biblio actif"
+              role="tab" aria-selected="true" aria-controls="panneauLivres"
+              onclick="choisirOngletBiblio('livres')">
+        Mes livres <span class="onglet-compte" id="compteLivres">0</span>
+      </button>
+      <button type="button" id="ongletSeries" class="onglet-biblio"
+              role="tab" aria-selected="false" aria-controls="panneauSeries"
+              onclick="choisirOngletBiblio('series')">
+        Mes séries <span class="onglet-compte" id="compteSeries">0</span>
+      </button>
+    </div>
+
+    <section id="panneauLivres" role="tabpanel" aria-labelledby="ongletLivres">
+      <ul id="listeLivres" class="grille-livres"></ul>
+
+      <div class="creer-livre">
+        <h3>Créer un nouveau livre</h3>
+        <div class="creer-ligne">
+          <input type="text" id="titreNouveauLivre" placeholder="Titre du nouveau livre"
+                 onkeydown="if(event.key==='Enter'){creerLivre();}">
+          <button type="button" id="formatNouveauLivre" class="bouton-format" onclick="ouvrirChoixFormatCreation()">Roman — 14,9 × 21,0 cm</button>
+          <button class="btn btn-primaire" onclick="creerLivre()">+ Créer un livre</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Une série ne fait que RANGER des livres : chaque tome reste listé
+         dans « Mes livres » et s'ouvre comme n'importe quel autre. -->
+    <section id="panneauSeries" role="tabpanel" aria-labelledby="ongletSeries" hidden>
+      <div class="barre-series">
         <button class="btn-mini" onclick="ouvrirEditionSerie()">+ Nouvelle série</button>
       </div>
       <ul id="listeSeries" class="liste-series"></ul>
     </section>
-
-    <div class="barre-section">
-      <h2>Mes livres</h2>
-      <button id="btnNouvelleSerie" class="btn-mini" onclick="ouvrirEditionSerie()">+ Nouvelle série</button>
-    </div>
-
-    <ul id="listeLivres" class="grille-livres"></ul>
-
-    <div class="creer-livre">
-      <h3>Créer un nouveau livre</h3>
-      <div class="creer-ligne">
-        <input type="text" id="titreNouveauLivre" placeholder="Titre du nouveau livre"
-               onkeydown="if(event.key==='Enter'){creerLivre();}">
-        <button type="button" id="formatNouveauLivre" class="bouton-format" onclick="ouvrirChoixFormatCreation()">Roman — 14,9 × 21,0 cm</button>
-        <button class="btn btn-primaire" onclick="creerLivre()">+ Créer un livre</button>
-      </div>
-    </div>
 
     <p id="message" class="message"></p>
   </main>

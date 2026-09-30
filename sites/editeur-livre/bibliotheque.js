@@ -47,6 +47,7 @@ async function chargerBibliotheque() {
 
   afficherSeries();
   afficherListeLivres();
+  restaurerOngletBiblio();
 
   // Tutoriel de bienvenue au tout premier lancement (une seule fois).
   setTimeout(() => lancerTutorielBiblio(false), 500);
@@ -130,6 +131,8 @@ function afficherListeLivres() {
   remplirProfil();
 
   const liste = document.getElementById("listeLivres");
+  const compte = document.getElementById("compteLivres");
+  if (compte) compte.textContent = bibliotheque.livres.length;
   liste.innerHTML = "";
 
   if (bibliotheque.livres.length === 0) {
@@ -270,19 +273,57 @@ function tomesDeLaSerie(serieId) {
     });
 }
 
-function afficherSeries() {
-  const section = document.getElementById("sectionSeries");
-  const liste = document.getElementById("listeSeries");
-  const btnHaut = document.getElementById("btnNouvelleSerie");
-  if (!section || !liste) return;
+// ----- Les deux onglets -----
+//
+// Un résumé de série tient plusieurs paragraphes : empilés sous les livres,
+// ils poussaient la grille hors de l'écran. L'onglet choisi est mémorisé sur
+// l'appareil — on revient souvent d'un livre vers la liste, et retomber
+// chaque fois sur l'autre onglet serait pénible.
+const CLE_ONGLET_BIBLIO = "el_ongletBiblio";
 
-  // Pas de série : la section disparaît, et c'est le bouton de la barre
-  // « Mes livres » qui propose d'en créer une. Une section vide sur une
-  // bibliothèque qui n'en a jamais eu ne ferait qu'encombrer.
-  section.hidden = series.length === 0;
-  if (btnHaut) btnHaut.hidden = series.length > 0;
+function choisirOngletBiblio(nom) {
+  const cible = nom === "series" ? "series" : "livres";
+  try { localStorage.setItem(CLE_ONGLET_BIBLIO, cible); } catch (e) {}
+
+  [["livres", "ongletLivres", "panneauLivres"], ["series", "ongletSeries", "panneauSeries"]]
+    .forEach(([id, ongletId, panneauId]) => {
+      const onglet = document.getElementById(ongletId);
+      const panneau = document.getElementById(panneauId);
+      const actif = id === cible;
+      if (onglet) {
+        onglet.classList.toggle("actif", actif);
+        onglet.setAttribute("aria-selected", actif ? "true" : "false");
+      }
+      if (panneau) panneau.hidden = !actif;
+    });
+}
+
+function restaurerOngletBiblio() {
+  let choix = "livres";
+  try { choix = localStorage.getItem(CLE_ONGLET_BIBLIO) || "livres"; } catch (e) {}
+  // Retomber sur les livres si l'onglet mémorisé n'a plus rien à montrer :
+  // arriver sur une page vide donne l'impression d'avoir tout perdu.
+  if (choix === "series" && !series.length) choix = "livres";
+  choisirOngletBiblio(choix);
+}
+
+function afficherSeries() {
+  const liste = document.getElementById("listeSeries");
+  const compte = document.getElementById("compteSeries");
+  if (compte) compte.textContent = series.length;
+  if (!liste) return;
 
   liste.innerHTML = "";
+
+  if (!series.length) {
+    const vide = document.createElement("li");
+    vide.className = "livres-vide";
+    vide.innerHTML =
+      "<div>Aucune série pour l'instant.<br>Une série regroupe les tomes d'une même " +
+      "histoire et porte son résumé.<br>Vos livres, eux, restent listés dans « Mes livres ».</div>";
+    liste.appendChild(vide);
+    return;
+  }
   series.forEach((serie) => {
     const tomes = tomesDeLaSerie(serie.id);
 
@@ -518,6 +559,9 @@ async function enregistrerSerie() {
   fermerEditionSerie();
   afficherSeries();
   afficherListeLivres();
+  // On vient de créer ou de modifier une série : autant la montrer, même si
+  // l'on partait de l'onglet des livres.
+  choisirOngletBiblio("series");
 }
 
 async function supprimerSerieCourante() {
