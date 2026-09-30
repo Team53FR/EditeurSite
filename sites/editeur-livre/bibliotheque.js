@@ -231,7 +231,9 @@ async function renommerLivre(id) {
 
   const message = document.getElementById("message");
   try {
-    await mettreAJourLivre(id, { titre, maj_le: new Date().toISOString() });
+    // mettreAJourLivre pose l'horodatage lui-même : le lui passer serait
+    // désormais refusé comme un champ inconnu.
+    await mettreAJourLivre(id, { titre });
   } catch (e) {
     message.textContent = "Renommage impossible : " + e.message;
     return;

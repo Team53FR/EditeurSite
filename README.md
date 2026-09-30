@@ -436,6 +436,18 @@ La numérotation des tomes est réécrite à chaque enregistrement, dans l'ordre
 affiché : le rang dans la fenêtre fait foi, pas un numéro saisi à la main qu'il
 faudrait tenir d'accord.
 
+**`mettreAJourLivre()` refuse les champs qu'elle ne connaît pas.** Elle filtrait
+déjà par une liste blanche (`CHAMPS_MODIFIABLES_LIVRE`), mais en JETANT
+silencieusement le reste : la requête partait, réussissait, et n'écrivait rien.
+C'est ainsi que le rattachement des tomes a paru fonctionner — l'écran suivait
+l'état local — puis disparaissait au rechargement. Les clés attendues sont
+celles de l'objet EN MÉMOIRE (`serieId`), pas les noms de colonnes
+(`serie_id`) ; passer l'un pour l'autre lève désormais une erreur.
+
+Leçon pour les tests : en remplaçant `mettreAJourLivre` elle-même, on ne
+traverse jamais cette liste. Ce qui touche à la persistance se teste en
+interceptant `requeteSupabase`, la vraie porte de sortie.
+
 **Statistiques d'un livre** : dans la bibliothèque, la ligne « format · pages »
 sous le titre d'une carte ouvre la fiche du livre — mots, pages, chapitres,
 temps de lecture, signes, densité, longueur du plus long et du plus court

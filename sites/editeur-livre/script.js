@@ -333,10 +333,12 @@ async function supprimerSerieDistante(id) {
 }
 
 // Rattacher un livre à une série (ou l'en détacher avec serieId = null).
+// Les clés sont celles de mettreAJourLivre — en camelCase, comme l'objet en
+// mémoire — et non les noms de colonnes de la base.
 async function definirSerieDuLivre(livreId, serieId, tome) {
   await mettreAJourLivre(livreId, {
-    serie_id: serieId,
-    tome: serieId ? (typeof tome === "number" ? tome : null) : null
+    serieId: serieId || null,
+    tome: serieId && typeof tome === "number" ? tome : null
   });
 }
 
@@ -420,15 +422,29 @@ async function enregistrerLivreDistant(livre, majLeConnu) {
 // Modifie quelques champs d'un livre SANS toucher à son texte : la
 // bibliothèque renomme, repose une couverture ou publie sans jamais avoir
 // chargé les double-pages.
+const CHAMPS_MODIFIABLES_LIVRE = {
+  titre: "titre", auteur: "auteur", format: "format",
+  espaceTitre: "espace_titre", couverture: "couverture",
+  quatrieme: "quatrieme", tranche: "tranche",
+  serieId: "serie_id", tome: "tome"
+};
+
 async function mettreAJourLivre(id, champs) {
   const ligne = { maj_le: new Date().toISOString() };
-  const correspondance = {
-    titre: "titre", auteur: "auteur", format: "format",
-    espaceTitre: "espace_titre", couverture: "couverture",
-    quatrieme: "quatrieme", tranche: "tranche"
-  };
+
   Object.keys(champs || {}).forEach((cle) => {
-    if (correspondance[cle]) ligne[correspondance[cle]] = champs[cle] === undefined ? null : champs[cle];
+    // Un champ inconnu ne passe plus en silence.
+    //
+    // Cette liste ne filtrait pas seulement : elle JETAIT sans rien dire ce
+    // qu'elle ne reconnaissait pas. La requête partait, réussissait, et
+    // n'écrivait rien — c'est ainsi que les tomes d'une série ont paru
+    // s'enregistrer (l'écran suivait l'état local) puis disparaissaient au
+    // rechargement. Une faute de frappe coûtait le même silence.
+    if (!CHAMPS_MODIFIABLES_LIVRE[cle]) {
+      throw new Error("Champ de livre inconnu : « " + cle + " ». " +
+        "Champs acceptés : " + Object.keys(CHAMPS_MODIFIABLES_LIVRE).join(", ") + ".");
+    }
+    ligne[CHAMPS_MODIFIABLES_LIVRE[cle]] = champs[cle] === undefined ? null : champs[cle];
   });
   await requeteSupabase(`livres?id=eq.${encodeURIComponent(id)}`, {
     method: "PATCH",
