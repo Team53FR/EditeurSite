@@ -80,6 +80,16 @@ h1, h2, h3 { font-family: var(--serif); font-weight: 600; line-height: 1.15; mar
 }
 .btn-fantome:hover { background: #fff; }
 
+/* Une action qui détruit : contour rouge au repos, plein au survol. Elle ne
+   doit ressembler ni à l'action principale, ni à « Annuler » — se tromper de
+   bouton ne coûte pas la même chose des deux côtés. */
+.btn-danger {
+  background: transparent;
+  color: #a33;
+  border-color: rgba(170,51,51,.4);
+}
+.btn-danger:hover { background: #a33; border-color: #a33; color: #fff; }
+
 /* ---------- Barre de navigation ---------- */
 
 .nav {
@@ -559,14 +569,23 @@ main.contenu { padding-top: 40px; padding-bottom: 60px; }
 .serie-ajout { display: flex; gap: 8px; align-items: center; }
 .serie-ajout .serie-champ { flex: 1; min-width: 0; }
 
-/* Supprimer n'est pas annuler : la couleur le dit, et l'écart le confirme —
-   le bouton part à gauche, loin de « Enregistrer » qu'on vise sans regarder. */
-.serie-supprimer {
-  margin-right: auto;
-  color: #a33;
-  border-color: rgba(170,51,51,.35);
+/* Le pied de la fenêtre. « Supprimer » n'est pas « Annuler » : la couleur le
+   dit, et l'écart le confirme — le bouton part à gauche, loin de
+   « Enregistrer » qu'on vise sans regarder. */
+.serie-actions {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  justify-content: flex-end;
+  margin-top: 24px;
 }
-.serie-supprimer:hover { background: #a33; border-color: #a33; color: #fff; }
+.serie-actions .btn-danger { margin-right: auto; }
+
+@media (max-width: 460px) {
+  /* À l'étroit, les trois boutons s'empilent : « Supprimer » garde sa place
+     à part, en bas, plutôt que de venir se coller aux deux autres. */
+  .serie-actions { flex-direction: column-reverse; align-items: stretch; }
+  .serie-actions .btn { justify-content: center; }
+  .serie-actions .btn-danger { margin-right: 0; margin-top: 6px; }
+}
 
 @media (max-width: 560px) {
   .serie-modifier { position: static; margin-top: 14px; }
