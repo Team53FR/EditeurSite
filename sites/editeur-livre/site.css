@@ -408,6 +408,125 @@ main.contenu { padding-top: 40px; padding-bottom: 60px; }
 .livre-carte:hover .livre-suppr { opacity: 1; }
 .livre-suppr:hover { background: #a33; color: #fff; }
 
+/* Renommer : même pastille que la suppression, posée juste à sa gauche.
+   Le titre ne se changeait que dans l'éditeur de couverture, une fois le
+   livre ouvert — autant dire nulle part. */
+.livre-renommer {
+  position: absolute; top: 10px; right: 44px;
+  width: 28px; height: 28px; border-radius: 50%;
+  border: none; cursor: pointer;
+  background: rgba(255,253,248,.85);
+  color: var(--accent-deep); font-size: 14px; line-height: 1;
+  display: grid; place-items: center;
+  opacity: 0; transition: opacity .12s ease;
+  box-shadow: var(--ombre-douce);
+}
+.livre-carte:hover .livre-renommer { opacity: 1; }
+.livre-renommer:hover { background: var(--accent); color: #fff; }
+
+/* ---------- Séries ----------
+   Une série RANGE des livres, elle ne les contient pas : ses tomes restent
+   listés dans « Mes livres ». D'où une carte en largeur, qui présente le
+   résumé de l'histoire et l'ordre de lecture, et non une grille de
+   couvertures qui ferait doublon avec la liste du dessous. */
+.section-series { margin-bottom: 34px; }
+
+.liste-series { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 16px; }
+
+.serie-carte {
+  position: relative;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 18px 20px;
+  box-shadow: var(--ombre-douce);
+}
+
+.serie-entete { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.serie-nom { font-family: var(--serif); font-size: 20px; font-weight: 600; color: var(--ink); }
+.serie-compte { font-size: 12.5px; color: var(--ink-soft); }
+
+.serie-resume-texte {
+  margin: 10px 0 0;
+  font-size: 14.5px; line-height: 1.55; color: var(--ink);
+  white-space: pre-wrap;   /* les paragraphes saisis à la main sont conservés */
+}
+
+.serie-liste-tomes {
+  margin: 14px 0 0; padding-left: 20px;
+  display: flex; flex-direction: column; gap: 5px;
+  font-size: 14px;
+}
+.serie-liste-tomes li { color: var(--ink-soft); }
+
+.serie-tome-lien {
+  border: none; background: none; padding: 0; cursor: pointer;
+  font-family: var(--sans); font-size: 14px; font-weight: 600;
+  color: var(--ink); text-align: left;
+}
+.serie-tome-lien:hover { color: var(--accent-deep); text-decoration: underline; }
+.serie-tome-pages { font-size: 12.5px; color: var(--ink-soft); margin-left: 8px; }
+
+.serie-vide { color: var(--ink-soft); font-size: 13.5px; font-style: italic; }
+
+.serie-modifier { position: absolute; top: 16px; right: 18px; }
+
+/* ---------- La fenêtre d'édition d'une série ---------- */
+.serie-label {
+  display: block; margin: 16px 0 6px;
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .08em; color: var(--ink-soft);
+}
+.serie-champ {
+  width: 100%; box-sizing: border-box;
+  padding: 10px 12px;
+  border: 1px solid var(--line); border-radius: 9px;
+  background: #fffdf8; color: var(--ink);
+  font-family: var(--sans); font-size: 14.5px;
+}
+.serie-champ:focus {
+  outline: none; border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(138,75,56,.14);
+}
+.serie-resume { font-family: var(--serif); font-size: 15px; line-height: 1.5; resize: vertical; }
+
+.serie-tomes { list-style: none; padding: 0; margin: 0 0 12px; display: flex; flex-direction: column; gap: 6px; }
+.serie-tome-ligne {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 10px;
+  border: 1px solid var(--line); border-radius: 9px;
+  background: var(--cream);
+}
+.serie-tome-num {
+  font-size: 11.5px; font-weight: 700; color: var(--accent-deep);
+  white-space: nowrap;
+}
+/* Le titre prend la place qui reste, et se coupe plutôt que de pousser les
+   boutons hors de la carte. */
+.serie-tome-nom {
+  flex: 1; min-width: 0;
+  font-size: 14px; color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.serie-tome-ligne .btn-mini { padding: 4px 9px; font-size: 12px; }
+
+.serie-ajout { display: flex; gap: 8px; align-items: center; }
+.serie-ajout .serie-champ { flex: 1; min-width: 0; }
+
+/* Supprimer n'est pas annuler : la couleur le dit, et l'écart le confirme —
+   le bouton part à gauche, loin de « Enregistrer » qu'on vise sans regarder. */
+.serie-supprimer {
+  margin-right: auto;
+  color: #a33;
+  border-color: rgba(170,51,51,.35);
+}
+.serie-supprimer:hover { background: #a33; border-color: #a33; color: #fff; }
+
+@media (max-width: 560px) {
+  .serie-modifier { position: static; margin-top: 14px; }
+  .serie-ajout { flex-direction: column; align-items: stretch; }
+}
+
 .livres-vide {
   grid-column: 1 / -1;
   text-align: center;

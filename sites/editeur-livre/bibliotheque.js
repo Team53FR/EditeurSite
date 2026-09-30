@@ -36,6 +36,16 @@ async function chargerBibliotheque() {
   // dernière connexion.
   moiCentral = await rafraichirIdentiteCentrale();
 
+  // Les séries ne sont qu'un classement : si leur lecture échoue, la
+  // bibliothèque doit rester utilisable. On note l'incident et on continue.
+  try {
+    series = await chargerSeries();
+  } catch (erreur) {
+    series = [];
+    message.textContent = "Séries indisponibles : " + erreur.message;
+  }
+
+  afficherSeries();
   afficherListeLivres();
 
   // Tutoriel de bienvenue au tout premier lancement (une seule fois).
@@ -180,6 +190,16 @@ function afficherListeLivres() {
       if (e.key === "Enter" || e.key === " ") { e.preventDefault(); ouvrirStatsLivre(livre.id); }
     };
 
+    // Renommer : le titre ne se changeait que dans l'éditeur de couverture,
+    // une fois le livre ouvert — autant dire nulle part.
+    const btnRenommer = document.createElement("button");
+    btnRenommer.className = "livre-renommer";
+    btnRenommer.textContent = "✎";
+    btnRenommer.title = "Renommer ce livre";
+    btnRenommer.setAttribute("aria-label", "Renommer « " + (livre.titre || "") + " »");
+    btnRenommer.onclick = (e) => { e.stopPropagation(); renommerLivre(livre.id); };
+    li.appendChild(btnRenommer);
+
     const btnSuppr = document.createElement("button");
     btnSuppr.className = "livre-suppr";
     btnSuppr.textContent = "✕";
@@ -190,6 +210,352 @@ function afficherListeLivres() {
     liste.appendChild(li);
   });
 }
+
+// ----- Renommer un livre -----
+//
+// Le titre est aussi celui imprimé sur la couverture : c'est la même donnée,
+// et la changer ici la change là-bas. On ne touche QUE le titre
+// (mettreAJourLivre), jamais le manuscrit — la bibliothèque n'a pas le texte
+// en mémoire, et l'enregistrement complet le refuserait justement.
+async function renommerLivre(id) {
+  const livre = bibliotheque.livres.find((l) => l.id === id);
+  if (!livre) return;
+
+  const saisi = prompt("Nouveau titre du livre :", livre.titre || "");
+  if (saisi === null) return;                       // annulé
+  const titre = saisi.trim();
+  if (!titre || titre === livre.titre) return;      // vide ou inchangé : rien à faire
+
+  const message = document.getElementById("message");
+  try {
+    await mettreAJourLivre(id, { titre, maj_le: new Date().toISOString() });
+  } catch (e) {
+    message.textContent = "Renommage impossible : " + e.message;
+    return;
+  }
+  livre.titre = titre;
+  afficherListeLivres();
+  afficherSeries();
+  message.textContent = "Livre renommé.";
+  setTimeout(() => { if (message.textContent === "Livre renommé.") message.textContent = ""; }, 3000);
+}
+
+// =====================================================================
+//  Séries : plusieurs tomes d'une même histoire
+//
+//  Une série RANGE des livres et porte le résumé d'ensemble ; elle ne les
+//  contient pas. Chaque tome reste listé dans « Mes livres » et s'ouvre,
+//  s'imprime et se publie exactement comme avant — supprimer une série ne
+//  supprime donc aucun manuscrit.
+// =====================================================================
+
+let series = [];
+let serieEnEdition = null;   // l'id de la série ouverte, ou null si c'est une création
+let tomesEnEdition = [];     // les ids des livres, dans l'ordre choisi
+
+function livreParId(id) {
+  return bibliotheque.livres.find((l) => l.id === id) || null;
+}
+
+// Les tomes d'une série, dans l'ordre. `tome` fait foi ; à défaut (un livre
+// rattaché sans numéro), on retombe sur l'ordre de création.
+function tomesDeLaSerie(serieId) {
+  return bibliotheque.livres
+    .filter((l) => l.serieId === serieId)
+    .sort((a, b) => {
+      const ta = typeof a.tome === "number" ? a.tome : Infinity;
+      const tb = typeof b.tome === "number" ? b.tome : Infinity;
+      if (ta !== tb) return ta - tb;
+      return String(a.dateCreation || "").localeCompare(String(b.dateCreation || ""));
+    });
+}
+
+function afficherSeries() {
+  const section = document.getElementById("sectionSeries");
+  const liste = document.getElementById("listeSeries");
+  const btnHaut = document.getElementById("btnNouvelleSerie");
+  if (!section || !liste) return;
+
+  // Pas de série : la section disparaît, et c'est le bouton de la barre
+  // « Mes livres » qui propose d'en créer une. Une section vide sur une
+  // bibliothèque qui n'en a jamais eu ne ferait qu'encombrer.
+  section.hidden = series.length === 0;
+  if (btnHaut) btnHaut.hidden = series.length > 0;
+
+  liste.innerHTML = "";
+  series.forEach((serie) => {
+    const tomes = tomesDeLaSerie(serie.id);
+
+    const li = document.createElement("li");
+    li.className = "serie-carte";
+
+    const entete = document.createElement("div");
+    entete.className = "serie-entete";
+    entete.innerHTML =
+      '<span class="serie-nom">' + echapper(serie.titre || "Série sans titre") + "</span>" +
+      '<span class="serie-compte">' + tomes.length +
+        (tomes.length > 1 ? " tomes" : " tome") + "</span>";
+    li.appendChild(entete);
+
+    if (serie.resume) {
+      const resume = document.createElement("p");
+      resume.className = "serie-resume-texte";
+      resume.textContent = serie.resume;
+      li.appendChild(resume);
+    }
+
+    const ol = document.createElement("ol");
+    ol.className = "serie-liste-tomes";
+    if (!tomes.length) {
+      const vide = document.createElement("li");
+      vide.className = "serie-vide";
+      vide.textContent = "Aucun tome pour l'instant.";
+      ol.appendChild(vide);
+    } else {
+      tomes.forEach((l) => {
+        const item = document.createElement("li");
+        const lien = document.createElement("button");
+        lien.type = "button";
+        lien.className = "serie-tome-lien";
+        lien.textContent = l.titre || "Sans titre";
+        lien.title = "Ouvrir « " + (l.titre || "") + " »";
+        lien.onclick = () => ouvrirLivre(l.id);
+        item.appendChild(lien);
+        const pages = document.createElement("span");
+        pages.className = "serie-tome-pages";
+        pages.textContent = (l.nbPages || 0) + " p.";
+        item.appendChild(pages);
+        ol.appendChild(item);
+      });
+    }
+    li.appendChild(ol);
+
+    const modifier = document.createElement("button");
+    modifier.type = "button";
+    modifier.className = "btn-mini serie-modifier";
+    modifier.textContent = "Modifier";
+    modifier.onclick = () => ouvrirEditionSerie(serie.id);
+    li.appendChild(modifier);
+
+    liste.appendChild(li);
+  });
+}
+
+// ----- La fenêtre : créer ou modifier une série -----
+
+function ouvrirEditionSerie(id) {
+  const modal = document.getElementById("modalSerie");
+  if (!modal) return;
+
+  const serie = id ? series.find((s) => s.id === id) : null;
+  serieEnEdition = serie ? serie.id : null;
+  tomesEnEdition = serie ? tomesDeLaSerie(serie.id).map((l) => l.id) : [];
+
+  document.getElementById("serieTitreFenetre").textContent =
+    serie ? "Modifier la série" : "Nouvelle série";
+  document.getElementById("serieTitre").value = serie ? serie.titre : "";
+  document.getElementById("serieResume").value = serie ? serie.resume : "";
+  document.getElementById("serieMessage").textContent = "";
+  // Rien à supprimer tant que la série n'existe pas.
+  document.getElementById("serieSupprimer").hidden = !serie;
+
+  rendreTomesEnEdition();
+  modal.style.display = "flex";
+  document.getElementById("serieTitre").focus();
+}
+
+function fermerEditionSerie() {
+  const modal = document.getElementById("modalSerie");
+  if (modal) modal.style.display = "none";
+  serieEnEdition = null;
+  tomesEnEdition = [];
+}
+
+// La liste des tomes choisis, et le menu des livres encore disponibles.
+function rendreTomesEnEdition() {
+  const ul = document.getElementById("serieTomes");
+  const menu = document.getElementById("serieAjoutLivre");
+  if (!ul || !menu) return;
+
+  ul.innerHTML = "";
+  tomesEnEdition.forEach((livreId, i) => {
+    const livre = livreParId(livreId);
+    const li = document.createElement("li");
+    li.className = "serie-tome-ligne";
+
+    const num = document.createElement("span");
+    num.className = "serie-tome-num";
+    num.textContent = "Tome " + (i + 1);
+    li.appendChild(num);
+
+    const nom = document.createElement("span");
+    nom.className = "serie-tome-nom";
+    nom.textContent = livre ? (livre.titre || "Sans titre") : "(livre introuvable)";
+    li.appendChild(nom);
+
+    const monter = document.createElement("button");
+    monter.type = "button";
+    monter.className = "btn-mini";
+    monter.textContent = "↑";
+    monter.title = "Monter d'un rang";
+    monter.disabled = i === 0;
+    monter.onclick = () => { deplacerTome(i, -1); };
+    li.appendChild(monter);
+
+    const descendre = document.createElement("button");
+    descendre.type = "button";
+    descendre.className = "btn-mini";
+    descendre.textContent = "↓";
+    descendre.title = "Descendre d'un rang";
+    descendre.disabled = i === tomesEnEdition.length - 1;
+    descendre.onclick = () => { deplacerTome(i, 1); };
+    li.appendChild(descendre);
+
+    const retirer = document.createElement("button");
+    retirer.type = "button";
+    retirer.className = "btn-mini";
+    retirer.textContent = "Retirer";
+    retirer.title = "Retirer de la série (le livre n'est pas supprimé)";
+    retirer.onclick = () => {
+      tomesEnEdition.splice(i, 1);
+      rendreTomesEnEdition();
+    };
+    li.appendChild(retirer);
+
+    ul.appendChild(li);
+  });
+
+  if (!tomesEnEdition.length) {
+    const vide = document.createElement("li");
+    vide.className = "serie-vide";
+    vide.textContent = "Aucun tome. Ajoutez-en un ci-dessous.";
+    ul.appendChild(vide);
+  }
+
+  // Un livre ne peut appartenir qu'à une série : on ne propose donc que les
+  // livres libres, plus ceux déjà rattachés à CELLE-CI (pour pouvoir les
+  // retirer puis les remettre sans quitter la fenêtre).
+  const dispo = bibliotheque.livres.filter((l) =>
+    !tomesEnEdition.includes(l.id) && (!l.serieId || l.serieId === serieEnEdition));
+
+  menu.innerHTML = "";
+  if (!dispo.length) {
+    const opt = document.createElement("option");
+    opt.value = "";
+    opt.textContent = "Aucun livre disponible";
+    menu.appendChild(opt);
+    menu.disabled = true;
+  } else {
+    menu.disabled = false;
+    dispo.forEach((l) => {
+      const opt = document.createElement("option");
+      opt.value = l.id;
+      opt.textContent = l.titre || "Sans titre";
+      menu.appendChild(opt);
+    });
+  }
+}
+
+function deplacerTome(i, sens) {
+  const j = i + sens;
+  if (j < 0 || j >= tomesEnEdition.length) return;
+  const tmp = tomesEnEdition[i];
+  tomesEnEdition[i] = tomesEnEdition[j];
+  tomesEnEdition[j] = tmp;
+  rendreTomesEnEdition();
+}
+
+function ajouterTomeAlaSerie() {
+  const menu = document.getElementById("serieAjoutLivre");
+  if (!menu || !menu.value) return;
+  tomesEnEdition.push(menu.value);
+  rendreTomesEnEdition();
+}
+
+async function enregistrerSerie() {
+  const message = document.getElementById("serieMessage");
+  const titre = document.getElementById("serieTitre").value.trim();
+  const resume = document.getElementById("serieResume").value.trim();
+
+  if (!titre) {
+    message.textContent = "Donnez un titre à la série.";
+    document.getElementById("serieTitre").focus();
+    return;
+  }
+
+  try {
+    let id = serieEnEdition;
+    if (id) {
+      await mettreAJourSerie(id, { titre, resume: resume || null });
+      const s = series.find((x) => x.id === id);
+      if (s) { s.titre = titre; s.resume = resume; }
+    } else {
+      id = await creerSerieDistante(titre, resume);
+      series.push({ id, titre, resume, dateCreation: new Date().toISOString() });
+    }
+
+    // Les livres qui étaient dans la série et n'y sont plus : on les détache.
+    const avant = tomesDeLaSerie(id).map((l) => l.id);
+    const retires = avant.filter((livreId) => !tomesEnEdition.includes(livreId));
+
+    for (const livreId of retires) {
+      await definirSerieDuLivre(livreId, null);
+      const l = livreParId(livreId);
+      if (l) { l.serieId = null; l.tome = null; }
+    }
+    // Puis on (re)numérote ceux qui restent, dans l'ordre affiché.
+    for (let i = 0; i < tomesEnEdition.length; i++) {
+      const livreId = tomesEnEdition[i];
+      await definirSerieDuLivre(livreId, id, i + 1);
+      const l = livreParId(livreId);
+      if (l) { l.serieId = id; l.tome = i + 1; }
+    }
+  } catch (e) {
+    message.textContent = "Enregistrement impossible : " + e.message;
+    return;
+  }
+
+  fermerEditionSerie();
+  afficherSeries();
+  afficherListeLivres();
+}
+
+async function supprimerSerieCourante() {
+  if (!serieEnEdition) return;
+  const serie = series.find((s) => s.id === serieEnEdition);
+  const nb = tomesDeLaSerie(serieEnEdition).length;
+
+  if (!confirm("Supprimer la série « " + (serie ? serie.titre : "") + " » ?\n\n" +
+      (nb ? "Ses " + nb + " tome(s) ne seront PAS supprimés : ils redeviennent des livres sans série.\n"
+          : "") +
+      "Le résumé de l'histoire, lui, sera perdu.")) {
+    return;
+  }
+
+  const message = document.getElementById("serieMessage");
+  try {
+    await supprimerSerieDistante(serieEnEdition);
+  } catch (e) {
+    message.textContent = "Suppression impossible : " + e.message;
+    return;
+  }
+
+  // La base a mis serie_id à NULL toute seule (« on delete set null ») :
+  // on aligne l'état local sur elle plutôt que de recharger la page.
+  bibliotheque.livres.forEach((l) => {
+    if (l.serieId === serieEnEdition) { l.serieId = null; l.tome = null; }
+  });
+  series = series.filter((s) => s.id !== serieEnEdition);
+
+  fermerEditionSerie();
+  afficherSeries();
+  afficherListeLivres();
+}
+
+document.addEventListener("keydown", (e) => {
+  const modal = document.getElementById("modalSerie");
+  if (e.key === "Escape" && modal && modal.style.display !== "none") fermerEditionSerie();
+});
 
 // =====================================================================
 //  Statistiques d'un livre

@@ -406,6 +406,28 @@ vit en `localStorage`, partagée avec le portail et les deux autres sites (voir
 `sessionStorage` : c'est l'état d'un onglet, pas une session, et le déplacer
 ferait que deux onglets sur deux livres différents se marcheraient dessus.
 
+**Renommer un livre** : le titre ne se changeait que dans l'éditeur de
+couverture, une fois le livre ouvert — autant dire nulle part. Le crayon ✎ de
+chaque carte de la bibliothèque le fait désormais, par `mettreAJourLivre()` :
+seul le titre part en base, jamais le manuscrit, que la bibliothèque n'a de
+toute façon pas en mémoire (`enregistrerLivreDistant` le refuserait).
+
+**Séries** (table `series` + colonnes `livres.serie_id` / `livres.tome`) :
+plusieurs tomes d'une même histoire, avec le résumé d'ensemble et l'ordre de
+lecture. Une série n'est qu'un **classement** — chaque tome reste listé dans
+« Mes livres » et s'ouvre, s'imprime et se publie exactement comme avant. Deux
+conséquences voulues :
+
+- La clé étrangère est en `on delete set null`, jamais `cascade` : supprimer
+  une série ne doit pas emporter les manuscrits qu'elle rangeait. Les tomes
+  redeviennent des livres sans série, et seul le résumé est perdu.
+- Rien dans les règles de lecture des livres ne dépend de la série ; la table
+  `series` est privée sans exception, sans équivalent de « publié ».
+
+La numérotation des tomes est réécrite à chaque enregistrement, dans l'ordre
+affiché : le rang dans la fenêtre fait foi, pas un numéro saisi à la main qu'il
+faudrait tenir d'accord.
+
 **Statistiques d'un livre** : dans la bibliothèque, la ligne « format · pages »
 sous le titre d'une carte ouvre la fiche du livre — mots, pages, chapitres,
 temps de lecture, signes, densité, longueur du plus long et du plus court

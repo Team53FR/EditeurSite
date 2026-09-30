@@ -53,8 +53,21 @@
 
   <!-- ===== Contenu ===== -->
   <main class="contenu">
+
+    <!-- Séries : plusieurs tomes d'une même histoire. Une série ne fait que
+         RANGER des livres — chaque tome reste listé dans « Mes livres » et
+         s'ouvre comme n'importe quel autre. -->
+    <section id="sectionSeries" class="section-series" hidden>
+      <div class="barre-section">
+        <h2>Mes séries</h2>
+        <button class="btn-mini" onclick="ouvrirEditionSerie()">+ Nouvelle série</button>
+      </div>
+      <ul id="listeSeries" class="liste-series"></ul>
+    </section>
+
     <div class="barre-section">
       <h2>Mes livres</h2>
+      <button id="btnNouvelleSerie" class="btn-mini" onclick="ouvrirEditionSerie()">+ Nouvelle série</button>
     </div>
 
     <ul id="listeLivres" class="grille-livres"></ul>
@@ -78,6 +91,41 @@
          onclick="event.stopPropagation()">
       <button class="modal-fermer" onclick="fermerStatsLivre()" aria-label="Fermer">&#10005;</button>
       <div id="statsContenu"></div>
+    </div>
+  </div>
+
+  <!-- Créer ou modifier une série : son titre, son résumé, et les tomes
+       qu'elle range, dans l'ordre. -->
+  <div id="modalSerie" class="modal-fond" style="display:none" onclick="fermerEditionSerie()">
+    <div class="modal-carte" role="dialog" aria-modal="true" aria-label="Série"
+         onclick="event.stopPropagation()">
+      <button class="modal-fermer" onclick="fermerEditionSerie()" aria-label="Fermer">&#10005;</button>
+      <h3 id="serieTitreFenetre">Nouvelle série</h3>
+
+      <label class="serie-label" for="serieTitre">Titre de la série</label>
+      <input type="text" id="serieTitre" class="serie-champ" maxlength="120"
+             placeholder="Le nom de l'histoire, pas celui d'un tome">
+
+      <label class="serie-label" for="serieResume">Résumé de l'histoire</label>
+      <textarea id="serieResume" class="serie-champ serie-resume" rows="5"
+                placeholder="De quoi parle l'ensemble des tomes ?"></textarea>
+
+      <div id="serieBlocTomes" class="stats-bloc">
+        <h4>Les tomes <span class="h4-aide">— dans l'ordre de lecture</span></h4>
+        <ul id="serieTomes" class="serie-tomes"></ul>
+        <div class="serie-ajout">
+          <select id="serieAjoutLivre" class="serie-champ"></select>
+          <button type="button" class="btn-mini" onclick="ajouterTomeAlaSerie()">Ajouter ce livre</button>
+        </div>
+      </div>
+
+      <p id="serieMessage" class="message"></p>
+
+      <div class="ci-actions">
+        <button type="button" id="serieSupprimer" class="ci-annuler serie-supprimer" onclick="supprimerSerieCourante()">Supprimer la série</button>
+        <button type="button" class="ci-annuler" onclick="fermerEditionSerie()">Annuler</button>
+        <button type="button" class="ci-generer" onclick="enregistrerSerie()">Enregistrer</button>
+      </div>
     </div>
   </div>
 

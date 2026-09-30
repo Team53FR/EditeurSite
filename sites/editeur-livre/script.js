@@ -224,6 +224,8 @@ function versLivreMemoire(r) {
     auteur: r.auteur || "",
     format: r.format || "149x210",
     espaceTitre: r.espace_titre == null ? undefined : Number(r.espace_titre),
+    serieId: r.serie_id || null,
+    tome: r.tome == null ? null : Number(r.tome),
     publie: !!r.publie,
     publieLe: r.publie_le || null,
     couverture: r.couverture || undefined,
@@ -247,6 +249,13 @@ function versLigneLivre(livre, horodatage) {
     auteur: livre.auteur || null,
     format: livre.format || "149x210",
     espace_titre: (typeof livre.espaceTitre === "number") ? livre.espaceTitre : null,
+    // Écrites explicitement plutôt que laissées de côté : cette fonction ne
+    // sert qu'à des livres chargés en entier (le garde-fou d'en dessous s'en
+    // assure), donc le rattachement est toujours connu — et l'écrire noir sur
+    // blanc évite de dépendre des colonnes que PostgREST choisit de toucher
+    // dans la branche « ON CONFLICT UPDATE ».
+    serie_id: livre.serieId || null,
+    tome: (typeof livre.tome === "number") ? livre.tome : null,
     publie: !!livre.publie,
     publie_le: livre.publieLe || null,
     couverture: livre.couverture || null,
@@ -268,12 +277,67 @@ function versLigneLivre(livre, horodatage) {
 // pagination, et la bibliothèque affichait alors « 0 p. ».
 const CHAMPS_LIVRE_META =
   "id,titre,auteur,format,espace_titre,publie,publie_le,couverture,quatrieme,tranche,nb_pages,cree_le,maj_le," +
-  "livre_spreads(count)";
+  "serie_id,tome,livre_spreads(count)";
 
 async function chargerBibliothequeMeta() {
   const lignes = await requeteSupabase(
     `livres?user_id=eq.${monIdentifiant()}&select=${CHAMPS_LIVRE_META}&order=cree_le`);
   return { livres: (lignes || []).map(versLivreMemoire) };
+}
+
+// ----- Séries : plusieurs tomes d'une même histoire -----
+//
+// Une série n'est qu'un CLASSEMENT. Elle range des livres et porte le résumé
+// d'ensemble ; le tome, lui, reste un livre autonome qui s'ouvre, s'imprime
+// et se publie sans elle. Supprimer une série ne supprime donc aucun livre
+// (« on delete set null » côté base) : les tomes redeviennent des livres sans
+// série.
+
+async function chargerSeries() {
+  const lignes = await requeteSupabase(
+    `series?user_id=eq.${monIdentifiant()}&select=id,titre,resume,cree_le,maj_le&order=cree_le`);
+  return (lignes || []).map((r) => ({
+    id: r.id,
+    titre: r.titre || "",
+    resume: r.resume || "",
+    dateCreation: r.cree_le,
+    dateModif: r.maj_le
+  }));
+}
+
+async function creerSerieDistante(titre, resume) {
+  const id = "s" + Date.now();
+  await requeteSupabase("series", {
+    method: "POST",
+    headers: { Prefer: "return=minimal" },
+    body: JSON.stringify({
+      id,
+      user_id: monIdentifiant(),
+      titre: titre,
+      resume: resume || null
+    })
+  });
+  return id;
+}
+
+async function mettreAJourSerie(id, champs) {
+  await requeteSupabase(`series?id=eq.${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { Prefer: "return=minimal" },
+    body: JSON.stringify(Object.assign({ maj_le: new Date().toISOString() }, champs))
+  });
+}
+
+async function supprimerSerieDistante(id) {
+  await requeteSupabase(`series?id=eq.${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
+// Rattacher un livre à une série (ou l'en détacher avec serieId = null).
+async function definirSerieDuLivre(livreId, serieId, tome) {
+  await mettreAJourLivre(livreId, {
+    serie_id: serieId,
+    tome: serieId ? (typeof tome === "number" ? tome : null) : null
+  });
 }
 
 // Un livre entier : sa ligne, ses double-pages, son cache de pagination.

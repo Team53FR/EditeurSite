@@ -27,6 +27,20 @@
 -- autre compte pour vérifier s'il est publié.
 -- ============================================================================
 
+-- Une série regroupe plusieurs tomes d'une même histoire et porte le résumé
+-- d'ensemble. Ce n'est qu'un CLASSEMENT : un tome reste un livre autonome,
+-- qui s'ouvre, s'imprime et se publie sans elle. Rien dans les règles de
+-- lecture des livres ne dépend de la série.
+create table public.series (
+  id       text primary key,
+  user_id  uuid not null references public.users(id) on delete cascade,
+  titre    text not null,
+  resume   text,
+  cree_le  timestamptz not null default now(),
+  maj_le   timestamptz not null default now()
+);
+create index series_user_id_idx on public.series(user_id);
+
 create table public.livres (
   id            text primary key,
   user_id       uuid not null references public.users(id) on delete cascade,
@@ -34,6 +48,11 @@ create table public.livres (
   auteur        text,
   format        text not null,
   espace_titre  numeric,
+  -- « on delete set null » et NON « cascade » : supprimer une série ne doit
+  -- jamais emporter les manuscrits qu'elle rangeait. Les tomes redeviennent
+  -- des livres sans série.
+  serie_id      text references public.series(id) on delete set null,
+  tome          integer,
   publie        boolean not null default false,
   publie_le     timestamptz,
   couverture    jsonb,   -- {fond, imageChemin, texte, afficherTitre, afficherAuteur, imgZoom, imgOffsetX/Y, imgBaseW/H, ...}
@@ -58,8 +77,33 @@ create table public.livre_spreads (
   primary key (livre_id, position)
 );
 
+create index livres_serie_idx on public.livres(serie_id) where serie_id is not null;
+
 alter table public.livres enable row level security;
 alter table public.livre_spreads enable row level security;
+alter table public.series enable row level security;
+
+-- Une série est privée sans exception : contrairement aux livres, elle n'a
+-- pas d'équivalent de « publié ».
+create policy "series : lecture (soi-même)" on public.series
+  for select using ((select auth.uid()) = user_id);
+create policy "series : écriture (soi-même)" on public.series
+  for insert with check ((select auth.uid()) = user_id);
+create policy "series : modification (soi-même)" on public.series
+  for update using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
+create policy "series : suppression (soi-même)" on public.series
+  for delete using ((select auth.uid()) = user_id);
+
+-- Droits explicites, dans les deux sens.
+--
+-- À partir du 30/10/2026, Supabase n'accorde PLUS automatiquement de droits
+-- sur les nouvelles tables du schéma public : sans le grant, la table serait
+-- invisible de l'API malgré ses policies. Avant cette date, il accorde au
+-- contraire TOUT à « anon » — d'où le revoke. Une série ne se lit ni ne
+-- s'écrit sans compte, et un droit qu'on n'a pas ne peut pas être ouvert par
+-- mégarde dans une policy future.
+grant select, insert, update, delete on public.series to authenticated;
+revoke all on public.series from anon;
 
 -- Une seule politique de lecture (propriétaire OU publié) : deux politiques
 -- permissives distinctes seraient chacune évaluée à chaque lecture, pour le
