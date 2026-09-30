@@ -172,6 +172,36 @@ function cheminDepuisUrlStorage(url) {
   return (typeof url === "string" && url.startsWith(prefixe)) ? url.slice(prefixe.length) : null;
 }
 
+// Copie un visuel vers un autre chemin du même bucket, et renvoie l'URL
+// publique de la copie (ou null s'il n'y avait rien à copier).
+//
+// Storage copie côté serveur : les octets ne repassent pas par le navigateur,
+// ce qui compte pour une couverture de plusieurs mégaoctets.
+//
+// Pourquoi COPIER plutôt que partager le chemin : supprimer un livre supprime
+// ses images (voir supprimerLivre). Deux livres qui pointeraient le même
+// fichier, et effacer l'un ferait disparaître la couverture de l'autre.
+async function copierImageStorage(urlOuCheminSource, cheminDest) {
+  const source = cheminDepuisUrlStorage(urlOuCheminSource) || urlOuCheminSource;
+  // Une image restée sur un serveur extérieur n'est pas à nous : on laisse
+  // les deux livres pointer dessus, il n'y a rien à supprimer plus tard.
+  if (!source || /^https?:\/\//i.test(source)) return urlOuCheminSource || null;
+
+  const reponse = await fetch(`${SUPABASE_URL}/storage/v1/object/copy`, {
+    method: "POST",
+    headers: {
+      "apikey": SUPABASE_ANON_KEY,
+      "Authorization": `Bearer ${_jetonCourant()}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ bucketId: BUCKET, sourceKey: source, destinationKey: cheminDest })
+  });
+  if (!reponse.ok) {
+    throw new Error("Copie de l'image impossible (" + reponse.status + ").");
+  }
+  return `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${cheminDest}`;
+}
+
 async function supprimerImageStorage(urlOuChemin) {
   const chemin = cheminDepuisUrlStorage(urlOuChemin) || urlOuChemin;
   if (!chemin || /^https?:\/\//i.test(chemin)) return;

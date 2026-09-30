@@ -433,6 +433,24 @@ format ou l'interligne — surtout pas par `mettreAJourLivre()`, qui changerait
 `maj_le` dans le dos de l'éditeur et ferait croire à la sauvegarde suivante que
 le livre a été modifié ailleurs.
 
+**Dupliquer un livre** (bouton ⧉ de la carte) : le doublon est un livre neuf et
+indépendant — texte, mise en page, réglages et visuels lui appartiennent. Trois
+choses ne se recopient pas, et c'est délibéré :
+
+- **la publication** — un brouillon de travail n'a pas à paraître publié le
+  jour de sa création ;
+- **le rattachement à une série** — le doublon prendrait le numéro de tome de
+  l'original, et la série afficherait deux « Tome 3 » ;
+- **les images**, qui sont COPIÉES dans Storage et jamais partagées.
+
+Ce dernier point est le piège de la fonctionnalité : `supprimerLivre()` efface
+les fichiers de Storage **par chemin**. Deux livres pointant le même visuel, et
+supprimer l'un ferait disparaître la couverture de l'autre. D'où
+`copierImageStorage()`, qui duplique côté serveur (`/storage/v1/object/copy`,
+les octets ne repassent pas par le navigateur) vers le chemin du nouveau livre.
+Si la copie échoue, le doublon repart **sans** l'image et le dit — jamais de
+repli sur le chemin de l'original.
+
 **Renommer un livre** : le titre ne se changeait que dans l'éditeur de
 couverture, une fois le livre ouvert — autant dire nulle part. Le crayon ✎ de
 chaque carte de la bibliothèque le fait désormais, par `mettreAJourLivre()` :

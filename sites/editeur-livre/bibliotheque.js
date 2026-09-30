@@ -203,6 +203,14 @@ function afficherListeLivres() {
     btnRenommer.onclick = (e) => { e.stopPropagation(); renommerLivre(livre.id); };
     li.appendChild(btnRenommer);
 
+    const btnDupliquer = document.createElement("button");
+    btnDupliquer.className = "livre-dupliquer";
+    btnDupliquer.textContent = "⧉";
+    btnDupliquer.title = "Dupliquer ce livre";
+    btnDupliquer.setAttribute("aria-label", "Dupliquer « " + (livre.titre || "") + " »");
+    btnDupliquer.onclick = (e) => { e.stopPropagation(); dupliquerLivre(livre.id); };
+    li.appendChild(btnDupliquer);
+
     const btnSuppr = document.createElement("button");
     btnSuppr.className = "livre-suppr";
     btnSuppr.textContent = "✕";
@@ -212,6 +220,100 @@ function afficherListeLivres() {
 
     liste.appendChild(li);
   });
+}
+
+// ----- Dupliquer un livre -----
+//
+// Le doublon est un livre neuf, indépendant : son texte, ses réglages et ses
+// visuels sont à lui. Trois choses ne se recopient PAS, et c'est délibéré :
+//
+//   - la publication — un brouillon de travail n'a aucune raison de paraître
+//     publié le jour de sa création ;
+//   - le rattachement à une série — le doublon prendrait le numéro de tome de
+//     l'original, et la série afficherait deux « Tome 3 » ;
+//   - les images, qui sont COPIÉES et non partagées : supprimer un livre
+//     supprime ses fichiers, et un chemin commun ferait disparaître la
+//     couverture de l'autre.
+
+// Le chemin d'un visuel du nouveau livre, à la convention du bucket :
+// <compte>/<id du livre>_<face>.<extension> (voir script.js).
+function cheminVisuelCopie(urlSource, nouvelId, face) {
+  const source = cheminDepuisUrlStorage(urlSource) || String(urlSource || "");
+  const ext = (source.split(".").pop() || "jpg").toLowerCase();
+  return `${obtenirPrefixeImagesUtilisateur()}/${nouvelId}_${face}.${ext}`;
+}
+
+async function dupliquerLivre(id) {
+  const message = document.getElementById("message");
+  const meta = bibliotheque.livres.find((l) => l.id === id);
+  if (!meta) return;
+
+  if (!confirm("Dupliquer « " + (meta.titre || "Sans titre") + " » ?\n\n" +
+      "Le doublon reprend le texte, la mise en page et les couvertures, " +
+      "mais ne sera ni publié ni rattaché à une série.")) {
+    return;
+  }
+
+  message.textContent = "Duplication en cours…";
+  try {
+    // La bibliothèque n'a que les métadonnées : il faut le texte pour le copier.
+    const source = await chargerLivreComplet(id);
+    const nouvelId = "l" + Date.now();
+
+    const nouveau = {
+      id: nouvelId,
+      titre: (source.titre || "Sans titre") + " (copie)",
+      auteur: source.auteur || "",
+      format: source.format,
+      espaceTitre: source.espaceTitre,
+      gardesDebut: source.gardesDebut,
+      gardesFin: source.gardesFin,
+      couverture: source.couverture ? Object.assign({}, source.couverture) : undefined,
+      quatrieme: source.quatrieme ? Object.assign({}, source.quatrieme) : undefined,
+      tranche: source.tranche ? Object.assign({}, source.tranche) : undefined,
+      pages: Array.isArray(source.pages) ? source.pages.map((p) => Object.assign({}, p)) : [],
+      spreads: Array.isArray(source.spreads) ? source.spreads.slice() : [""],
+      nbPages: source.nbPages || 0,
+      publie: false,
+      publieLe: null,
+      serieId: null,
+      tome: null
+    };
+
+    // Les visuels, un par un. Une copie qui échoue ne doit pas emporter la
+    // duplication — on préfère un doublon sans image à pas de doublon du tout
+    // — mais elle ne doit pas non plus passer sous silence : sans le dire, on
+    // laisserait croire que la couverture a été reprise. Et surtout, jamais
+    // de repli sur le chemin de l'original : supprimer un livre supprime ses
+    // fichiers, et l'autre perdrait sa couverture.
+    const manquantes = [];
+    for (const face of ["couverture", "quatrieme", "tranche"]) {
+      const data = nouveau[face];
+      if (!data || !data.imageChemin) continue;
+      try {
+        data.imageChemin = await copierImageStorage(
+          data.imageChemin, cheminVisuelCopie(data.imageChemin, nouvelId, face));
+      } catch (e) {
+        delete data.imageChemin;
+        manquantes.push(face === "quatrieme" ? "4e de couverture" : face);
+      }
+    }
+
+    await creerLivreDistant(nouveau);
+    bibliotheque.livres.push(nouveau);
+    afficherListeLivres();
+    afficherSeries();
+
+    message.textContent = manquantes.length
+      ? "Livre dupliqué, mais sans " + manquantes.join(", ") +
+        " : l'image n'a pas pu être copiée."
+      : "Livre dupliqué : « " + nouveau.titre + " ».";
+    setTimeout(() => {
+      if (message.textContent.startsWith("Livre dupliqué")) message.textContent = "";
+    }, 6000);
+  } catch (erreur) {
+    message.textContent = "Duplication impossible : " + erreur.message;
+  }
 }
 
 // ----- Renommer un livre -----
