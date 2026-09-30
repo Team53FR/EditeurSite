@@ -3523,33 +3523,10 @@ function repaginerTout() {
 
 // ----- Compteur de mots (sur le texte continu) -----
 
-// Le texte d'un passage tel qu'on le LIT, et non tel que textContent le rend.
-//
-// textContent recolle ce que les balises séparaient : « <h2>Introduction</h2>
-// <p>Un monde » devient « IntroductionUn monde », et le livre entier, dont les
-// paragraphes sont séparés par « <br><br> », perdait ainsi un mot à chaque
-// changement de paragraphe. On rend donc aux ruptures l'espace qu'elles
-// occupent à l'écran.
-//
-// Le remplacement se fait sur le HTML, avant l'analyse, et non sur le DOM
-// ensuite : ce compteur tourne à chaque frappe sur toutes les doubles-pages,
-// et insérer un nœud après chaque <br> d'un livre de trois cents pages s'y
-// verrait. Une balise citée dans un attribut fausserait le compte d'un mot —
-// pour un compteur, c'est sans conséquence.
-const RUPTURES_MOTS = /<(?:br|hr)\b[^>]*>|<\/(?:p|div|li|h[1-6]|blockquote|pre|tr|td|th|figcaption)\s*>/gi;
-
-function texteAvecRuptures(source) {
-  const html = typeof source === "string" ? (source || "")
-    : (source && source.innerHTML) || "";
-  const boite = document.createElement("div");
-  boite.innerHTML = html.replace(RUPTURES_MOTS, " ");
-  return boite.textContent || "";
-}
-
-function compterMots(source) {
-  const texte = texteAvecRuptures(source).trim();
-  return texte ? texte.split(/\s+/).length : 0;
-}
+// compterMots() et texteAvecRuptures() vivent dans script.js : la
+// bibliothèque en a besoin elle aussi, pour les statistiques d'un livre, et
+// deux copies d'une même règle de comptage finiraient par diverger — le
+// sommaire n'annoncerait plus le même nombre que la fiche du livre.
 
 function majCompteurMots() {
   if (indexLivre === -1) return;

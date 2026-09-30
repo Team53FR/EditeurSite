@@ -72,6 +72,15 @@
     <p id="message" class="message"></p>
   </main>
 
+  <!-- Statistiques d'un livre (clic sur la ligne « format · pages » d'une carte) -->
+  <div id="modalStats" class="modal-fond" style="display:none" onclick="fermerStatsLivre()">
+    <div class="modal-carte" role="dialog" aria-modal="true" aria-label="Statistiques du livre"
+         onclick="event.stopPropagation()">
+      <button class="modal-fermer" onclick="fermerStatsLivre()" aria-label="Fermer">&#10005;</button>
+      <div id="statsContenu"></div>
+    </div>
+  </div>
+
   <script src="attente.js"></script>
   <script src="script.js"></script>
   <script src="tutoriel.js"></script>

@@ -9,6 +9,9 @@ envelopperAttente({
   supprimerLivre: "Suppression du livre…",
   enregistrerNom: "Enregistrement du pseudo…",
 });
+// ouvrirStatsLivre n'y figure pas : elle montre son propre voile dans la
+// fenêtre (« Lecture du livre… »), et un voile de page par-dessus cacherait
+// justement ce qu'on vient d'ouvrir.
 
 // La bibliothèque ne descend QUE les métadonnées des livres : un titre, une
 // vignette et un nombre de pages. Le texte (les double-pages) reste en base
@@ -60,7 +63,7 @@ function lancerTutorielBiblio(forcer) {
     { cible: "#formatNouveauLivre", titre: "Le format",
       texte: "Choisissez la taille des pages (Roman, Grand roman, Poche, A4). Vous pourrez la changer plus tard dans l'éditeur." },
     { cible: "#listeLivres", titre: "Vos livres",
-      texte: "Vos livres s'afficheront ici avec leur couverture. Cliquez sur l'un d'eux pour l'ouvrir dans l'éditeur." },
+      texte: "Vos livres s'afficheront ici avec leur couverture. Cliquez sur l'un d'eux pour l'ouvrir dans l'éditeur, ou sur la petite ligne « format · pages » sous son titre pour voir ses statistiques : mots, chapitres, temps de lecture." },
     { cible: null, titre: "À vous de jouer ✍️",
       texte: "Créez votre premier livre, puis ouvrez-le : un second guide vous présentera tous les outils d'écriture. Bonne écriture !" }
   ], {
@@ -164,6 +167,19 @@ function afficherListeLivres() {
     meta.querySelector(".l-titre").onclick = () => ouvrirLivre(livre.id);
     li.appendChild(meta);
 
+    // Le détail chiffré du livre : la ligne « format · pages » l'annonce déjà
+    // en petit, autant en faire la porte d'entrée plutôt que d'ajouter un
+    // bouton de plus sur une carte qui n'en a pas la place.
+    const detail = meta.querySelector(".l-detail");
+    detail.classList.add("cliquable-stats");
+    detail.title = "Voir les statistiques de « " + (livre.titre || "") + " »";
+    detail.setAttribute("role", "button");
+    detail.setAttribute("tabindex", "0");
+    detail.onclick = (e) => { e.stopPropagation(); ouvrirStatsLivre(livre.id); };
+    detail.onkeydown = (e) => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); ouvrirStatsLivre(livre.id); }
+    };
+
     const btnSuppr = document.createElement("button");
     btnSuppr.className = "livre-suppr";
     btnSuppr.textContent = "✕";
@@ -174,6 +190,159 @@ function afficherListeLivres() {
     liste.appendChild(li);
   });
 }
+
+// =====================================================================
+//  Statistiques d'un livre
+//
+//  Ces chiffres existaient déjà, mais dans la fiche qu'un ADMINISTRATEUR
+//  ouvrait sur un autre compte (l'ancien utilisateurs.html). Cette page a
+//  disparu quand la gestion des comptes est passée au portail central, et
+//  les statistiques sont tombées avec elle — sans que ce soit voulu : c'est
+//  l'auteur du livre, pas l'administrateur, qui a le plus de raisons de
+//  savoir où en est son manuscrit. Elles reviennent donc ici, sur la carte
+//  du livre, pour son propriétaire.
+// =====================================================================
+
+// Temps de lecture estimé, sur la base de 200 mots par minute.
+function tempsLecture(mots) {
+  const min = Math.round(mots / 200);
+  if (min < 1) return "moins d'1 min";
+  if (min < 60) return min + " min";
+  const h = Math.floor(min / 60), m = min % 60;
+  return h + " h" + (m ? " " + m : "");
+}
+
+// Longueur de chaque chapitre, en mots. Ce qui précède le premier titre
+// (avant-propos, dédicace) n'en est pas un et n'est pas compté.
+function longueursChapitres(html) {
+  const boite = document.createElement("div");
+  boite.innerHTML = html || "";
+  const longueurs = [];
+  let courant = null;
+  boite.childNodes.forEach((n) => {
+    if (n.nodeType === 1 && n.tagName === "H2" && (n.textContent || "").trim()) {
+      if (courant !== null) longueurs.push(courant);
+      courant = 0;
+    }
+    if (courant === null) return;
+    courant += compterMots(n.nodeType === 1 ? n : (n.textContent || ""));
+  });
+  if (courant !== null) longueurs.push(courant);
+  return longueurs.filter((x) => x > 0);
+}
+
+function statsLivre(livre) {
+  const contenu = Array.isArray(livre.spreads) ? livre.spreads.join(" ") : "";
+
+  const boite = document.createElement("div");
+  boite.innerHTML = contenu;
+
+  let chapitres = 0;
+  boite.querySelectorAll("h2").forEach((h) => {
+    if ((h.textContent || "").trim()) chapitres++;
+  });
+
+  const longueurs = longueursChapitres(contenu);
+  const mots = compterMots(contenu);
+  // versLivreMemoire a déjà fait le calcul ; nombreDePages(), lui, attend une
+  // LIGNE de base et rendrait 0 sur l'objet en mémoire.
+  const pages = livre.nbPages
+    || (Array.isArray(livre.pages) ? livre.pages.length : 0)
+    || (Array.isArray(livre.spreads) ? livre.spreads.length * 2 : 0);
+  const couv = livre.couverture || {};
+  const quatr = livre.quatrieme || {};
+
+  return {
+    mots,
+    pages,
+    chapitres,
+    signes: texteAvecRuptures(contenu).trim().length,
+    chapMax: longueurs.length ? Math.max.apply(null, longueurs) : 0,
+    chapMin: longueurs.length ? Math.min.apply(null, longueurs) : 0,
+    chapMoyen: longueurs.length
+      ? Math.round(longueurs.reduce((a, b) => a + b, 0) / longueurs.length) : 0,
+    aImageCouv: !!couv.imageChemin,
+    aQuatrImage: !!quatr.imageChemin,
+    aAuteur: !!(livre.auteur && String(livre.auteur).trim()),
+    publie: !!livre.publie
+  };
+}
+
+function tuileStat(valeur, libelle) {
+  return '<div class="stat-tuile"><b>' + valeur + "</b><span>" + libelle + "</span></div>";
+}
+
+function rendreStatsLivre(livre, s) {
+  const nb = (n) => n.toLocaleString("fr-FR");
+
+  const lignes = [
+    ["Temps de lecture", "≈ " + tempsLecture(s.mots)],
+    ["Signes (espaces compris)", nb(s.signes)],
+    ["Format", libelleFormat(livre.format)]
+  ];
+  if (s.pages) lignes.push(["Densité", nb(Math.round(s.mots / s.pages)) + " mots/page"]);
+  if (s.chapitres) {
+    lignes.push(["Chapitre le plus long", nb(s.chapMax) + " mots"]);
+    lignes.push(["Chapitre le plus court", nb(s.chapMin) + " mots"]);
+    lignes.push(["Chapitre moyen", nb(s.chapMoyen) + " mots"]);
+  }
+  lignes.push(["Auteur renseigné", s.aAuteur ? "Oui" : "Non"]);
+  lignes.push(["Couverture illustrée", s.aImageCouv ? "Oui" : "Non"]);
+  lignes.push(["4ᵉ de couverture illustrée", s.aQuatrImage ? "Oui" : "Non"]);
+  lignes.push(["Publié", s.publie ? "Oui" : "Non"]);
+
+  return '<div class="stats-entete">' +
+      '<div><div class="stats-nom">' + echapper(livre.titre || "Sans titre") + "</div>" +
+      (s.aAuteur ? '<div class="stats-sous">' + echapper(livre.auteur) + "</div>" : "") +
+      "</div></div>" +
+    '<div class="stats-tuiles">' +
+      tuileStat(nb(s.mots), "mots") +
+      tuileStat(nb(s.pages), s.pages > 1 ? "pages" : "page") +
+      tuileStat(nb(s.chapitres), s.chapitres > 1 ? "chapitres" : "chapitre") +
+      tuileStat(tempsLecture(s.mots), "de lecture") +
+    "</div>" +
+    '<div class="stats-bloc"><h4>Détail</h4><dl class="stats-resume">' +
+      lignes.map(([k, v]) =>
+        "<div><dt>" + echapper(k) + "</dt><dd>" + echapper(String(v)) + "</dd></div>").join("") +
+    "</dl></div>" +
+    '<p class="stats-note">Le nombre de pages est celui du découpage actuel : ' +
+    "il change avec le format, l'interligne et l'espace au-dessus des titres.</p>";
+}
+
+async function ouvrirStatsLivre(id) {
+  const modal = document.getElementById("modalStats");
+  const contenu = document.getElementById("statsContenu");
+  if (!modal || !contenu) return;
+
+  modal.style.display = "flex";
+  contenu.innerHTML = '<div class="stats-chargement">Lecture du livre…</div>';
+
+  // La bibliothèque ne descend que les métadonnées : le texte doit être
+  // rapatrié pour être compté.
+  let livre;
+  try {
+    livre = await chargerLivreComplet(id);
+  } catch (e) {
+    // La fenêtre a pu être refermée entre-temps : ne rien écrire dedans.
+    if (modal.style.display === "none") return;
+    contenu.innerHTML = '<div class="stats-erreur">Impossible de lire ce livre : ' +
+      echapper(e.message) + "</div>";
+    return;
+  }
+
+  if (modal.style.display === "none") return;
+  contenu.innerHTML = rendreStatsLivre(livre, statsLivre(livre));
+}
+
+function fermerStatsLivre() {
+  const modal = document.getElementById("modalStats");
+  if (modal) modal.style.display = "none";
+}
+
+document.addEventListener("keydown", (e) => {
+  const modal = document.getElementById("modalStats");
+  if (e.key === "Escape" && modal && modal.style.display !== "none") fermerStatsLivre();
+});
 
 // Dimensions (mm) des formats, pour recalculer la taille de page de l'éditeur
 // à laquelle les décalages (imgOffsetX/Y) ont été enregistrés.

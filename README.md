@@ -406,6 +406,21 @@ vit en `localStorage`, partagée avec le portail et les deux autres sites (voir
 `sessionStorage` : c'est l'état d'un onglet, pas une session, et le déplacer
 ferait que deux onglets sur deux livres différents se marcheraient dessus.
 
+**Statistiques d'un livre** : dans la bibliothèque, la ligne « format · pages »
+sous le titre d'une carte ouvre la fiche du livre — mots, pages, chapitres,
+temps de lecture, signes, densité, longueur du plus long et du plus court
+chapitre. Ces chiffres existaient déjà, mais dans la fiche qu'un ADMINISTRATEUR
+ouvrait sur un autre compte (`utilisateurs.html`) ; cette page a disparu quand
+la gestion des comptes est passée au portail central, et les statistiques sont
+tombées avec elle sans que ce soit voulu. Elles sont revenues côté propriétaire
+du livre, ce qui est leur place. Le CSS, lui, n'avait jamais été retiré : les
+classes `.stats-*` de `site.css` servent telles quelles.
+
+La bibliothèque ne descend que les métadonnées : ouvrir la fiche rapatrie le
+livre entier (`chargerLivreComplet`), d'où le voile « Lecture du livre… ».
+`compterMots()` vit dans `script.js` et non dans `editeur.js` précisément pour
+que la fiche et le compteur du sommaire annoncent le même nombre.
+
 **Écrire un chapitre d'un seul tenant** (`manuscrit.js`) : l'éditeur compose en
 doubles-pages, ce qu'il faut pour voir tomber la mise en page — mais pour
 écrire, la page gêne : on ajoute une phrase au début, tout se décale, le
