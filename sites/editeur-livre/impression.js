@@ -2290,7 +2290,9 @@ function exporterImprimeur(cible) {
   flushSpread();
   const livre = livreActuel();
   const f = resoudreFormat(FORMATS, livre.format || "149x210", "149x210");
-  const pagesEcran = (livre.pages || []).length;
+  // Pages de garde comprises : c'est le total que l'on compare à celui du
+  // fichier (qui les contient aussi), et le nombre de feuilles du livre relié.
+  const pagesEcran = feuilletsDuLivre(livre).length;
 
   // Une seule repagination : on en garde un INSTANTANÉ du contenu des pages,
   // et le livre retrouve aussitôt sa pagination d'écran. Le fichier est
@@ -2306,7 +2308,9 @@ function exporterImprimeur(cible) {
 }
 
 function ouvrirControleImprimeur(cible, livre, f, pagesEcran, pagesPro) {
-  const nbPagesPro = pagesPro.length;
+  // Les gardes sont des pages du fichier (voir genererFichierImprimeur) : elles
+  // comptent pour le dos, pour le total annoncé et pour le multiple de quatre.
+  const nbPagesPro = pagesPro.length + nombreTotalGardes(livre);
   fermerPanneauImpression();
   const ancien = document.getElementById("controleImprimeur");
   if (ancien) ancien.remove();
@@ -2490,8 +2494,11 @@ function genererFichierImprimeur(cible, dosMm, livre, f, pagesPro, papier) {
 
     const margeInt = f.margeH + DELTA_RELIURE_MM;
     const margeExt = Math.max(6, f.margeH - DELTA_RELIURE_MM);
-    pagesPro.forEach((contenu, i) => {
-      zone.appendChild(creerPagePro(contenu, i + 1, f, margeInt, margeExt));
+    // Les gardes s'impriment ici comme chez KDP : des feuilles blanches, non
+    // foliotées, qui décident du côté de la reliure par leur rang PHYSIQUE.
+    feuilletsProAvecGardes(livre, pagesPro).forEach((feuillet) => {
+      zone.appendChild(creerPagePro(
+        feuillet.contenu, feuillet.numero, f, margeInt, margeExt, feuillet.position));
     });
   };
 
@@ -2650,7 +2657,10 @@ function pagesEtMargeKDP(livre) {
   const sauveMargeV = f.margeV, sauveMargeH = f.margeH;
   const sauveLarg = f.larg, sauveHaut = f.haut;
 
-  const pagesEcran = (livre.pages || []).length;
+  // Les gardes font partie du livre relié : elles comptent pour le palier de
+  // marge de reliure (qui dépend du nombre TOTAL de pages) comme pour le dos.
+  const gardes = nombreTotalGardes(livre);
+  const pagesEcran = (livre.pages || []).length + gardes;
 
   // Les chiffres de KDP sont des MINIMUMS, pas des marges de livre.
   //
@@ -2689,7 +2699,7 @@ function pagesEtMargeKDP(livre) {
       appliquerFormatPage(livre.format);
       repaginerTout();
       pagesPro = (livre.pages || []).map((p) => (p && p.contenu) || "");
-      const suivante = Math.max(sauveMargeH + DELTA_RELIURE_MM, kdpMargeReliure(pagesPro.length));
+      const suivante = Math.max(sauveMargeH + DELTA_RELIURE_MM, kdpMargeReliure(pagesPro.length + gardes));
       if (suivante === margeInt) break;
       margeInt = suivante;
     }
@@ -2701,7 +2711,7 @@ function pagesEtMargeKDP(livre) {
     repaginerTout();
   }
 
-  return { pagesPro, margeInt, margeExt, margeV, nbPages: pagesPro.length };
+  return { pagesPro, margeInt, margeExt, margeV, nbPages: pagesPro.length + gardes };
 }
 
 function exporterKDP(cible) {
@@ -2715,13 +2725,16 @@ function exporterKDP(cible) {
     return;
   }
 
+  // Pages de garde comprises : c'est le nombre de feuilles du livre relié.
+  const pagesEcran = feuilletsDuLivre(livre).length;
+
   if (cible === "couverture") {
-    ouvrirControleKDP(cible, livre, (livre.pages || []).length, null, null);
+    ouvrirControleKDP(cible, livre, pagesEcran, null, null);
     return;
   }
 
   const { pagesPro, margeInt, margeExt, margeV } = pagesEtMargeKDP(livre);
-  ouvrirControleKDP(cible, livre, (livre.pages || []).length, pagesPro,
+  ouvrirControleKDP(cible, livre, pagesEcran, pagesPro,
     { interieure: margeInt, exterieure: margeExt, verticale: margeV });
 }
 
@@ -2741,7 +2754,7 @@ function ouvrirControleKDP(cible, livre, pagesEcran, pagesPro, marges) {
   if (ancien) ancien.remove();
 
   const couverture = cible === "couverture";
-  const nbPages = couverture ? pagesEcran : pagesPro.length;
+  const nbPages = couverture ? pagesEcran : pagesPro.length + nombreTotalGardes(livre);
   const mm = (v) => Number(v).toFixed(1).replace(".", ",");
   const papierDefaut = KDP_PAPIER_DEFAUT;
   const dos = epaisseurDosKDP(nbPages, papierDefaut);
@@ -3065,8 +3078,12 @@ function ajouterReperesPli(feuille, hautTrim, positionsMm, pointille) {
 }
 
 // Page intérieure : recto = page impaire (petit fond à gauche).
-function creerPagePro(contenu, numero, f, margeInt, margeExt) {
-  const recto = numero % 2 === 1;
+// `position` est le rang PHYSIQUE du feuillet, `numero` le folio imprimé —
+// vide pour une garde. Sans `position`, une garde au début décalerait la
+// marge de reliure du mauvais côté de toutes les pages qui la suivent.
+function creerPagePro(contenu, numero, f, margeInt, margeExt, position) {
+  const rang = typeof position === "number" ? position : numero;
+  const recto = rang % 2 === 1;
   const feuille = creerFeuillePro(f.larg, f.haut);
   const zone = creerZoneRognePro(f.larg, f.haut);
 
@@ -3289,8 +3306,10 @@ function ouvrirTranche() {
   const ancien = document.getElementById("dialogueTranche");
   if (ancien) ancien.remove();
 
-  // Épaisseur d'aperçu : celle qu'aura le dos pour le nombre de pages actuel.
-  const dosMm = epaisseurDosMm((livre.pages || []).length, GRAMMAGE_DEFAUT, MAIN_DEFAUT);
+  // Épaisseur d'aperçu : celle qu'aura le dos pour le nombre de pages actuel,
+  // gardes comprises — la même largeur que la couverture à plat.
+  const nbFeuillets = feuilletsDuLivre(livre).length;
+  const dosMm = epaisseurDosMm(nbFeuillets, GRAMMAGE_DEFAUT, MAIN_DEFAUT);
   const aImage = !!(livre.couverture && livre.couverture.imageChemin);
 
   const champ = (id, libelle, valeur, attrs) =>
@@ -3440,7 +3459,7 @@ function ouvrirTranche() {
     scene.appendChild(dos);
 
     fond.querySelector("#trLegende").textContent =
-      "Dos de " + dosMm.toFixed(1).replace(".", ",") + " mm · " + (livre.pages || []).length + " pages";
+      "Dos de " + dosMm.toFixed(1).replace(".", ",") + " mm · " + nbFeuillets + " pages";
     fond.querySelector("#trNoteDos").textContent = dosMm >= 6
       ? "Assez épais pour porter du texte."
       : "Sous 6 mm, l'usage est de laisser le dos nu : le texte tomberait sur les plis.";

@@ -3543,9 +3543,29 @@ function majCompteurMots() {
   let mots = 0;
   spreadsLivre().forEach(html => { mots += compterMots(html); });
 
-  const nbPages = (livreActuel().pages || []).length;
+  // Le total est celui du livre RELIÉ : les gardes sont de vraies feuilles, et
+  // c'est ce nombre-là qu'il faut connaître pour prévoir le dos de la
+  // couverture. On précise ce qui en relève, sans quoi le chiffre ne
+  // correspondrait plus à celui des pages numérotées.
+  const gardes = nombreTotalGardes(livreActuel());
+  const nbPages = (livreActuel().pages || []).length + gardes;
   const el = document.getElementById("compteurMots");
-  if (el) el.textContent = `${mots} mot${mots > 1 ? "s" : ""} · ${nbPages} page${nbPages > 1 ? "s" : ""}`;
+  if (el) {
+    el.textContent = `${mots} mot${mots > 1 ? "s" : ""} · ${nbPages} page${nbPages > 1 ? "s" : ""}` +
+      (gardes ? ` (dont ${gardes} de garde)` : "");
+  }
+  majEtiquetteGardes();
+}
+
+// Le bouton dit combien de pages de garde sont posées : sans cela, le réglage
+// ne se voit nulle part dans l'éditeur, puisque les gardes sont blanches et
+// n'ont pas de place parmi les pages écrites.
+function majEtiquetteGardes() {
+  if (indexLivre === -1) return;
+  const bouton = document.getElementById("btnPagesGarde");
+  if (!bouton) return;
+  const gardes = nombreTotalGardes(livreActuel());
+  bouton.textContent = gardes ? `▭ Pages de garde · ${gardes}` : "▭ Pages de garde";
 }
 
 // ----- Recherche : positionner dans la zone unique -----
@@ -3710,6 +3730,9 @@ function enregistrerPagesDeGarde() {
   if (!change) return;
   marquerModifie();
   planifierBrouillon();
+  // Compteur et bouton montrent le nouveau total tout de suite, sans attendre
+  // la prochaine frappe.
+  majCompteurMots();
 
   const message = document.getElementById("message");
   if (message) {

@@ -932,6 +932,14 @@ function feuilletsDuLivre(livre) {
   return feuillets;
 }
 
+// Le nombre de feuillets blancs ajoutés au livre, début et fin confondus.
+// Un seul endroit qui lit les DEUX réglages : tout calcul qui compte les
+// pages du livre relié (dos, palier de marge, total annoncé) s'y réfère,
+// pour qu'aucun n'en oublie un.
+function nombreTotalGardes(livre) {
+  return nombreGardes(livre && livre.gardesDebut) + nombreGardes(livre && livre.gardesFin);
+}
+
 // ----- Compter les mots d'un passage -----
 //
 // Le texte d'un passage tel qu'on le LIT, et non tel que textContent le rend.
