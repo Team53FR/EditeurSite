@@ -354,6 +354,16 @@ button.danger {
 }
 
 .texte-livre {
+  /* Justifié avec césure, COMME LE FICHIER IMPRIMÉ.
+     L'écran composait au drapeau sans césure : les lignes ne se coupaient pas
+     au même endroit que dans le PDF, le nombre de pages annoncé était faux, et
+     le livre imprimé ne ressemblait pas à celui qu'on avait sous les yeux.
+     C'est aussi ce qui rend le MESUREUR fidèle : il porte cette même classe,
+     il pèse donc désormais le texte tel qu'il sera imprimé.
+     La césure française suppose « lang="fr" » sur la page — il y est. */
+  text-align: justify;
+  hyphens: auto;
+  -webkit-hyphens: auto;
   font-family: "EB Garamond", Georgia, serif;
   /* Taille du texte courant : posée par le format du livre (voir
      appliquerTypoFormat), avec celle du roman en secours. */
@@ -1829,11 +1839,11 @@ button.danger {
    composer le texte exactement comme le PDF exporté (justifié, avec césure),
    sans quoi les lignes ne tombent pas au même endroit et le bas des pages se
    retrouve rogné. Voir avecPaginationImprimeur() dans impression.js. */
-#mesureCachee.mesure-pro {
-  text-align: justify;
-  hyphens: auto;
-  -webkit-hyphens: auto;
-}
+/* La règle « #mesureCachee.mesure-pro » a été retirée : elle devait faire
+   composer le mesureur comme le fichier imprimé, mais visait #mesureCachee
+   quand la pagination passe par #mesureSpread — elle n'a donc jamais agi.
+   .texte-livre justifie désormais avec césure, mesureur compris, ce qui rend
+   la bascule inutile. */
 
 
 /* ===== Dialogue « Renommer les chapitres » =====

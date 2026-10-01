@@ -1474,18 +1474,27 @@ function nomFichierConforme(prefixe, titre) {
 // travail demandé, puis remet la pagination d'origine dans tous les cas.
 function avecPaginationImprimeur(livre, travail) {
   const piedInitial = PIED_PAGE_PX;
-  // Le mesureur compose en drapeau et sans césure, alors que le fichier
-  // imprimeur est justifié avec césure : sans cet accord, les lignes ne
-  // tombent pas au même endroit et le bas des pages est rogné à l'impression.
-  const mesure = document.getElementById("mesureCachee");
+  // Le mesureur compose maintenant comme le fichier — justifié, avec césure
+  // (voir .texte-livre). Il n'y a donc plus de bascule à faire ici.
+  //
+  // Il y en avait une : la classe « mesure-pro ». Elle était posée sur
+  // #mesureCachee, qui n'a jamais servi à mesurer — la pagination passe par
+  // #mesureSpread (voir mesureEl). Le garde-fou visait donc le mauvais
+  // élément et n'a jamais rien fait.
+  //
+  // Ce qu'il en coûtait, précisément : la justification ne change pas où les
+  // lignes se coupent (elle ne fait qu'étirer les espaces), mais la CÉSURE,
+  // si. Mesuré sans césure puis rendu avec, le texte d'une page tenait en
+  // moins de lignes que prévu : des pages finissant trop tôt, et un fichier
+  // plus long qu'il n'aurait dû — ce qui gonfle à son tour le dos et le
+  // palier de marge de reliure. Rien n'était rogné, mais rien ne tombait
+  // juste. Aligner l'écran sur le fichier règle cela à la racine.
   try {
-    if (mesure) mesure.classList.add("mesure-pro");
     PIED_PAGE_PX = PIED_PRO_PX;
     appliquerFormatPage(livre.format || "149x210");
     repaginerTout();
     return travail();
   } finally {
-    if (mesure) mesure.classList.remove("mesure-pro");
     PIED_PAGE_PX = piedInitial;
     appliquerFormatPage(livre.format || "149x210");
     repaginerTout();
@@ -2577,7 +2586,11 @@ function formatKDPDuLivre(livre) {
 }
 
 const KDP_FOND_PERDU_MM     = 3.2;  // débord de la couverture (obligatoire)
-const KDP_MARGE_EXT_MM      = 6.4;  // haut, bas, petit fond — minimum exigé
+// PLANCHER, et rien d'autre : c'est le minimum qu'Amazon exige en tête, en
+// pied et au grand fond. Ce n'est PAS une marge de livre — aucun roman ne se
+// compose à 6,4 mm du bord. On s'en sert pour relever les marges de l'auteur
+// si elles descendent dessous, jamais pour les remplacer.
+const KDP_MARGE_EXT_MM      = 6.4;
 
 // Marge de reliure (gouttière) minimum, selon le nombre de pages du fichier
 // final : plus le livre est épais, plus la courbure de la reliure mange de
@@ -2636,31 +2649,44 @@ function pagesEtMargeKDP(livre) {
   const f = FORMATS[livre.format] || FORMATS["kdp5585"];
   const sauveMargeV = f.margeV, sauveMargeH = f.margeH;
   const sauveLarg = f.larg, sauveHaut = f.haut;
-  const mesure = document.getElementById("mesureCachee");
 
   const pagesEcran = (livre.pages || []).length;
-  let margeInt = kdpMargeReliure(pagesEcran);
+
+  // Les chiffres de KDP sont des MINIMUMS, pas des marges de livre.
+  //
+  // Appliqués tels quels, ils posaient le texte à 6,4 mm du bord supérieur —
+  // là où l'auteur en avait composé 18 — et élargissaient le bloc de dix
+  // millimètres. Le livre imprimé ne ressemblait plus à ce qui avait été
+  // écrit : lignes plus longues, page plus haute, tout décalé.
+  //
+  // On part donc des marges de l'auteur, et on ne les RELÈVE que si elles
+  // passent sous le minimum exigé. C'est déjà le principe de l'export
+  // imprimeur, qui conserve la largeur du bloc de texte ; seul cet export y
+  // échappait.
+  const margeExt = Math.max(sauveMargeH, KDP_MARGE_EXT_MM);
+  const margeV = Math.max(sauveMargeV, KDP_MARGE_EXT_MM);
+  let margeInt = Math.max(sauveMargeH, kdpMargeReliure(pagesEcran));
   let pagesPro = null;
 
   try {
     const fmt = formatKDPDuLivre(livre);
-    if (mesure) mesure.classList.add("mesure-pro");
     PIED_PAGE_PX = PIED_PRO_PX;
     f.larg = fmt.larg;
     f.haut = fmt.haut;
-    f.margeV = KDP_MARGE_EXT_MM;
+    f.margeV = margeV;
 
     for (let i = 0; i < 5; i++) {
-      f.margeH = (margeInt + KDP_MARGE_EXT_MM) / 2;
+      // La MOYENNE des deux marges : le mesureur travaille sur une page
+      // symétrique, dont la largeur de bloc est exactement celle du fichier.
+      f.margeH = (margeInt + margeExt) / 2;
       appliquerFormatPage(livre.format);
       repaginerTout();
       pagesPro = (livre.pages || []).map((p) => (p && p.contenu) || "");
-      const suivante = kdpMargeReliure(pagesPro.length);
+      const suivante = Math.max(sauveMargeH, kdpMargeReliure(pagesPro.length));
       if (suivante === margeInt) break;
       margeInt = suivante;
     }
   } finally {
-    if (mesure) mesure.classList.remove("mesure-pro");
     PIED_PAGE_PX = piedInitial;
     f.margeV = sauveMargeV; f.margeH = sauveMargeH;
     f.larg = sauveLarg; f.haut = sauveHaut;
@@ -2668,7 +2694,7 @@ function pagesEtMargeKDP(livre) {
     repaginerTout();
   }
 
-  return { pagesPro, margeInt, nbPages: pagesPro.length };
+  return { pagesPro, margeInt, margeExt, margeV, nbPages: pagesPro.length };
 }
 
 function exporterKDP(cible) {
@@ -2687,8 +2713,9 @@ function exporterKDP(cible) {
     return;
   }
 
-  const { pagesPro, margeInt } = pagesEtMargeKDP(livre);
-  ouvrirControleKDP(cible, livre, (livre.pages || []).length, pagesPro, margeInt);
+  const { pagesPro, margeInt, margeExt, margeV } = pagesEtMargeKDP(livre);
+  ouvrirControleKDP(cible, livre, (livre.pages || []).length, pagesPro,
+    { interieure: margeInt, exterieure: margeExt, verticale: margeV });
 }
 
 // La marge de reliure KDP dépend du nombre de pages, qui dépend lui-même de
@@ -2701,13 +2728,14 @@ envelopperAttenteLourde({
   exporterKDP: ["Préparation du fichier KDP…", "Le livre est recomposé aux marges imposées par Amazon."]
 });
 
-function ouvrirControleKDP(cible, livre, pagesEcran, pagesPro, margeInt) {
+function ouvrirControleKDP(cible, livre, pagesEcran, pagesPro, marges) {
   fermerPanneauImpression();
   const ancien = document.getElementById("controleImprimeur");
   if (ancien) ancien.remove();
 
   const couverture = cible === "couverture";
   const nbPages = couverture ? pagesEcran : pagesPro.length;
+  const mm = (v) => Number(v).toFixed(1).replace(".", ",");
   const papierDefaut = KDP_PAPIER_DEFAUT;
   const dos = epaisseurDosKDP(nbPages, papierDefaut);
   const fmt = formatKDPDuLivre(livre);
@@ -2717,8 +2745,11 @@ function ouvrirControleKDP(cible, livre, pagesEcran, pagesPro, margeInt) {
     "Format exact " + fmt.larg.toFixed(2).replace(".", ",") + " × " + fmt.haut.toFixed(2).replace(".", ",") + " mm, sans marge technique ni repère : c'est ce que KDP demande",
     couverture
       ? "Fond perdu de " + KDP_FOND_PERDU_MM + " mm sur les quatre bords, couleur de fond comprise"
-      : "Marge de reliure de " + margeInt.toFixed(1).replace(".", ",") + " mm (minimum KDP pour " + nbPages + " pages), " +
-        KDP_MARGE_EXT_MM + " mm sur les trois autres bords"
+      : "Vos marges, relevées si besoin aux minimums KDP : " +
+        mm(marges.interieure) + " mm au petit fond (minimum " +
+        mm(kdpMargeReliure(nbPages)) + " mm pour " + nbPages + " pages), " +
+        mm(marges.exterieure) + " mm au grand fond, " + mm(marges.verticale) +
+        " mm en tête (minimum " + mm(KDP_MARGE_EXT_MM) + " mm)"
   ];
   if (couverture) {
     conformes.splice(2, 0, "Registre assuré entre 4e, dos et 1re de couverture");
@@ -2755,8 +2786,10 @@ function ouvrirControleKDP(cible, livre, pagesEcran, pagesPro, margeInt) {
 
   if (!couverture && nbPages !== pagesEcran) {
     html += '<p class="ci-note">Le fichier compte ' + nbPages + " pages, contre " + pagesEcran +
-      " à l'écran : la marge de reliure KDP (" + margeInt.toFixed(1).replace(".", ",") +
-      " mm) réduit légèrement la largeur de texte. Votre livre à l'écran n'est pas modifié.</p>";
+      " à l'écran. Deux raisons : la marge de reliure (" + mm(marges.interieure) +
+      " mm) est plus large que celle de l'écran, et le texte est <b>justifié avec " +
+      "césure</b> dans le fichier alors qu'il est au drapeau à l'écran — les lignes ne " +
+      "se coupent donc pas au même endroit. Votre livre à l'écran n'est pas modifié.</p>";
   }
 
   if (couverture) {
@@ -2819,11 +2852,11 @@ function ouvrirControleKDP(cible, livre, pagesEcran, pagesPro, margeInt) {
       dosMm = (isFinite(saisi) && saisi >= 0) ? saisi : dos;
     }
     fond.remove();
-    setTimeout(() => genererFichierKDP(cible, dosMm, livre, pagesPro, margeInt), 50);
+    setTimeout(() => genererFichierKDP(cible, dosMm, livre, pagesPro, marges), 50);
   };
 }
 
-function genererFichierKDP(cible, dosMm, livre, pagesPro, margeInt) {
+function genererFichierKDP(cible, dosMm, livre, pagesPro, marges) {
   const message = document.getElementById("message");
   if (message) message.textContent = "Préparation du fichier KDP...";
   ouvrirAttente("Préparation du fichier…",
@@ -2858,12 +2891,11 @@ function genererFichierKDP(cible, dosMm, livre, pagesPro, margeInt) {
     }
 
     stylePage.textContent = "@page { size: " + fmt.larg + "mm " + fmt.haut + "mm; margin: 0; }";
-    const margeExt = KDP_MARGE_EXT_MM;
     // Les gardes partent aussi chez KDP : ce sont des pages du fichier, et
     // leur nombre a déjà servi à calculer le dos.
     feuilletsProAvecGardes(livre, pagesPro).forEach((feuillet) => {
       zone.appendChild(creerPageKDP(
-        feuillet.contenu, feuillet.numero, margeInt, margeExt, fmt, feuillet.position));
+        feuillet.contenu, feuillet.numero, marges, fmt, feuillet.position));
     });
   };
 
@@ -2882,19 +2914,23 @@ function genererFichierKDP(cible, dosMm, livre, pagesPro, margeInt) {
 // Comme creerPageTexteImpression : `position` est le rang physique du
 // feuillet (il décide du recto-verso), `numero` le folio imprimé — vide pour
 // une page de garde, qui n'est jamais foliotée.
-function creerPageKDP(contenu, numero, margeInt, margeExt, fmt, position) {
+// `marges` porte les trois cotes retenues par pagesEtMargeKDP : celles de
+// l'auteur, relevées au besoin aux minimums de KDP. Elles DOIVENT être les
+// mêmes qu'à la mesure, sinon le texte ne tombe pas où la pagination l'a cru
+// et le bas des pages se retrouve rogné.
+function creerPageKDP(contenu, numero, marges, fmt, position) {
   const rang = typeof position === "number" ? position : numero;
   const recto = rang % 2 === 1;
   const feuille = creerFeuillePro(fmt.larg, fmt.haut, 0);
   const zone = creerZoneRognePro(fmt.larg, fmt.haut, 0);
 
-  zone.style.paddingTop = KDP_MARGE_EXT_MM + "mm";
-  zone.style.paddingLeft = (recto ? margeInt : margeExt) + "mm";
-  zone.style.paddingRight = (recto ? margeExt : margeInt) + "mm";
+  zone.style.paddingTop = marges.verticale + "mm";
+  zone.style.paddingLeft = (recto ? marges.interieure : marges.exterieure) + "mm";
+  zone.style.paddingRight = (recto ? marges.exterieure : marges.interieure) + "mm";
 
   const texte = document.createElement("div");
   texte.className = "texte-impression";
-  texte.style.height = (fmt.haut - KDP_MARGE_EXT_MM - PIED_PRO_MM + TOLERANCE_PRO_MM) + "mm";
+  texte.style.height = (fmt.haut - marges.verticale - PIED_PRO_MM + TOLERANCE_PRO_MM) + "mm";
   texte.innerHTML = contenu || "";
   zone.appendChild(texte);
 

@@ -625,6 +625,41 @@ alors comme le PDF (justifié, avec césure) au lieu du drapeau sans césure du
 mode écran. Sans cet accord, les lignes ne tombent pas au même endroit et le
 bas des pages est silencieusement rogné par l'`overflow: hidden`.
 
+**Export KDP — les minimums d'Amazon ne sont pas des marges.** `KDP_MARGE_EXT_MM`
+(6,4 mm) et `kdpMargeReliure()` sont les **planchers** qu'Amazon exige ; l'export
+les appliquait tels quels, comme s'il s'agissait de marges de livre. Sur un
+roman composé avec 18 mm en tête et 16 mm sur les côtés, le fichier sortait avec
+6,4 mm en tête : bloc de texte **9,7 mm plus large et 11,6 mm plus haut** que ce
+qui avait été composé. Le livre imprimé ne ressemblait plus à celui de l'écran.
+
+`pagesEtMargeKDP()` part désormais des marges de l'auteur et ne les **relève**
+que si elles passent sous le plancher — `Math.max`, jamais de remplacement.
+Les trois cotes retenues (`interieure`, `exterieure`, `verticale`) circulent
+jusqu'à `creerPageKDP()`, qui doit poser EXACTEMENT celles qui ont servi à la
+mesure : sinon le texte ne tombe pas où la pagination l'a cru et le bas des
+pages est rogné.
+
+C'est le principe que suivait déjà l'export imprimeur — « la somme des deux
+marges reste identique à l'éditeur pour que le bloc de texte garde exactement
+la même largeur ». Seul l'export KDP y échappait.
+
+**L'écran compose comme le fichier** : `.texte-livre` justifie avec césure, et
+le mesureur porte cette classe — il pèse donc le texte tel qu'il sera imprimé.
+
+Ce n'était pas le cas. L'écran composait au drapeau sans césure, et un garde-fou
+était prévu : la classe `mesure-pro`, posée pendant la repagination. Mais elle
+était appliquée à `#mesureCachee`, qui **n'a jamais servi à mesurer** — la
+pagination passe par `#mesureSpread` (voir `mesureEl()`). Le garde-fou visait le
+mauvais élément et n'a jamais agi.
+
+Ce qu'il en coûtait, précisément : la justification ne change pas où les lignes
+se coupent — elle ne fait qu'étirer les espaces — mais la **césure**, si.
+Mesuré sans césure puis rendu avec, le texte d'une page tenait en moins de
+lignes que prévu : des pages finissant trop tôt, et un fichier plus long qu'il
+n'aurait dû, ce qui gonfle à son tour le dos et le palier de marge de reliure.
+Rien n'était rogné, mais rien ne tombait juste. `mesure-pro` a été retiré :
+l'accord se fait maintenant à la source.
+
 **Ce qu'un navigateur ne sait pas faire** : convertir en CMJN, produire du
 PDF/X-1a, appliquer un profil de sortie. Le panneau de contrôle affiché avant
 génération le dit explicitement, plutôt que de laisser croire que le fichier
