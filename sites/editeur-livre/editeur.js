@@ -3603,7 +3603,7 @@ function majEtiquetteGardes() {
   const bouton = document.getElementById("btnPagesGarde");
   if (!bouton) return;
   const gardes = nombreTotalGardes(livreActuel());
-  bouton.textContent = gardes ? `▭ Pages de garde · ${gardes}` : "▭ Pages de garde";
+  bouton.textContent = gardes ? `▭ Gardes · ${gardes}` : "▭ Gardes";
   majGardesEdition();
 }
 

@@ -31,6 +31,12 @@
         <button onclick="ouvrirCouverture('couverture')" id="btnCouv" class="secondaire petit btn-couv">📖 Couverture</button>
         <button onclick="ouvrirCouverture('quatrieme')" id="btnQuatr" class="secondaire petit btn-couv">📕 4e de couv.</button>
         <button onclick="ouvrirTranche()" id="btnTranche" class="secondaire petit btn-couv" title="Couleurs et texte du dos du livre">📗 Tranche</button>
+        <!-- Les gardes sont un réglage du livre qu'on pose une fois, comme la
+             couverture et la tranche : elles rejoignent leur grille (2 × 2)
+             plutôt que de peser autant que « + Chapitre ». -->
+        <button type="button" id="btnPagesGarde" onclick="ouvrirPagesDeGarde()"
+                class="secondaire petit btn-couv"
+                title="Pages de garde : feuillets blancs et non numérotés, au début et à la fin du livre">▭ Gardes</button>
       </div>
 
       <div class="sommaire-separateur"></div>
@@ -56,12 +62,6 @@
 
       <div class="sommaire-section">Chapitres</div>
       <button onclick="ajouterChapitre()" class="secondaire petit btn-chapitre" title="Ajouter un chapitre (démarre sur une nouvelle page)">+ Chapitre</button>
-
-      <!-- Les gardes ne sont pas un outil de relecture : c'est un réglage du
-           livre, qu'on pose une fois. Il reste donc dehors, à la vue. -->
-      <button type="button" id="btnPagesGarde" onclick="ouvrirPagesDeGarde()"
-              class="secondaire petit btn-chapitre"
-              title="Feuillets blancs et non numérotés, au début et à la fin du livre">▭ Pages de garde</button>
 
       <!-- Les outils qui relisent le livre entier sont regroupés : ils servent
            de loin en loin, et leur nombre est appelé à grandir. « + Chapitre »
