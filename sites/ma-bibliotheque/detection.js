@@ -3,6 +3,24 @@
 //  depuis son titre — avec le plus d'exactitude possible.
 // =====================================================================
 //
+//  ⚠ CE FICHIER N'EST CHARGÉ PAR AUCUNE PAGE. Aucune balise <script> ne
+//  le référence, rien ne l'importe, et sw.js ne le précache pas : le code
+//  ci-dessous ne s'exécute jamais. Il est conservé parce qu'il n'est PAS
+//  un doublon de collection.js — celui-ci enchaîne Google Books, Open
+//  Library et la BnF l'une après l'autre, là où ce fichier apporte des
+//  capacités qu'on ne trouve nulle part ailleurs dans le site :
+//  validation EAN-13 et conversions ISBN-10 ↔ ISBN-13, source openBD pour
+//  les ISBN japonais, interrogation en parallèle avec fusion champ par
+//  champ et traçabilité de la source, cache localStorage des ISBN,
+//  scoring de correspondance de titre, et reconstruction des saisons par
+//  chaînage des suites AniList.
+//
+//  Pour le mettre en service il faudrait l'ajouter à collection.html, le
+//  lister dans FICHIERS_COQUILLE de sw.js (en bumpant CACHE_NOM) et
+//  rerouter les appels de détection de collection.js vers detecterLivre()
+//  et detecterSeries(). Tant que ce n'est pas fait, ne pas corriger de
+//  bug ici en croyant corriger le comportement du site.
+//
 //  Ce fichier ne touche à aucune interface : il interroge, recoupe et
 //  renvoie. collection.js s'occupe de l'affichage.
 //
