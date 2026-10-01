@@ -1041,6 +1041,15 @@ function feuilletsProAvecGardes(livre, pagesPro) {
   return feuillets;
 }
 
+// « 409 pages (408 de texte + 1 de garde) » : le total que paie le dos, et ce
+// qui le compose. Sans le détail, un total qui diffère d'une page de celui de
+// l'écran ressemble à une garde oubliée — alors que le fichier est recomposé et
+// peut compter une page de texte de moins ou de plus.
+function decomptePages(total, gardes) {
+  return total + " pages" +
+    (gardes ? " (" + (total - gardes) + " de texte + " + gardes + " de garde)" : "");
+}
+
 // La suite des demi-feuilles, dans l'ordre de lecture : les feuillets du
 // livre — pages de garde comprises, elles s'impriment blanches — complétée
 // par des blanches jusqu'à un multiple de quatre, puisqu'un cahier plié se
@@ -2360,12 +2369,13 @@ function ouvrirControleImprimeur(cible, livre, f, pagesEcran, pagesPro) {
     "<div><span>Format rogné</span><strong>" + f.larg + " × " + f.haut + " mm</strong></div>" +
     "<div><span>Support à générer</span><strong>" + largSupport +
       " × " + (f.haut + 2 * MARGE_TECHNIQUE_MM) + " mm</strong></div>" +
-    "<div><span>Pages du fichier</span><strong>" + (couverture ? "1 planche" : nbPagesPro + " pages") + "</strong></div>" +
+    "<div><span>Pages du fichier</span><strong>" + (couverture ? "1 planche" : decomptePages(nbPagesPro, nombreTotalGardes(livre))) + "</strong></div>" +
     '<div><span>Nom à donner</span><strong class="ci-nom">' + nom + ".pdf</strong></div>" +
   "</div>";
 
   if (!couverture && nbPagesPro !== pagesEcran) {
-    html += '<p class="ci-note">Le fichier compte ' + nbPagesPro + " pages, contre " + pagesEcran +
+    html += '<p class="ci-note">Le fichier compte ' + decomptePages(nbPagesPro, nombreTotalGardes(livre)) +
+      ", contre " + decomptePages(pagesEcran, nombreTotalGardes(livre)) +
       " à l'écran : le folio est remonté pour respecter le blanc tournant de 7 mm, ce qui réduit " +
       "légèrement la hauteur de texte. Votre livre à l'écran n'est pas modifié.</p>";
   }
@@ -2802,13 +2812,14 @@ function ouvrirControleKDP(cible, livre, pagesEcran, pagesPro, marges) {
 
   html += '<div class="ci-resume">' +
     "<div><span>Format rogné</span><strong>" + fmt.larg.toFixed(2).replace(".", ",") + " × " + fmt.haut.toFixed(2).replace(".", ",") + " mm</strong></div>" +
-    "<div><span>Pages du fichier</span><strong>" + (couverture ? "1 planche" : nbPages + " pages") + "</strong></div>" +
+    "<div><span>Pages du fichier</span><strong>" + (couverture ? "1 planche" : decomptePages(nbPages, nombreTotalGardes(livre))) + "</strong></div>" +
     '<div><span>Nom à donner</span><strong class="ci-nom">' + nom + ".pdf</strong></div>" +
   "</div>";
 
   if (!couverture && nbPages !== pagesEcran) {
-    html += '<p class="ci-note">Le fichier compte ' + nbPages + " pages, contre " + pagesEcran +
-      " à l'écran. Deux raisons : la marge de reliure (" + mm(marges.interieure) +
+    html += '<p class="ci-note">Le fichier compte ' + decomptePages(nbPages, nombreTotalGardes(livre)) +
+      ", contre " + decomptePages(pagesEcran, nombreTotalGardes(livre)) +
+      " à l'écran. Les pages de garde sont comprises des deux côtés ; la différence vient du texte. Deux raisons : la marge de reliure (" + mm(marges.interieure) +
       " mm) est plus large que celle de l'écran, et le texte est <b>justifié avec " +
       "césure</b> dans le fichier alors qu'il est au drapeau à l'écran — les lignes ne " +
       "se coupent donc pas au même endroit. Votre livre à l'écran n'est pas modifié.</p>";
