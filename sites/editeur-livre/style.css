@@ -408,6 +408,37 @@ button.danger {
   pointer-events: none;
 }
 
+/* Les pages de garde, vues de côté : une feuille blanche qui dépasse du livre,
+   du côté où elle se trouve (avant la page 1, après la dernière). Une garde n'a
+   pas de texte, donc pas de place dans la zone éditable — mais il faut la
+   VOIR, pour compter les feuilles du livre relié. Elle suit le zoom du livre
+   (elle est dans .spread-edition) et ouvre le réglage au clic. */
+.garde-tranche {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 44px;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f4efe0;
+  border: 1.5px dashed #c9bfa4;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  color: #8a7f63;
+  font-family: "EB Garamond", Georgia, serif;
+  font-size: 15px;
+  font-style: italic;
+  letter-spacing: 0.04em;
+  writing-mode: vertical-rl;
+  cursor: pointer;
+}
+.garde-tranche[hidden] { display: none; }
+.garde-tranche:hover { background: #faf6ec; color: #5c5238; }
+.garde-debut { right: 100%; margin-right: 10px; border-radius: 3px 0 0 3px; text-orientation: mixed; transform: rotate(180deg); }
+.garde-fin   { left: 100%;  margin-left: 10px;  border-radius: 0 3px 3px 0; }
+
 .texte-livre p {
   margin: 0 0 6px 0;
 }
@@ -455,6 +486,24 @@ button.danger {
 .page-livre.page-vierge-apercu {
   background: transparent;
   box-shadow: none;
+}
+
+/* Page de garde dans l'aperçu : blanche, non numérotée, mais étiquetée — sinon
+   on ne la distingue pas d'une page vide. */
+.page-livre.page-garde-apercu {
+  position: relative;
+}
+.garde-mention {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #c4bba3;
+  font-style: italic;
+  font-size: 15px;
+  letter-spacing: 0.06em;
+  pointer-events: none;
 }
 
 .sommaire-actions {

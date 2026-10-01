@@ -178,6 +178,14 @@
           <div id="editeurSpread" class="texte-livre editeur-spread" contenteditable="true"></div>
           <div class="numero-page num-spread" id="numeroGauche"></div>
           <div class="numero-page num-spread" id="numeroDroite"></div>
+          <!-- Les gardes sont blanches : elles n'ont aucune place dans la zone
+               éditable. On les montre en tranche de feuille sur le côté, à
+               l'endroit où elles se trouvent dans le livre (avant la page 1,
+               après la dernière). Voir majGardesEdition. -->
+          <button type="button" class="garde-tranche garde-debut" id="gardeDebutEd" hidden
+                  onclick="ouvrirPagesDeGarde()"></button>
+          <button type="button" class="garde-tranche garde-fin" id="gardeFinEd" hidden
+                  onclick="ouvrirPagesDeGarde()"></button>
         </div>
       </div>
 

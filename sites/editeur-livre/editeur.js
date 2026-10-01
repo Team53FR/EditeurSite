@@ -1060,7 +1060,9 @@ function donneesInterieur(idx) {
     gauche: fG ? fG.page : null,
     droite: fD ? fD.page : null,
     numG: fG ? fG.numero : "",
-    numD: fD ? fD.numero : ""
+    numD: fD ? fD.numero : "",
+    gardeG: !!(fG && fG.garde),
+    gardeD: !!(fD && fD.garde)
   };
 }
 
@@ -1094,8 +1096,8 @@ function pageCoteApercu(idx, cote) {
   }
   const d = donneesInterieur(idx);
   return cote === "gauche"
-    ? creerPageTexteApercu(d.gauche, d.numG)
-    : creerPageTexteApercu(d.droite, d.numD);
+    ? creerPageTexteApercu(d.gauche, d.numG, d.gardeG)
+    : creerPageTexteApercu(d.droite, d.numD, d.gardeD);
 }
 
 function positionnerPageAnim(pageEl, left) {
@@ -1237,9 +1239,21 @@ function afficherApercu() {
   appliquerFormatPage(livre.format || "149x210");
 }
 
-function creerPageTexteApercu(page, numero) {
+function creerPageTexteApercu(page, numero, garde) {
   const div = document.createElement("div");
   div.className = "page-livre";
+
+  // Une garde est une page blanche : sans étiquette, on la prendrait pour une
+  // page vide du livre. L'étiquette n'existe qu'à l'écran — rien ne s'imprime
+  // d'ici (l'impression a ses propres pages, voir impression.js).
+  if (garde) {
+    div.classList.add("page-garde-apercu");
+    const mention = document.createElement("div");
+    mention.className = "garde-mention";
+    mention.textContent = "Page de garde";
+    div.appendChild(mention);
+    return div;
+  }
 
   const texte = document.createElement("div");
   texte.className = "texte-livre";
@@ -2577,6 +2591,30 @@ function afficherSpread() {
   if (nG) nG.textContent = indexSpread + 1;
   if (nD) nD.textContent = indexSpread + 2;
   majBoutonsNavigation();
+  majGardesEdition();
+}
+
+// Montre les pages de garde sur le côté du livre : celles du début à gauche de
+// la première double-page, celles de la fin à droite de la dernière. Elles ne
+// sont pas dans la zone éditable (rien à y écrire) mais doivent se VOIR, pour
+// compter les feuilles du livre relié.
+function majGardesEdition() {
+  const gDebut = document.getElementById("gardeDebutEd");
+  const gFin = document.getElementById("gardeFinEd");
+  if (!gDebut || !gFin || indexLivre === -1) return;
+
+  const livre = livreActuel();
+  const debut = nombreGardes(livre.gardesDebut);
+  const fin = nombreGardes(livre.gardesFin);
+  const premiere = numSpread() === 0;
+  const derniere = numSpread() >= spreadsLivre().length - 1;
+
+  const libelle = (n) => n > 1 ? `${n} pages de garde` : "Page de garde";
+  gDebut.hidden = !(debut && premiere);
+  gFin.hidden = !(fin && derniere);
+  gDebut.textContent = libelle(debut);
+  gFin.textContent = libelle(fin);
+  gDebut.title = gFin.title = "Feuillets blancs non numérotés — cliquer pour les modifier";
 }
 
 // Grise « Précédent » sur la première double-page et « Suivant » sur la dernière,
@@ -3566,6 +3604,7 @@ function majEtiquetteGardes() {
   if (!bouton) return;
   const gardes = nombreTotalGardes(livreActuel());
   bouton.textContent = gardes ? `▭ Pages de garde · ${gardes}` : "▭ Pages de garde";
+  majGardesEdition();
 }
 
 // ----- Recherche : positionner dans la zone unique -----
