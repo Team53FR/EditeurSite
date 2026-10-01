@@ -2988,11 +2988,29 @@ function creerCouverturePlatKDP(livre, dosMm, promessesImages) {
   feuille.appendChild(debord);
 
   zone.appendChild(creerPanneauCouverture(livre, "quatrieme", f, promessesImages));
-  zone.appendChild(construireDosLivre(livre, dosMm, f.haut, promessesImages));
+  zone.appendChild(recouvrirJointuresDos(construireDosLivre(livre, dosMm, f.haut, promessesImages), dosMm));
   zone.appendChild(creerPanneauCouverture(livre, "couverture", f, promessesImages));
 
   feuille.appendChild(zone);
   return feuille;
+}
+
+// Trois panneaux côte à côte (4e | dos | 1re) tombent sur des positions
+// fractionnaires : 150 mm font 566,93 px, et un dos de 24,44 mm n'est pas un
+// nombre rond non plus. Un lecteur de PDF lisse le bord de chaque rectangle, et
+// laisse alors voir ce qu'il y a DERRIÈRE dans la jointure — la couleur de
+// fond de la couverture, d'où un filet clair entre la 4e et le dos.
+//
+// Le dos mord donc de RECOUVREMENT_DOS_MM sous chaque voisin (marge négative,
+// largeur augmentée d'autant) : le total reste exact, les repères de pli ne
+// bougent pas, et la jointure n'a plus de fond à montrer. Dans l'ordre de
+// peinture, le dos recouvre la 4e et la 1re recouvre le dos.
+const RECOUVREMENT_DOS_MM = 0.2;
+function recouvrirJointuresDos(dos, dosMm) {
+  dos.style.width = (dosMm + 2 * RECOUVREMENT_DOS_MM) + "mm";
+  dos.style.marginLeft = (-RECOUVREMENT_DOS_MM) + "mm";
+  dos.style.marginRight = (-RECOUVREMENT_DOS_MM) + "mm";
+  return dos;
 }
 
 // Feuille = format rogné + marge technique (fond perdu + repères).
@@ -3619,7 +3637,7 @@ function creerCouverturePlat(livre, f, dosMm, promessesImages, pourImprimeur) {
 
   zone.appendChild(creerPanneauCouverture(livre, "quatrieme", f, promessesImages));
 
-  zone.appendChild(construireDosLivre(livre, dosMm, f.haut, promessesImages));
+  zone.appendChild(recouvrirJointuresDos(construireDosLivre(livre, dosMm, f.haut, promessesImages), dosMm));
 
   zone.appendChild(creerPanneauCouverture(livre, "couverture", f, promessesImages));
 
