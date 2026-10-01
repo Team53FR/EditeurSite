@@ -634,6 +634,14 @@ qui avait été composé. Le livre imprimé ne ressemblait plus à celui de l'é
 
 `pagesEtMargeKDP()` part désormais des marges de l'auteur et ne les **relève**
 que si elles passent sous le plancher — `Math.max`, jamais de remplacement.
+
+Elle **décale** aussi le bloc vers l'extérieur, comme le fait l'export
+imprimeur : `+ DELTA_RELIURE_MM` au petit fond, autant de retiré au grand. La
+somme ne bouge pas, donc la largeur du bloc reste celle de l'écran, mais le
+texte s'écarte du pli. Centrer la page serait une erreur : la reliure avale
+quelques millimètres au petit fond, et un bloc centré paraît aspiré vers le
+dos. Sur un livre très épais, le minimum de reliure de KDP (jusqu'à 22,3 mm)
+reprend la main sur ce décalage.
 Les trois cotes retenues (`interieure`, `exterieure`, `verticale`) circulent
 jusqu'à `creerPageKDP()`, qui doit poser EXACTEMENT celles qui ont servi à la
 mesure : sinon le texte ne tombe pas où la pagination l'a cru et le bas des

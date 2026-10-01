@@ -2663,9 +2663,16 @@ function pagesEtMargeKDP(livre) {
   // passent sous le minimum exigé. C'est déjà le principe de l'export
   // imprimeur, qui conserve la largeur du bloc de texte ; seul cet export y
   // échappait.
-  const margeExt = Math.max(sauveMargeH, KDP_MARGE_EXT_MM);
+  //
+  // Et comme lui, on DÉCALE le bloc vers l'extérieur : + DELTA_RELIURE_MM au
+  // petit fond, autant de retiré au grand fond. La somme ne bouge pas — la
+  // largeur du bloc est donc exactement celle de l'écran — mais le texte
+  // s'écarte du pli. Centrer la page donnerait un livre dont le texte paraît
+  // aspiré vers la reliure : le pli en avale quelques millimètres, et l'œil
+  // les lui compte en plus.
+  const margeExt = Math.max(sauveMargeH - DELTA_RELIURE_MM, KDP_MARGE_EXT_MM);
   const margeV = Math.max(sauveMargeV, KDP_MARGE_EXT_MM);
-  let margeInt = Math.max(sauveMargeH, kdpMargeReliure(pagesEcran));
+  let margeInt = Math.max(sauveMargeH + DELTA_RELIURE_MM, kdpMargeReliure(pagesEcran));
   let pagesPro = null;
 
   try {
@@ -2682,7 +2689,7 @@ function pagesEtMargeKDP(livre) {
       appliquerFormatPage(livre.format);
       repaginerTout();
       pagesPro = (livre.pages || []).map((p) => (p && p.contenu) || "");
-      const suivante = Math.max(sauveMargeH, kdpMargeReliure(pagesPro.length));
+      const suivante = Math.max(sauveMargeH + DELTA_RELIURE_MM, kdpMargeReliure(pagesPro.length));
       if (suivante === margeInt) break;
       margeInt = suivante;
     }
@@ -2745,11 +2752,13 @@ function ouvrirControleKDP(cible, livre, pagesEcran, pagesPro, marges) {
     "Format exact " + fmt.larg.toFixed(2).replace(".", ",") + " × " + fmt.haut.toFixed(2).replace(".", ",") + " mm, sans marge technique ni repère : c'est ce que KDP demande",
     couverture
       ? "Fond perdu de " + KDP_FOND_PERDU_MM + " mm sur les quatre bords, couleur de fond comprise"
-      : "Vos marges, relevées si besoin aux minimums KDP : " +
-        mm(marges.interieure) + " mm au petit fond (minimum " +
+      : "Vos marges, décalées vers l'extérieur pour la reliure : " +
+        mm(marges.interieure) + " mm au petit fond (minimum KDP " +
         mm(kdpMargeReliure(nbPages)) + " mm pour " + nbPages + " pages), " +
         mm(marges.exterieure) + " mm au grand fond, " + mm(marges.verticale) +
-        " mm en tête (minimum " + mm(KDP_MARGE_EXT_MM) + " mm)"
+        " mm en tête. La largeur du bloc de texte ne change pas : ce qui est " +
+        "ajouté au petit fond est retiré au grand, pour que le texte s'écarte " +
+        "du pli sans que la mise en page bouge."
   ];
   if (couverture) {
     conformes.splice(2, 0, "Registre assuré entre 4e, dos et 1re de couverture");
