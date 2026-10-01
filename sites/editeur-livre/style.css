@@ -489,16 +489,17 @@ button.danger {
 }
 
 /* Page de garde dans l'aperçu : blanche, non numérotée, mais étiquetée — sinon
-   on ne la distingue pas d'une page vide. */
+   on ne la distingue pas d'une page vide.
+   Surtout PAS de « position » sur la page : pendant le tournage, la feuille
+   superpose ses deux faces avec « .anim-leaf-face { position: absolute } »,
+   qu'une règle plus spécifique écraserait — la face de garde se retrouverait
+   empilée SOUS l'autre, décalée d'une page de haut. L'étiquette se centre donc
+   par le flex de la page (c'est déjà un .page-livre en colonne). */
 .page-livre.page-garde-apercu {
-  position: relative;
+  justify-content: center;
+  align-items: center;
 }
 .garde-mention {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   color: #c4bba3;
   font-style: italic;
   font-size: 15px;
