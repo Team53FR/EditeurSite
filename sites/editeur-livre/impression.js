@@ -1041,14 +1041,8 @@ function feuilletsProAvecGardes(livre, pagesPro) {
   return feuillets;
 }
 
-// « 409 pages (408 de texte + 1 de garde) » : le total que paie le dos, et ce
-// qui le compose. Sans le détail, un total qui diffère d'une page de celui de
-// l'écran ressemble à une garde oubliée — alors que le fichier est recomposé et
-// peut compter une page de texte de moins ou de plus.
-function decomptePages(total, gardes) {
-  return total + " pages" +
-    (gardes ? " (" + (total - gardes) + " de texte + " + gardes + " de garde)" : "");
-}
+// decomptePages() vit dans script.js : la barre latérale de l'éditeur en a
+// besoin aussi, et les deux doivent dire le total de la même façon.
 
 // La suite des demi-feuilles, dans l'ordre de lecture : les feuillets du
 // livre — pages de garde comprises, elles s'impriment blanches — complétée
@@ -1091,6 +1085,21 @@ function creerPageBlancheImpression(f) {
   return div;
 }
 
+// Pose le folio SOUS LE BLOC DE TEXTE, et non sous la page.
+//
+// Le folio était centré sur la largeur de la feuille (left: 0; right: 0), alors
+// que le texte est décalé vers l'extérieur : la marge de reliure est plus large
+// que l'autre. Sur un livre à 20 mm de reliure et 12 mm au grand fond, le numéro
+// tombait 4 mm à côté de l'axe du texte — à gauche du texte sur un recto, à
+// droite sur un verso, et ça se voit d'une page à l'autre.
+//
+// On lui donne donc les mêmes marges latérales qu'au texte, sur le même côté.
+// Son centrage se fait alors sur la colonne, comme dans un livre imprimé.
+function poserFolio(num, recto, margeInt, margeExt) {
+  num.style.left = (recto ? margeInt : margeExt) + "mm";
+  num.style.right = (recto ? margeExt : margeInt) + "mm";
+}
+
 // `position` est le rang PHYSIQUE du feuillet, `numero` le folio imprimé.
 // Les deux diffèrent dès qu'il y a des pages de garde : une garde occupe une
 // place sans porter de numéro, et c'est la place — pas le folio — qui dit de
@@ -1116,6 +1125,7 @@ function creerPageTexteImpression(page, numero, f, margeInt, margeExt, position)
   const num = document.createElement("div");
   num.className = "numero-impression";
   num.textContent = numero;
+  poserFolio(num, recto, margeInt, margeExt);
   div.appendChild(num);
 
   return div;
@@ -2971,6 +2981,7 @@ function creerPageKDP(contenu, numero, marges, fmt, position) {
   num.className = "numero-impression numero-pro";
   num.style.bottom = FOLIO_PRO_MM + "mm";
   num.textContent = numero;
+  poserFolio(num, recto, marges.interieure, marges.exterieure);
   zone.appendChild(num);
 
   feuille.appendChild(zone);
@@ -3130,6 +3141,7 @@ function creerPagePro(contenu, numero, f, margeInt, margeExt, position) {
   num.className = "numero-impression numero-pro";
   num.style.bottom = FOLIO_PRO_MM + "mm";
   num.textContent = numero;
+  poserFolio(num, recto, margeInt, margeExt);
   zone.appendChild(num);
 
   feuille.appendChild(zone);

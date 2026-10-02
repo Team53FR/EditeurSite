@@ -940,6 +940,17 @@ function nombreTotalGardes(livre) {
   return nombreGardes(livre && livre.gardesDebut) + nombreGardes(livre && livre.gardesFin);
 }
 
+// « 409 pages (408 de texte + 1 de garde) » : le total que paie le dos, et ce
+// qui le compose. Sans le détail, un total qui diffère d'une page de celui de
+// l'écran ressemble à une garde oubliée — alors que le fichier est recomposé et
+// peut compter une page de texte de moins ou de plus. Le détail permet aussi de
+// vérifier l'addition d'un coup d'œil : « dont 1 de garde » laisse croire que
+// la garde est déjà comprise dans les pages numérotées que l'on voit.
+function decomptePages(total, gardes) {
+  return total + " pages" +
+    (gardes ? " (" + (total - gardes) + " de texte + " + gardes + " de garde)" : "");
+}
+
 // ----- Compter les mots d'un passage -----
 //
 // Le texte d'un passage tel qu'on le LIT, et non tel que textContent le rend.

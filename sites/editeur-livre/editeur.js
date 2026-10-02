@@ -3583,16 +3583,45 @@ function majCompteurMots() {
 
   // Le total est celui du livre RELIÉ : les gardes sont de vraies feuilles, et
   // c'est ce nombre-là qu'il faut connaître pour prévoir le dos de la
-  // couverture. On précise ce qui en relève, sans quoi le chiffre ne
-  // correspondrait plus à celui des pages numérotées.
+  // couverture. On montre l'addition — « 408 de texte + 1 de garde » — plutôt
+  // que « dont 1 de garde », qui laissait croire que la garde était déjà
+  // comprise dans les pages numérotées qu'on a sous les yeux.
   const gardes = nombreTotalGardes(livreActuel());
-  const nbPages = (livreActuel().pages || []).length + gardes;
+  const total = nombrePagesTexte() + gardes;
   const el = document.getElementById("compteurMots");
   if (el) {
-    el.textContent = `${mots} mot${mots > 1 ? "s" : ""} · ${nbPages} page${nbPages > 1 ? "s" : ""}` +
-      (gardes ? ` (dont ${gardes} de garde)` : "");
+    const decompte = decomptePages(total, gardes);
+    // Le détail passe à la ligne : il est trop long pour tenir à côté du
+    // nombre de mots dans la barre latérale, et un retour automatique le
+    // coupait en plein milieu de l'addition.
+    el.innerHTML = `${mots} mot${mots > 1 ? "s" : ""} · ` +
+      (gardes ? decompte.replace(" (", "<br>(") : decompte);
   }
   majEtiquetteGardes();
+}
+
+// Le nombre de pages de TEXTE, sûr même si le tableau dérivé est en retard.
+//
+// `livre.pages` se met à jour au fil des modifications, mais il peut garder une
+// page de trop quand une double-page de fin disparaît — la sauvegarde la
+// retranche (voir sauvegarder) sans que l'écran en soit informé. Le compteur
+// annonçait alors 410 pour un livre dont la dernière page était la 408 et qui
+// portait une garde, soit 409 : l'étiquette affichait l'état d'avant la
+// resynchronisation.
+//
+// n doubles-pages ne peuvent pas donner plus de 2n pages. Au-delà, le tableau
+// est périmé : on le régénère — ce que la sauvegarde ferait de toute façon.
+// Seule cette borne HAUTE est testée : la borne basse (2n-1) est violée
+// légitimement par une double-page finale encore vide, et la tester ici
+// relancerait la régénération complète à chaque frappe.
+function nombrePagesTexte() {
+  const livre = livreActuel();
+  const nbSpreads = spreadsLivre().length;
+  if ((livre.pages || []).length > nbSpreads * 2) {
+    pagesObsoletes = true;
+    assurerPagesAJour();
+  }
+  return (livre.pages || []).length;
 }
 
 // Le bouton dit combien de pages de garde sont posées : sans cela, le réglage
@@ -3649,6 +3678,11 @@ async function sauvegarder() {
   if (numSpread() >= spreads.length) indexSpread = Math.max(0, (spreads.length - 1) * 2);
   afficherSpread();
   afficherSommaire();
+  // Le tableau de pages vient d'être resynchronisé avec les doubles-pages : le
+  // compteur doit en rendre compte, sans quoi il garde le total d'avant et
+  // diffère de ce qui part en base. Avant l'envoi, et non après : ce qui est
+  // compté est ainsi exactement ce qui est enregistré.
+  majCompteurMots();
 
   try {
     majLeConnu = await enregistrerLivreDistant(livreActuel(), majLeConnu);

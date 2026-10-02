@@ -428,6 +428,23 @@ compte les gardes, qui sont du papier comme le reste. `creerPageTexteImpression`
 et `creerPageKDP` reçoivent la position à part du folio : sans cela, une seule
 garde mettait toutes les marges de reliure du mauvais côté.
 
+**Le compteur de la barre latérale** annonce le total du livre relié sous la
+forme « 409 pages (408 de texte + 1 de garde) » — `decomptePages()`, dans
+`script.js`, la même formulation que le panneau d'export. Le détail montre
+l'addition : l'ancien « dont 1 de garde » laissait croire que la garde était
+déjà comprise dans les pages numérotées qu'on a sous les yeux.
+
+Il a affiché un jour 410 pour un livre dont la dernière page était la 408 et qui
+portait une garde. Le tableau `livre.pages` peut en effet garder une page de trop
+quand une double-page de fin disparaît ; `sauvegarder()` le resynchronise (le test
+`nbPages > nbSpreads * 2`) mais ne rappelait pas `majCompteurMots()` : l'étiquette
+montrait l'état d'**avant** la resynchronisation, alors que la base recevait le
+bon chiffre. Deux corrections : la sauvegarde rafraîchit le compteur avant l'envoi,
+et `nombrePagesTexte()` régénère le tableau s'il dépasse 2 × le nombre de
+doubles-pages. Seule cette borne **haute** est testée : la borne basse est violée
+légitimement par une double-page finale encore vide, et la tester ici relancerait
+la régénération complète à chaque frappe.
+
 Le réglage est posé en mémoire et part avec la sauvegarde suivante, comme le
 format ou l'interligne — surtout pas par `mettreAJourLivre()`, qui changerait
 `maj_le` dans le dos de l'éditeur et ferait croire à la sauvegarde suivante que
@@ -642,6 +659,17 @@ texte s'écarte du pli. Centrer la page serait une erreur : la reliure avale
 quelques millimètres au petit fond, et un bloc centré paraît aspiré vers le
 dos. Sur un livre très épais, le minimum de reliure de KDP (jusqu'à 22,3 mm)
 reprend la main sur ce décalage.
+
+**Le folio suit le bloc de texte, pas la page.** Il était centré sur la largeur
+de la feuille (`.numero-impression { left: 0; right: 0 }`) alors que le texte,
+lui, est décalé : sur un livre à 20 mm de reliure et 12 mm au grand fond, le
+numéro tombait 4 mm à côté de l'axe du texte — à gauche sur un recto, à droite
+sur un verso. `poserFolio()` lui donne les mêmes marges latérales que le texte,
+du même côté ; il est appelé par les trois constructeurs de pages
+(`creerPageTexteImpression`, `creerPageKDP`, `creerPagePro`), qui avaient tous le
+défaut. Les règles d'impression vivent dans `@media print` : pour tester cette
+géométrie à l'écran, on en recopie les équivalents dans la page de test.
+
 Les trois cotes retenues (`interieure`, `exterieure`, `verticale`) circulent
 jusqu'à `creerPageKDP()`, qui doit poser EXACTEMENT celles qui ont servi à la
 mesure : sinon le texte ne tombe pas où la pagination l'a cru et le bas des
