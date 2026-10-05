@@ -155,7 +155,7 @@ create policy "livre_spreads : suppression (soi-même)" on public.livre_spreads
 
 
 -- ============================================================================
--- Notes de livre : une page d'idées par livre, du texte brut, PRIVÉ
+-- Notes de livre : des pages d'idées rangées en onglets, par livre, PRIVÉES
 -- ============================================================================
 -- Table SÉPARÉE de `livres`, et ce n'est pas un détail d'organisation. La règle
 -- de lecture de `livres` est « soi-même OU publié » : tout compte connecté lit la
@@ -166,6 +166,9 @@ create policy "livre_spreads : suppression (soi-même)" on public.livre_spreads
 create table public.livre_notes (
   livre_id  text primary key references public.livres(id) on delete cascade,
   user_id   uuid not null references public.users(id) on delete cascade,
+  -- Les onglets et leur texte, en JSON {"v":2,"onglets":[…]} (voir notes.js) ;
+  -- les notes d'avant les onglets sont du texte brut, lu comme un premier onglet.
+  -- La limite vaut pour TOUS les onglets ensemble.
   contenu   text not null default '' check (char_length(contenu) <= 200000),
   -- Compteur de révisions, pour l'enregistrement concurrent : deux onglets
   -- ouverts sur les mêmes notes ne s'écrasent pas en silence, le second à

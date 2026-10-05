@@ -378,7 +378,8 @@ async function definirSerieDuLivre(livreId, serieId, tome) {
 
 // ----- Notes de livre : la page d'idées de l'auteur -----
 //
-// Du texte brut, privé, une page par livre. Elles vivent dans leur PROPRE table
+// Des pages d'idées rangées en onglets, privées, pour chaque livre (le format du
+// contenu est décrit en tête de notes.js). Elles vivent dans leur PROPRE table
 // (livre_notes) et non dans une colonne de `livres`, pour une raison de sécurité :
 // la règle de lecture de `livres` est « soi-même OU publié », donc tout compte
 // connecté lit la ligne entière d'un livre publié. Des notes posées là seraient

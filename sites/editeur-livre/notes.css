@@ -31,6 +31,7 @@
 }
 
 .notes-entete {
+  flex-shrink: 0;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -62,18 +63,105 @@
 .notes-bouton:focus-visible { outline: 2px solid var(--s-accent, var(--accent, #8a4b38)); outline-offset: 2px; }
 
 .notes-aide {
+  flex-shrink: 0;
   margin: 6px 0 14px;
   font-size: 13px;
   line-height: 1.5;
   color: var(--s-ink-soft, var(--ink-soft, #6f6455));
 }
 
+/* Les onglets : une rangée de pastilles au-dessus de la zone d'écriture. Elle défile
+   de côté quand il y en a trop, plutôt que de passer à la ligne et de manger la
+   place de l'écriture. */
+.notes-onglets {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 10px;
+  padding-bottom: 2px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.notes-onglet {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--s-line, var(--line, #e6ddc9));
+  border-radius: 999px;
+  background: transparent;
+}
+.notes-onglet.actif {
+  border-color: var(--s-accent, var(--accent, #8a4b38));
+  background: var(--s-cream, var(--cream, #f6efe0));
+}
+.notes-onglet-nom,
+.notes-onglet-act,
+.notes-onglet-ajout {
+  border: none;
+  background: transparent;
+  color: var(--s-ink-soft, var(--ink-soft, #6f6455));
+  font: 600 13px/1 var(--s-sans, var(--sans, system-ui, sans-serif));
+  cursor: pointer;
+}
+.notes-onglet-nom {
+  max-width: 200px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.notes-onglet:not(.actif) .notes-onglet-nom:hover { color: var(--s-ink, var(--ink, #2b2622)); }
+.notes-onglet.actif .notes-onglet-nom {
+  padding-right: 6px;
+  color: var(--s-ink, var(--ink, #2b2622));
+}
+.notes-onglet-act {
+  width: 24px;
+  height: 24px;
+  margin-right: 2px;
+  border-radius: 50%;
+  font-size: 12px;
+}
+.notes-onglet-act:last-child { margin-right: 6px; }
+.notes-onglet-act:hover { background: rgba(0, 0, 0, .07); color: var(--s-ink, var(--ink, #2b2622)); }
+.notes-onglet-ajout {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border: 1px dashed var(--s-line, var(--line, #e6ddc9));
+  border-radius: 50%;
+  font-size: 17px;
+}
+.notes-onglet-ajout:hover:not(:disabled) { color: var(--s-ink, var(--ink, #2b2622)); border-color: var(--s-accent, var(--accent, #8a4b38)); }
+.notes-onglet-ajout:disabled { opacity: .45; cursor: not-allowed; }
+.notes-onglet-saisie {
+  width: 150px;
+  padding: 7px 12px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--s-ink, var(--ink, #2b2622));
+  font: 600 13px/1 var(--s-sans, var(--sans, system-ui, sans-serif));
+}
+.notes-onglet-saisie:focus { outline: none; }
+.notes-onglet-nom:focus-visible,
+.notes-onglet-act:focus-visible,
+.notes-onglet-ajout:focus-visible { outline: 2px solid var(--s-accent, var(--accent, #8a4b38)); outline-offset: 1px; }
+
+/* La zone d'écriture est une zone modifiable (elle montre du gras et de l'italique,
+   ce qu'un textarea ne sait pas faire). Elle défile d'elle-même, et le pied de
+   fenêtre reste en vue. */
 .notes-texte {
-  flex: 1;
+  flex: 1 1 auto;
   min-height: 46vh;
   width: 100%;
+  position: relative;          /* porte le texte d'invite, voir plus bas */
   box-sizing: border-box;
   padding: 14px 16px;
+  overflow-y: auto;
+  overflow-x: hidden;
   border: 1px solid var(--s-line, var(--line, #e6ddc9));
   border-radius: 10px;
   background: #fffef9;
@@ -81,20 +169,31 @@
   font-family: var(--s-serif, var(--serif, "EB Garamond", Georgia, serif));
   font-size: 16px;
   line-height: 1.6;
-  resize: none;                /* la fenêtre s'adapte à l'écran, pas à la poignée */
+  white-space: pre-wrap;       /* les espaces multiples restent des espaces, pas des insécables */
   /* Une adresse web collée, sans espace, ne doit pas faire défiler la zone de
      côté : elle passe à la ligne là où elle déborde. */
   overflow-wrap: anywhere;
-  overflow-x: hidden;
 }
 .notes-texte:focus {
   outline: none;
   border-color: var(--s-accent, var(--accent, #8a4b38));
   box-shadow: 0 0 0 3px rgba(138, 75, 56, .14);
 }
-.notes-texte:disabled { opacity: .6; }
+.notes-texte[contenteditable="false"] { opacity: .6; }
+/* Le texte d'invite : un pseudo-élément ABSOLU, pour ne pas devenir une ligne de
+   plus dans la zone (et donc dans ce qu'on enregistre). */
+.notes-texte[data-vide="1"]::before {
+  content: attr(data-placeholder);
+  position: absolute;
+  top: 14px;
+  left: 16px;
+  right: 16px;
+  color: #9a8f7e;
+  pointer-events: none;
+}
 
 .notes-pied {
+  flex-shrink: 0;
   display: flex;
   justify-content: space-between;
   gap: 12px;
@@ -109,6 +208,7 @@
 /* Le conflit : assez voyant pour qu'on ne le manque pas, car c'est de lui que
    dépend le texte qu'on vient d'écrire. */
 .notes-alerte {
+  flex-shrink: 0;
   margin: 0 0 12px;
   padding: 12px 14px;
   border: 1px solid #e0b5ae;

@@ -456,8 +456,9 @@ format ou l'interligne — surtout pas par `mettreAJourLivre()`, qui changerait
 `maj_le` dans le dos de l'éditeur et ferait croire à la sauvegarde suivante que
 le livre a été modifié ailleurs.
 
-**Notes de livre** (table `livre_notes`, `notes.js` / `notes.css`) : une page de
-texte libre par livre, pour y poser les idées — personnages, intrigues, pistes.
+**Notes de livre** (table `livre_notes`, `notes.js` / `notes.css`) : des pages de
+texte libre par livre, rangées en **onglets** (20 au plus), pour y poser les
+idées — personnages, intrigues, pistes.
 Deux entrées : la pastille de la carte, dans la bibliothèque, et le bouton
 « 📝 Notes » du sommaire de l'éditeur, pour y revenir en cours d'écriture. Le
 module construit sa propre fenêtre : la bibliothèque et l'éditeur n'ont pas les
@@ -499,6 +500,36 @@ La duplication d'un livre reprend ses notes (en version 1, comme une ligne neuve
 La suppression du livre les emporte (`on delete cascade`). Les pastilles de carte
 n'apparaissaient qu'au survol — introuvables sur téléphone : elles restent visibles
 là où il n'y a pas de survol (`@media (hover: none)`).
+
+**Onglets et mise en forme.** Tout tient dans la colonne `contenu` (aucune
+migration de base), sous la forme d'un JSON `{"v":2,"onglets":[{id,titre,texte}]}`.
+Les notes d'avant les onglets sont du texte brut : on les lit comme un premier
+onglet « Notes » (identifiant fixe, pour que deux ouvertures donnent le même
+document), et le format ne change qu'à la première *modification* — ouvrir des
+notes n'écrit jamais rien. Un JSON abîmé s'affiche comme du texte plutôt que de
+disparaître.
+
+Le gras et l'italique n'existent **que par Ctrl+B et Ctrl+I** (pas de barre
+d'outils, c'était la demande). Le `texte` d'un onglet est du texte à balisage
+minimal : des retours à la ligne, et seulement `<b>` et `<i>`, tout `< & >` du
+texte étant échappé. La zone d'écriture est un `contenteditable`, donc **de
+l'HTML potentiel**, et trois règles tiennent la porte :
+
+- on n'écrit jamais ce texte avec `innerHTML` : `remplir()` construit la page
+  nœud par nœud (`createTextNode`, `createElement`), si bien que même une ligne
+  trafiquée à la main dans la base ne donne que du texte inerte ;
+- ce qui est enregistré se relit dans la page (`lignesDepuisDOM`) et ne garde que
+  les lignes, le gras et l'italique : tout autre balisage est écarté, quel que
+  soit le navigateur (Chrome, Firefox et Safari ne fabriquent pas les mêmes
+  `<div>`/`<br>` quand on appuie sur Entrée) ;
+- on **colle du texte brut** seulement, le **dépôt** est refusé, et les mises en
+  forme autres que gras/italique (Ctrl+U, menus du navigateur) sont bloquées :
+  elles s'afficheraient, puis disparaîtraient à la réouverture.
+
+La limite de la colonne (200 000 caractères) vaut pour **tous les onglets
+ensemble** ; au-delà, l'envoi est refusé côté navigateur avec un message, et la
+fenêtre reste ouverte. Échap pendant le renommage d'un onglet annule le nom, pas la
+fenêtre. L'ordre des onglets est celui de leur création (pas de glisser-déposer).
 
 **Dupliquer un livre** (bouton ⧉ de la carte) : le doublon est un livre neuf et
 indépendant — texte, mise en page, réglages et visuels lui appartiennent. Trois
