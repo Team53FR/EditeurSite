@@ -376,6 +376,77 @@ async function definirSerieDuLivre(livreId, serieId, tome) {
   });
 }
 
+// ----- Notes de livre : la page d'idées de l'auteur -----
+//
+// Du texte brut, privé, une page par livre. Elles vivent dans leur PROPRE table
+// (livre_notes) et non dans une colonne de `livres`, pour une raison de sécurité :
+// la règle de lecture de `livres` est « soi-même OU publié », donc tout compte
+// connecté lit la ligne entière d'un livre publié. Des notes posées là seraient
+// lisibles par les autres comptes dès la publication — intrigues et spoilers
+// compris. Dans livre_notes, seul le propriétaire du livre y accède.
+//
+// Pour la même raison elles ne passent JAMAIS par versLigneLivre() ni par
+// l'enregistrement du livre : le manuscrit et les notes s'enregistrent à part,
+// et un livre dont on sauvegarde le texte ne touche pas à ses notes.
+
+// Le contenu des notes et leur numéro de version. Un livre sans notes rend un
+// contenu vide et une version `null` : c'est ce `null` qui dit à
+// enregistrerNotesLivre qu'il faut CRÉER la ligne plutôt que la modifier.
+async function chargerNotesLivre(livreId) {
+  const lignes = await requeteSupabase(
+    `livre_notes?livre_id=eq.${encodeURIComponent(livreId)}&select=contenu,version`);
+  const ligne = lignes && lignes[0];
+  return ligne
+    ? { contenu: ligne.contenu || "", version: Number(ligne.version) || 0 }
+    : { contenu: "", version: null };
+}
+
+// Enregistre les notes et rend la NOUVELLE version.
+//
+// L'écriture est conditionnée par la version que l'appelant a lue : si les notes
+// ont changé entre-temps — un autre onglet, un autre appareil —, rien n'est
+// écrasé et l'erreur porte `conflit = true`. Sans cela, deux fenêtres ouvertes
+// sur les mêmes notes se les écraseraient mutuellement, sans un mot, et ce sont
+// des idées qu'on ne retape pas.
+async function enregistrerNotesLivre(livreId, contenu, version) {
+  const erreurConflit = () => {
+    const e = new Error("Ces notes ont été modifiées ailleurs.");
+    e.conflit = true;
+    return e;
+  };
+  const maintenant = new Date().toISOString();
+
+  if (version === null) {
+    // Première écriture. Si la ligne existe déjà (créée entre-temps par un
+    // autre onglet), la clé primaire refuse : c'est un conflit, pas une panne.
+    try {
+      await requeteSupabase("livre_notes", {
+        method: "POST",
+        headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({
+          livre_id: livreId, user_id: monIdentifiant(),
+          contenu, version: 1, maj_le: maintenant
+        })
+      });
+    } catch (e) {
+      if (e.status === 409) throw erreurConflit();
+      throw e;
+    }
+    return 1;
+  }
+
+  // « return=representation » rend les lignes modifiées : aucune, c'est que la
+  // version a changé (ou que la ligne a disparu) — le PATCH, lui, répond 200.
+  const modifiees = await requeteSupabase(
+    `livre_notes?livre_id=eq.${encodeURIComponent(livreId)}&version=eq.${version}`, {
+      method: "PATCH",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify({ contenu, version: version + 1, maj_le: maintenant })
+    });
+  if (!modifiees || !modifiees.length) throw erreurConflit();
+  return version + 1;
+}
+
 // Un livre entier : sa ligne, ses double-pages, son cache de pagination.
 // `proprietaire` n'est pas passé : RLS décide seule si la lecture est permise
 // (le sien, ou un livre publié).

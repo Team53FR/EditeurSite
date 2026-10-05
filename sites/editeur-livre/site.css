@@ -459,6 +459,28 @@ main.contenu { padding-top: 40px; padding-bottom: 60px; }
 .livre-carte:hover .livre-dupliquer { opacity: 1; }
 .livre-dupliquer:hover { background: var(--accent); color: #fff; }
 
+/* Notes : la quatrième pastille, à gauche de la duplication. */
+.livre-notes {
+  position: absolute; top: 10px; right: 112px;
+  width: 28px; height: 28px; border-radius: 50%;
+  border: none; cursor: pointer;
+  background: rgba(255,253,248,.85);
+  color: var(--accent-deep);
+  display: grid; place-items: center;
+  opacity: 0; transition: opacity .12s ease;
+  box-shadow: var(--ombre-douce);
+}
+.livre-carte:hover .livre-notes,
+.livre-notes:focus-visible { opacity: 1; }
+.livre-notes:hover { background: var(--accent); color: #fff; }
+
+/* Les pastilles n'apparaissent qu'au SURVOL — et un écran tactile n'en a pas :
+   sur téléphone, supprimer, renommer, dupliquer et lire ses notes étaient
+   introuvables. Là où il n'y a pas de survol, elles restent visibles. */
+@media (hover: none) {
+  .livre-suppr, .livre-renommer, .livre-dupliquer, .livre-notes { opacity: 1; }
+}
+
 /* ---------- Les deux onglets ----------
    Ils tiennent lieu de titres de section : « Mes livres » et « Mes séries »
    ne sont plus empilés, on passe de l'un à l'autre. Un résumé de série tient

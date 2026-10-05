@@ -1,0 +1,148 @@
+/* Notes de livre — la fenêtre d'idées (voir notes.js).
+ *
+ * La bibliothèque (site.css) et l'éditeur (style.css) n'ont pas les mêmes
+ * variables de couleur : --paper / --ink d'un côté, --s-paper / --s-ink de
+ * l'autre. Chaque couleur essaie donc les deux familles avant de retomber sur
+ * une valeur fixe, qui est la palette crème et brune commune aux deux pages.
+ */
+
+.notes-fond {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;               /* au-dessus des autres fenêtres du site */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(43, 34, 24, .48);
+}
+
+.notes-carte {
+  width: min(780px, 100%);
+  max-height: calc(100vh - 40px);
+  display: flex;
+  flex-direction: column;
+  padding: 22px 24px 16px;
+  box-sizing: border-box;
+  border-radius: 16px;
+  background: var(--s-paper, var(--paper, #fffdf8));
+  color: var(--s-ink, var(--ink, #2b2622));
+  box-shadow: 0 24px 70px rgba(0, 0, 0, .32);
+}
+
+.notes-entete {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.notes-titre {
+  margin: 0;
+  font-family: var(--s-serif, var(--serif, Georgia, serif));
+  font-size: 21px;
+  font-weight: 600;
+  line-height: 1.25;
+  overflow-wrap: anywhere;     /* un titre sans espace ne doit pas élargir la carte */
+}
+
+.notes-fermer {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--s-ink-soft, var(--ink-soft, #6f6455));
+  font-size: 15px;
+  cursor: pointer;
+}
+.notes-fermer:hover { background: var(--s-cream, var(--cream, #f6efe0)); color: var(--s-ink, var(--ink, #2b2622)); }
+.notes-fermer:focus-visible,
+.notes-bouton:focus-visible { outline: 2px solid var(--s-accent, var(--accent, #8a4b38)); outline-offset: 2px; }
+
+.notes-aide {
+  margin: 6px 0 14px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--s-ink-soft, var(--ink-soft, #6f6455));
+}
+
+.notes-texte {
+  flex: 1;
+  min-height: 46vh;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 14px 16px;
+  border: 1px solid var(--s-line, var(--line, #e6ddc9));
+  border-radius: 10px;
+  background: #fffef9;
+  color: inherit;
+  font-family: var(--s-serif, var(--serif, "EB Garamond", Georgia, serif));
+  font-size: 16px;
+  line-height: 1.6;
+  resize: none;                /* la fenêtre s'adapte à l'écran, pas à la poignée */
+  /* Une adresse web collée, sans espace, ne doit pas faire défiler la zone de
+     côté : elle passe à la ligne là où elle déborde. */
+  overflow-wrap: anywhere;
+  overflow-x: hidden;
+}
+.notes-texte:focus {
+  outline: none;
+  border-color: var(--s-accent, var(--accent, #8a4b38));
+  box-shadow: 0 0 0 3px rgba(138, 75, 56, .14);
+}
+.notes-texte:disabled { opacity: .6; }
+
+.notes-pied {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+  font-size: 12.5px;
+  color: var(--s-ink-soft, var(--ink-soft, #6f6455));
+}
+.notes-etat.ok      { color: #2e7d32; }
+.notes-etat.attente { color: #c77700; }
+.notes-etat.erreur  { color: #b3261e; font-weight: 600; }
+
+/* Le conflit : assez voyant pour qu'on ne le manque pas, car c'est de lui que
+   dépend le texte qu'on vient d'écrire. */
+.notes-alerte {
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  border: 1px solid #e0b5ae;
+  border-radius: 10px;
+  background: #fdf1ef;
+  color: #7a2a20;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+.notes-alerte[hidden] { display: none; }
+.notes-alerte-texte { margin: 0 0 10px; }
+.notes-alerte-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.notes-bouton {
+  padding: 8px 14px;
+  border: 1px solid var(--s-line, var(--line, #e6ddc9));
+  border-radius: 9px;
+  background: var(--s-paper, var(--paper, #fffdf8));
+  color: var(--s-ink, var(--ink, #2b2622));
+  font: 600 13px/1 var(--s-sans, var(--sans, system-ui, sans-serif));
+  cursor: pointer;
+}
+.notes-bouton:hover { border-color: var(--s-accent, var(--accent, #8a4b38)); }
+
+/* Sur téléphone, la fenêtre prend tout l'écran : c'est une page à écrire, et un
+   cadre qui laisse voir la page d'en dessous ne fait que réduire la place. */
+@media (max-width: 560px) {
+  .notes-fond { padding: 0; }
+  .notes-carte {
+    width: 100%;
+    height: 100%;
+    max-height: none;
+    border-radius: 0;
+    padding: 16px 14px 12px;
+  }
+  .notes-texte { min-height: 0; }
+}

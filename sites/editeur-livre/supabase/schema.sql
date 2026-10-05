@@ -152,3 +152,53 @@ create policy "livre_spreads : modification (soi-même)" on public.livre_spreads
   with check ((select auth.uid()) = (select user_id from public.livres l where l.id = livre_id));
 create policy "livre_spreads : suppression (soi-même)" on public.livre_spreads
   for delete using ((select auth.uid()) = (select user_id from public.livres l where l.id = livre_id));
+
+
+-- ============================================================================
+-- Notes de livre : une page d'idées par livre, du texte brut, PRIVÉ
+-- ============================================================================
+-- Table SÉPARÉE de `livres`, et ce n'est pas un détail d'organisation. La règle
+-- de lecture de `livres` est « soi-même OU publié » : tout compte connecté lit la
+-- ligne ENTIÈRE d'un livre publié. Une colonne `notes` y exposerait les
+-- intrigues et les spoilers de l'auteur à tous les autres comptes dès qu'il
+-- publie — alors que le texte du livre, lui, est fait pour être lu. Ici, aucune
+-- branche « publié » : seule la personne qui possède le livre voit ses notes.
+create table public.livre_notes (
+  livre_id  text primary key references public.livres(id) on delete cascade,
+  user_id   uuid not null references public.users(id) on delete cascade,
+  contenu   text not null default '' check (char_length(contenu) <= 200000),
+  -- Compteur de révisions, pour l'enregistrement concurrent : deux onglets
+  -- ouverts sur les mêmes notes ne s'écrasent pas en silence, le second à
+  -- enregistrer apprend que les notes ont changé (voir enregistrerNotesLivre
+  -- dans script.js). Un horodatage ne ferait pas l'affaire — comparé à la
+  -- microseconde, il se perd en route côté navigateur.
+  version   integer not null default 0,
+  maj_le    timestamptz not null default now()
+);
+create index livre_notes_user_id_idx on public.livre_notes(user_id);
+
+alter table public.livre_notes enable row level security;
+
+create policy "livre_notes : lecture (soi-même)" on public.livre_notes
+  for select using ((select auth.uid()) = user_id);
+
+-- La clé primaire est l'identifiant du livre : sans la deuxième condition, un
+-- compte pourrait poser des notes sur un livre PUBLIÉ qu'il ne possède pas (il
+-- peut le lire), et le vrai propriétaire ne pourrait plus jamais créer les
+-- siennes — la clé serait prise.
+create policy "livre_notes : écriture (soi-même, sur son livre)" on public.livre_notes
+  for insert with check (
+    (select auth.uid()) = user_id
+    and exists (select 1 from public.livres l where l.id = livre_id and l.user_id = (select auth.uid()))
+  );
+
+create policy "livre_notes : modification (soi-même)" on public.livre_notes
+  for update using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
+
+create policy "livre_notes : suppression (soi-même)" on public.livre_notes
+  for delete using ((select auth.uid()) = user_id);
+
+-- Droits explicites, dans les deux sens : accordés à « authenticated », retirés à
+-- « anon » à qui Supabase donne encore tout par défaut avant le 30/10/2026.
+grant select, insert, update, delete on public.livre_notes to authenticated;
+revoke all on public.livre_notes from anon;

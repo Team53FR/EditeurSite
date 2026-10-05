@@ -3712,6 +3712,16 @@ function ouvrirApercu() {
   afficherApercu();
 }
 
+// Les notes du livre en cours : une page d'idées, privée (voir notes.js). Elles
+// s'ouvrent par-dessus l'éditeur sans le toucher — le texte du livre et ses
+// notes s'enregistrent chacun de leur côté, et la fenêtre isole ses touches des
+// raccourcis de l'éditeur (Ctrl+Z n'y annule pas le livre).
+function ouvrirNotesDuLivre() {
+  const livre = livreActuel();
+  if (!livre) return;
+  ouvrirNotesLivre(livre.id, livre.titre, document.getElementById("btnNotes"));
+}
+
 // =====================================================================
 //  Pages de garde
 //

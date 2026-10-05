@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="impression.css">
 <link rel="stylesheet" href="tutoriel.css">
 <link rel="stylesheet" href="manuscrit.css">
+<link rel="stylesheet" href="notes.css">
 <link rel="icon" href="icone-192.png">
 <link rel="apple-touch-icon" href="icone-192.png">
 </head>
@@ -37,6 +38,12 @@
         <button type="button" id="btnPagesGarde" onclick="ouvrirPagesDeGarde()"
                 class="secondaire petit btn-couv"
                 title="Pages de garde : feuillets blancs et non numérotés, au début et à la fin du livre">▭ Gardes</button>
+        <!-- Les idées du livre : une page de texte libre, privée. Sur toute la
+             largeur de la grille — un cinquième bouton laissé seul dans sa
+             rangée aurait l'air d'un oubli. -->
+        <button type="button" id="btnNotes" onclick="ouvrirNotesDuLivre()"
+                class="secondaire petit btn-couv btn-notes"
+                title="Vos idées pour ce livre : une page de notes, visible de vous seul">📝 Notes</button>
       </div>
 
       <div class="sommaire-separateur"></div>
@@ -453,6 +460,7 @@
 
   <script src="attente.js"></script>
   <script src="script.js"></script>
+  <script src="notes.js"></script>
   <script src="tutoriel.js"></script>
   <script src="editeur.js"></script>
   <script src="manuscrit.js"></script>

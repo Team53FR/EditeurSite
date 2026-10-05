@@ -266,6 +266,12 @@ dossier `Supabase/` à la racine du dépôt BDD — à côté des anciens dossie
 `Old/DroidFortnite`, `Old/EditeurLivre`, etc., conservés tels quels comme
 dernière image du système précédent.
 
+⚠ **La liste des tables exportées est écrite dans ce script**, dans le dépôt BDD :
+une table créée après sa mise en place — `series` (séries de livres) et
+`livre_notes` (notes de livre) — doit y être **ajoutée à la main**, faute de quoi
+elle n'est pas sauvegardée. Les notes sont du texte qu'on ne retape pas : c'est
+précisément ce que cette sauvegarde est censée protéger.
+
 Le script utilise la clé **`service_role`** (secret GitHub Actions
 `SUPABASE_SERVICE_ROLE_KEY` sur le dépôt BDD, jamais exposée côté client) pour
 contourner RLS et tout exporter, y compris les données personnelles de chaque
@@ -449,6 +455,50 @@ Le réglage est posé en mémoire et part avec la sauvegarde suivante, comme le
 format ou l'interligne — surtout pas par `mettreAJourLivre()`, qui changerait
 `maj_le` dans le dos de l'éditeur et ferait croire à la sauvegarde suivante que
 le livre a été modifié ailleurs.
+
+**Notes de livre** (table `livre_notes`, `notes.js` / `notes.css`) : une page de
+texte libre par livre, pour y poser les idées — personnages, intrigues, pistes.
+Deux entrées : la pastille de la carte, dans la bibliothèque, et le bouton
+« 📝 Notes » du sommaire de l'éditeur, pour y revenir en cours d'écriture. Le
+module construit sa propre fenêtre : la bibliothèque et l'éditeur n'ont pas les
+mêmes feuilles de style, il emprunte leurs couleurs avec une valeur de repli.
+
+**Pourquoi une table à part, et pas une colonne de `livres`.** La règle de lecture
+de `livres` est « soi-même OU publié » : tout compte connecté lit la ligne
+*entière* d'un livre publié. Une colonne `notes` aurait exposé les intrigues et
+les spoilers de l'auteur à tous les autres comptes dès qu'il publie — le texte du
+livre est fait pour être lu, ses notes non. `livre_notes` n'a aucune branche
+« publié » : seul le propriétaire du livre y accède. Pour la même raison les notes
+ne passent **jamais** par `versLigneLivre()` ni par l'enregistrement du livre :
+elles s'enregistrent à part.
+
+La clé primaire est l'identifiant du livre, d'où une règle d'insertion qui exige
+que le livre soit à soi : sans elle, un compte pouvait poser des notes sur un livre
+publié qu'il ne possède pas, et le vrai propriétaire ne pouvait plus créer les
+siennes (la clé était prise). Vérifié en base : un autre compte ne lit, ne
+modifie, ne supprime ni ne squatte rien, et un anonyme est refusé.
+
+**L'enregistrement est automatique** (700 ms après la dernière frappe, et à la
+fermeture) : une page d'idées s'écrit au fil de l'eau, et un bouton qu'on oublie
+est une idée perdue. Il est conditionné par un numéro de **version** : deux
+onglets ouverts sur les mêmes notes ne s'écrasent pas, le second à enregistrer
+apprend qu'elles ont changé et choisit — recharger, ou garder sa version.
+Le PATCH répond 200 même quand rien ne correspond ; c'est l'absence de ligne
+renvoyée (`return=representation`) qui trahit le conflit. Trois garde-fous qui ont
+chacun une raison :
+
+- un seul envoi à la fois : une frappe pendant l'envoi partirait avec la *même*
+  version et serait refusée comme un faux conflit ;
+- la fenêtre refuse de se fermer tant qu'un enregistrement a échoué ou qu'un
+  conflit est en attente (un test a trouvé le cas où `enregistrer()` renvoyait
+  « succès » sur un conflit, et fermait en jetant le texte) ;
+- ses touches ne remontent pas à la page : sans cela, Ctrl+Z dans les notes
+  annulait le texte *du livre*, derrière la fenêtre.
+
+La duplication d'un livre reprend ses notes (en version 1, comme une ligne neuve).
+La suppression du livre les emporte (`on delete cascade`). Les pastilles de carte
+n'apparaissaient qu'au survol — introuvables sur téléphone : elles restent visibles
+là où il n'y a pas de survol (`@media (hover: none)`).
 
 **Dupliquer un livre** (bouton ⧉ de la carte) : le doublon est un livre neuf et
 indépendant — texte, mise en page, réglages et visuels lui appartiennent. Trois

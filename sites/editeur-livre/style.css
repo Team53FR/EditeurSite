@@ -978,6 +978,12 @@ button.danger {
   text-overflow: ellipsis;
 }
 
+/* Notes : sur toute la largeur de la grille 2 × 2, sous les quatre réglages du
+   livre. Ce n'est pas un réglage mais un outil d'écriture — on y revient en
+   cours de route —, et un cinquième bouton seul dans sa rangée aurait l'air d'un
+   oubli. */
+.sommaire .btn-notes { grid-column: 1 / -1; }
+
 /* Aperçu / impression : boutons-icônes compacts */
 .sommaire-outils {
   display: flex;

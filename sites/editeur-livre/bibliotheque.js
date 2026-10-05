@@ -215,6 +215,21 @@ function afficherListeLivres() {
     btnRenommer.onclick = (e) => { e.stopPropagation(); renommerLivre(livre.id); };
     li.appendChild(btnRenommer);
 
+    // Les notes du livre : une page d'idées, privée (voir notes.js). L'icône est
+    // un dessin et non un caractère : aucun des symboles unicode d'une page de
+    // texte n'est assez net à 14 px à côté de ⧉ ✎ ✕.
+    const btnNotes = document.createElement("button");
+    btnNotes.className = "livre-notes";
+    btnNotes.innerHTML =
+      '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+      'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/>' +
+      '<path d="M14 3v5h5"/><path d="M9 13h6"/><path d="M9 17h6"/></svg>';
+    btnNotes.title = "Notes de ce livre";
+    btnNotes.setAttribute("aria-label", "Notes de « " + (livre.titre || "") + " »");
+    btnNotes.onclick = (e) => { e.stopPropagation(); ouvrirNotesLivre(livre.id, livre.titre, btnNotes); };
+    li.appendChild(btnNotes);
+
     const btnDupliquer = document.createElement("button");
     btnDupliquer.className = "livre-dupliquer";
     btnDupliquer.textContent = "⧉";
@@ -261,7 +276,7 @@ async function dupliquerLivre(id) {
   if (!meta) return;
 
   if (!confirm("Dupliquer « " + (meta.titre || "Sans titre") + " » ?\n\n" +
-      "Le doublon reprend le texte, la mise en page et les couvertures, " +
+      "Le doublon reprend le texte, la mise en page, les couvertures et les notes, " +
       "mais ne sera ni publié ni rattaché à une série.")) {
     return;
   }
@@ -311,14 +326,28 @@ async function dupliquerLivre(id) {
       }
     }
 
+    // Les notes appartiennent au livre : le doublon les reprend, comme son texte.
+    // Elles sont lues AVANT la création (rien ne dépend encore du nouveau livre)
+    // mais écrites APRÈS : la règle de la base n'accepte des notes que sur un
+    // livre qui existe et qui est à soi. Leur échec ne défait pas la duplication
+    // — le livre existe, c'est le plus précieux —, mais il est dit.
+    let notes = null, notesManquantes = false;
+    try { notes = await chargerNotesLivre(id); } catch (e) { notesManquantes = true; }
+
     await creerLivreDistant(nouveau);
+    if (notes && notes.contenu) {
+      try { await enregistrerNotesLivre(nouvelId, notes.contenu, null); }
+      catch (e) { notesManquantes = true; }
+    }
     bibliotheque.livres.push(nouveau);
     afficherListeLivres();
     afficherSeries();
 
-    message.textContent = manquantes.length
-      ? "Livre dupliqué, mais sans " + manquantes.join(", ") +
-        " : l'image n'a pas pu être copiée."
+    const incidents = [];
+    if (manquantes.length) incidents.push("sans " + manquantes.join(", ") + " (image non copiée)");
+    if (notesManquantes) incidents.push("sans ses notes (non copiées)");
+    message.textContent = incidents.length
+      ? "Livre dupliqué, mais " + incidents.join(" et ") + "."
       : "Livre dupliqué : « " + nouveau.titre + " ».";
     setTimeout(() => {
       if (message.textContent.startsWith("Livre dupliqué")) message.textContent = "";
