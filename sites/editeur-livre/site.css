@@ -495,53 +495,127 @@ main.contenu { padding-top: 40px; padding-bottom: 60px; }
 }
 .onglet-biblio.actif .onglet-compte { background: rgba(138,75,56,.12); color: var(--accent-deep); }
 
-.barre-series { display: flex; justify-content: flex-end; margin-bottom: 18px; }
+.barre-series { display: flex; justify-content: flex-start; margin-bottom: 20px; }
 
-/* ---------- Séries ----------
+/* ---------- Séries : des boutons, puis le détail ----------
    Une série RANGE des livres, elle ne les contient pas : ses tomes restent
-   listés dans « Mes livres ». D'où une carte en largeur, qui présente le
-   résumé de l'histoire et l'ordre de lecture, et non une grille de
-   couvertures qui ferait doublon avec l'autre onglet. */
+   listés dans « Mes livres ». L'onglet montre donc chaque série sous forme de
+   bouton — ses couvertures, son titre, le nombre de tomes — et le résumé de
+   l'histoire, qui peut faire plusieurs paragraphes, n'apparaît que dans le
+   détail. Empilé dans la liste, il repoussait la série suivante hors de
+   l'écran. */
 
-.liste-series { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 16px; }
+.liste-series { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 14px; }
 
-.serie-carte {
-  position: relative;
+.serie-bouton {
+  display: flex; align-items: center; gap: 20px;
+  padding: 16px 20px;
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: 16px;
-  padding: 18px 20px;
   box-shadow: var(--ombre-douce);
+  cursor: pointer;
+  transition: border-color .12s ease, transform .12s ease;
+}
+.serie-bouton:hover { border-color: var(--accent); transform: translateY(-1px); }
+.serie-bouton:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.serie-couvs { display: flex; gap: 8px; flex-shrink: 0; align-items: flex-start; }
+.serie-minis { display: flex; flex-direction: column; gap: 8px; }
+.serie-sans-couv {
+  width: 84px; aspect-ratio: 149 / 210;
+  display: grid; place-items: center;
+  border: 1.5px dashed var(--line); border-radius: 6px;
+  color: var(--ink-soft); font-size: 24px;
 }
 
-.serie-entete { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
-.serie-nom { font-family: var(--serif); font-size: 20px; font-weight: 600; color: var(--ink); }
-.serie-compte { font-size: 12.5px; color: var(--ink-soft); }
+.serie-infos { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.serie-nom { font-family: var(--serif); font-size: 21px; font-weight: 600; color: var(--ink); }
+.serie-meta { font-size: 13px; color: var(--ink-soft); }
+.serie-extrait {
+  font-size: 13.5px; line-height: 1.5; color: var(--ink-soft);
+  /* Deux lignes au plus : c'est un avant-goût, le résumé entier est dans le détail. */
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.serie-fleche { font-size: 28px; line-height: 1; color: var(--ink-soft); flex-shrink: 0; }
+.serie-bouton:hover .serie-fleche { color: var(--accent); }
 
-.serie-resume-texte {
-  margin: 10px 0 0;
-  font-size: 14.5px; line-height: 1.55; color: var(--ink);
+/* Les vignettes de couverture : la même .livre-couv que la grille des livres,
+   réduite. Le texte y est trop petit pour être lu — c'est l'image qui
+   reconnaît le livre — et le curseur est celui du conteneur, qui est
+   cliquable : la couverture elle-même ne fait rien. */
+.livre-couv.vignette-serie,
+.livre-couv.vignette-mini,
+.livre-couv.vignette-tome { cursor: inherit; box-shadow: 0 2px 8px rgba(0,0,0,.18); }
+
+.livre-couv.vignette-serie { width: 84px; padding: 8px 5px; }
+.livre-couv.vignette-mini  { width: 38px; padding: 4px 3px; }
+.livre-couv.vignette-tome  { width: 92px; padding: 8px 5px; flex-shrink: 0; }
+
+.livre-couv.vignette-serie .c-titre,
+.livre-couv.vignette-tome .c-titre { font-size: calc(8px * var(--mult-titre, 1)); }
+.livre-couv.vignette-serie .c-auteur,
+.livre-couv.vignette-tome .c-auteur { font-size: calc(5px * var(--mult-auteur, 1)); margin-top: 3px; }
+.livre-couv.vignette-mini .c-titre,
+.livre-couv.vignette-mini .c-auteur { display: none; }
+
+/* Le détail d'une série */
+.serie-retour {
+  display: inline-flex; align-items: center; gap: 8px;
+  border: none; background: none; cursor: pointer;
+  padding: 6px 8px 6px 0; margin-bottom: 16px;
+  font-family: var(--sans); font-size: 15px; font-weight: 600; color: var(--ink);
+}
+.serie-retour:hover { color: var(--accent-deep); }
+.serie-retour:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+
+.serie-detail-titre { font-family: var(--serif); font-size: 28px; font-weight: 600; margin: 0 0 10px; color: var(--ink); }
+
+.serie-detail-resume {
+  margin: 0; max-width: 70ch;
+  font-size: 15px; line-height: 1.6; color: var(--ink);
   white-space: pre-wrap;   /* les paragraphes saisis à la main sont conservés */
 }
-
-.serie-liste-tomes {
-  margin: 14px 0 0; padding-left: 20px;
-  display: flex; flex-direction: column; gap: 5px;
-  font-size: 14px;
+.serie-detail-resume.replie {
+  display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden;
 }
-.serie-liste-tomes li { color: var(--ink-soft); }
-
-.serie-tome-lien {
-  border: none; background: none; padding: 0; cursor: pointer;
-  font-family: var(--sans); font-size: 14px; font-weight: 600;
-  color: var(--ink); text-align: left;
+.serie-lire-suite {
+  border: none; background: none; cursor: pointer; padding: 0; margin-top: 6px;
+  font-family: var(--sans); font-size: 14px; font-weight: 700; color: var(--ink);
+  text-decoration: underline; text-underline-offset: 3px;
 }
-.serie-tome-lien:hover { color: var(--accent-deep); text-decoration: underline; }
-.serie-tome-pages { font-size: 12.5px; color: var(--ink-soft); margin-left: 8px; }
+.serie-lire-suite:hover { color: var(--accent-deep); }
+
+.serie-detail-meta { margin: 16px 0; font-size: 13.5px; color: var(--ink-soft); }
+.serie-detail-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 28px; }
+.serie-detail-actions .btn { padding: 10px 18px; font-size: 14px; }
+
+.serie-detail-tomes { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
+
+.serie-tome-rang {
+  display: flex; align-items: flex-start; gap: 20px;
+  padding: 12px; border-radius: 14px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background .12s ease, border-color .12s ease;
+}
+.serie-tome-rang:hover { background: var(--cream); border-color: var(--line); }
+.serie-tome-rang:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.tome-textes { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.tome-rang {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .08em; color: var(--accent-deep);
+}
+.tome-titre { font-family: var(--serif); font-size: 19px; font-weight: 600; color: var(--ink); line-height: 1.25; }
+.tome-detail { font-size: 12.5px; color: var(--ink-soft); }
+.tome-resume {
+  margin-top: 4px;
+  font-size: 13.5px; line-height: 1.5; color: var(--ink-soft);
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}
 
 .serie-vide { color: var(--ink-soft); font-size: 13.5px; font-style: italic; }
-
-.serie-modifier { position: absolute; top: 16px; right: 18px; }
 
 /* ---------- La fenêtre d'édition d'une série ---------- */
 .serie-label {
@@ -604,8 +678,13 @@ main.contenu { padding-top: 40px; padding-bottom: 60px; }
 }
 
 @media (max-width: 560px) {
-  .serie-modifier { position: static; margin-top: 14px; }
   .serie-ajout { flex-direction: column; align-items: stretch; }
+  /* À l'étroit, le bouton de série laisse la place au texte : la colonne des
+     petites couvertures disparaît, il ne reste que la première. */
+  .serie-bouton { gap: 14px; padding: 14px; }
+  .serie-minis { display: none; }
+  .serie-tome-rang { gap: 14px; padding: 10px 6px; }
+  .serie-detail-actions .btn { flex: 1 1 100%; justify-content: center; }
 }
 
 .livres-vide {

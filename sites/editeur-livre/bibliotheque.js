@@ -127,6 +127,33 @@ function remplirProfil() {
   if (elPages) elPages.textContent = totalPages;
 }
 
+// La couverture d'un livre en vignette : sa couleur, son titre, son auteur, et
+// son image de fond s'il en a une.
+//
+// Écrite une fois pour trois usages — la grille des livres, les boutons de
+// séries et les lignes de tomes — plutôt que recopiée : trois copies d'un
+// même rendu finissent toujours par se contredire. `classe` ne règle que la
+// TAILLE (voir .vignette-serie / .vignette-mini dans site.css) ; ce que fait
+// un clic est l'affaire de l'appelant.
+function creerCouvertureLivre(livre, classe) {
+  const couv = livre.couverture || {};
+  const afficherTitre = couv.afficherTitre !== false;
+  const afficherAuteur = couv.afficherAuteur !== false && livre.auteur;
+
+  const div = document.createElement("div");
+  div.className = "livre-couv" + (classe ? " " + classe : "");
+  div.style.background = couv.fond || "#1a1a2e";
+  div.style.color = couv.texte || "#ffffff";
+  div.innerHTML =
+    (afficherTitre ? `<div class="c-titre" style="${styleTexteCouv(couv, 'titre')}">${echapper(livre.titre || "Sans titre")}</div>` : "") +
+    (afficherAuteur ? `<div class="c-auteur" style="${styleTexteCouv(couv, 'auteur')}">${echapper(livre.auteur)}</div>` : "");
+
+  // Si la couverture a une image de fond, on l'affiche par-dessus la couleur.
+  // Sinon, on garde la couleur (ou le blanc) : rien à charger.
+  if (couv.imageChemin) chargerImageCouvVignette(div, couv.imageChemin, livre.format, couv);
+  return div;
+}
+
 function afficherListeLivres() {
   remplirProfil();
 
@@ -148,29 +175,14 @@ function afficherListeLivres() {
   bibliotheque.livres.forEach((livre) => {
     const nbPages = livre.nbPages || 0;
     const labelFormat = libelleFormatCourt(livre.format);
-    const couv = livre.couverture || {};
-    const fond = couv.fond || "#1a1a2e";
-    const couleurTexte = couv.texte || "#ffffff";
-    const afficherTitre = couv.afficherTitre !== false;
-    const afficherAuteur = couv.afficherAuteur !== false && livre.auteur;
 
     const li = document.createElement("li");
     li.className = "livre-carte";
 
-    const couvDiv = document.createElement("div");
-    couvDiv.className = "livre-couv";
-    couvDiv.style.background = fond;
-    couvDiv.style.color = couleurTexte;
+    const couvDiv = creerCouvertureLivre(livre);
     couvDiv.title = "Ouvrir « " + (livre.titre || "") + " »";
-    couvDiv.innerHTML =
-      (afficherTitre ? `<div class="c-titre" style="${styleTexteCouv(couv, 'titre')}">${echapper(livre.titre || "Sans titre")}</div>` : "") +
-      (afficherAuteur ? `<div class="c-auteur" style="${styleTexteCouv(couv, 'auteur')}">${echapper(livre.auteur)}</div>` : "");
     couvDiv.onclick = () => ouvrirLivre(livre.id);
     li.appendChild(couvDiv);
-
-    // Si la couverture a une image de fond, on l'affiche par-dessus la couleur.
-    // Sinon, on garde la couleur (ou le blanc) : rien à charger.
-    if (couv.imageChemin) chargerImageCouvVignette(couvDiv, couv.imageChemin, livre.format, couv);
 
     const meta = document.createElement("div");
     meta.className = "livre-meta";
@@ -411,12 +423,48 @@ function restaurerOngletBiblio() {
   choisirOngletBiblio(choix);
 }
 
+// ----- La vue des séries : des boutons, puis le détail de celle qu'on ouvre -----
+//
+// L'onglet a deux vues. La LISTE montre chaque série sous forme de bouton —
+// ses couvertures, son titre, le nombre de tomes — et le DÉTAIL, atteint d'un
+// clic, porte ce qui n'a pas sa place dans un bouton : le résumé de l'histoire
+// et les tomes dans l'ordre de lecture. Empilés sur la même page, le résumé de
+// chaque série repoussait la suivante hors de l'écran.
+//
+// `serieOuverte` est l'id de la série dont on lit le détail, ou null pour la
+// liste. Tout appelant qui change une série ou un livre se contente de rappeler
+// afficherSeries() : la vue courante est conservée, et se corrige d'elle-même
+// si la série affichée a disparu.
+let serieOuverte = null;
+
+const nbFr = (n) => Number(n || 0).toLocaleString("fr-FR");
+
+function resumeTomes(tomes) {
+  const pages = tomes.reduce((somme, l) => somme + (l.nbPages || 0), 0);
+  return tomes.length + (tomes.length > 1 ? " tomes" : " tome") +
+    (pages ? " · " + nbFr(pages) + " pages" : "");
+}
+
 function afficherSeries() {
-  const liste = document.getElementById("listeSeries");
   const compte = document.getElementById("compteSeries");
   if (compte) compte.textContent = series.length;
-  if (!liste) return;
 
+  // Une série supprimée ou introuvable ne se lit plus : retour à la liste.
+  if (serieOuverte && !series.some((s) => s.id === serieOuverte)) serieOuverte = null;
+
+  const vueListe = document.getElementById("vueListeSeries");
+  const vueDetail = document.getElementById("vueDetailSerie");
+  if (!vueListe || !vueDetail) return;
+  vueListe.hidden = !!serieOuverte;
+  vueDetail.hidden = !serieOuverte;
+
+  if (serieOuverte) afficherDetailSerie(series.find((s) => s.id === serieOuverte), vueDetail);
+  else afficherListeSeries();
+}
+
+function afficherListeSeries() {
+  const liste = document.getElementById("listeSeries");
+  if (!liste) return;
   liste.innerHTML = "";
 
   if (!series.length) {
@@ -428,67 +476,204 @@ function afficherSeries() {
     liste.appendChild(vide);
     return;
   }
+
   series.forEach((serie) => {
     const tomes = tomesDeLaSerie(serie.id);
 
     const li = document.createElement("li");
-    li.className = "serie-carte";
+    const bouton = document.createElement("div");
+    bouton.className = "serie-bouton";
+    bouton.setAttribute("role", "button");
+    bouton.setAttribute("tabindex", "0");
+    bouton.setAttribute("aria-label",
+      "Ouvrir la série « " + (serie.titre || "sans titre") + " », " + resumeTomes(tomes));
 
-    const entete = document.createElement("div");
-    entete.className = "serie-entete";
-    entete.innerHTML =
-      '<span class="serie-nom">' + echapper(serie.titre || "Série sans titre") + "</span>" +
-      '<span class="serie-compte">' + tomes.length +
-        (tomes.length > 1 ? " tomes" : " tome") + "</span>";
-    li.appendChild(entete);
-
-    if (serie.resume) {
-      const resume = document.createElement("p");
-      resume.className = "serie-resume-texte";
-      resume.textContent = serie.resume;
-      li.appendChild(resume);
-    }
-
-    const ol = document.createElement("ol");
-    ol.className = "serie-liste-tomes";
-    if (!tomes.length) {
-      const vide = document.createElement("li");
-      vide.className = "serie-vide";
-      vide.textContent = "Aucun tome pour l'instant.";
-      ol.appendChild(vide);
+    // Les couvertures : celle du premier tome en grand, celles des deux
+    // suivants en petit à côté. Une série sans tome n'en montre aucune.
+    const couvs = document.createElement("div");
+    couvs.className = "serie-couvs";
+    if (tomes.length) {
+      couvs.appendChild(creerCouvertureLivre(tomes[0], "vignette-serie"));
+      if (tomes.length > 1) {
+        const minis = document.createElement("div");
+        minis.className = "serie-minis";
+        tomes.slice(1, 3).forEach((l) => minis.appendChild(creerCouvertureLivre(l, "vignette-mini")));
+        couvs.appendChild(minis);
+      }
     } else {
-      tomes.forEach((l) => {
-        const item = document.createElement("li");
-        const lien = document.createElement("button");
-        lien.type = "button";
-        lien.className = "serie-tome-lien";
-        lien.textContent = l.titre || "Sans titre";
-        lien.title = "Ouvrir « " + (l.titre || "") + " »";
-        lien.onclick = () => ouvrirLivre(l.id);
-        item.appendChild(lien);
-        const pages = document.createElement("span");
-        pages.className = "serie-tome-pages";
-        pages.textContent = (l.nbPages || 0) + " p.";
-        item.appendChild(pages);
-        ol.appendChild(item);
-      });
+      const vide = document.createElement("div");
+      vide.className = "serie-sans-couv";
+      vide.textContent = "▭";
+      couvs.appendChild(vide);
     }
-    li.appendChild(ol);
+    bouton.appendChild(couvs);
 
-    const modifier = document.createElement("button");
-    modifier.type = "button";
-    modifier.className = "btn-mini serie-modifier";
-    modifier.textContent = "Modifier";
-    modifier.onclick = () => ouvrirEditionSerie(serie.id);
-    li.appendChild(modifier);
+    const infos = document.createElement("div");
+    infos.className = "serie-infos";
+    infos.innerHTML =
+      '<span class="serie-nom">' + echapper(serie.titre || "Série sans titre") + "</span>" +
+      '<span class="serie-meta">' + resumeTomes(tomes) + "</span>" +
+      (serie.resume ? '<span class="serie-extrait">' + echapper(serie.resume) + "</span>" : "");
+    bouton.appendChild(infos);
 
+    const fleche = document.createElement("span");
+    fleche.className = "serie-fleche";
+    fleche.setAttribute("aria-hidden", "true");
+    fleche.textContent = "›";
+    bouton.appendChild(fleche);
+
+    const ouvrir = () => ouvrirDetailSerie(serie.id);
+    bouton.onclick = ouvrir;
+    bouton.onkeydown = (e) => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); ouvrir(); }
+    };
+
+    li.appendChild(bouton);
     liste.appendChild(li);
   });
 }
 
+function afficherDetailSerie(serie, conteneur) {
+  const tomes = tomesDeLaSerie(serie.id);
+  conteneur.innerHTML = "";
+
+  const retour = document.createElement("button");
+  retour.type = "button";
+  retour.className = "serie-retour";
+  retour.innerHTML = '<span aria-hidden="true">←</span> Séries';
+  retour.onclick = fermerDetailSerie;
+  conteneur.appendChild(retour);
+
+  const titre = document.createElement("h3");
+  titre.className = "serie-detail-titre";
+  titre.textContent = serie.titre || "Série sans titre";
+  conteneur.appendChild(titre);
+
+  // Le résumé, replié au-delà de quelques lignes : il peut faire plusieurs
+  // paragraphes, et pousserait les tomes — ce qu'on vient chercher — hors de
+  // l'écran. Le bouton n'existe que si le texte est assez long pour être coupé.
+  if (serie.resume) {
+    const resume = document.createElement("p");
+    resume.className = "serie-detail-resume";
+    resume.textContent = serie.resume;
+    conteneur.appendChild(resume);
+
+    if (serie.resume.length > SEUIL_RESUME_REPLIE) {
+      resume.classList.add("replie");
+      const suite = document.createElement("button");
+      suite.type = "button";
+      suite.className = "serie-lire-suite";
+      suite.textContent = "Lire la suite";
+      suite.setAttribute("aria-expanded", "false");
+      suite.onclick = () => {
+        const replie = resume.classList.toggle("replie");
+        suite.textContent = replie ? "Lire la suite" : "Réduire";
+        suite.setAttribute("aria-expanded", replie ? "false" : "true");
+      };
+      conteneur.appendChild(suite);
+    }
+  }
+
+  const meta = document.createElement("p");
+  meta.className = "serie-detail-meta";
+  meta.textContent = resumeTomes(tomes);
+  conteneur.appendChild(meta);
+
+  const actions = document.createElement("div");
+  actions.className = "serie-detail-actions";
+  [
+    ["+ Ajouter des livres", "btn btn-primaire", () => ouvrirEditionSerie(serie.id, "ajout")],
+    ["Modifier la série", "btn btn-fantome", () => ouvrirEditionSerie(serie.id)],
+    ["Supprimer la série", "btn btn-danger", () => supprimerSerie(serie.id)]
+  ].forEach(([libelle, classe, action]) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = classe;
+    b.textContent = libelle;
+    b.onclick = action;
+    actions.appendChild(b);
+  });
+  conteneur.appendChild(actions);
+
+  const ol = document.createElement("ol");
+  ol.className = "serie-detail-tomes";
+  if (!tomes.length) {
+    const vide = document.createElement("li");
+    vide.className = "serie-vide";
+    vide.textContent = "Aucun tome pour l'instant : ajoutez-en avec « Ajouter des livres ».";
+    ol.appendChild(vide);
+  }
+
+  // L'ordre affiché fait foi : le rang, et non le numéro stocké, qui peut avoir
+  // des trous si un livre a été retiré depuis (voir enregistrerSerie).
+  tomes.forEach((livre, i) => {
+    const li = document.createElement("li");
+    const ligne = document.createElement("div");
+    ligne.className = "serie-tome-rang";
+    ligne.setAttribute("role", "button");
+    ligne.setAttribute("tabindex", "0");
+    ligne.setAttribute("aria-label", "Tome " + (i + 1) + " : ouvrir « " + (livre.titre || "Sans titre") + " »");
+
+    const couv = creerCouvertureLivre(livre, "vignette-tome");
+    ligne.appendChild(couv);
+
+    const textes = document.createElement("div");
+    textes.className = "tome-textes";
+    const resumeLivre = livre.quatrieme && livre.quatrieme.resumeTexte
+      ? String(livre.quatrieme.resumeTexte).trim() : "";
+    textes.innerHTML =
+      '<span class="tome-rang">Tome ' + (i + 1) + "</span>" +
+      '<span class="tome-titre">' + echapper(livre.titre || "Sans titre") + "</span>" +
+      '<span class="tome-detail">' + echapper(libelleFormatCourt(livre.format)) + " · " +
+        nbFr(livre.nbPages || 0) + " pages" +
+        (livre.publie ? " · publié" : "") + "</span>" +
+      (resumeLivre ? '<span class="tome-resume">' + echapper(resumeLivre) + "</span>" : "");
+    ligne.appendChild(textes);
+
+    const ouvrir = () => ouvrirLivre(livre.id);
+    ligne.onclick = ouvrir;
+    ligne.onkeydown = (e) => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); ouvrir(); }
+    };
+    li.appendChild(ligne);
+    ol.appendChild(li);
+  });
+  conteneur.appendChild(ol);
+}
+
+// Au-delà, le résumé est replié derrière « Lire la suite ». En nombre de
+// caractères plutôt qu'en mesurant le texte : la mesure exige que l'onglet soit
+// affiché, ce qu'il n'est pas au moment où l'on construit la vue.
+const SEUIL_RESUME_REPLIE = 280;
+
+function ouvrirDetailSerie(id) {
+  serieOuverte = id;
+  afficherSeries();
+  // Le détail remplace la liste : on revient en haut, et le focus suit, pour
+  // que le clavier ne reste pas sur un bouton qui n'existe plus à l'écran.
+  window.scrollTo(0, 0);
+  const retour = document.querySelector("#vueDetailSerie .serie-retour");
+  if (retour) retour.focus();
+}
+
+function fermerDetailSerie() {
+  const id = serieOuverte;
+  serieOuverte = null;
+  afficherSeries();
+  // On retombe sur le bouton de la série qu'on vient de quitter, pas en haut de
+  // la liste : avec plusieurs séries, perdre sa place obligerait à la retrouver.
+  const boutons = [...document.querySelectorAll("#listeSeries .serie-bouton")];
+  const rang = series.findIndex((s) => s.id === id);
+  if (boutons[rang]) boutons[rang].focus();
+}
+
 // ----- La fenêtre : créer ou modifier une série -----
 
-function ouvrirEditionSerie(id) {
+// `cible` choisit où tombe le focus : « ajout » mène droit au menu d'ajout d'un
+// livre, pour le bouton « Ajouter des livres » du détail — y arriver par le
+// champ du titre obligerait à descendre jusqu'au menu pour faire ce qu'on
+// vient de demander.
+function ouvrirEditionSerie(id, cible) {
   const modal = document.getElementById("modalSerie");
   if (!modal) return;
 
@@ -506,7 +691,14 @@ function ouvrirEditionSerie(id) {
 
   rendreTomesEnEdition();
   modal.style.display = "flex";
-  document.getElementById("serieTitre").focus();
+
+  const menu = document.getElementById("serieAjoutLivre");
+  if (cible === "ajout" && menu && !menu.disabled) {
+    menu.focus();
+    menu.scrollIntoView({ block: "center" });
+  } else {
+    document.getElementById("serieTitre").focus();
+  }
 }
 
 function fermerEditionSerie() {
@@ -628,8 +820,10 @@ async function enregistrerSerie() {
     return;
   }
 
+  // Hors du try : l'identifiant sert aussi APRÈS l'enregistrement, pour ouvrir
+  // la série qu'on vient de créer.
+  let id = serieEnEdition;
   try {
-    let id = serieEnEdition;
     if (id) {
       await mettreAJourSerie(id, { titre, resume: resume || null });
       const s = series.find((x) => x.id === id);
@@ -660,18 +854,27 @@ async function enregistrerSerie() {
     return;
   }
 
+  // On a modifié ou créé une série : on l'ouvre, pour voir ce que l'on vient de
+  // faire — ses tomes dans l'ordre choisi — plutôt que de ramener à la liste.
+  // Cela vaut aussi quand on partait de l'onglet des livres.
   fermerEditionSerie();
+  serieOuverte = id;
   afficherSeries();
   afficherListeLivres();
-  // On vient de créer ou de modifier une série : autant la montrer, même si
-  // l'on partait de l'onglet des livres.
   choisirOngletBiblio("series");
 }
 
-async function supprimerSerieCourante() {
-  if (!serieEnEdition) return;
-  const serie = series.find((s) => s.id === serieEnEdition);
-  const nb = tomesDeLaSerie(serieEnEdition).length;
+// Le bouton de la fenêtre d'édition : supprime la série qu'elle affiche.
+function supprimerSerieCourante() {
+  return supprimerSerie(serieEnEdition);
+}
+
+// `id` est passé explicitement : cette fonction sert à la fenêtre d'édition ET
+// au détail d'une série, et seule la première a une série « en édition ».
+async function supprimerSerie(id) {
+  if (!id) return;
+  const serie = series.find((s) => s.id === id);
+  const nb = tomesDeLaSerie(id).length;
 
   if (!confirm("Supprimer la série « " + (serie ? serie.titre : "") + " » ?\n\n" +
       (nb ? "Ses " + nb + " tome(s) ne seront PAS supprimés : ils redeviennent des livres sans série.\n"
@@ -680,9 +883,12 @@ async function supprimerSerieCourante() {
     return;
   }
 
-  const message = document.getElementById("serieMessage");
+  // L'erreur s'affiche là où l'on est : dans la fenêtre si elle est ouverte,
+  // sinon sous la page.
+  const fenetreOuverte = document.getElementById("modalSerie").style.display !== "none";
+  const message = document.getElementById(fenetreOuverte ? "serieMessage" : "message");
   try {
-    await supprimerSerieDistante(serieEnEdition);
+    await supprimerSerieDistante(id);
   } catch (e) {
     message.textContent = "Suppression impossible : " + e.message;
     return;
@@ -691,11 +897,13 @@ async function supprimerSerieCourante() {
   // La base a mis serie_id à NULL toute seule (« on delete set null ») :
   // on aligne l'état local sur elle plutôt que de recharger la page.
   bibliotheque.livres.forEach((l) => {
-    if (l.serieId === serieEnEdition) { l.serieId = null; l.tome = null; }
+    if (l.serieId === id) { l.serieId = null; l.tome = null; }
   });
-  series = series.filter((s) => s.id !== serieEnEdition);
+  series = series.filter((s) => s.id !== id);
 
   fermerEditionSerie();
+  // La série supprimée ne peut plus être affichée : retour à la liste.
+  if (serieOuverte === id) serieOuverte = null;
   afficherSeries();
   afficherListeLivres();
 }
@@ -920,9 +1128,26 @@ async function chargerImageCouvVignette(couvDiv, url, formatKey, data) {
     img.style.height = hauteurAffichee + "px";
     img.style.transform =
       `translate(${centreX + (data.imgOffsetX || 0)}px, ${centreY + (data.imgOffsetY || 0)}px) scale(${zoom})`;
-    // Réduire l'ensemble à la largeur réelle de la vignette.
-    wrap.style.transform = `scale(${couvDiv.clientWidth / ref.largPx})`;
+    ajusterEchelle();
   };
+
+  // Réduire l'ensemble à la largeur réelle de la vignette.
+  //
+  // Ce calcul se faisait une seule fois, au chargement de l'image, avec
+  // clientWidth. Dans un onglet MASQUÉ, clientWidth vaut 0 : l'échelle tombait
+  // à 0 et la couverture devenait invisible pour de bon, même une fois
+  // l'onglet affiché. Le cas était sans conséquence tant que seule la grille
+  // des livres (toujours visible) portait des couvertures ; les séries, elles,
+  // vivent dans l'onglet qu'on ne regarde pas au départ.
+  //
+  // Un ResizeObserver rejoue donc le calcul à chaque changement de taille de la
+  // vignette : il couvre le passage de masqué à affiché, et au passage le
+  // redimensionnement de la fenêtre, que la grille n'a jamais suivi.
+  const ajusterEchelle = () => {
+    const largeur = couvDiv.clientWidth;
+    if (largeur > 0) wrap.style.transform = `scale(${largeur / ref.largPx})`;
+  };
+  if (typeof ResizeObserver === "function") new ResizeObserver(ajusterEchelle).observe(couvDiv);
   img.src = url;
 
   wrap.appendChild(img);

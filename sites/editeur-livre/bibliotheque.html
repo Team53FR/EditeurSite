@@ -87,10 +87,16 @@
     <!-- Une série ne fait que RANGER des livres : chaque tome reste listé
          dans « Mes livres » et s'ouvre comme n'importe quel autre. -->
     <section id="panneauSeries" role="tabpanel" aria-labelledby="ongletSeries" hidden>
-      <div class="barre-series">
-        <button class="btn-mini" onclick="ouvrirEditionSerie()">+ Nouvelle série</button>
+      <!-- Deux vues dans le même onglet : la liste des séries, en boutons, puis
+           le détail de celle sur laquelle on a cliqué (résumé, et ses tomes
+           dans l'ordre). Une seule est visible à la fois. -->
+      <div id="vueListeSeries">
+        <div class="barre-series">
+          <button type="button" class="btn btn-primaire" onclick="ouvrirEditionSerie()">+ Créer une série</button>
+        </div>
+        <ul id="listeSeries" class="liste-series"></ul>
       </div>
-      <ul id="listeSeries" class="liste-series"></ul>
+      <div id="vueDetailSerie" class="serie-detail" hidden></div>
     </section>
 
     <p id="message" class="message"></p>

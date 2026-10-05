@@ -486,6 +486,37 @@ hors de l'écran. L'onglet choisi est mémorisé (`el_ongletBiblio`), mais un
 onglet « séries » mémorisé alors qu'il n'y a plus aucune série renvoie aux
 livres — arriver sur une page vide donne l'impression d'avoir tout perdu.
 
+**L'onglet « Mes séries » a deux vues**, dans le même onglet. La **liste** montre
+chaque série sous forme de bouton : la couverture du tome 1 en grand, celles des
+tomes 2 et 3 en petit, le titre, « 3 tomes · 1 144 pages » et un extrait du
+résumé. Un clic ouvre le **détail** : « ← Séries », le titre, le résumé (replié
+au-delà de 280 caractères, avec « Lire la suite »), les actions — ajouter des
+livres, modifier, supprimer — puis les tomes **dans l'ordre**, chacun avec sa
+couverture, son format, ses pages et le résumé de sa propre 4ᵉ de couverture.
+Un résumé de série fait plusieurs paragraphes : empilé dans la liste, il
+repoussait la série suivante hors de l'écran.
+
+`serieOuverte` (l'id de la série lue, ou `null` pour la liste) est le seul état.
+Tout appelant qui change une série ou un livre rappelle `afficherSeries()` : la
+vue courante est conservée, et retombe sur la liste si la série affichée a
+disparu. Enregistrer la fenêtre d'édition **ouvre** la série concernée — créée
+ou modifiée —, pour voir tout de suite ses tomes dans l'ordre choisi.
+
+Le rang « Tome N » est celui de la position affichée, pas le numéro stocké : un
+livre retiré de la série laisse un trou dans les numéros, que `enregistrerSerie`
+referme à la sauvegarde suivante.
+
+**Les vignettes de couverture** (`creerCouvertureLivre`, une seule fois pour la
+grille, les boutons de séries et les lignes de tomes) calculaient leur échelle au
+chargement de l'image, avec `clientWidth`. Dans un onglet **masqué**, il vaut 0 :
+l'échelle tombait à 0 et la couverture restait invisible pour de bon, même une
+fois l'onglet affiché. Sans conséquence tant que seule la grille — toujours
+visible — portait des couvertures ; les séries vivent dans l'onglet qu'on ne
+regarde pas au départ. Un `ResizeObserver` rejoue maintenant le calcul à chaque
+changement de taille de la vignette, ce qui couvre le passage de masqué à
+affiché, et au passage le redimensionnement de la fenêtre que la grille n'a
+jamais suivi.
+
 Deux conséquences voulues du modèle :
 
 - La clé étrangère est en `on delete set null`, jamais `cascade` : supprimer
