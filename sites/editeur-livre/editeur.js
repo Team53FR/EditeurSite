@@ -24,7 +24,7 @@ envelopperAttenteLourde({
   appliquerInterligne: ["Nouvel interligne…", "Tout le texte est recomposé."],
   ouvrirApercu: ["Préparation de l'aperçu…", "Les pages sont recalculées au découpage exact."],
   appliquerInsecables: ["Espaces insécables…", "Tout le livre est recomposé, puis les pages sont relues."],
-  ouvrirCorrectionCoupes: ["Correction des coupes de page…", "Tout le livre est recomposé, puis les pages sont relues."],
+  corrigerLesCoupes: ["Correction des coupes de page…", "Tout le livre est recomposé, puis les pages sont relues."],
   fermerApercu: ["Retour à l'édition…"],
 });
 
@@ -456,10 +456,73 @@ function fermerDialogueCoupes() {
   if (d) d.remove();
 }
 
+// En DEUX temps, et le premier ne change rien :
+//   1. on ANALYSE — on montre où le livre est coupé, tel qu'il est enregistré ;
+//   2. on ne recompose que si l'auteur le demande (corrigerLesCoupes).
 function ouvrirCorrectionCoupes() {
   if (modeApercu || modeCouverture) return;
   flushSpread();
+  ouvrirDialogueAnalyseCoupes(analyserCoupes());
+}
+
+// Où le livre est-il coupé MAINTENANT ? Les double-pages enregistrées sont relues sans
+// rien recomposer : ni texte touché, ni balise enregistrée, ni livre marqué modifié —
+// calculerDeuxPages ne mesure que dans le mesureur caché.
+//
+// Elle mesure COMME L'ÉCRAN ET LE FICHIER : au milieu d'une double-page, la protection
+// est posée à l'affichage et à l'impression, donc une coupe y est déjà évitée (les
+// compter serait signaler ce que personne ne voit). Restent celles ENTRE deux
+// double-pages, que la coupe enregistrée fixe : ce sont elles que corrigerLesCoupes
+// refait. Une première version lisait aussi le milieu des double-pages « tel
+// qu'enregistré » et annonçait, après correction, des coupes que le livre n'avait pas.
+function analyserCoupes() {
+  const pages = [];
+  spreadsLivre().forEach((html) => {
+    const d = calculerDeuxPages(html);
+    pages.push({ contenu: d.gauche }, { contenu: d.droite });
+  });
+  return coupesDansPages(pages);
+}
+
+// Le texte du livre tel qu'il est, espaces et ruptures comprises, sans le balisage : de
+// quoi vérifier qu'une recomposition n'a rien changé d'autre que la mise en page.
+function texteExactDuLivre() {
+  let tout = "";
+  spreadsLivre().forEach((s) => { tout = fusionnerSuite(tout, s); });
+  const boite = document.createElement("div");
+  boite.innerHTML = tout;
+  let t = "";
+  const marche = document.createTreeWalker(boite, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
+  while (marche.nextNode()) {
+    const n = marche.currentNode;
+    if (n.nodeType === 3) t += n.data;
+    else if (n.nodeName === "BR") t += "¶";
+  }
+  return t;
+}
+
+// Deuxième temps : recomposer. Garde-fou : si le TEXTE différait après coup — un
+// caractère de moins ou de plus —, on remet le livre tel qu'il était et on le dit.
+// Une recomposition ne doit toucher qu'à la mise en page.
+function corrigerLesCoupes() {
+  if (modeApercu || modeCouverture) return;
+  flushSpread();
+  const livre = livreActuel();
+  const sauvegarde = spreadsLivre().slice();
+  const avant = texteExactDuLivre();
+
   repaginerTout();                      // tout est recomposé : les protections se posent de zéro
+
+  if (texteExactDuLivre() !== avant) {
+    livre.spreads = sauvegarde;
+    pagesObsoletes = true;
+    regenererToutesPages();
+    afficherSpread();
+    afficherSommaire();
+    majCompteurMots();
+    ouvrirDialogueCoupesAnnulees();
+    return;
+  }
   marquerModifie();
   planifierBrouillon();
   afficherSommaire();
@@ -467,59 +530,70 @@ function ouvrirCorrectionCoupes() {
   ouvrirDialogueCoupes(compterProtections(), coupesRestantes());
 }
 
-// Remplace, dans tout le livre, l'espace ordinaire par une espace INSÉCABLE devant « » »
-// et après « « » : la règle typographique française. Une espace insécable ne se coupe
-// jamais, quelle que soit la mise en page : plus de guillemet seul, définitivement.
-//
-// C'est un vrai changement du texte (un caractère invisible), donc une option que l'on
-// choisit, pas quelque chose que la recomposition fait d'elle-même. On travaille nœud de
-// texte par nœud de texte, sans toucher au balisage ; une espace et son guillemet
-// séparés par une mise en forme (« mot<i> »</i> ») sont traités aussi, d'un nœud à l'autre.
-function rendreInsecablesLesGuillemets(html) {
-  const boite = document.createElement("div");
-  boite.innerHTML = html || "";
-  const noeuds = [];
-  const marche = document.createTreeWalker(boite, NodeFilter.SHOW_TEXT);
-  let n; while ((n = marche.nextNode())) noeuds.push(n);
-
-  let compte = 0;
-  const NBSP = "\u00a0";
-  noeuds.forEach((noeud) => {
-    // Dans un même nœud.
-    const apres = noeud.data
-      .replace(/(\S) +»/g, (m, c) => { compte++; return c + NBSP + "»"; })
-      .replace(/« +(?=\S)/g, () => { compte++; return "«" + NBSP; });
-    if (apres !== noeud.data) noeud.data = apres;
-  });
-  // D'un nœud au suivant.
-  for (let i = 0; i + 1 < noeuds.length; i++) {
-    const a = noeuds[i], b = noeuds[i + 1];
-    if (/\S +$/.test(a.data) && /^»/.test(b.data)) { a.data = a.data.replace(/ +$/, NBSP); compte++; }
-    else if (/\S$/.test(a.data) && /^ +»/.test(b.data)) { b.data = b.data.replace(/^ +/, NBSP); compte++; }   // « mot|␣» »
-    else if (/«$/.test(a.data) && /^ +\S/.test(b.data)) { b.data = b.data.replace(/^ +/, NBSP); compte++; }   // « «|␣mot »
-    else if (/« +$/.test(a.data) && /^\S/.test(b.data)) { a.data = a.data.replace(/ +$/, NBSP); compte++; }   // « «␣|mot »
-  }
-  return { html: boite.innerHTML, compte };
+function ouvrirDialogueCoupesAnnulees() {
+  fermerDialogueCoupes();
+  const fond = document.createElement("div");
+  fond.id = "dialogueCoupes";
+  fond.className = "modal-impression";
+  fond.innerHTML = '<div class="modal-impression-carte ci-carte" role="dialog" aria-modal="true">' +
+    '<button class="mi-fermer" aria-label="Fermer">&#10005;</button><h3>Correction annulée</h3>' +
+    '<p class="mi-intro">La recomposition aurait modifié le texte du livre (un caractère de plus ou de moins). ' +
+    "Par sécurité, <b>le livre a été remis exactement comme il était</b> : rien n&rsquo;a changé.</p>" +
+    '<div class="ci-actions"><button class="ci-generer" id="coupesFermer">Fermer</button></div></div>';
+  fond.addEventListener("click", (e) => { if (e.target === fond) fermerDialogueCoupes(); });
+  document.body.appendChild(fond);
+  fond.querySelector(".mi-fermer").onclick = fermerDialogueCoupes;
+  fond.querySelector("#coupesFermer").onclick = fermerDialogueCoupes;
 }
 
-function insecablesDansLeLivre() {
-  flushSpread();
-  const livre = livreActuel();
-  let total = 0;
-  livre.spreads = spreadsLivre().map((h) => {
-    const r = rendreInsecablesLesGuillemets(h);
-    total += r.compte;
-    return r.compte ? r.html : h;
-  });
-  if (total) {
-    pagesObsoletes = true;
-    marquerModifie();
-    planifierBrouillon();
-    repaginerTout();
-    afficherSommaire();
-    majCompteurMots();
+// Le premier temps : ce qu'on a trouvé, et le choix. RIEN n'a été modifié.
+function ouvrirDialogueAnalyseCoupes(restantes) {
+  fermerDialogueCoupes();
+  const n = restantes.length;
+  const pluriel = (k, un, plusieurs) => k + " " + (k > 1 ? plusieurs : un);
+  const mots = restantes.filter((r) => /mot/.test(r.cause)).length;
+  const signes = n - mots;
+
+  let html = '<div class="modal-impression-carte ci-carte" role="dialog" aria-modal="true">' +
+    '<button class="mi-fermer" aria-label="Fermer">&#10005;</button><h3>Coupes de page</h3>';
+
+  if (!n) {
+    html += '<p class="mi-intro">Aucun mot coupé ni guillemet resté seul entre deux pages. ' +
+      "<b>Rien à corriger</b> — et rien n&rsquo;a été modifié.</p>" +
+      '<div class="ci-actions"><button class="ci-generer" id="coupesFermer">Fermer</button></div></div>';
+  } else {
+    const detail = [];
+    if (mots) detail.push(pluriel(mots, "mot coupé", "mots coupés"));
+    if (signes) detail.push(pluriel(signes, "guillemet ou signe resté seul", "guillemets ou signes restés seuls"));
+    html += '<p class="mi-intro"><b>' + pluriel(n, "coupe trouvée", "coupes trouvées") + "</b> entre deux pages : " + detail.join(" et ") +
+      ". <b>Rien n&rsquo;a encore été modifié.</b> Cliquez sur une ligne pour voir l&rsquo;endroit ; si vous le voulez, " +
+      "le livre sera recomposé pour que chacun passe en entier sur la page suivante, avec son voisin " +
+      "(le texte, lui, ne change pas).</p>" +
+      '<div class="renom-liste esp-liste">';
+    restantes.forEach((r, i) => {
+      html += '<button type="button" class="esp-ligne" data-i="' + i + '" title="Aller à cette page">' +
+        '<span class="renom-page">p.' + (r.page + 1) + "</span>" +
+        '<span class="esp-extrait"><span class="esp-avant">' + echapperTitre(r.extrait) + "</span>" +
+        '<span class="esp-apres"> — ' + echapperTitre(r.cause) + "</span></span></button>";
+    });
+    html += "</div>" +
+      '<div class="ci-actions"><button class="ci-annuler" id="coupesFermer">Ne rien changer</button>' +
+      '<button class="ci-generer" id="coupesCorriger">Corriger ' + (n > 1 ? "les " + n + " coupes" : "la coupe") + "</button></div></div>";
   }
-  return total;
+
+  const fond = document.createElement("div");
+  fond.id = "dialogueCoupes";
+  fond.className = "modal-impression";
+  fond.innerHTML = html;
+  fond.addEventListener("click", (e) => { if (e.target === fond) fermerDialogueCoupes(); });
+  document.body.appendChild(fond);
+  fond.querySelector(".mi-fermer").onclick = fermerDialogueCoupes;
+  fond.querySelector("#coupesFermer").onclick = fermerDialogueCoupes;
+  const corriger = fond.querySelector("#coupesCorriger");
+  if (corriger) corriger.onclick = () => corrigerLesCoupes();   // nom global : la version avec voile d'attente
+  fond.querySelectorAll(".esp-ligne").forEach((b) => {
+    b.onclick = () => { const r = restantes[Number(b.dataset.i)]; fermerDialogueCoupes(); allerAPage(r.page); };
+  });
 }
 
 function ouvrirDialogueCoupes(protections, restantes, insecables) {
@@ -3113,7 +3187,10 @@ function compterProtections() {
 // éviter (mot plus long qu'une ligne, par exemple) — relevées sur le TEXTE des
 // pages, pas sur la mise en page : c'est un contrôle indépendant de la correction.
 function coupesRestantes() {
-  const pages = (livreActuel().pages || []);
+  return coupesDansPages(livreActuel().pages || []);
+}
+
+function coupesDansPages(pages) {
   const restantes = [];
   const boite = document.createElement("div");
   for (let i = 0; i + 1 < pages.length; i++) {

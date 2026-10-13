@@ -944,14 +944,34 @@ Les ruptures `<br>` comptent pour une coupure dans ce repérage : ce livre sépa
 paragraphes par « <br><br> » à l'intérieur d'un même `<p>`, et sans cela la dernière
 lettre d'un paragraphe et la première du suivant auraient semblé former un mot.
 
-**L'outil « ✂ Coupes de page »** (menu « Relecture » du panneau, `ouvrirCorrectionCoupes`).
-La protection se pose d'elle-même à chaque recomposition ; l'outil la demande
-MAINTENANT sur tout le livre — un livre composé avant qu'elle existe garde ses
-anciennes coupes jusqu'à la prochaine recomposition — et la CONTRÔLE : il relit le texte
-des pages (`coupesRestantes`, indépendant de la mise en page) et liste ce qui subsiste
-(mot plus long qu'une ligne…), avec un lien vers chaque page. Le bilan compte les
-balises posées (`compterProtections`). Le livre est marqué modifié : les balises sont
-enregistrées avec le texte.
+**L'outil « ✂ Coupes de page »** (menu « Relecture » du panneau) travaille en **deux
+temps, et le premier ne change rien**.
+
+1. `ouvrirCorrectionCoupes` → `analyserCoupes` : il MONTRE où le livre est coupé —
+   page, extrait (« systém | atique »), cause — sans rien recomposer, sans toucher au
+   texte, sans enregistrer de balise, sans marquer le livre modifié. Boutons : « Ne rien
+   changer » / « Corriger les N coupes ». S'il n'y a rien, il le dit et n'offre rien.
+2. `corrigerLesCoupes` (seulement si l'on clique) : recompose tout le livre, pose les
+   protections, puis relit les pages (`coupesDansPages`, indépendant de la mise en page)
+   et affiche le bilan. Le livre est alors marqué modifié : les balises sont enregistrées.
+
+C'est ce qu'a demandé l'auteur : voir avant de décider. La première version recomposait
+d'emblée et n'expliquait qu'après.
+
+**Garde-fou.** `corrigerLesCoupes` compare le texte du livre avant et après (`texteExactDuLivre` :
+espaces et ruptures `<br>` comprises, sans le balisage). S'il diffère d'un seul
+caractère, les double-pages sont remises EXACTEMENT comme elles étaient et la fenêtre
+« Correction annulée » le dit. Une recomposition ne doit toucher qu'à la mise en page.
+(Né d'un retour : après une coupe de page, « Espaces après les points » retrouvait des
+points collés déjà corrigés. Je n'ai pas pu le reproduire — 24 livres de structures et
+de ponctuations variées sortent de la correction avec un texte strictement identique —
+le garde-fou est donc là pour que, si cela existe, ce soit visible et sans dégât.)
+
+**Ce que l'analyse compte.** Elle mesure COMME L'ÉCRAN ET LE FICHIER : au milieu d'une
+double-page la protection est posée à l'affichage et à l'impression, donc une coupe y est
+déjà évitée ; restent les coupes ENTRE deux double-pages, que la coupe enregistrée fixe.
+Une version intermédiaire lisait aussi le milieu des double-pages « tel
+qu'enregistré » et annonçait, après correction, des coupes que le livre n'avait pas.
 
 **Le menu « Relecture » est une fenêtre flottante** (`placerListeOutils`), plus une liste
 qui se déplie dans le panneau : dépliée sur place, elle repoussait les chapitres hors
