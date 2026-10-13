@@ -907,6 +907,34 @@ page redevient coupable à la ligne. Elles ne changent pas le texte, seulement s
 habillage, et les balises vides que laisse une coupe tombant pile au bord d'un mot
 ne sont pas stockées.
 
+**Guillemets restés seuls.** Même mécanisme pour un « » » en tête de page (séparé de
+sa phrase) ou un « « » en pied de page (séparé de ce qu'il ouvre). Le texte les sépare
+du mot voisin par une espace ordinaire, que le navigateur prend pour un endroit où
+couper ; l'espace insécable, elle, ne se coupe pas. `groupeALaCoupe()` rend alors le
+groupe « mot + espace + signe » (ou « signe + espace + mot »), enveloppé de la même
+balise — dont la règle CSS porte maintenant aussi `white-space: nowrap`, sans quoi un
+groupe se couperait à son espace. Seuls « » » et « « » sont concernés : « ? ! : ; »
+ne se détachent jamais du mot qui les précède, même après une espace (UAX 14, LB13).
+Mesuré dans Chrome 152 : un « » » en fin de texte reste seul sur sa ligne pour environ
+15 % des largeurs de colonne avec une espace ordinaire, jamais avec une espace
+insécable. Le texte, lui, n'est jamais modifié.
+
+Les ruptures `<br>` comptent pour une coupure dans ce repérage : ce livre sépare ses
+paragraphes par « <br><br> » à l'intérieur d'un même `<p>`, et sans cela la dernière
+lettre d'un paragraphe et la première du suivant auraient semblé former un mot.
+
+**L'outil « ✂ Coupes de page »** (menu « Relecture » du panneau, `ouvrirCorrectionCoupes`).
+La protection se pose d'elle-même à chaque recomposition ; l'outil la demande
+MAINTENANT sur tout le livre — un livre composé avant qu'elle existe garde ses
+anciennes coupes jusqu'à la prochaine recomposition — et la CONTRÔLE : il relit le texte
+des pages (`coupesRestantes`, indépendant de la mise en page) et liste ce qui subsiste
+(mot plus long qu'une ligne…), avec un lien vers chaque page. Le bilan compte les
+balises posées (`compterProtections`). Le livre est marqué modifié : les balises sont
+enregistrées avec le texte.
+
+**Le bloc « Relecture » déplié** se détache de la liste des chapitres : filet dessous,
+fond teinté, de l'air (classe `.ouvert` posée sur `.bloc-outils`).
+
 Points à connaître :
 
 - les frontières se traitent **dans l'ordre, une à une** : protéger un mot décale

@@ -449,6 +449,9 @@ button.danger {
 .sans-cesure {
   hyphens: none;
   -webkit-hyphens: none;
+  /* Un mot ne se coupe pas ; un groupe « mot » » non plus (voir groupeALaCoupe) :
+     le navigateur le déplace d'un bloc au lieu de le couper à l'espace. */
+  white-space: nowrap;
 }
 
 .texte-livre:focus {
@@ -3020,4 +3023,18 @@ button.danger {
   .sommaire .btn-icone { height: 30px; }
   .sommaire button.btn-chapitre.secondaire { padding-top: 6px; padding-bottom: 6px; }
   .bloc-outils { margin-bottom: 6px; }
+}
+
+/* La liste des outils de relecture, quand elle est dépliée, se détache de la liste des
+   chapitres : un filet en dessous et de l'air, sinon les deux se confondent. */
+.bloc-outils.ouvert {
+  padding-bottom: 10px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--s-line);
+}
+.bloc-outils.ouvert .liste-outils {
+  background: rgba(138, 75, 56, .04);
+  border-radius: 0 8px 8px 0;
+  padding-top: 4px;
+  padding-bottom: 4px;
 }

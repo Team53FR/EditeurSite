@@ -23,6 +23,7 @@ envelopperAttenteLourde({
   changerFormat: ["Changement de format…", "Tout le texte est recomposé aux nouvelles dimensions."],
   appliquerInterligne: ["Nouvel interligne…", "Tout le texte est recomposé."],
   ouvrirApercu: ["Préparation de l'aperçu…", "Les pages sont recalculées au découpage exact."],
+  ouvrirCorrectionCoupes: ["Correction des coupes de page…", "Tout le livre est recomposé, puis les pages sont relues."],
   fermerApercu: ["Retour à l'édition…"],
 });
 
@@ -277,6 +278,82 @@ function espaceDisponibleLivre(el, zone, compact) {
   const replie = document.querySelector(".conteneur-livre")?.classList.contains("sommaire-reduite");
   const sommaire = compact ? 0 : (replie ? 8 : 276);
   return { w: window.innerWidth - sommaire - 32, h: window.innerHeight - 180 };
+}
+
+// =====================================================================
+//  Outil de relecture : les coupes de page
+//
+//  La protection se pose d'elle-même à chaque recomposition (eviterMotsCoupes).
+//  Cet outil sert à la demander MAINTENANT, sur tout le livre — un livre mis en page
+//  avant que la protection existe garde ses anciennes coupes jusqu'à la prochaine
+//  recomposition — et à CONTRÔLER le résultat : il relit les pages, et signale ce qui
+//  n'a pas pu être évité.
+// =====================================================================
+
+function fermerDialogueCoupes() {
+  const d = document.getElementById("dialogueCoupes");
+  if (d) d.remove();
+}
+
+function ouvrirCorrectionCoupes() {
+  if (modeApercu || modeCouverture) return;
+  flushSpread();
+  repaginerTout();                      // tout est recomposé : les protections se posent de zéro
+  marquerModifie();
+  planifierBrouillon();
+  afficherSommaire();
+  majCompteurMots();
+  ouvrirDialogueCoupes(compterProtections(), coupesRestantes());
+}
+
+function ouvrirDialogueCoupes(protections, restantes) {
+  fermerDialogueCoupes();
+  const total = protections.mots + protections.signes;
+  const pluriel = (n, un, plusieurs) => n + " " + (n > 1 ? plusieurs : un);
+
+  let html = '<div class="modal-impression-carte ci-carte" role="dialog" aria-modal="true">' +
+    '<button class="mi-fermer" aria-label="Fermer">&#10005;</button>' +
+    "<h3>Coupes de page</h3>";
+
+  if (total) {
+    const morceaux = [];
+    if (protections.mots) morceaux.push(pluriel(protections.mots, "mot qui aurait été coupé", "mots qui auraient été coupés"));
+    if (protections.signes) morceaux.push(pluriel(protections.signes, "guillemet ou signe qui serait resté seul", "guillemets ou signes qui seraient restés seuls"));
+    html += '<p class="mi-intro">Le livre a été recomposé : ' + morceaux.join(" et ") +
+      " entre deux pages. Chacun passe maintenant en entier sur la page suivante, avec son voisin. " +
+      "Le texte, lui, n&rsquo;a pas changé.</p>";
+  } else {
+    html += '<p class="mi-intro">Le livre a été recomposé : aucun mot ni guillemet ne tombe entre deux pages.</p>';
+  }
+
+  if (restantes.length) {
+    html += '<p class="mi-intro"><b>' + pluriel(restantes.length, "coupe subsiste", "coupes subsistent") +
+      "</b> — la mise en page ne peut pas les éviter (un mot plus long qu&rsquo;une ligne, par exemple). " +
+      "Cliquez sur une ligne pour aller voir.</p>" +
+      '<div class="renom-liste esp-liste">';
+    restantes.forEach((r, i) => {
+      html += '<button type="button" class="esp-ligne" data-i="' + i + '" title="Aller à cette page">' +
+        '<span class="renom-page">p.' + (r.page + 1) + "</span>" +
+        '<span class="esp-extrait"><span class="esp-avant">' + echapperTitre(r.extrait) + "</span>" +
+        '<span class="esp-apres"> — ' + echapperTitre(r.cause) + "</span></span></button>";
+    });
+    html += "</div>";
+  } else {
+    html += '<p class="mi-intro">Contrôle : les pages ont été relues, il ne reste aucune coupe à corriger.</p>';
+  }
+  html += '<div class="ci-actions"><button class="ci-generer">Fermer</button></div></div>';
+
+  const fond = document.createElement("div");
+  fond.id = "dialogueCoupes";
+  fond.className = "modal-impression";
+  fond.innerHTML = html;
+  fond.addEventListener("click", (e) => { if (e.target === fond) fermerDialogueCoupes(); });
+  document.body.appendChild(fond);
+  fond.querySelector(".mi-fermer").onclick = fermerDialogueCoupes;
+  fond.querySelector(".ci-generer").onclick = fermerDialogueCoupes;
+  fond.querySelectorAll(".esp-ligne").forEach((b) => {
+    b.onclick = () => { const r = restantes[Number(b.dataset.i)]; fermerDialogueCoupes(); allerAPage(r.page); };
+  });
 }
 
 // =====================================================================
@@ -2021,6 +2098,9 @@ function appliquerEtatOutilsLivre(ouvert) {
   liste.hidden = !ouvert;
   bouton.setAttribute("aria-expanded", ouvert ? "true" : "false");
   bouton.classList.toggle("ouvert", ouvert);
+  // Le bloc entier le sait aussi : c'est lui qui se sépare de la liste des chapitres.
+  const bloc = bouton.closest(".bloc-outils");
+  if (bloc) bloc.classList.toggle("ouvert", ouvert);
 }
 
 function basculerOutilsLivre() {
@@ -2572,6 +2652,9 @@ function pointCoupe(el, seuilX) {
 
 // ----- Pas de mot coupé d'une page à l'autre -----
 //
+// (Même mécanisme pour un guillemet fermant ou un « ? ! : » resté seul en haut de
+// page, et pour un guillemet ouvrant resté seul en bas : voir groupeALaCoupe.)
+//
 // La césure automatique (hyphens: auto) coupe un mot en fin de ligne, et c'est
 // voulu : un texte justifié en a besoin. Mais à la DERNIÈRE ligne d'une page, la
 // coupe tombe entre deux pages — « disposit- » en bas, « ion » en haut — et le
@@ -2590,35 +2673,81 @@ function pointCoupe(el, seuilX) {
 // de la prochaine composition. Elle ne change pas le texte, seulement son habillage.
 const CARACTERE_DE_MOT = /[\p{L}\p{M}\p{N}]/u;
 
-// Les morceaux de texte du mot que la coupe `p` traverse, ou null si elle tombe
-// entre deux mots (un espace, un tiret) ou en début de bloc. `deja` dit que le
-// mot est déjà protégé : s'il se coupe malgré tout (plus long qu'une ligne, par
-// exemple), on n'insiste pas.
-function motTraverseParLaCoupe(el, p) {
+// Les signes qui ne doivent pas commencer une page (fermants) ni en finir une
+// (ouvrants). Un « » » seul en haut de page, ou un « « » seul en bas, sépare une
+// citation de sa ponctuation : en français, ces signes se collent au mot voisin.
+// Le texte les en sépare souvent par une espace ordinaire, que le navigateur prend
+// pour un endroit où couper (l'espace insécable, elle, ne se coupe pas).
+const SIGNE_FERMANT = /[»?!;:)\]}…%]/;
+const SIGNE_OUVRANT = /[«(\[{]/;
+
+// Ce que la coupe `p` sépare à tort, ou null :
+//   - un MOT coupé en deux (« systém | atique ») ;
+//   - un signe FERMANT en tête de page, séparé du mot qu'il suit : on rend le mot,
+//     l'espace et le signe (« existé | » » devient « [existé »] ») ;
+//   - un signe OUVRANT en pied de page, séparé du mot qu'il précède.
+// `morceaux` : les bouts de texte à envelopper, `sorte` : « mot » ou « signe ».
+// `deja` dit que tout est déjà protégé : si ça se coupe malgré tout (mot plus long
+// qu'une ligne, par exemple), on n'insiste pas.
+function groupeALaCoupe(el, p) {
   const bloc = blocAncetre(p.node) || el;
-  const marche = document.createTreeWalker(bloc, NodeFilter.SHOW_TEXT);
+  // Texte ET <br> : ce livre sépare ses paragraphes par « <br><br> » dans un même
+  // <p>. Sans cette rupture, la dernière lettre d'un paragraphe et la première du
+  // suivant se toucheraient dans le texte, et la coupe semblerait traverser un mot.
+  const marche = document.createTreeWalker(bloc, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
   const noeuds = [];
   let texte = "", indice = -1, n;
   while ((n = marche.nextNode())) {
+    if (n.nodeType === 1) { if (n.nodeName === "BR") texte += "\n"; continue; }
     if (n === p.node) indice = texte.length + p.offset;
     noeuds.push({ node: n, debut: texte.length });
     texte += n.data;
   }
   if (indice < 1 || indice >= texte.length) return null;
-  if (!CARACTERE_DE_MOT.test(texte[indice - 1]) || !CARACTERE_DE_MOT.test(texte[indice])) return null;
 
-  let a = indice - 1, b = indice;
-  while (a > 0 && CARACTERE_DE_MOT.test(texte[a - 1])) a--;
-  while (b < texte.length && CARACTERE_DE_MOT.test(texte[b])) b++;
+  const apres = texte[indice], avant = texte[indice - 1];
+  const blanc = (c) => /\s/.test(c) && c !== "\n";
+  const estMot = (c) => CARACTERE_DE_MOT.test(c);
+  let a, b, sorte;
+
+  if (estMot(avant) && estMot(apres)) {
+    a = indice - 1; b = indice;
+    while (a > 0 && estMot(texte[a - 1])) a--;
+    while (b < texte.length && estMot(texte[b])) b++;
+    sorte = "mot";
+  } else if (SIGNE_FERMANT.test(apres) && blanc(avant)) {
+    // Le signe, et ceux qui le suivent (« ». », « ?! »)…
+    b = indice;
+    while (b < texte.length && (SIGNE_FERMANT.test(texte[b]) || /[.,]/.test(texte[b]))) b++;
+    // …l'espace avant, puis le mot qu'il faut lui rendre.
+    let m = indice;
+    while (m > 0 && blanc(texte[m - 1])) m--;
+    let mot = m;
+    while (mot > 0 && estMot(texte[mot - 1])) mot--;
+    if (mot === m) return null;                  // rien à rattacher (début de paragraphe)
+    a = mot; sorte = "signe";
+  } else if (estMot(apres) && blanc(avant)) {
+    // Un signe ouvrant juste avant l'espace qui précède la coupe ?
+    let o = indice;
+    while (o > 0 && blanc(texte[o - 1])) o--;
+    if (o < 1 || !SIGNE_OUVRANT.test(texte[o - 1])) return null;
+    a = o - 1;
+    b = indice;
+    while (b < texte.length && estMot(texte[b])) b++;
+    sorte = "signe";
+  } else {
+    return null;
+  }
 
   const morceaux = [];
   noeuds.forEach(({ node, debut }) => {
     const de = Math.max(a, debut), fin = Math.min(b, debut + node.data.length);
     if (de < fin) morceaux.push({ node, de: de - debut, fin: fin - debut });
   });
+  if (!morceaux.length) return null;
   const deja = morceaux.every((m) => m.node.parentNode.classList &&
     m.node.parentNode.classList.contains("sans-cesure"));
-  return { morceaux, deja };
+  return { morceaux, deja, sorte };
 }
 
 // Enveloppe chaque morceau. À rebours : couper un nœud ne déplace que sa queue,
@@ -2634,6 +2763,45 @@ function envelopperMot(morceaux) {
     milieu.parentNode.insertBefore(balise, milieu);
     balise.appendChild(milieu);
   }
+}
+
+// Ce que la recomposition a protégé, relevé sur les doubles-pages enregistrées :
+// des mots entiers, et des groupes « mot + espace + signe » (ce qui contient une
+// espace). Chaque frontière de page y laisse sa balise, voir eviterMotsCoupes.
+function compterProtections() {
+  let mots = 0, signes = 0;
+  const re = /<span class="sans-cesure">([^<]*)<\/span>/g;
+  spreadsLivre().forEach((html) => {
+    let m;
+    while ((m = re.exec(html || ""))) { if (/\s/.test(m[1])) signes++; else mots++; }
+  });
+  return { mots, signes };
+}
+
+// Les coupes qui subsistent entre deux pages — celles que la mise en page n'a pas pu
+// éviter (mot plus long qu'une ligne, par exemple) — relevées sur le TEXTE des
+// pages, pas sur la mise en page : c'est un contrôle indépendant de la correction.
+function coupesRestantes() {
+  const pages = (livreActuel().pages || []);
+  const restantes = [];
+  const boite = document.createElement("div");
+  for (let i = 0; i + 1 < pages.length; i++) {
+    boite.innerHTML = (pages[i + 1] && pages[i + 1].contenu) || "";
+    const premier = boite.firstElementChild;
+    if (!premier || premier.getAttribute("data-suite") !== "1") continue;   // nouveau paragraphe : rien de coupé
+    const fin = texteBrutPage(pages[i].contenu || "").replace(/[ \t]+$/, "");
+    const debut = texteBrutPage(pages[i + 1].contenu || "").replace(/^[ \t]+/, "");
+    if (!fin || !debut) continue;
+    const dernier = fin.slice(-1), premierCar = debut.slice(0, 1);
+    const finBrute = texteBrutPage(pages[i].contenu || "");
+    const collee = finBrute.length === fin.length;           // aucune espace entre les deux pages
+    let cause = null;
+    if (collee && CARACTERE_DE_MOT.test(dernier) && CARACTERE_DE_MOT.test(premierCar)) cause = "mot coupé";
+    else if (SIGNE_FERMANT.test(premierCar)) cause = "signe fermant seul en tête de page";
+    else if (SIGNE_OUVRANT.test(dernier)) cause = "signe ouvrant seul en pied de page";
+    if (cause) restantes.push({ page: i, cause, extrait: fin.slice(-14) + " | " + debut.slice(0, 14) });
+  }
+  return restantes;
 }
 
 // Seuil horizontal de la frontière entre la colonne k et la suivante (k = 1, 2…).
@@ -2661,12 +2829,12 @@ function eviterMotsCoupes(el, jusqua) {
 
   for (let k = 1; k <= jusqua && k <= 10000; k++) {
     let p = null;
-    for (let essai = 0; essai < 3; essai++) {
+    for (let essai = 0; essai < 4; essai++) {
       p = pointCoupe(el, seuilFrontiere(el, k));
       if (!p) break;
-      const mot = motTraverseParLaCoupe(el, p);
-      if (!mot || mot.deja) break;
-      envelopperMot(mot.morceaux);
+      const groupe = groupeALaCoupe(el, p);
+      if (!groupe || groupe.deja) break;
+      envelopperMot(groupe.morceaux);
     }
     bornes.push(p);
     if (!p) break;
