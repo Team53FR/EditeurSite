@@ -443,6 +443,14 @@ button.danger {
   margin: 0 0 6px 0;
 }
 
+/* Un mot que la frontière de page aurait coupé (voir eviterMotsCoupes) : il ne
+   se coupe plus, et passe en entier sur la page suivante. Pas de style propre
+   à l'impression : cette règle vaut pour l'écran comme pour le fichier. */
+.sans-cesure {
+  hyphens: none;
+  -webkit-hyphens: none;
+}
+
 .texte-livre:focus {
   outline: none;
 }

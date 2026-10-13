@@ -2356,6 +2356,124 @@ function pointCoupe(el, seuilX) {
   return trouve;
 }
 
+// ----- Pas de mot coupé d'une page à l'autre -----
+//
+// La césure automatique (hyphens: auto) coupe un mot en fin de ligne, et c'est
+// voulu : un texte justifié en a besoin. Mais à la DERNIÈRE ligne d'une page, la
+// coupe tombe entre deux pages — « disposit- » en bas, « ion » en haut — et le
+// lecteur doit tourner la page pour finir le mot. Les imprimeurs l'évitent.
+//
+// Le navigateur ne propose rien pour cela : `hyphenate-limit-last`, qui le
+// ferait, n'existe presque nulle part. On agit donc sur le mot lui-même. Quand
+// une frontière de page tombe au milieu d'un mot, on l'enveloppe d'une balise
+// « sans-cesure » (hyphens: none, voir style.css) : il ne peut plus se couper, et
+// passe en entier sur la page suivante. C'est le navigateur qui le replace, donc
+// l'écran, l'aperçu et le fichier imprimé restent d'accord — aucune coupe
+// « corrigée » à la main d'un côté seulement.
+//
+// La balise est posée à chaque (re)composition, après avoir retiré les anciennes :
+// un mot qui n'est plus en bout de page redevient coupable à la ligne suivante
+// de la prochaine composition. Elle ne change pas le texte, seulement son habillage.
+const CARACTERE_DE_MOT = /[\p{L}\p{M}\p{N}]/u;
+
+// Les morceaux de texte du mot que la coupe `p` traverse, ou null si elle tombe
+// entre deux mots (un espace, un tiret) ou en début de bloc. `deja` dit que le
+// mot est déjà protégé : s'il se coupe malgré tout (plus long qu'une ligne, par
+// exemple), on n'insiste pas.
+function motTraverseParLaCoupe(el, p) {
+  const bloc = blocAncetre(p.node) || el;
+  const marche = document.createTreeWalker(bloc, NodeFilter.SHOW_TEXT);
+  const noeuds = [];
+  let texte = "", indice = -1, n;
+  while ((n = marche.nextNode())) {
+    if (n === p.node) indice = texte.length + p.offset;
+    noeuds.push({ node: n, debut: texte.length });
+    texte += n.data;
+  }
+  if (indice < 1 || indice >= texte.length) return null;
+  if (!CARACTERE_DE_MOT.test(texte[indice - 1]) || !CARACTERE_DE_MOT.test(texte[indice])) return null;
+
+  let a = indice - 1, b = indice;
+  while (a > 0 && CARACTERE_DE_MOT.test(texte[a - 1])) a--;
+  while (b < texte.length && CARACTERE_DE_MOT.test(texte[b])) b++;
+
+  const morceaux = [];
+  noeuds.forEach(({ node, debut }) => {
+    const de = Math.max(a, debut), fin = Math.min(b, debut + node.data.length);
+    if (de < fin) morceaux.push({ node, de: de - debut, fin: fin - debut });
+  });
+  const deja = morceaux.every((m) => m.node.parentNode.classList &&
+    m.node.parentNode.classList.contains("sans-cesure"));
+  return { morceaux, deja };
+}
+
+// Enveloppe chaque morceau. À rebours : couper un nœud ne déplace que sa queue,
+// les nœuds d'avant (et leurs index) restent donc valables.
+function envelopperMot(morceaux) {
+  for (let i = morceaux.length - 1; i >= 0; i--) {
+    const { node, de, fin } = morceaux[i];
+    let milieu = node;
+    if (fin < node.data.length) node.splitText(fin);
+    if (de > 0) milieu = node.splitText(de);
+    const balise = document.createElement("span");
+    balise.className = "sans-cesure";
+    milieu.parentNode.insertBefore(balise, milieu);
+    balise.appendChild(milieu);
+  }
+}
+
+// Seuil horizontal de la frontière entre la colonne k et la suivante (k = 1, 2…).
+// Même arithmétique que seuilsColonnes : au milieu de la gouttière.
+function seuilFrontiere(el, k) {
+  const g = geomEdition;
+  return el.getBoundingClientRect().left + k * (g.largeurColonne + g.gouttiere) - g.gouttiere / 2;
+}
+
+// Protège les mots qui tomberaient sur une frontière de colonne, de la première
+// à la `jusqua`-ième (ou jusqu'à la dernière avec Infinity). Rend le point de
+// coupe de CHAQUE frontière, dans l'ordre, que l'appelant n'a donc pas à
+// recalculer ; le dernier est null quand il n'y a plus rien au-delà.
+//
+// Les frontières se traitent dans l'ordre et une à une : protéger un mot décale
+// tout ce qui le suit, la frontière d'après doit donc être relue sur la
+// composition à jour. Les points déjà rendus, eux, restent justes — ce qui
+// précède une frontière ne bouge pas quand on agit plus loin.
+function eviterMotsCoupes(el, jusqua) {
+  const bornes = [];
+  if (!geomEdition || el.getBoundingClientRect().width === 0) return bornes;   // pas de mise en page : rien à mesurer
+
+  el.querySelectorAll("span.sans-cesure").forEach((b) => b.replaceWith(...b.childNodes));
+  el.normalize();
+
+  for (let k = 1; k <= jusqua && k <= 10000; k++) {
+    let p = null;
+    for (let essai = 0; essai < 3; essai++) {
+      p = pointCoupe(el, seuilFrontiere(el, k));
+      if (!p) break;
+      const mot = motTraverseParLaCoupe(el, p);
+      if (!mot || mot.deja) break;
+      envelopperMot(mot.morceaux);
+    }
+    bornes.push(p);
+    if (!p) break;
+  }
+  return bornes;
+}
+
+// Le contenu d'une double-page tel qu'on l'AFFICHE : mots de frontière protégés.
+// La mesure se fait sur le mesureur (hors zoom), pas sur la zone d'édition — ni le
+// curseur ni l'annuler/rétablir n'y sont touchés : on ne fait que lui donner du
+// HTML déjà composé.
+function avecMotsProteges(html) {
+  const mes = mesureEl();
+  if (!mes || !geomEdition || !html) return html;
+  mes.innerHTML = html;
+  eviterMotsCoupes(mes, 1);
+  const res = mes.innerHTML;
+  mes.innerHTML = "";
+  return res;
+}
+
 function blocAncetre(node) {
   let b = node;
   while (b && b.nodeType === Node.TEXT_NODE) b = b.parentNode;
@@ -2397,6 +2515,11 @@ function htmlEntre(el, a, b, marquerSuite) {
     }
   }
 
+  // Une coupe qui tombe pile au bord d'un mot protégé (voir eviterMotsCoupes) en
+  // laisse la balise, VIDE, au bout du morceau d'avant : cloneContents recopie
+  // tout ancêtre que la borne traverse. Inutile à stocker.
+  d.querySelectorAll("span.sans-cesure").forEach((b) => { if (!b.textContent) b.remove(); });
+
   if (marquerSuite && a && !estDebutDeBloc(a.node, a.offset) && d.firstElementChild) {
     d.firstElementChild.setAttribute("data-suite", "1");
   }
@@ -2428,7 +2551,9 @@ function calculerPartition(html) {
   const mes = mesureEl();
   if (!mes || !geomEdition) return { garde: html || "", overflow: "" };
   mes.innerHTML = html || "";
-  const p3 = pointCoupe(mes, seuilsColonnes(mes).col3);
+  // Frontières 1 (entre les deux pages) et 2 (fin de la double-page) : aucun mot
+  // coupé ni dans l'une ni dans l'autre. Le point rendu pour la 2e est la coupe.
+  const p3 = eviterMotsCoupes(mes, 2)[1] || null;
   const res = {
     garde: htmlEntre(mes, null, p3, false),
     overflow: p3 ? htmlEntre(mes, p3, null, true) : ""
@@ -2454,19 +2579,14 @@ function decouperEnDoublesPages(html) {
   if (!mes || !geomEdition) return [html || ""];
   mes.innerHTML = html || "";
 
-  const g = geomEdition;
-  const pas = g.largeurColonne + g.gouttiere;   // d'une colonne à la suivante
-  const gauche = mes.getBoundingClientRect().left;
-  // Frontière au début de la double-page s : juste avant la colonne 2s+1,
-  // au milieu de la gouttière (voir seuilsColonnes, même arithmétique).
-  const seuil = (s) => gauche + 2 * s * pas - g.gouttiere / 2;
-
+  // Toutes les frontières de colonne, mots de frontière protégés. Les
+  // frontières IMPAIRES séparent les deux pages d'une double-page : elles ne
+  // coupent rien ici (la double-page reste d'un seul tenant), mais c'est là
+  // qu'il faut protéger le mot. Les PAIRES — début de la double-page s, juste
+  // avant la colonne 2s+1 — sont les coupes.
+  const bornes = eviterMotsCoupes(mes, 10000);
   const points = [];
-  for (let s = 1; s <= 5000; s++) {
-    const p = pointCoupe(mes, seuil(s));
-    if (!p) break;
-    points.push(p);
-  }
+  for (let k = 2; k <= bornes.length && bornes[k - 1]; k += 2) points.push(bornes[k - 1]);
 
   const morceaux = [];
   for (let i = 0; i <= points.length; i++) {
@@ -2507,7 +2627,7 @@ function calculerDeuxPages(html) {
   const mes = mesureEl();
   if (!mes || !geomEdition) return { gauche: html || "", droite: "" };
   mes.innerHTML = html || "";
-  const p2 = pointCoupe(mes, seuilsColonnes(mes).col2);
+  const p2 = eviterMotsCoupes(mes, 1)[0] || null;
   // La coupe entre les deux pages laisse souvent une coquille de titre vide
   // en fin de page gauche (le titre lui-même passant à droite). Elle est
   // invisible à l'écran mais coûte tout l'espace au-dessus des titres à
@@ -2585,7 +2705,7 @@ function afficherSpread() {
   const s = numSpread();
   assurerSpread(s);
   const spreads = spreadsLivre();
-  ed.innerHTML = spreads[s] || "";
+  ed.innerHTML = avecMotsProteges(spreads[s] || "");
   const nG = document.getElementById("numeroGauche");
   const nD = document.getElementById("numeroDroite");
   if (nG) nG.textContent = indexSpread + 1;
@@ -2594,7 +2714,7 @@ function afficherSpread() {
   majGardesEdition();
 }
 
-// Montre les pages de garde sur le côté du livre : celles du début à gauche de
+// Montre les gardes sur le côté du livre : celles du début à gauche de
 // la première double-page, celles de la fin à droite de la dernière. Elles ne
 // sont pas dans la zone éditable (rien à y écrire) mais doivent se VOIR, pour
 // compter les feuilles du livre relié.
@@ -2609,12 +2729,12 @@ function majGardesEdition() {
   const premiere = numSpread() === 0;
   const derniere = numSpread() >= spreadsLivre().length - 1;
 
-  const libelle = (n) => n > 1 ? `${n} pages de garde` : "Page de garde";
+  const libelle = (n) => n > 1 ? `${n} feuilles de garde` : "Feuille de garde";
   gDebut.hidden = !(debut && premiere);
   gFin.hidden = !(fin && derniere);
   gDebut.textContent = libelle(debut);
   gFin.textContent = libelle(fin);
-  gDebut.title = gFin.title = "Feuillets blancs non numérotés — cliquer pour les modifier";
+  gDebut.title = gFin.title = "Feuilles blanches non numérotées (2 pages chacune) — cliquer pour les modifier";
 }
 
 // Grise « Précédent » sur la première double-page et « Suivant » sur la dernière,
@@ -3624,15 +3744,16 @@ function nombrePagesTexte() {
   return (livre.pages || []).length;
 }
 
-// Le bouton dit combien de pages de garde sont posées : sans cela, le réglage
+// Le bouton dit combien de feuilles de garde sont posées : sans cela, le réglage
 // ne se voit nulle part dans l'éditeur, puisque les gardes sont blanches et
 // n'ont pas de place parmi les pages écrites.
 function majEtiquetteGardes() {
   if (indexLivre === -1) return;
   const bouton = document.getElementById("btnPagesGarde");
   if (!bouton) return;
-  const gardes = nombreTotalGardes(livreActuel());
-  bouton.textContent = gardes ? `▭ Gardes · ${gardes}` : "▭ Gardes";
+  const feuilles = nombreFeuillesGarde(livreActuel());
+  bouton.textContent = feuilles ? `▭ Gardes · ${feuilles} f.` : "▭ Gardes";
+  bouton.title = feuilles ? `${feuilles} feuille${feuilles > 1 ? "s" : ""} de garde (${feuilles * PAGES_PAR_GARDE} pages)` : "";
   majGardesEdition();
 }
 
@@ -3723,17 +3844,17 @@ function ouvrirNotesDuLivre() {
 }
 
 // =====================================================================
-//  Pages de garde
+//  Feuilles de garde
 //
-//  Des feuillets blancs et NON FOLIOTÉS, au début et à la fin du livre.
+//  Des feuilles blanches et NON FOLIOTÉES, au début et à la fin du livre.
 //  Comme dans un livre relié : on ouvre la couverture et l'on tombe sur une
 //  page blanche avant le texte.
 //
-//  Elles ne touchent pas à la pagination — le premier texte reste la page 1
-//  — mais ce sont de vraies feuilles : elles s'impriment, elles épaississent
-//  le dos, et chacune fait basculer de l'autre côté tout ce qui la suit
-//  (voir feuilletsDuLivre dans script.js, qui distingue le rang physique du
-//  folio imprimé).
+//  Une garde est une vraie FEUILLE, donc deux pages (recto et verso) : elles
+//  s'impriment, elles épaississent le dos, et le texte reste du même côté qu'avant
+//  — une garde d'une seule page ferait basculer tout le livre. Elles ne touchent
+//  pas à la pagination : le premier texte reste la page 1 (voir feuilletsDuLivre
+//  dans script.js, qui distingue le rang physique du folio imprimé).
 //
 //  Comme le format ou l'interligne, le réglage est posé en mémoire et part
 //  avec la prochaine sauvegarde. Surtout PAS de mettreAJourLivre() ici : il
@@ -3788,16 +3909,13 @@ function rafraichirApercuGardes() {
     return;
   }
 
+  // Dire les pages que ça fait : « 1 feuille » ne se compte pas sur le dos, « 2
+  // pages » si.
+  const bout = (n, ou) => n + (n > 1 ? " feuilles" : " feuille") + " (" + n * PAGES_PAR_GARDE + " pages) " + ou;
   const bouts = [];
-  if (debut) bouts.push(debut + (debut > 1 ? " feuillets blancs" : " feuillet blanc") + " avant le texte");
-  if (fin) bouts.push(fin + (fin > 1 ? " feuillets blancs" : " feuillet blanc") + " après");
-
-  // Chaque feuillet ajouté au début fait changer de côté tout le livre : à
-  // l'impression, la page 1 passe de droite à gauche et inversement. Autant
-  // le dire ici plutôt que de le laisser découvrir sur le papier.
-  const cote = debut % 2 === 0 ? "à droite, comme dans un livre imprimé"
-    : "à gauche — un nombre impair de gardes fait basculer tout le livre";
-  zone.textContent = bouts.join(", ") + ". À l'impression, la page 1 tombera " + cote + ".";
+  if (debut) bouts.push(bout(debut, "avant le texte"));
+  if (fin) bouts.push(bout(fin, "après"));
+  zone.textContent = bouts.join(", ") + ". La page 1 reste à droite, comme dans un livre imprimé.";
 }
 
 function enregistrerPagesDeGarde() {
@@ -3821,8 +3939,8 @@ function enregistrerPagesDeGarde() {
   if (message) {
     const total = debut + fin;
     message.textContent = total
-      ? total + (total > 1 ? " pages de garde posées." : " page de garde posée.")
-      : "Pages de garde retirées.";
+      ? total + (total > 1 ? " feuilles de garde posées." : " feuille de garde posée.")
+      : "Feuilles de garde retirées.";
     setTimeout(() => { if (message.textContent.includes("garde")) message.textContent = ""; }, 3000);
   }
 }

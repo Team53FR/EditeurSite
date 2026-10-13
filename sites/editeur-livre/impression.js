@@ -1034,9 +1034,9 @@ function feuilletsProAvecGardes(livre, pagesPro) {
   const debut = nombreGardes(livre.gardesDebut);
   const fin = nombreGardes(livre.gardesFin);
   const feuillets = [];
-  for (let i = 0; i < debut; i++) feuillets.push({ contenu: "", numero: "" });
+  for (let i = 0; i < debut * PAGES_PAR_GARDE; i++) feuillets.push({ contenu: "", numero: "" });
   pagesPro.forEach((contenu, i) => feuillets.push({ contenu, numero: i + 1 }));
-  for (let i = 0; i < fin; i++) feuillets.push({ contenu: "", numero: "" });
+  for (let i = 0; i < fin * PAGES_PAR_GARDE; i++) feuillets.push({ contenu: "", numero: "" });
   feuillets.forEach((f, i) => { f.position = i + 1; });
   return feuillets;
 }
@@ -3159,6 +3159,28 @@ function creerPagePro(contenu, numero, f, margeInt, margeExt, position) {
 // Chaque réglage peut valoir « comme la couverture » (valeur nulle) : un
 // livre déjà écrit garde exactement l'aspect qu'il avait, sans migration.
 
+// 4 → « IV ». Les tomes ne montent pas haut : au-delà de 399, ou pour autre
+// chose qu'un nombre entier, on n'y touche pas.
+function enChiffresRomains(n) {
+  const table = [[100, "C"], [90, "XC"], [50, "L"], [40, "XL"], [10, "X"], [9, "IX"], [5, "V"], [4, "IV"], [1, "I"]];
+  let reste = n, sortie = "";
+  table.forEach(([valeur, lettres]) => {
+    while (reste >= valeur) { sortie += lettres; reste -= valeur; }
+  });
+  return sortie;
+}
+
+// Le texte posé sur la pastille. Seul un NOMBRE se convertit : « 2 » devient
+// « II », mais « Hors-série » reste tel quel, quel que soit le réglage.
+function textePastille(texte, chiffres) {
+  const t = String(texte || "").trim();
+  if (chiffres === "romain" && /^\d{1,3}$/.test(t)) {
+    const n = parseInt(t, 10);
+    if (n >= 1 && n <= 399) return enChiffresRomains(n);
+  }
+  return t;
+}
+
 function donneesTranche(livre) {
   const t = (livre && livre.tranche) || {};
   const couv = (livre && livre.couverture) || {};
@@ -3185,6 +3207,12 @@ function donneesTranche(livre) {
     pastilleFond: t.pastilleFond || "#22c55e",
     pastilleTexte: t.pastilleTexte || "#0b1220",
     pastilleTaille: Number(t.pastilleTaille) > 0 ? Number(t.pastilleTaille) : 9,
+    // Apparence du numéro de tome : une bande de couleur sur toute la largeur du
+    // dos (ce que la pastille a toujours été, donc le défaut), un rond de
+    // couleur, ou le numéro seul sur le fond du dos.
+    pastilleForme: t.pastilleForme === "rond" || t.pastilleForme === "nu" ? t.pastilleForme : "bande",
+    // « 2 » ou « II » : la façon d'écrire un numéro tapé en chiffres.
+    pastilleChiffres: t.pastilleChiffres === "romain" ? "romain" : "arabe",
     surtitre: typeof t.surtitre === "string" ? t.surtitre : "",
     surtitreTaille: Number(t.surtitreTaille) > 0 ? Number(t.surtitreTaille) : 6,
     credits: typeof t.credits === "string" ? t.credits : "",
@@ -3240,14 +3268,16 @@ function construireDosLivre(livre, dosMm, hautMm, promessesImages) {
     chargerImageCouverture(img, cheminBandeau, promessesImages);
   }
 
-  // 2) Pastille : le numéro de tome, droit, sur son propre aplat.
+  // 2) Pastille : le numéro de tome, droit. Trois apparences : une bande de
+  //    couleur sur toute la largeur du dos, un rond de couleur, ou le numéro
+  //    seul, sans aplat, sur le fond du dos.
   if (r.pastille.trim()) {
     const p = document.createElement("div");
-    p.className = "dos-pastille";
-    p.style.background = r.pastilleFond;
+    p.className = "dos-pastille dos-pastille-" + r.pastilleForme;
+    if (r.pastilleForme !== "nu") p.style.background = r.pastilleFond;
     p.style.color = r.pastilleTexte;
     p.style.fontSize = r.pastilleTaille + "pt";
-    p.textContent = r.pastille;
+    p.textContent = textePastille(r.pastille, r.pastilleChiffres);
     dos.appendChild(p);
   }
 
@@ -3390,10 +3420,24 @@ function ouvrirTranche() {
         '<div class="tranche-duo">' +
           champ("trPastille", "Texte", d.pastille, 'maxlength="6" class="tr-mini"') +
           '<label>Fond <input type="color" id="trPastilleFond" value="' + d.pastilleFond + '"></label>' +
-          '<label>Texte <input type="color" id="trPastilleTexte" value="' + d.pastilleTexte + '"></label>' +
+          '<label>Chiffre <input type="color" id="trPastilleTexte" value="' + d.pastilleTexte + '"></label>' +
           nombre("trPastilleTaille", "pt", d.pastilleTaille, 4, 24) +
         "</div>" +
-        '<p class="aide-champ">Le numéro de tome, posé droit sur son aplat de couleur.</p>' +
+        '<div class="tranche-duo">' +
+          '<label>Forme <select id="trPastilleForme">' +
+            '<option value="bande">Bande de couleur</option>' +
+            '<option value="rond">Rond de couleur</option>' +
+            '<option value="nu">Numéro seul</option>' +
+          "</select></label>" +
+          '<label>Chiffres <select id="trPastilleChiffres">' +
+            '<option value="arabe">1, 2, 3</option>' +
+            '<option value="romain">I, II, III</option>' +
+          "</select></label>" +
+          (typeof livre.tome === "number"
+            ? '<button type="button" class="btn-lien" id="trPastilleTome">Reprendre le tome ' + livre.tome + "</button>"
+            : "") +
+        "</div>" +
+        '<p class="aide-champ" id="trPastilleAide"></p>' +
       "</fieldset>" +
 
       '<fieldset class="tr-bloc"><legend>Titre</legend>' +
@@ -3449,6 +3493,8 @@ function ouvrirTranche() {
   document.body.appendChild(fond);
 
   fond.querySelector("#trSens").value = d.sens;
+  fond.querySelector("#trPastilleForme").value = d.pastilleForme;
+  fond.querySelector("#trPastilleChiffres").value = d.pastilleChiffres;
 
   const val = (id) => fond.querySelector("#" + id).value;
   const num = (id, defaut) => {
@@ -3464,6 +3510,8 @@ function ouvrirTranche() {
     pastilleFond: val("trPastilleFond"),
     pastilleTexte: val("trPastilleTexte"),
     pastilleTaille: num("trPastilleTaille", d.pastilleTaille),
+    pastilleForme: val("trPastilleForme"),
+    pastilleChiffres: val("trPastilleChiffres"),
     surtitre: val("trSurtitre"),
     surtitreTaille: num("trSurtitreTaille", d.surtitreTaille),
     contenu: val("trContenu"),
@@ -3499,6 +3547,18 @@ function ouvrirTranche() {
     scene.style.width = (dosApercu * PX_PAR_MM * echelle) + "px";
     scene.appendChild(dos);
 
+    // La pastille : « Fond » n'a pas de sens pour un numéro seul, et l'aide dit
+    // ce que le chiffre deviendra.
+    const forme = r.pastilleForme;
+    fond.querySelector("#trPastilleFond").disabled = forme === "nu";
+    fond.querySelector("#trPastilleAide").textContent =
+      (forme === "nu" ? "Le numéro seul, sur le fond du dos : choisissez-lui une couleur lisible. "
+        : forme === "rond" ? "Le numéro dans un rond de couleur. "
+        : "Le numéro sur une bande de couleur, d'un bord à l'autre du dos. ") +
+      (r.pastilleChiffres === "romain"
+        ? "Un nombre tapé en chiffres (2) s'écrit en romain (II) ; un autre texte reste tel quel."
+        : "");
+
     fond.querySelector("#trLegende").textContent =
       "Dos de " + dosMm.toFixed(1).replace(".", ",") + " mm · " + nbFeuillets + " pages";
     fond.querySelector("#trNoteDos").textContent = dosMm >= 6
@@ -3510,6 +3570,21 @@ function ouvrirTranche() {
     c.addEventListener("input", rafraichir);
     c.addEventListener("change", rafraichir);
   });
+
+  // Passer au numéro seul : la couleur du chiffre était choisie pour se lire
+  // SUR un aplat (sombre sur vert). Sur le fond du dos elle disparaîtrait peut-être :
+  // on la remet à celle du texte du dos, et l'auteur la change s'il veut.
+  fond.querySelector("#trPastilleForme").addEventListener("change", (e) => {
+    if (e.target.value === "nu") {
+      fond.querySelector("#trPastilleTexte").value = fond.querySelector("#trTexte").value;
+      rafraichir();
+    }
+  });
+  const reprendreTome = fond.querySelector("#trPastilleTome");
+  if (reprendreTome) reprendreTome.onclick = () => {
+    fond.querySelector("#trPastille").value = String(livre.tome);
+    rafraichir();
+  };
 
   fond.querySelector("#trReset").onclick = () => {
     const couv = livre.couverture || {};
@@ -3571,6 +3646,8 @@ function ouvrirTranche() {
     t.pastilleFond = r.pastilleFond;
     t.pastilleTexte = r.pastilleTexte;
     t.pastilleTaille = r.pastilleTaille;
+    t.pastilleForme = r.pastilleForme;
+    t.pastilleChiffres = r.pastilleChiffres;
     t.surtitre = r.surtitre;
     t.surtitreTaille = r.surtitreTaille;
     t.taille = r.taille;

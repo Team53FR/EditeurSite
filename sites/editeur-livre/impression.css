@@ -485,6 +485,23 @@
   overflow: hidden;
 }
 .dos-pastille { padding: 0.6mm 0; font-weight: 700; }
+/* Le rond : un disque dont la taille suit celle du chiffre, sans jamais dépasser
+   la largeur du dos. Le numéro seul n'a pas d'aplat — juste un peu d'air. */
+.dos-pastille-rond {
+  align-self: center;
+  box-sizing: border-box;
+  width: 2.1em;
+  max-width: calc(100% - 1.6mm);
+  aspect-ratio: 1;
+  margin: 1mm 0;
+  padding: 0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+.dos-pastille-nu { margin: 0.6mm 0; }
 .dos-pied { padding: 1.2mm 0; opacity: 0.9; }
 
 /* Le titre occupe tout ce qui reste, centré sur la hauteur du dos. */

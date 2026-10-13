@@ -412,9 +412,18 @@ vit en `localStorage`, partagée avec le portail et les deux autres sites (voir
 `sessionStorage` : c'est l'état d'un onglet, pas une session, et le déplacer
 ferait que deux onglets sur deux livres différents se marcheraient dessus.
 
-**Pages de garde** (`livres.gardes_debut` / `gardes_fin`) : des feuillets
-blancs et **non foliotés**, au début et à la fin du livre — comme en ouvrant un
-livre relié. Le bouton « ▭ Pages de garde » du sommaire les règle.
+**Feuilles de garde** (`livres.gardes_debut` / `gardes_fin`) : des feuilles
+blanches et **non foliotées**, au début et à la fin du livre — comme en ouvrant un
+livre relié. Le bouton « ▭ Gardes » du sommaire les règle.
+
+**Le réglage compte des FEUILLES, pas des pages** : une garde = un recto + un
+verso, soit `PAGES_PAR_GARDE` = 2 pages (script.js). Une garde d'une seule page
+n'existe pas sur le papier — l'autre face de la feuille est là de toute façon — et
+elle faisait basculer tout le texte de côté. Les valeurs déjà enregistrées gardent
+leur nombre mais changent de sens : un livre à « 1 garde » a désormais 2 pages
+blanches, pas une (aucune migration : la colonne reste un entier de 0 à 20).
+`nombreTotalGardes()` rend des **pages** (c'est ce que comptent le dos, les paliers
+de marge et le décompte), `nombreFeuillesGarde()` des feuilles.
 
 Tout tient dans une distinction que `feuilletsDuLivre()` (script.js) rend
 explicite, et qu'il ne faut jamais confondre :
@@ -424,9 +433,10 @@ explicite, et qu'il ne faut jamais confondre :
 | `position` | le rang **physique** dans le livre. C'est lui, et lui seul, qui dit si la page est un recto (impair, à droite, reliure à gauche). |
 | `numero` | le **folio imprimé**. Vide pour une garde ; le premier texte reste la page 1, quoi qu'on mette devant. |
 
-Conséquence à connaître : **une garde en plus au début fait basculer tout le
-livre de l'autre côté**. C'est pourquoi la fenêtre annonce en clair de quel
-côté la page 1 tombera, plutôt que de le laisser découvrir sur le papier.
+Conséquence : **le texte reste du même côté**, la page 1 est toujours un recto.
+Avec des gardes d'une page, une garde de plus au début le faisait basculer — la
+fenêtre devait l'annoncer ; elle dit maintenant combien de pages blanches le
+réglage ajoute (« 1 feuille (2 pages) avant le texte »).
 
 Toute sortie du livre passe par `feuilletsDuLivre()` — aperçu, impression page
 à page, livret, deux-pages-par-feuille, export KDP — et le calcul du dos
@@ -807,6 +817,52 @@ lignes que prévu : des pages finissant trop tôt, et un fichier plus long qu'il
 n'aurait dû, ce qui gonfle à son tour le dos et le palier de marge de reliure.
 Rien n'était rogné, mais rien ne tombait juste. `mesure-pro` a été retiré :
 l'accord se fait maintenant à la source.
+
+**Pas de mot coupé d'une page à l'autre** (`eviterMotsCoupes`, editeur.js). La
+césure automatique coupe un mot en fin de ligne, ce qui est voulu dans un texte
+justifié ; mais à la dernière ligne d'une page, « disposit- » en bas et « ion » en
+haut obligent le lecteur à tourner la page pour finir le mot. `hyphenate-limit-last`,
+qui y répondrait en CSS, n'existe presque nulle part.
+
+Quand une frontière de page tombe **au milieu d'un mot** (le caractère d'avant et
+celui d'après sont tous deux des lettres : la seule façon d'y arriver est la
+césure), le mot est enveloppé d'un `<span class="sans-cesure">` (`hyphens: none`,
+style.css). Il ne peut plus se couper et c'est le **navigateur** qui le replace en
+entier sur la page suivante : l'écran, l'aperçu et le fichier imprimé restent donc
+d'accord, au lieu de recevoir chacun sa coupe « corrigée » à la main. Les balises
+sont retirées puis reposées à chaque composition (`calculerPartition`,
+`calculerDeuxPages`, `decouperEnDoublesPages`) : un mot qui n'est plus en bout de
+page redevient coupable à la ligne. Elles ne changent pas le texte, seulement son
+habillage, et les balises vides que laisse une coupe tombant pile au bord d'un mot
+ne sont pas stockées.
+
+Points à connaître :
+
+- les frontières se traitent **dans l'ordre, une à une** : protéger un mot décale
+  tout ce qui le suit, donc la frontière d'après doit se relire sur la mise en page
+  à jour. C'est ce qui rend la repagination complète environ deux fois plus longue
+  (de l'ordre de 250 ms contre 110 ms pour 46 doubles-pages) ;
+- la zone d'édition n'est **jamais mesurée** (elle est sous le zoom) : l'affichage
+  d'une double-page passe par `avecMotsProteges()`, qui compose sur le mesureur et
+  ne donne à la zone que du HTML déjà prêt — le curseur et l'annuler/rétablir natif
+  ne sont pas touchés ;
+- **pendant la frappe**, un mot peut rester coupé au milieu de la double-page jusqu'à
+  la prochaine recomposition (changement de page, débordement, aperçu) : modifier le
+  DOM sous le curseur à chaque frappe casserait l'annuler/rétablir. Le fichier
+  imprimé, lui, est toujours recomposé ;
+- un mot plus long qu'une ligne, ou portant un trait d'union conditionnel saisi à la
+  main, peut se couper malgré la balise ; on ne boucle pas dessus (3 essais).
+
+**La tranche : le numéro de tome** (`tranche.pastilleForme`, `pastilleChiffres`,
+`construireDosLivre`). Trois apparences — une **bande** de couleur sur toute la
+largeur du dos (ce que la pastille a toujours été, donc le défaut : un livre
+existant ne change pas d'aspect), un **rond** de couleur, ou le **numéro seul** sur
+le fond du dos — et des chiffres **arabes ou romains**. Seul un nombre entier de 1 à
+399 se convertit (« 2 » → « II ») ; « Hors-série » reste tel quel. Le rond a la
+taille du chiffre sans jamais dépasser la largeur du dos. Pour le numéro seul, le
+panneau reprend la couleur du texte du dos : celle du chiffre était choisie pour se
+lire sur un aplat. Un bouton « Reprendre le tome N » recopie le tome de la série.
+Tout est dans le JSON `tranche` : aucune migration.
 
 **Ce qu'un navigateur ne sait pas faire** : convertir en CMJN, produire du
 PDF/X-1a, appliquer un profil de sortie. Le panneau de contrôle affiché avant

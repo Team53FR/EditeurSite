@@ -966,17 +966,20 @@ function rendreContenuOngletFormat(fond, formatActuel, appliquer) {
 
 // ----- Les feuillets du livre, gardes comprises -----
 //
-// Une page de garde est un vrai feuillet : elle occupe une place dans le
-// livre relié, elle épaissit le dos, et elle décide de quel côté tombe la
-// suivante. Mais elle ne porte pas de numéro — dans un livre imprimé, les
-// gardes ne sont jamais foliotées.
+// Une garde est une vraie FEUILLE : deux pages, un recto et un verso, blanches
+// et sans numéro — dans un livre imprimé, les gardes ne sont jamais foliotées.
+// Elle occupe sa place dans le livre relié et elle épaissit le dos.
+//
+// Le réglage (gardesDebut, gardesFin) compte des FEUILLES, pas des pages. Une
+// garde d'une seule page n'existe pas sur le papier : l'autre face de la feuille
+// est là de toute façon, et elle ferait basculer tout le texte de côté.
 //
 // D'où deux notions qu'il ne faut surtout pas confondre :
 //
 //   `position` — le rang PHYSIQUE dans le livre (1, 2, 3…). C'est lui, et
 //                lui seul, qui dit si la page est un recto (impair, à
-//                droite, reliure à gauche) ou un verso. Ajouter UNE garde au
-//                début fait donc basculer tout le livre de l'autre côté.
+//                droite, reliure à gauche) ou un verso. Une garde étant une
+//                feuille entière, le texte reste du même côté qu'avant.
 //   `numero`   — le folio IMPRIMÉ. Vide pour une garde ; la première page
 //                écrite reste la page 1, quoi qu'on mette devant.
 //
@@ -984,6 +987,7 @@ function rendreContenuOngletFormat(fond, formatActuel, appliquer) {
 // KDP, calcul du dos — passe par ici, pour que les gardes n'existent pas à
 // moitié.
 const MAX_GARDES = 20;
+const PAGES_PAR_GARDE = 2;   // une feuille : recto + verso
 
 function nombreGardes(valeur) {
   const n = Math.round(Number(valeur) || 0);
@@ -996,19 +1000,24 @@ function feuilletsDuLivre(livre) {
   const fin = nombreGardes(livre && livre.gardesFin);
 
   const feuillets = [];
-  for (let i = 0; i < debut; i++) feuillets.push({ page: null, numero: "", garde: true });
+  for (let i = 0; i < debut * PAGES_PAR_GARDE; i++) feuillets.push({ page: null, numero: "", garde: true });
   pages.forEach((page, i) => feuillets.push({ page, numero: i + 1, garde: false }));
-  for (let i = 0; i < fin; i++) feuillets.push({ page: null, numero: "", garde: true });
+  for (let i = 0; i < fin * PAGES_PAR_GARDE; i++) feuillets.push({ page: null, numero: "", garde: true });
 
   feuillets.forEach((f, i) => { f.position = i + 1; });
   return feuillets;
 }
 
-// Le nombre de feuillets blancs ajoutés au livre, début et fin confondus.
-// Un seul endroit qui lit les DEUX réglages : tout calcul qui compte les
-// pages du livre relié (dos, palier de marge, total annoncé) s'y réfère,
-// pour qu'aucun n'en oublie un.
+// Le nombre de PAGES blanches ajoutées au livre, début et fin confondus (deux
+// par feuille de garde). Un seul endroit qui lit les DEUX réglages : tout calcul
+// qui compte les pages du livre relié (dos, palier de marge, total annoncé)
+// s'y réfère, pour qu'aucun n'en oublie un.
 function nombreTotalGardes(livre) {
+  return (nombreGardes(livre && livre.gardesDebut) + nombreGardes(livre && livre.gardesFin)) * PAGES_PAR_GARDE;
+}
+
+// Le même total, en FEUILLES — ce que l'auteur règle.
+function nombreFeuillesGarde(livre) {
   return nombreGardes(livre && livre.gardesDebut) + nombreGardes(livre && livre.gardesFin);
 }
 

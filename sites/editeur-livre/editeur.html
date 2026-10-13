@@ -427,24 +427,25 @@
        sans jamais toucher à la zone d'édition ni au curseur. -->
   <div id="mesureSpread" class="texte-livre editeur-spread" style="position:absolute; visibility:hidden; left:-99999px; top:0;"></div>
 
-  <!-- Pages de garde : feuillets blancs et non foliotés, au début et à la fin -->
+  <!-- Gardes : feuilles blanches (2 pages) et non foliotées, au début et à la fin -->
   <div id="modalGardes" class="modal-impression" style="display:none" onclick="fermerPagesDeGarde()">
     <div class="modal-impression-carte ci-carte" role="dialog" aria-modal="true"
-         aria-label="Pages de garde" onclick="event.stopPropagation()">
+         aria-label="Feuilles de garde" onclick="event.stopPropagation()">
       <button class="mi-fermer" onclick="fermerPagesDeGarde()" aria-label="Fermer">&#10005;</button>
-      <h3>Pages de garde</h3>
-      <p class="mi-intro">Des feuillets <b>blancs</b> et <b>sans numéro</b>, comme en ouvrant
-        un livre relié. Ils ne décalent pas votre pagination : votre premier texte reste la
+      <h3>Feuilles de garde</h3>
+      <p class="mi-intro">Des feuilles <b>blanches</b> et <b>sans numéro</b>, comme en ouvrant
+        un livre relié. Chaque feuille compte <b>deux pages</b> (recto et verso), donc votre texte
+        reste du même côté. Elles ne décalent pas votre pagination : votre premier texte reste la
         page&nbsp;1. Mais ce sont de vraies feuilles — elles s'impriment, et elles épaississent
         le dos de la couverture.</p>
 
       <div class="gardes-reglages">
         <label class="gardes-champ">
-          <span>Au début</span>
+          <span>Au début (feuilles)</span>
           <input type="number" id="gardesDebut" min="0" max="20" step="1" value="0">
         </label>
         <label class="gardes-champ">
-          <span>À la fin</span>
+          <span>À la fin (feuilles)</span>
           <input type="number" id="gardesFin" min="0" max="20" step="1" value="0">
         </label>
       </div>
