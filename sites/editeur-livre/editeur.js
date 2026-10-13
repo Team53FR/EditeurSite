@@ -64,6 +64,16 @@ const FORMATS = {
 // page, quelle que soit la taille de la fenêtre, et la pagination ne bouge pas.
 const PX_PAR_MM = 96 / 25.4;
 
+// « Petit écran » : téléphone ou tablette en portrait. Le panneau de gauche y
+// devient un tiroir et le livre se lit page par page (voir style.css). Le seuil est
+// le même que celui de la feuille de style.
+const requeteCompacte = window.matchMedia("(max-width: 900px)");
+function modeCompact() { return requeteCompacte.matches; }
+// En dessous de cette échelle, le texte de deux pages côte à côte devient trop petit
+// pour s'écrire : on passe à une page à la fois. Une tablette en portrait (≈ 0,65)
+// garde les deux pages ; un téléphone (≈ 0,3) n'en montre qu'une.
+const ECHELLE_MIN_DEUX_PAGES = 0.6;
+
 // Hauteur de la bande réservée au numéro de page, en pixels logiques.
 // Variable et non constante : l'export « fichier pour l'imprimeur » la
 // remonte le temps de la génération, pour que le folio respecte le blanc
@@ -178,34 +188,209 @@ function appliquerFormatPage(formatKey) {
   }
 
   // --- Zoom d'affichage pour tenir dans l'espace disponible ---
-  const reduit = document.querySelector(".conteneur-livre")?.classList.contains("sommaire-reduite");
-  const sommaireLarg = reduit ? 8 : 240; // sommaire + gap + marge (0 si replié)
-  const margesH      = 32;
-  const barresH      = 56 + 52 + 10 + 32 + 10; // outils + actions + gaps + message
-  const margeV       = 32;
-
-  const bookLargLogique = 2 * largPx + gapPages;
-  const dispoW = window.innerWidth  - sommaireLarg - margesH;
-  const dispoH = window.innerHeight - barresH - margeV;
-
-  let echelle = Math.min(dispoW / bookLargLogique, dispoH / hautPx);
-  if (!isFinite(echelle) || echelle <= 0) echelle = 1;
-  echelle = Math.min(echelle, 1.6); // ne pas zoomer à l'excès sur grand écran
-  echelleAffichage = echelle;
+  //
+  // L'espace se MESURE (voir espaceDisponibleLivre). Il était calculé avec des
+  // hauteurs et des largeurs écrites en dur — « la barre d'outils fait 56 px » —,
+  // vraies tant que la fenêtre était large : dès que la barre passait sur deux
+  // lignes, le livre se croyait plus petit qu'il n'était et débordait, boutons
+  // « Précédent / Sauvegarder / Suivant » compris.
+  const compact = modeCompact();
+  let echellePrincipale = null;
 
   document.querySelectorAll(".livre-ouvert").forEach(el => {
+    const zone = el.closest(".zone-livre");
+    const vue = zone ? zone.id : "";
+    // Sur un petit écran la couverture et son panneau se SUPERPOSENT : côte à côte,
+    // chacun serait trop étroit pour s'utiliser.
+    const empile = compact && vue === "vueCouverture";
+    const logL = empile ? largPx : 2 * largPx + gapPages;          // taille logique du livre ouvert
+    const logH = empile ? 2 * hautPx + gapPages : hautPx;
+    const dispo = espaceDisponibleLivre(el, zone, compact);
+
+    let echelle;
+    if (compact && vue === "vueEditeur") {
+      // Les deux pages tiennent-elles à une échelle lisible (tablette) ? Sinon on en
+      // montre UNE en largeur — c'est ce qui rend le texte lisible — et l'autre, comme
+      // le bas de celle-ci, se fait défiler (voir .defile-livre).
+      const deux = dispo.w / logL >= ECHELLE_MIN_DEUX_PAGES;
+      echelle = deux ? Math.min(dispo.w / logL, dispo.h / logH) : dispo.w / largPx;
+      document.querySelector(".conteneur-livre").classList.toggle("une-page", !deux);
+    } else if (empile) {
+      echelle = dispo.w / largPx;
+    } else {
+      echelle = Math.min(dispo.w / logL, dispo.h / logH);
+    }
+    if (!isFinite(echelle) || echelle <= 0) echelle = 1;
+    echelle = Math.min(echelle, 1.6); // ne pas zoomer à l'excès sur grand écran
+    if (zone && zone.offsetParent !== null && echellePrincipale === null) echellePrincipale = echelle;
+
+    // Couverture sur petit écran : seul l'APERÇU se réduit. Le panneau de réglages,
+    // lui, garde sa taille réelle et occupe la largeur — réduit au même zoom, ses
+    // champs auraient des lettres de 8 px, inutilisables au doigt.
+    const apercuCouv = document.getElementById("previewCouv");
+    if (empile && apercuCouv) {
+      el.style.transform = "";
+      el.style.margin = "";
+      apercuCouv.style.transformOrigin = "top left";
+      apercuCouv.style.transform = `scale(${echelle})`;
+      apercuCouv.style.margin = `0 ${largPx * (echelle - 1)}px ${hautPx * (echelle - 1)}px 0`;
+      return;
+    }
+    if (vue === "vueCouverture" && apercuCouv) {
+      apercuCouv.style.transform = "";
+      apercuCouv.style.margin = "";
+    }
+
     el.style.transform = `scale(${echelle})`;
     el.style.transformOrigin = "center center";
     // Marges compensatrices : la mise en page réserve la taille RÉELLE (zoomée),
     // pour que le centrage et le défilement restent corrects.
-    const dLarg = (bookLargLogique * (echelle - 1)) / 2;
-    const dHaut = (hautPx * (echelle - 1)) / 2;
+    const dLarg = (logL * (echelle - 1)) / 2;
+    const dHaut = (logH * (echelle - 1)) / 2;
     el.style.margin = `${dHaut}px ${dLarg}px`;
+  });
+  echelleAffichage = echellePrincipale === null ? 1 : echellePrincipale;
+}
+
+// L'espace où le livre peut se poser, en pixels d'écran.
+//  - petit écran : la zone de défilement (.defile-livre), qui occupe tout ce que les
+//    barres laissent ;
+//  - grand écran : la zone de la vue, moins la hauteur RÉELLE de ce qui l'entoure
+//    (barre d'outils sur une ou deux lignes, recherche, boutons, message) ;
+//  - vue cachée : une estimation d'après la fenêtre, le temps qu'elle apparaisse
+//    (ouvrirCouverture rappelle appliquerFormatPage une fois la vue affichée).
+function espaceDisponibleLivre(el, zone, compact) {
+  const defile = el.closest(".defile-livre");
+  if (compact && defile && defile.offsetParent !== null) {
+    return { w: defile.clientWidth - 4, h: defile.clientHeight - 4 };
+  }
+  if (!compact && zone && zone.offsetParent !== null) {
+    const ecart = parseFloat(getComputedStyle(zone).rowGap) || 0;
+    let h = zone.clientHeight;
+    [...zone.children].forEach(c => {
+      if (c.contains(el) || c.offsetParent === null) return;
+      const st = getComputedStyle(c);
+      h -= c.offsetHeight + (parseFloat(st.marginTop) || 0) + (parseFloat(st.marginBottom) || 0) + ecart;
+    });
+    return { w: zone.clientWidth - 8, h: h - 4 };
+  }
+  const replie = document.querySelector(".conteneur-livre")?.classList.contains("sommaire-reduite");
+  const sommaire = compact ? 0 : (replie ? 8 : 276);
+  return { w: window.innerWidth - sommaire - 32, h: window.innerHeight - 180 };
+}
+
+// =====================================================================
+//  Petits écrans : tiroir, barre du haut, page par page
+//
+//  Sous 900 px, le panneau de gauche ne peut plus rester à côté du livre : il
+//  devient un tiroir que la barre du haut ouvre, et le livre prend toute la
+//  largeur. La mise en page est dans style.css (« Petits écrans ») ; ce qui suit
+//  ne fait que la piloter.
+// =====================================================================
+
+function basculerTiroir(ouvrir) {
+  const conteneur = document.querySelector(".conteneur-livre");
+  if (!conteneur) return;
+  const ouvert = ouvrir === undefined ? !conteneur.classList.contains("tiroir-ouvert") : !!ouvrir;
+  conteneur.classList.toggle("tiroir-ouvert", ouvert);
+  const bouton = document.getElementById("boutonTiroir");
+  if (bouton) bouton.setAttribute("aria-expanded", ouvert ? "true" : "false");
+  document.removeEventListener("keydown", surEchapTiroir, true);
+  if (ouvert) document.addEventListener("keydown", surEchapTiroir, true);
+}
+
+function surEchapTiroir(e) {
+  if (e.key !== "Escape") return;
+  e.preventDefault();
+  e.stopPropagation();
+  basculerTiroir(false);
+}
+
+// Le livre est large, l'écran étroit : on fait défiler. Ces boutons amènent la page
+// de gauche ou celle de droite d'un geste, et disent laquelle est à l'écran.
+function defileEdition() {
+  return document.querySelector("#vueEditeur .defile-livre");
+}
+
+function allerACote(cote) {
+  const d = defileEdition();
+  if (!d) return;
+  d.scrollTo({ left: cote === "droite" ? d.scrollWidth : 0, behavior: "smooth" });
+}
+
+function majBasculePages() {
+  const g = document.getElementById("btnPageG");
+  const dr = document.getElementById("btnPageD");
+  if (!g || !dr) return;
+  g.textContent = "Page " + (indexSpread + 1);
+  dr.textContent = "Page " + (indexSpread + 2);
+  const d = defileEdition();
+  const max = d ? d.scrollWidth - d.clientWidth : 0;
+  const droite = !!d && max > 4 && d.scrollLeft > max / 2;
+  g.classList.toggle("actif", !droite);
+  dr.classList.toggle("actif", droite);
+}
+
+// Après un changement de page : on repart du haut de la page de gauche.
+function recalerDefilement() {
+  const d = defileEdition();
+  if (d) { d.scrollLeft = 0; d.scrollTop = 0; }
+  majBasculePages();
+}
+
+function initMobile() {
+  // Chaque livre ouvert reçoit une zone de défilement. Sur grand écran elle est
+  // « display: contents » : elle n'existe pas pour la mise en page.
+  document.querySelectorAll(".livre-ouvert").forEach(el => {
+    if (el.parentNode.classList.contains("defile-livre")) return;
+    const zone = document.createElement("div");
+    zone.className = "defile-livre";
+    el.parentNode.insertBefore(zone, el);
+    zone.appendChild(el);
+  });
+  const defile = defileEdition();
+  if (defile) defile.addEventListener("scroll", majBasculePages, { passive: true });
+
+  // La barre du haut reprend le titre et l'état d'enregistrement du panneau : on les
+  // suit plutôt que de les réécrire aux endroits qui les changent.
+  const suivre = (source, cible, avecClasse) => {
+    const src = document.getElementById(source), dst = document.getElementById(cible);
+    if (!src || !dst) return;
+    const copier = () => {
+      // « Modifications non enregistrées » est trop long pour la barre du haut.
+      dst.textContent = avecClasse && /non enregistr/i.test(src.textContent) ? "● Non enregistré" : src.textContent;
+      if (avecClasse) dst.className = "bm-etat " + src.className.replace("etat-sauvegarde", "").trim();
+    };
+    new MutationObserver(copier).observe(src, { childList: true, characterData: true, subtree: true, attributes: true });
+    copier();
+  };
+  suivre("titreLivre", "titreLivreMobile", false);
+  suivre("etatSauvegarde", "etatMobile", true);
+
+  // Choisir quelque chose dans le tiroir le referme : on vient pour agir, pas pour
+  // garder le menu ouvert devant le livre. (Les boutons qui déplient — Relecture —
+  // n'en font pas partie.)
+  const panneau = document.querySelector(".sommaire");
+  if (panneau) panneau.addEventListener("click", (e) => {
+    if (!modeCompact()) return;
+    if (e.target.closest(".btn-couv, .btn-icone, .btn-chapitre, .bouton-format, .outil, .sommaire-actions button, li .libelle-page, li .num-chapitre")) {
+      setTimeout(() => basculerTiroir(false), 0);
+    }
+  });
+
+  // Passer au grand écran avec le tiroir ouvert : il se referme (il n'a plus de sens).
+  requeteCompacte.addEventListener("change", () => {
+    basculerTiroir(false);
+    if (indexLivre !== -1) appliquerFormatPage(livreActuel().format || "149x210");
+    majBasculePages();
   });
 }
 
+
 // Replier / déplier le panneau de gauche (comme la barre latérale de Claude)
 function basculerSommaire() {
+  // Petit écran : le bouton du panneau le ferme (c'est un tiroir), il ne le replie pas.
+  if (modeCompact()) { basculerTiroir(false); return; }
   sommaireReduite = !sommaireReduite;
   appliquerReductionSommaire();
   try { localStorage.setItem("sommaire_reduite", sommaireReduite ? "1" : "0"); } catch (e) {}
@@ -2724,6 +2909,7 @@ function afficherSpread() {
   if (nD) nD.textContent = indexSpread + 2;
   majBoutonsNavigation();
   majGardesEdition();
+  majBasculePages();
 }
 
 // Montre les gardes sur le côté du livre : celles du début à gauche de
@@ -3057,6 +3243,7 @@ function allerAPage(i) {
   indexSpread = i - (i % 2);
   afficherSpread();
   afficherSommaire();
+  recalerDefilement();
 }
 
 function pagePrecedente() {
@@ -3065,6 +3252,7 @@ function pagePrecedente() {
     indexSpread -= 2;
     afficherSpread();
     afficherSommaire();
+    recalerDefilement();
   }
 }
 
@@ -3077,6 +3265,7 @@ function pageSuivante() {
     indexSpread += 2;
     afficherSpread();
     afficherSommaire();
+    recalerDefilement();
   }
 }
 
@@ -4409,5 +4598,6 @@ function majEtatBarreOutils() {
   }
 }
 
+initMobile();
 chargerLivre();
 initGlissementImageCouverture();

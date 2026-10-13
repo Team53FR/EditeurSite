@@ -2763,3 +2763,198 @@ button.danger {
 
 /* Les lignes de réglages mettent le menu à la hauteur des champs voisins. */
 .tr-champ .sel-boite, .dc-ligne .sel-boite { width: 100%; }
+
+/* =====================================================================
+   Petits écrans (téléphone, tablette en portrait) — sous 900 px
+   =====================================================================
+   Le panneau de gauche ne peut plus rester à côté du livre : il devient un
+   TIROIR, ouvert par la barre du haut. Le livre prend toute la largeur : UNE page
+   tient à l'écran, l'autre se fait défiler (boutons « Page 1 / Page 2 »). La barre
+   d'outils reste sur une seule ligne, qui défile, au lieu de manger la moitié de
+   l'écran en s'empilant. Le seuil est répété dans editeur.js (requeteCompacte).
+
+   En dehors de ce seuil, rien de tout cela n'existe : la barre, le fond du
+   tiroir et les boutons de page sont masqués, et la zone de défilement est
+   « display: contents » — absente de la mise en page. */
+.barre-mobile, .tiroir-fond, .bascule-pages { display: none; }
+.defile-livre { display: contents; }
+
+@media (max-width: 900px) {
+  body {
+    display: block;
+    height: 100vh;
+    height: 100dvh;            /* la barre d'adresse mobile ne mange pas le bas de la page */
+  }
+
+  .conteneur-livre {
+    flex-direction: column;
+    gap: 0;
+    height: 100vh;
+    height: 100dvh;
+    max-height: none;
+    padding: 0;
+  }
+
+  /* --- La barre du haut --- */
+  .barre-mobile {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+    padding: 8px 12px;
+    padding-right: 58px;       /* la place du bouton « accueil », flottant en haut à droite */
+    background: var(--s-paper);
+    border-bottom: 1px solid var(--s-line);
+  }
+  .bm-menu {
+    flex-shrink: 0;
+    width: 42px; height: 42px;
+    margin: 0; padding: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--s-cream);
+    border: 1px solid var(--s-line);
+    border-radius: 10px;
+    color: var(--s-ink);
+  }
+  .bm-titre {
+    flex: 1; min-width: 0;
+    font-family: var(--s-serif);
+    font-size: 18px; font-weight: 600;
+    color: var(--s-ink);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .bm-etat { flex-shrink: 0; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .bm-etat.enregistre { color: #2e7d32; }
+  .bm-etat.non-enregistre { color: #c77700; }
+
+  /* Le bouton « accueil » du portail se met dans le coin de la barre du haut : en bas
+     à gauche il recouvrait « Précédent ». */
+  .bouton-retour-portail {
+    top: 9px !important; right: 10px !important;
+    left: auto !important; bottom: auto !important;
+    width: 40px !important; height: 40px !important;
+  }
+
+  /* Une fenêtre ouverte (réglages, notes) passe devant : le bouton « accueil » ne doit pas
+     recouvrir sa croix de fermeture, dans le même coin. */
+  body:has(.modal-impression:not([style*="none"])) .bouton-retour-portail,
+  body:has(.notes-fond) .bouton-retour-portail { display: none !important; }
+
+  /* --- Le tiroir --- */
+  .bouton-ouvrir-sommaire { display: none !important; }
+  .tiroir-fond {
+    display: block;
+    position: fixed; inset: 0; z-index: 80;
+    background: rgba(43, 34, 24, .42);
+    opacity: 0; pointer-events: none;
+    transition: opacity .2s ease;
+  }
+  .conteneur-livre.tiroir-ouvert .tiroir-fond { opacity: 1; pointer-events: auto; }
+
+  /* « !important » : le panneau se masque en ligne (aperçu) et par .sommaire-reduite
+     sur grand écran ; ici il ne se masque jamais, il glisse hors de l'écran. */
+  .sommaire,
+  .conteneur-livre.sommaire-reduite .sommaire {
+    display: flex !important;
+    position: fixed;
+    top: 0; bottom: 0; left: 0; z-index: 90;
+    height: 100vh; height: 100dvh;
+    width: min(88vw, 340px);
+    box-sizing: border-box;
+    border-radius: 0 16px 16px 0;
+    padding: 16px 14px;
+    transform: translateX(-105%);
+    visibility: hidden;
+    transition: transform .22s ease, visibility 0s linear .22s;
+  }
+  .conteneur-livre.tiroir-ouvert .sommaire {
+    transform: none;
+    visibility: visible;
+    transition: transform .22s ease, visibility 0s;
+  }
+  .sommaire .bouton-toggle-sommaire { width: 38px; height: 38px; }
+
+  /* --- La zone du livre --- */
+  .zone-livre {
+    align-items: stretch;
+    gap: 8px;
+    padding: 8px;
+    box-sizing: border-box;
+    min-height: 0;
+    width: 100%;
+  }
+  .defile-livre {
+    display: flex;                 /* le livre se centre quand il tient en entier (tablette, aperçu) */
+    align-items: center;
+    justify-content: center;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 10px;
+  }
+  /* Largeur du CONTENU : sans cela le livre prend celle de la zone (moins les marges
+     négatives du zoom), et le zoom, centré sur cette boîte, décale les pages. */
+  .defile-livre > .livre-ouvert { width: max-content; flex: none; }
+  /* …mais jamais quand il déborde : centré, son début serait hors d'atteinte du défilement. */
+  .conteneur-livre.une-page #vueEditeur .defile-livre,
+  #vueCouverture .defile-livre { align-items: flex-start; justify-content: flex-start; }
+  #vueCouverture .defile-livre > .livre-ouvert { flex-direction: column; width: 100%; flex: 1 1 100%; }
+  /* Le panneau de réglages de la couverture : pleine largeur, taille réelle. Ses
+     dimensions en ligne (celles d'une page) sont celles d'un grand écran. */
+  .paneau-edition-couv {
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* --- La barre d'outils : une ligne, qui défile --- */
+  .barre-outils {
+    flex-wrap: nowrap;
+    flex-shrink: 0;
+    overflow-x: auto;
+    padding: 6px 8px;
+    gap: 6px;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .barre-outils::-webkit-scrollbar { display: none; }
+  .barre-outils > * { flex-shrink: 0; }
+  .barre-outils button { width: 40px; height: 40px; }
+  .barre-outils select,
+  .barre-outils .input-taille { height: 40px; box-sizing: border-box; font-size: 14px; }
+  .barre-outils .input-taille { width: 58px; }
+  .panneau-recherche { flex-wrap: wrap; flex-shrink: 0; }
+  .panneau-recherche input { min-width: 0; flex: 1 1 120px; }
+
+  /* --- Page de gauche / page de droite --- */
+  .bascule-pages { display: none; }
+  .conteneur-livre.une-page .bascule-pages {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  .bascule-pages button {
+    flex: 0 1 120px;
+    margin: 0; padding: 8px 12px;
+    background: var(--s-cream);
+    border: 1px solid var(--s-line);
+    border-radius: 999px;
+    color: var(--s-ink-soft);
+    font-size: 13px; font-weight: 600;
+  }
+  .bascule-pages button.actif {
+    background: var(--s-accent);
+    border-color: var(--s-accent);
+    color: #fff;
+  }
+
+  /* --- Les actions du bas : à portée de pouce --- */
+  .barre-actions {
+    flex-shrink: 0;
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+  .barre-actions button { min-height: 46px; padding: 10px 8px; }
+  .zone-livre > .message { margin: 0; min-height: 0; flex-shrink: 0; text-align: center; }
+}

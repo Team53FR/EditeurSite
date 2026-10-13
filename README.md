@@ -818,6 +818,36 @@ n'aurait dû, ce qui gonfle à son tour le dos et le palier de marge de reliure.
 Rien n'était rogné, mais rien ne tombait juste. `mesure-pro` a été retiré :
 l'accord se fait maintenant à la source.
 
+**L'éditeur sur petit écran** (sous 900 px : `requeteCompacte` dans editeur.js, bloc
+« Petits écrans » de style.css — le seuil est écrit aux deux endroits). Deux défauts
+de fond, un seul remède :
+
+- `editeur.html` n'avait **pas de balise `viewport`** : un téléphone composait la page
+  à 980 px puis la réduisait, d'où un panneau et un livre minuscules côte à côte ;
+- le zoom du livre se calculait avec des tailles **écrites en dur** (« la barre d'outils
+  fait 56 px »). Dès qu'elle passait sur deux lignes, le livre se croyait plus petit
+  qu'il n'était et débordait : boutons du bas coupés. `espaceDisponibleLivre()`
+  **mesure** maintenant la zone et ce qui l'entoure.
+
+Sur petit écran : le panneau de gauche devient un **tiroir** (☰ dans une barre du
+haut qui reprend le titre et l'état d'enregistrement ; il se referme au choix d'un
+chapitre ou d'un bouton, par Échap ou en touchant le fond), la barre d'outils tient
+sur **une ligne qui défile**, et le livre se lit **page par page** : une page tient
+en largeur, l'autre se fait défiler, avec deux boutons « Page 1 / Page 2 » pour y
+aller d'un geste. Si les deux pages tiennent à une échelle lisible (≥ 0,6 :
+`ECHELLE_MIN_DEUX_PAGES`, soit une tablette en portrait) on garde la double-page. La
+couverture et son panneau de réglages se **superposent** ; seul l'aperçu est réduit,
+le panneau garde sa taille réelle (réduit, ses champs auraient des lettres de 8 px).
+
+Choses à savoir : chaque `.livre-ouvert` reçoit à l'initialisation une zone de
+défilement `.defile-livre`, en `display: contents` sur grand écran — absente de la
+mise en page, donc sans risque pour le bureau. Le tiroir se masque par `transform`
+et `visibility`, jamais par `display` (l'aperçu et `.sommaire-reduite` masquent le
+panneau en ligne : `!important` l'emporte). Le bouton « accueil » du portail passe en
+haut à droite et se cache derrière une fenêtre ouverte, dans le même coin que sa
+croix. L'aperçu (feuilletage) reste à deux pages ajustées à la largeur : sur un
+téléphone c'est une vignette, à lire en pinçant.
+
 **L'aperçu feuillette comme un livre** : à l'ouverture de la couverture, l'**intérieur
 de la couverture** est à gauche et la **page 1 à droite** ; les pages se regardent
 ensuite par paires (2-3), (4-5)… — jamais (1-2), qui n'existe pas sur un livre
