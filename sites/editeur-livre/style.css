@@ -3025,16 +3025,81 @@ button.danger {
   .bloc-outils { margin-bottom: 6px; }
 }
 
-/* La liste des outils de relecture, quand elle est dépliée, se détache de la liste des
-   chapitres : un filet en dessous et de l'air, sinon les deux se confondent. */
-.bloc-outils.ouvert {
-  padding-bottom: 10px;
-  margin-bottom: 12px;
-  border-bottom: 1px solid var(--s-line);
+/* =====================================================================
+   Les outils de relecture : une fenêtre flottante
+   =====================================================================
+   Dépliée dans le panneau, la liste repoussait les chapitres hors de l'écran. Elle
+   flotte maintenant (position: fixed, placée par placerListeOutils) : rien ne se
+   déplace, et l'on referme d'un clic à côté. */
+.liste-outils {
+  position: fixed;
+  z-index: 100;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 8px;
+  gap: 2px;
+  overflow-y: auto;
+  background: var(--s-paper);
+  border: 1px solid var(--s-line);
+  border-left: 1px solid var(--s-line);
+  border-radius: 14px;
+  box-shadow: 0 18px 44px rgba(43, 34, 24, .22), 0 2px 6px rgba(43, 34, 24, .08);
 }
-.bloc-outils.ouvert .liste-outils {
-  background: rgba(138, 75, 56, .04);
-  border-radius: 0 8px 8px 0;
-  padding-top: 4px;
-  padding-bottom: 4px;
+.outils-groupe {
+  padding: 8px 8px 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--s-ink-soft);
 }
+.outils-groupe:first-child { padding-top: 4px; }
+.liste-outils .outil {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 8px;
+  border-radius: 10px;
+}
+.outil-icone {
+  flex-shrink: 0;
+  width: 32px; height: 32px;
+  display: grid; place-items: center;
+  border-radius: 9px;
+  background: var(--s-cream);
+  border: 1px solid var(--s-line);
+  font-size: 15px;
+  line-height: 1;
+  color: var(--s-accent-deep);
+}
+.liste-outils .outil:hover .outil-icone,
+.liste-outils .outil:focus-visible .outil-icone { background: #fff; border-color: var(--s-accent); }
+.outil-texte { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.liste-outils .outil strong { font-size: 13px; }
+.liste-outils .outil small { font-size: 11.5px; line-height: 1.4; }
+
+/* Le bouton garde son accent tant que la fenêtre est ouverte ; le chevron pointe vers
+   elle — à droite sur grand écran, vers le haut quand elle s'ouvre dessous. */
+.btn-outils.ouvert { border-color: var(--s-accent); background: #fff; }
+.btn-outils.ouvert .chevron-outils { transform: rotate(-90deg); }
+@media (max-width: 900px) {
+  .btn-outils.ouvert .chevron-outils { transform: rotate(180deg); }
+}
+
+/* Les passages en italique : le passage lui-même, en italique et en accent, dans son contexte. */
+.italique-filtre {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0 0 8px;
+  padding: 9px 12px;
+  border: 1px solid var(--s-line);
+  border-radius: 9px;
+  background: var(--s-cream);
+  color: var(--s-ink);
+  font: inherit;
+  font-size: 13.5px;
+}
+.italique-filtre:focus { outline: none; border-color: var(--s-accent); box-shadow: 0 0 0 3px rgba(138, 75, 56, .14); }
+.esp-italique { font-style: italic; font-weight: 600; color: var(--s-accent-deep); }
+.esp-ligne[hidden] { display: none; }
+.italique-vide { text-align: center; color: var(--s-ink-soft); }

@@ -932,8 +932,33 @@ des pages (`coupesRestantes`, indépendant de la mise en page) et liste ce qui s
 balises posées (`compterProtections`). Le livre est marqué modifié : les balises sont
 enregistrées avec le texte.
 
-**Le bloc « Relecture » déplié** se détache de la liste des chapitres : filet dessous,
-fond teinté, de l'air (classe `.ouvert` posée sur `.bloc-outils`).
+**Le menu « Relecture » est une fenêtre flottante** (`placerListeOutils`), plus une liste
+qui se déplie dans le panneau : dépliée sur place, elle repoussait les chapitres hors
+de l'écran, et un filet ou un fond teinté n'y changeait rien — c'était un problème de
+place, pas d'habillage. En `position: fixed`, elle ne déplace rien (vérifié : la
+liste des chapitres reste au pixel près) et n'est pas rognée par le défilement du
+panneau. Grand écran : à droite du panneau, à hauteur du bouton. Petit écran : sous le
+bouton, dans le tiroir, et elle défile si elle est trop haute plutôt que de remonter
+recouvrir le bouton qui l'a ouverte. Elle se referme d'un clic à côté, d'Échap, d'un
+défilement du panneau ; un redimensionnement la **replace** (la fermer ferait
+disparaître le menu sous le doigt quand la barre d'adresse mobile se replie). Les
+outils sont rangés en deux groupes — « Écrire » et « Vérifier le texte » — chacun avec
+une icône, un titre et une explication. Piège : le tiroir mobile glisse pendant 0,2 s ;
+ouvert aussitôt, le bouton n'est pas encore à sa place, d'où un second placement à
+260 ms.
+
+**L'outil « Passages en italique »** (`ouvrirPassagesItalique`). Relève chaque passage
+en italique des **paragraphes** — les titres et sous-titres sont exclus : ils sont en
+italique (ou en gras) par leur mise en page, pas par une emphase de l'auteur. Un
+nœud de texte est en italique si la balise la plus proche qui parle d'italique est
+`<i>`, `<em>` ou `font-style: italic` (un `<span style="font-style:normal">` à
+l'intérieur d'un `<i>` n'en est donc pas) et qu'aucun ancêtre n'est un `<h1>`–`<h6>`.
+Les morceaux qui se touchent, ou que seul du blanc sépare, ne font qu'un passage ; un
+passage coupé par du gras reste d'un seul tenant. Le relevé est en offsets sur le
+texte des pages, comme l'outil des espaces : `surlignerPosition` y sait aller, page de
+gauche comme page de droite (vérifié : la sélection est exactement le passage). La
+fenêtre donne le numéro de page, le passage en italique dans son contexte, le
+décompte (passages et mots) et un **filtre** sans accents ni majuscules.
 
 Points à connaître :
 

@@ -281,6 +281,166 @@ function espaceDisponibleLivre(el, zone, compact) {
 }
 
 // =====================================================================
+//  Outil de relecture : les passages en italique
+//
+//  Les pensées, les mots étrangers, les titres d'œuvres : l'italique est ce qu'on
+//  veut revoir d'un coup d'œil, et il se perd dans trois cents pages. L'outil les
+//  relève dans les PARAGRAPHES seulement : un titre ou un sous-titre est en italique
+//  (ou en gras) par sa mise en page, pas parce que l'auteur y a mis de l'emphase.
+//
+//  Le relevé se fait sur les pages, en offsets de leur texte — comme les espaces
+//  manquantes : surlignerPosition y sait aller, et la liste et le saut désignent
+//  le même endroit.
+// =====================================================================
+
+const TITRES_TEXTE = /^H[1-6]$/;
+
+// Ce nœud de texte est-il en italique, et en dehors d'un titre ? La balise la plus
+// proche qui parle d'italique décide : « <i style="font-style:normal"> » n'en est pas.
+function enItaliqueDansParagraphe(noeud, racine) {
+  let el = noeud.parentElement, italique = null;
+  while (el && el !== racine) {
+    if (TITRES_TEXTE.test(el.tagName)) return false;
+    if (italique === null) {
+      const style = el.style && el.style.fontStyle;
+      if (style === "normal") italique = false;
+      else if (style === "italic" || style === "oblique" || el.tagName === "I" || el.tagName === "EM") italique = true;
+    }
+    el = el.parentElement;
+  }
+  return italique === true;
+}
+
+// Les passages en italique d'un fragment, en offsets sur son texte entier. Les
+// morceaux qui se touchent (« <i>un</i> <i>deux</i> », ou une mise en forme qui
+// coupe un passage en deux) n'en font qu'un : on ne les sépare que par du blanc.
+function passagesItaliqueDansFragment(conteneur) {
+  const marche = document.createTreeWalker(conteneur, NodeFilter.SHOW_TEXT);
+  const morceaux = [];
+  let total = 0, n;
+  while ((n = marche.nextNode())) {
+    const longueur = n.data.length;
+    if (longueur && enItaliqueDansParagraphe(n, conteneur)) morceaux.push({ debut: total, fin: total + longueur });
+    total += longueur;
+  }
+  const texte = conteneur.textContent || "";
+  const passages = [];
+  morceaux.forEach((m) => {
+    const dernier = passages[passages.length - 1];
+    if (dernier && !texte.slice(dernier.fin, m.debut).trim()) dernier.fin = m.fin;
+    else passages.push({ debut: m.debut, fin: m.fin });
+  });
+  return passages
+    .map((p) => ({ debut: p.debut, fin: p.fin, texte: texte.slice(p.debut, p.fin) }))
+    .filter((p) => p.texte.trim());
+}
+
+function fermerDialogueItalique() {
+  const d = document.getElementById("dialogueItalique");
+  if (d) d.remove();
+}
+
+function ouvrirPassagesItalique() {
+  if (modeApercu || modeCouverture) return;
+  flushSpread();
+  assurerPagesAJour();
+
+  const trouvailles = [];
+  livreActuel().pages.forEach((p, iPage) => {
+    const boite = document.createElement("div");
+    boite.innerHTML = p.contenu || "";
+    // Un test de chaîne évite d'analyser les pages sans italique, la majorité.
+    if (!/<(i|em)\b|italic|oblique/i.test(p.contenu || "")) return;
+    const texte = boite.textContent || "";
+    passagesItaliqueDansFragment(boite).forEach((q) => {
+      trouvailles.push({
+        page: iPage, offset: q.debut, longueur: q.fin - q.debut, texte: q.texte.trim(),
+        avant: texte.slice(Math.max(0, q.debut - 32), q.debut).replace(/^\S*\s/, ""),
+        apres: texte.slice(q.fin, q.fin + 32).replace(/\s\S*$/, ""),
+        coupeAvant: q.debut - 32 > 0, coupeApres: q.fin + 32 < texte.length
+      });
+    });
+  });
+  ouvrirDialogueItalique(trouvailles);
+}
+
+// « Éléphant » et « elephant » se trouvent l'un l'autre : on cherche sans accents ni
+// majuscules, comme on tape.
+function sansAccents(t) {
+  return (t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
+function ouvrirDialogueItalique(trouvailles) {
+  fermerDialogueItalique();
+  const n = trouvailles.length;
+  const mots = trouvailles.reduce((somme, t) => somme + t.texte.split(/\s+/).length, 0);
+
+  let html = '<div class="modal-impression-carte ci-carte" role="dialog" aria-modal="true" aria-label="Passages en italique">' +
+    '<button class="mi-fermer" aria-label="Fermer">&#10005;</button>' +
+    "<h3>Passages en italique</h3>";
+
+  if (!n) {
+    html += '<p class="mi-intro">Aucun passage en italique dans les paragraphes. ' +
+      "(Les titres et sous-titres ne sont pas comptés.)</p>" +
+      '<div class="ci-actions"><button class="ci-generer">Fermer</button></div></div>';
+  } else {
+    html += '<p class="mi-intro"><b id="italiqueCompte">' + n + " passage" + (n > 1 ? "s" : "") + "</b> en italique, " +
+      mots + " mot" + (mots > 1 ? "s" : "") + " au total, dans les paragraphes (titres et sous-titres exclus). " +
+      "Cliquez sur une ligne pour aller au passage.</p>" +
+      '<input type="search" id="italiqueFiltre" class="italique-filtre" placeholder="Filtrer les passages…" aria-label="Filtrer les passages" autocomplete="off">' +
+      '<div class="renom-liste esp-liste" id="italiqueListe">';
+    trouvailles.forEach((t, i) => {
+      const court = t.texte.length > 150 ? t.texte.slice(0, 150).replace(/\s\S*$/, "") + "…" : t.texte;
+      html += '<button type="button" class="esp-ligne" data-i="' + i + '" title="Aller à ce passage">' +
+        '<span class="renom-page">p.' + (t.page + 1) + "</span>" +
+        '<span class="esp-extrait">' +
+          '<span class="esp-avant">' + (t.coupeAvant ? "…" : "") + echapperTitre(t.avant) + "</span>" +
+          '<em class="esp-italique">' + echapperTitre(court) + "</em>" +
+          '<span class="esp-apres">' + echapperTitre(t.apres) + (t.coupeApres ? "…" : "") + "</span>" +
+        "</span></button>";
+    });
+    html += '</div><p class="mi-intro italique-vide" id="italiqueVide" hidden>Aucun passage ne contient cela.</p>' +
+      '<div class="ci-actions"><button class="ci-generer">Fermer</button></div></div>';
+  }
+
+  const fond = document.createElement("div");
+  fond.id = "dialogueItalique";
+  fond.className = "modal-impression";
+  fond.innerHTML = html;
+  fond.addEventListener("click", (e) => { if (e.target === fond) fermerDialogueItalique(); });
+  document.body.appendChild(fond);
+
+  fond.querySelector(".mi-fermer").onclick = fermerDialogueItalique;
+  fond.querySelector(".ci-generer").onclick = fermerDialogueItalique;
+
+  fond.querySelectorAll(".esp-ligne").forEach((b) => {
+    b.onclick = () => {
+      const t = trouvailles[Number(b.dataset.i)];
+      fermerDialogueItalique();
+      surlignerPosition(t.page, t.offset, t.longueur, true);
+    };
+  });
+
+  const filtre = fond.querySelector("#italiqueFiltre");
+  if (filtre) {
+    const lignes = [...fond.querySelectorAll(".esp-ligne")];
+    const textes = trouvailles.map((t) => sansAccents(t.texte));
+    filtre.addEventListener("input", () => {
+      const q = sansAccents(filtre.value.trim());
+      let visibles = 0;
+      lignes.forEach((l, i) => {
+        const montre = !q || textes[i].includes(q);
+        l.hidden = !montre;
+        if (montre) visibles++;
+      });
+      fond.querySelector("#italiqueCompte").textContent = (q ? visibles + " sur " + n : n) + " passage" + ((q ? visibles : n) > 1 ? "s" : "");
+      fond.querySelector("#italiqueVide").hidden = visibles > 0;
+    });
+    filtre.focus();
+  }
+}
+
+// =====================================================================
 //  Outil de relecture : les coupes de page
 //
 //  La protection se pose d'elle-même à chaque recomposition (eviterMotsCoupes).
@@ -2098,9 +2258,81 @@ function appliquerEtatOutilsLivre(ouvert) {
   liste.hidden = !ouvert;
   bouton.setAttribute("aria-expanded", ouvert ? "true" : "false");
   bouton.classList.toggle("ouvert", ouvert);
-  // Le bloc entier le sait aussi : c'est lui qui se sépare de la liste des chapitres.
-  const bloc = bouton.closest(".bloc-outils");
-  if (bloc) bloc.classList.toggle("ouvert", ouvert);
+  if (ouvert) placerListeOutils(); else retirerEcouteursOutils();
+}
+
+// La liste des outils est une FENÊTRE FLOTTANTE (position: fixed), pas un bloc qui se
+// déplie dans le panneau : dépliée sur place, elle repoussait la liste des chapitres
+// hors de l'écran. Fixe, elle ne déplace rien — et ne se laisse pas rogner par le
+// défilement du panneau.
+//   - grand écran : à droite du panneau, à hauteur du bouton ;
+//   - petit écran : sous le bouton, dans le tiroir.
+// Elle se referme d'un clic à côté, d'Échap, d'un défilement ou d'un redimensionnement.
+function placerListeOutils() {
+  const bouton = document.getElementById("btnOutilsLivre");
+  const liste = document.getElementById("listeOutilsLivre");
+  if (!bouton || !liste) return;
+  const marge = 10;
+  const rb = bouton.getBoundingClientRect();
+
+  liste.style.maxHeight = "";
+  if (modeCompact()) {
+    const largeur = Math.min(window.innerWidth - rb.left - marge, Math.max(rb.width, 290));
+    liste.style.left = rb.left + "px";
+    liste.style.width = largeur + "px";
+    liste.style.top = (rb.bottom + 6) + "px";
+  } else {
+    const panneau = document.querySelector(".sommaire").getBoundingClientRect();
+    liste.style.left = (panneau.right + 10) + "px";
+    liste.style.width = "330px";
+    liste.style.top = rb.top + "px";
+  }
+  // Tenir dans la fenêtre. Sous le bouton (petit écran), on garde cette place et la liste
+  // défile si elle est trop haute : la faire remonter la ferait recouvrir le bouton
+  // même qui l'a ouverte. Faute de place (240 px au moins), ou à droite du panneau, on
+  // la remonte jusqu'à ce qu'elle tienne.
+  const h = liste.offsetHeight, bas = window.innerHeight - marge;
+  let top = parseFloat(liste.style.top);
+  const place = bas - top;
+  if (modeCompact() && place >= 240) {
+    liste.style.maxHeight = place + "px";
+  } else {
+    if (top + h > bas) top = Math.max(marge, bas - h);
+    liste.style.top = top + "px";
+    liste.style.maxHeight = (window.innerHeight - 2 * marge) + "px";
+  }
+
+  // Le tiroir glisse pendant 0,2 s : ouvert aussitôt, le bouton n'est pas encore à sa place.
+  // On replace une fois le glissement fini.
+  if (modeCompact()) setTimeout(replacerListeOutils, 260);
+  // addEventListener ignore un écouteur déjà posé : replacer peut rappeler sans empiler.
+  document.addEventListener("mousedown", fermerOutilsSiDehors, true);
+  window.addEventListener("resize", replacerListeOutils);
+  const panneau = document.querySelector(".sommaire");
+  if (panneau) panneau.addEventListener("scroll", fermerOutilsSurDefilement, { passive: true });
+}
+
+function retirerEcouteursOutils() {
+  document.removeEventListener("mousedown", fermerOutilsSiDehors, true);
+  window.removeEventListener("resize", replacerListeOutils);
+  const panneau = document.querySelector(".sommaire");
+  if (panneau) panneau.removeEventListener("scroll", fermerOutilsSurDefilement);
+}
+
+function fermerOutilsSiDehors(e) {
+  const bouton = document.getElementById("btnOutilsLivre");
+  const liste = document.getElementById("listeOutilsLivre");
+  if (liste.contains(e.target) || bouton.contains(e.target)) return;
+  appliquerEtatOutilsLivre(false);
+}
+
+function fermerOutilsSurDefilement() { appliquerEtatOutilsLivre(false); }
+
+// Un redimensionnement (barre d'adresse mobile qui se replie, rotation…) la REPLACE : la
+// fermer ferait disparaître le menu sous le doigt.
+function replacerListeOutils() {
+  const liste = document.getElementById("listeOutilsLivre");
+  if (liste && !liste.hidden) placerListeOutils();
 }
 
 function basculerOutilsLivre() {
