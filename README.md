@@ -919,6 +919,27 @@ Mesuré dans Chrome 152 : un « » » en fin de texte reste seul sur sa ligne po
 15 % des largeurs de colonne avec une espace ordinaire, jamais avec une espace
 insécable. Le texte, lui, n'est jamais modifié.
 
+**Le cas de « là. » ».** Un guillemet fermant suit très souvent un point, et la première
+version cherchait, avant l'espace, un MOT (des lettres seules) : « là. » n'en était pas
+un, et le guillemet restait seul en tête de page — c'est la coupe que l'outil signalait
+encore. Le groupe est maintenant « tout ce qui précède l'espace, jusqu'à l'espace
+d'avant » (point compris), et symétriquement « le mot entier, apostrophe comprise »
+après un guillemet ouvrant. Reproduit dans l'ancien code (6 cas sur 6 subsistaient), 0
+dans le nouveau.
+
+**Option « Rendre les espaces insécables »** (fenêtre de l'outil, proposée quand une
+coupe de ce genre subsiste). Remplace, dans tout le livre, l'espace ordinaire devant
+« » » et après « « » par une espace insécable — la règle typographique française, et
+la seule solution qui ne dépend pas de la mise en page. C'est un VRAI changement du
+texte (un caractère invisible, stocké `&nbsp;`), donc une option qu'on choisit, jamais
+quelque chose que la recomposition fait d'elle-même. `rendreInsecablesLesGuillemets`
+travaille nœud de texte par nœud de texte, sans toucher au balisage, et traite aussi
+une espace séparée de son guillemet par une mise en forme (« mot<i> »</i> »,
+« « <i>mot</i> »). Idempotente. Les `? ! : ;` n'en ont pas besoin : ils ne se détachent
+jamais du mot qui les précède. Piège à éviter dans un test : `flushSpread()` réécrit la
+double-page affichée dans le modèle ; si le livre a été changé sans réafficher
+l'éditeur, il écrase le nouveau texte par l'ancien.
+
 Les ruptures `<br>` comptent pour une coupure dans ce repérage : ce livre sépare ses
 paragraphes par « <br><br> » à l'intérieur d'un même `<p>`, et sans cela la dernière
 lettre d'un paragraphe et la première du suivant auraient semblé former un mot.

@@ -23,6 +23,7 @@ envelopperAttenteLourde({
   changerFormat: ["Changement de format…", "Tout le texte est recomposé aux nouvelles dimensions."],
   appliquerInterligne: ["Nouvel interligne…", "Tout le texte est recomposé."],
   ouvrirApercu: ["Préparation de l'aperçu…", "Les pages sont recalculées au découpage exact."],
+  appliquerInsecables: ["Espaces insécables…", "Tout le livre est recomposé, puis les pages sont relues."],
   ouvrirCorrectionCoupes: ["Correction des coupes de page…", "Tout le livre est recomposé, puis les pages sont relues."],
   fermerApercu: ["Retour à l'édition…"],
 });
@@ -466,7 +467,62 @@ function ouvrirCorrectionCoupes() {
   ouvrirDialogueCoupes(compterProtections(), coupesRestantes());
 }
 
-function ouvrirDialogueCoupes(protections, restantes) {
+// Remplace, dans tout le livre, l'espace ordinaire par une espace INSÉCABLE devant « » »
+// et après « « » : la règle typographique française. Une espace insécable ne se coupe
+// jamais, quelle que soit la mise en page : plus de guillemet seul, définitivement.
+//
+// C'est un vrai changement du texte (un caractère invisible), donc une option que l'on
+// choisit, pas quelque chose que la recomposition fait d'elle-même. On travaille nœud de
+// texte par nœud de texte, sans toucher au balisage ; une espace et son guillemet
+// séparés par une mise en forme (« mot<i> »</i> ») sont traités aussi, d'un nœud à l'autre.
+function rendreInsecablesLesGuillemets(html) {
+  const boite = document.createElement("div");
+  boite.innerHTML = html || "";
+  const noeuds = [];
+  const marche = document.createTreeWalker(boite, NodeFilter.SHOW_TEXT);
+  let n; while ((n = marche.nextNode())) noeuds.push(n);
+
+  let compte = 0;
+  const NBSP = "\u00a0";
+  noeuds.forEach((noeud) => {
+    // Dans un même nœud.
+    const apres = noeud.data
+      .replace(/(\S) +»/g, (m, c) => { compte++; return c + NBSP + "»"; })
+      .replace(/« +(?=\S)/g, () => { compte++; return "«" + NBSP; });
+    if (apres !== noeud.data) noeud.data = apres;
+  });
+  // D'un nœud au suivant.
+  for (let i = 0; i + 1 < noeuds.length; i++) {
+    const a = noeuds[i], b = noeuds[i + 1];
+    if (/\S +$/.test(a.data) && /^»/.test(b.data)) { a.data = a.data.replace(/ +$/, NBSP); compte++; }
+    else if (/\S$/.test(a.data) && /^ +»/.test(b.data)) { b.data = b.data.replace(/^ +/, NBSP); compte++; }   // « mot|␣» »
+    else if (/«$/.test(a.data) && /^ +\S/.test(b.data)) { b.data = b.data.replace(/^ +/, NBSP); compte++; }   // « «|␣mot »
+    else if (/« +$/.test(a.data) && /^\S/.test(b.data)) { a.data = a.data.replace(/ +$/, NBSP); compte++; }   // « «␣|mot »
+  }
+  return { html: boite.innerHTML, compte };
+}
+
+function insecablesDansLeLivre() {
+  flushSpread();
+  const livre = livreActuel();
+  let total = 0;
+  livre.spreads = spreadsLivre().map((h) => {
+    const r = rendreInsecablesLesGuillemets(h);
+    total += r.compte;
+    return r.compte ? r.html : h;
+  });
+  if (total) {
+    pagesObsoletes = true;
+    marquerModifie();
+    planifierBrouillon();
+    repaginerTout();
+    afficherSommaire();
+    majCompteurMots();
+  }
+  return total;
+}
+
+function ouvrirDialogueCoupes(protections, restantes, insecables) {
   fermerDialogueCoupes();
   const total = protections.mots + protections.signes;
   const pluriel = (n, un, plusieurs) => n + " " + (n > 1 ? plusieurs : un);
@@ -474,6 +530,14 @@ function ouvrirDialogueCoupes(protections, restantes) {
   let html = '<div class="modal-impression-carte ci-carte" role="dialog" aria-modal="true">' +
     '<button class="mi-fermer" aria-label="Fermer">&#10005;</button>' +
     "<h3>Coupes de page</h3>";
+
+  if (insecables !== null && insecables !== undefined) {
+    html += '<p class="mi-intro"><b>' + (insecables
+      ? pluriel(insecables, "espace rendue insécable", "espaces rendues insécables")
+      : "Aucune espace à modifier") +
+      "</b> devant « » » et après « « ». Le livre a été recomposé&nbsp;: ces guillemets restent " +
+      "désormais collés à leur mot, quelle que soit la mise en page.</p>";
+  }
 
   if (total) {
     const morceaux = [];
@@ -501,7 +565,22 @@ function ouvrirDialogueCoupes(protections, restantes) {
   } else {
     html += '<p class="mi-intro">Contrôle : les pages ont été relues, il ne reste aucune coupe à corriger.</p>';
   }
-  html += '<div class="ci-actions"><button class="ci-generer">Fermer</button></div></div>';
+
+  // Un guillemet qui subsiste se règle pour de bon par l'espace insécable. On le PROPOSE
+  // (c'est un changement du texte), on ne le fait pas d'office.
+  const propose = restantes.some((r) => /signe/.test(r.cause)) && (insecables === null || insecables === undefined);
+  if (propose) {
+    html += '<p class="mi-intro">Pour les guillemets, il existe un remède définitif : remplacer, dans tout le livre, ' +
+      "l&rsquo;espace ordinaire devant « » » et après « « » par une <b>espace insécable</b> — c&rsquo;est la règle " +
+      "typographique française, et une espace insécable ne se coupe jamais. Le texte ne change que d&rsquo;un caractère " +
+      "invisible.</p>";
+  }
+  html += '<div class="ci-actions">' +
+    (propose
+      ? '<button class="ci-annuler" id="coupesFermer">Fermer</button>' +
+        '<button class="ci-generer" id="coupesInsecables">Rendre les espaces insécables</button>'
+      : '<button class="ci-generer" id="coupesFermer">Fermer</button>') +
+    "</div></div>";
 
   const fond = document.createElement("div");
   fond.id = "dialogueCoupes";
@@ -510,10 +589,18 @@ function ouvrirDialogueCoupes(protections, restantes) {
   fond.addEventListener("click", (e) => { if (e.target === fond) fermerDialogueCoupes(); });
   document.body.appendChild(fond);
   fond.querySelector(".mi-fermer").onclick = fermerDialogueCoupes;
-  fond.querySelector(".ci-generer").onclick = fermerDialogueCoupes;
+  fond.querySelector("#coupesFermer").onclick = fermerDialogueCoupes;
+  const insecable = fond.querySelector("#coupesInsecables");
+  if (insecable) insecable.onclick = () => appliquerInsecables();   // nom global : la version avec voile d'attente
   fond.querySelectorAll(".esp-ligne").forEach((b) => {
     b.onclick = () => { const r = restantes[Number(b.dataset.i)]; fermerDialogueCoupes(); allerAPage(r.page); };
   });
+}
+
+// Le bouton de la fenêtre : applique, puis montre le nouveau bilan.
+function appliquerInsecables() {
+  const n = insecablesDansLeLivre();
+  ouvrirDialogueCoupes(compterProtections(), coupesRestantes(), n);
 }
 
 // =====================================================================
@@ -2961,11 +3048,13 @@ function groupeALaCoupe(el, p) {
     // Le signe, et ceux qui le suivent (« ». », « ?! »)…
     b = indice;
     while (b < texte.length && (SIGNE_FERMANT.test(texte[b]) || /[.,]/.test(texte[b]))) b++;
-    // …l'espace avant, puis le mot qu'il faut lui rendre.
+    // …l'espace avant, puis ce qui le précède jusqu'à la espace d'avant : « existé »,
+    // mais aussi « là. » — un guillemet suit très souvent un point, et chercher un
+    // MOT (lettres seules) laissait ce cas-là passer : « là. | » » restait coupé.
     let m = indice;
     while (m > 0 && blanc(texte[m - 1])) m--;
     let mot = m;
-    while (mot > 0 && estMot(texte[mot - 1])) mot--;
+    while (mot > 0 && !/\s/.test(texte[mot - 1])) mot--;
     if (mot === m) return null;                  // rien à rattacher (début de paragraphe)
     a = mot; sorte = "signe";
   } else if (estMot(apres) && blanc(avant)) {
@@ -2975,7 +3064,7 @@ function groupeALaCoupe(el, p) {
     if (o < 1 || !SIGNE_OUVRANT.test(texte[o - 1])) return null;
     a = o - 1;
     b = indice;
-    while (b < texte.length && estMot(texte[b])) b++;
+    while (b < texte.length && !/\s/.test(texte[b])) b++;   // le mot entier, apostrophe comprise (« J'ai »)
     sorte = "signe";
   } else {
     return null;
