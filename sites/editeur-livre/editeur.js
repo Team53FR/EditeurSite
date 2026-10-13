@@ -2258,7 +2258,13 @@ function appliquerEtatOutilsLivre(ouvert) {
   liste.hidden = !ouvert;
   bouton.setAttribute("aria-expanded", ouvert ? "true" : "false");
   bouton.classList.toggle("ouvert", ouvert);
-  if (ouvert) placerListeOutils(); else retirerEcouteursOutils();
+  if (ouvert) {
+    placerListeOutils();
+    // Le tiroir glisse pendant 0,2 s : ouvert aussitôt, le bouton n'est pas encore à sa
+    // place. On replace UNE fois, le glissement fini — et surtout pas depuis
+    // placerListeOutils elle-même, qui se rappellerait alors toutes les 260 ms.
+    if (modeCompact()) setTimeout(replacerListeOutils, 260);
+  } else retirerEcouteursOutils();
 }
 
 // La liste des outils est une FENÊTRE FLOTTANTE (position: fixed), pas un bloc qui se
@@ -2275,7 +2281,12 @@ function placerListeOutils() {
   const marge = 10;
   const rb = bouton.getBoundingClientRect();
 
-  liste.style.maxHeight = "";
+  // On ne VIDE plus maxHeight pour mesurer : à vide, la liste se déploie en entier, son
+  // défilement retombe à zéro — et cette fonction est rappelée à chaque redimensionnement
+  // (la barre d'adresse mobile se replie quand on fait défiler le menu). La liste
+  // « remontait toute seule ». La hauteur naturelle se lit sur scrollHeight, et le
+  // défilement est conservé par précaution.
+  const defilement = liste.scrollTop;
   if (modeCompact()) {
     const largeur = Math.min(window.innerWidth - rb.left - marge, Math.max(rb.width, 290));
     liste.style.left = rb.left + "px";
@@ -2291,7 +2302,7 @@ function placerListeOutils() {
   // défile si elle est trop haute : la faire remonter la ferait recouvrir le bouton
   // même qui l'a ouverte. Faute de place (240 px au moins), ou à droite du panneau, on
   // la remonte jusqu'à ce qu'elle tienne.
-  const h = liste.offsetHeight, bas = window.innerHeight - marge;
+  const h = liste.scrollHeight + (liste.offsetHeight - liste.clientHeight), bas = window.innerHeight - marge;
   let top = parseFloat(liste.style.top);
   const place = bas - top;
   if (modeCompact() && place >= 240) {
@@ -2302,9 +2313,8 @@ function placerListeOutils() {
     liste.style.maxHeight = (window.innerHeight - 2 * marge) + "px";
   }
 
-  // Le tiroir glisse pendant 0,2 s : ouvert aussitôt, le bouton n'est pas encore à sa place.
-  // On replace une fois le glissement fini.
-  if (modeCompact()) setTimeout(replacerListeOutils, 260);
+  liste.scrollTop = defilement;
+
   // addEventListener ignore un écouteur déjà posé : replacer peut rappeler sans empiler.
   document.addEventListener("mousedown", fermerOutilsSiDehors, true);
   window.addEventListener("resize", replacerListeOutils);

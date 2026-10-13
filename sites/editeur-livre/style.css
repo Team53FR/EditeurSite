@@ -3034,6 +3034,10 @@ button.danger {
 .liste-outils {
   position: fixed;
   z-index: 100;
+  /* Au bout de la liste, le geste ne doit pas continuer sur le panneau derrière : il
+     défilerait, entraînant le bouton — et la liste avec lui. */
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   box-sizing: border-box;
   margin: 0;
   padding: 8px;

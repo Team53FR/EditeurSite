@@ -945,7 +945,13 @@ disparaître le menu sous le doigt quand la barre d'adresse mobile se replie). L
 outils sont rangés en deux groupes — « Écrire » et « Vérifier le texte » — chacun avec
 une icône, un titre et une explication. Piège : le tiroir mobile glisse pendant 0,2 s ;
 ouvert aussitôt, le bouton n'est pas encore à sa place, d'où un second placement à
-260 ms.
+260 ms — **posé à l'ouverture seulement**. Il était d'abord dans `placerListeOutils`
+elle-même, qui se rappelait donc toutes les 260 ms, indéfiniment (28 replacements en
+1,5 s mesurés) ; et chaque placement vidait `maxHeight` pour mesurer la liste, ce qui la
+déployait en entier et ramenait son défilement à zéro : sur mobile, le menu
+« remontait tout seul » pendant qu'on le faisait défiler. La hauteur naturelle se lit
+maintenant sur `scrollHeight`, le défilement est conservé, et `overscroll-behavior:
+contain` empêche le geste de se transmettre au panneau derrière.
 
 **L'outil « Passages en italique »** (`ouvrirPassagesItalique`). Relève chaque passage
 en italique des **paragraphes** — les titres et sous-titres sont exclus : ils sont en
