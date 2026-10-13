@@ -2784,6 +2784,8 @@ button.danger {
     display: block;
     height: 100vh;
     height: 100dvh;            /* la barre d'adresse mobile ne mange pas le bas de la page */
+    height: var(--hauteur-ecran, 100vh);
+    height: min(100dvh, var(--hauteur-ecran, 100dvh));   /* le plus petit des deux : jamais plus haut que l'écran visible */
   }
 
   .conteneur-livre {
@@ -2791,6 +2793,8 @@ button.danger {
     gap: 0;
     height: 100vh;
     height: 100dvh;
+    height: var(--hauteur-ecran, 100vh);
+    height: min(100dvh, var(--hauteur-ecran, 100dvh));   /* le plus petit des deux : jamais plus haut que l'écran visible */
     max-height: none;
     padding: 0;
   }
@@ -2858,7 +2862,8 @@ button.danger {
     display: flex !important;
     position: fixed;
     top: 0; bottom: 0; left: 0; z-index: 90;
-    height: 100vh; height: 100dvh;
+    height: 100vh; height: 100dvh; height: var(--hauteur-ecran, 100vh);
+    height: min(100dvh, var(--hauteur-ecran, 100dvh));   /* le plus petit des deux : jamais plus haut que l'écran visible */
     width: min(88vw, 340px);
     box-sizing: border-box;
     border-radius: 0 16px 16px 0;
@@ -2953,8 +2958,66 @@ button.danger {
   /* --- Les actions du bas : à portée de pouce --- */
   .barre-actions {
     flex-shrink: 0;
-    padding-bottom: env(safe-area-inset-bottom, 0);
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 6px);
   }
   .barre-actions button { min-height: 46px; padding: 10px 8px; }
   .zone-livre > .message { margin: 0; min-height: 0; flex-shrink: 0; text-align: center; }
+}
+
+/* =====================================================================
+   Panneau de gauche : compact, et jamais coupé
+   =====================================================================
+   Sur un écran peu haut — un portable, ou n'importe quel écran zoomé à 150 % —,
+   le bas du panneau sortait de l'écran : le compteur était rogné et le bouton
+   « Bibliothèque » invisible. Trois remèdes : le bouton passe EN HAUT du panneau ;
+   les espaces entre blocs se resserrent (séparateurs de 12 à 8 px, plus de
+   séparateur entre le format et les outils) ; et si malgré tout le contenu dépasse,
+   le panneau défile au lieu de couper. */
+.retour-biblio {
+  align-self: flex-start;
+  margin: 0 0 8px -4px;
+  padding: 3px 8px;
+  background: transparent;
+  border: none;
+  border-radius: 7px;
+  color: var(--s-ink-soft);
+  font-family: system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .12s ease, color .12s ease;
+}
+.retour-biblio:hover { background: var(--s-cream); color: var(--s-accent-deep); }
+
+.sommaire { overflow-y: auto; }
+.sommaire ul { min-height: 64px; }
+.sommaire-separateur { margin: 8px 0; }
+.sommaire-entete { margin-bottom: 8px; }
+.sommaire-outils { margin: 8px 0 0; }
+.sommaire .btn-icone { height: 34px; }
+.sommaire-pied {
+  padding-top: 8px;
+  /* Collé au bas du panneau même quand celui-ci défile : le compteur et l'état
+     d'enregistrement ne se perdent jamais hors de l'écran. */
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  background: var(--s-paper);
+}
+
+/* Écran peu haut : on resserre encore. */
+@media (min-width: 901px) and (max-height: 760px) {
+  .sommaire { padding: 10px 14px; }
+  .sommaire ul { min-height: 40px; }
+  .retour-biblio { margin-bottom: 4px; padding-top: 2px; padding-bottom: 2px; }
+  .sommaire-entete { margin-bottom: 6px; }
+  .sommaire-couvertures { gap: 4px; }
+  .sommaire .btn-couv { padding-top: 6px; padding-bottom: 6px; }
+  .sommaire-separateur { margin: 4px 0; }
+  .sommaire-outils { margin-top: 6px; }
+  .label-format { margin-bottom: 4px; }
+  .sommaire .bouton-format, .sommaire .select-format { padding-top: 6px; padding-bottom: 6px; }
+  .sommaire .btn-icone { height: 30px; }
+  .sommaire button.btn-chapitre.secondaire { padding-top: 6px; padding-bottom: 6px; }
+  .bloc-outils { margin-bottom: 6px; }
 }

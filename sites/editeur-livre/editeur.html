@@ -35,6 +35,10 @@
     </button>
 
     <aside class="sommaire">
+      <!-- En haut du panneau et non en bas : sur un écran peu haut (ou zoomé à
+           150 %), le bas du panneau sortait de l'écran, et avec lui ce bouton. -->
+      <button type="button" class="retour-biblio" onclick="retourBibliotheque()">&#8592; Bibliothèque</button>
+
       <div class="sommaire-entete">
         <h2 id="titreLivre">Mon livre</h2>
         <button class="btn-aide-tuto" onclick="lancerTutorielEditeur(true)" title="Revoir le tutoriel">?</button>
@@ -65,8 +69,6 @@
 
       <label class="label-format" for="selectFormat">Format du livre</label>
       <button type="button" id="selectFormat" class="bouton-format" onclick="ouvrirChoixFormatEditeur()">Roman — 14,9 × 21,0 cm</button>
-
-      <div class="sommaire-separateur"></div>
 
       <div class="sommaire-outils">
         <button onclick="ouvrirApercu()" class="btn-icone" title="Mode aperçu" aria-label="Mode aperçu">
@@ -118,9 +120,6 @@
         <div id="etatSauvegarde" class="etat-sauvegarde enregistre">✓ Enregistré</div>
       </div>
 
-      <div class="sommaire-actions">
-        <button onclick="retourBibliotheque()" class="secondaire petit">&#8592; Bibliothèque</button>
-      </div>
     </aside>
 
     <!-- Vue éditeur de texte (mode normal) -->

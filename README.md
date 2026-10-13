@@ -848,6 +848,25 @@ haut à droite et se cache derrière une fenêtre ouverte, dans le même coin qu
 croix. L'aperçu (feuilletage) reste à deux pages ajustées à la largeur : sur un
 téléphone c'est une vignette, à lire en pinçant.
 
+**Le panneau de gauche ne se coupe plus.** Sur un écran peu haut — un portable, ou
+n'importe quel écran zoomé à 150 % — le bas du panneau sortait de l'écran : compteur
+rogné, bouton « Bibliothèque » invisible (il était tout en bas). Le bouton est
+maintenant **en haut** du panneau (et du tiroir, sur mobile) ; les espaces entre
+blocs sont resserrés (plus de séparateur entre le format et les outils) et se
+resserrent encore sous 760 px de haut ; le pied (compteur, état d'enregistrement)
+est `position: sticky` en bas du panneau ; et si le contenu dépasse malgré tout, le
+panneau **défile** au lieu de couper (`overflow-y: auto`, il était `hidden`). Vérifié à
+580 px de haut : tout tient, sans défilement.
+
+**Hauteur de l'écran sur mobile.** `100dvh` devrait suffire, mais sur certains
+navigateurs (ou dans une application qui s'étend sous la barre de navigation) il compte
+la zone cachée : le bas de la page, boutons compris, se retrouvait hors de l'écran.
+`majHauteurEcran()` mesure `window.innerHeight` dans `--hauteur-ecran`, et la mise en
+page prend `min(100dvh, var(--hauteur-ecran))` — le plus petit des deux, donc jamais
+plus haut que l'écran visible. Le zoom par pincement n'est pas suivi (la page
+rétrécirait sous les doigts). Non vérifié sur un vrai téléphone : le navigateur de
+test n'envoie pas toujours `resize` quand on change la taille émulée.
+
 **L'aperçu feuillette comme un livre** : à l'ouverture de la couverture, l'**intérieur
 de la couverture** est à gauche et la **page 1 à droite** ; les pages se regardent
 ensuite par paires (2-3), (4-5)… — jamais (1-2), qui n'existe pas sur un livre

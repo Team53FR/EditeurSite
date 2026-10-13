@@ -338,7 +338,24 @@ function recalerDefilement() {
   majBasculePages();
 }
 
+// La hauteur de l'écran, mesurée. `100dvh` devrait suffire ; sur certains navigateurs
+// mobiles (ou dans une application qui s'étend sous la barre de navigation) il
+// compte la zone cachée, et les boutons du bas se retrouvent hors de l'écran. `innerHeight`
+// donne la hauteur réellement visible.
+function majHauteurEcran() {
+  document.documentElement.style.setProperty("--hauteur-ecran", window.innerHeight + "px");
+}
+
 function initMobile() {
+  majHauteurEcran();
+  window.addEventListener("resize", majHauteurEcran);
+  window.addEventListener("orientationchange", majHauteurEcran);
+  if (window.visualViewport) window.visualViewport.addEventListener("resize", () => {
+    // Le zoom par pincement réduit aussi le viewport visuel : on ne le suit pas
+    // (la page rétrécirait sous les doigts) — seulement un changement de barre.
+    if (window.visualViewport.scale <= 1.01) majHauteurEcran();
+  });
+
   // Chaque livre ouvert reçoit une zone de défilement. Sur grand écran elle est
   // « display: contents » : elle n'existe pas pour la mise en page.
   document.querySelectorAll(".livre-ouvert").forEach(el => {
@@ -373,7 +390,7 @@ function initMobile() {
   const panneau = document.querySelector(".sommaire");
   if (panneau) panneau.addEventListener("click", (e) => {
     if (!modeCompact()) return;
-    if (e.target.closest(".btn-couv, .btn-icone, .btn-chapitre, .bouton-format, .outil, .sommaire-actions button, li .libelle-page, li .num-chapitre")) {
+    if (e.target.closest(".btn-couv, .btn-icone, .btn-chapitre, .bouton-format, .outil, .retour-biblio, li .libelle-page, li .num-chapitre")) {
       setTimeout(() => basculerTiroir(false), 0);
     }
   });
