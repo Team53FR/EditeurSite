@@ -2710,3 +2710,56 @@ button.danger {
   margin: 6px 0;
 }
 .mi-details-schema > p b { color: var(--s-ink, #2b2622); }
+
+/* ===== Menus déroulants des fenêtres de réglage (voir habillerSelect) =====
+   Même vocabulaire que .select-couv : fond crème, filet doux, coins arrondis, anneau
+   brun au focus. Le <select> d'origine reste dans la page, masqué. */
+.sel-natif { display: none !important; }
+
+.sel-boite { position: relative; display: inline-block; min-width: 0; max-width: 100%; }
+
+.sel-bouton {
+  display: inline-flex; align-items: center; justify-content: space-between; gap: 0.6rem;
+  width: 100%; box-sizing: border-box;
+  padding: 0.38rem 0.55rem 0.38rem 0.7rem;
+  border: 1px solid var(--s-line, #e6ddc9); border-radius: 9px;
+  background: var(--s-cream, #f6efe0); color: var(--s-ink, #2b2622);
+  font: inherit; font-size: 0.86rem; line-height: 1.3; text-align: left; cursor: pointer;
+}
+.sel-bouton::after {
+  content: ""; flex-shrink: 0; width: 0.5rem; height: 0.5rem;
+  border-right: 1.6px solid currentColor; border-bottom: 1.6px solid currentColor;
+  transform: translateY(-0.12rem) rotate(45deg); opacity: 0.6;
+  transition: transform 0.15s;
+}
+.sel-bouton[aria-expanded="true"]::after { transform: translateY(0.1rem) rotate(-135deg); }
+.sel-bouton:hover:not(:disabled) { border-color: var(--s-accent, #8a4b38); }
+.sel-bouton:focus { outline: none; }
+.sel-bouton:focus-visible,
+.sel-bouton[aria-expanded="true"] {
+  border-color: var(--s-accent, #8a4b38);
+  box-shadow: 0 0 0 3px rgba(138, 75, 56, .14);
+}
+.sel-bouton:disabled { opacity: 0.5; cursor: not-allowed; }
+.sel-etiquette { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.sel-liste {
+  position: absolute; z-index: 60; top: calc(100% + 4px); left: 0;
+  min-width: 100%; max-width: 22rem; max-height: 15rem; overflow-y: auto;
+  margin: 0; padding: 4px; list-style: none; box-sizing: border-box;
+  border: 1px solid var(--s-line, #e6ddc9); border-radius: 10px;
+  background: var(--s-paper, #fffdf8);
+  box-shadow: 0 12px 30px rgba(43, 34, 24, .18);
+}
+.sel-liste[hidden] { display: none; }
+.sel-option {
+  padding: 0.42rem 0.65rem; border-radius: 7px;
+  font-size: 0.86rem; line-height: 1.3; white-space: nowrap; cursor: pointer;
+  color: var(--s-ink, #2b2622);
+}
+.sel-option.actif { background: var(--s-cream, #f6efe0); }
+.sel-option.choisie { color: var(--s-accent, #8a4b38); font-weight: 600; }
+.sel-option.inactive { opacity: 0.45; cursor: not-allowed; }
+
+/* Les lignes de réglages mettent le menu à la hauteur des champs voisins. */
+.tr-champ .sel-boite, .dc-ligne .sel-boite { width: 100%; }

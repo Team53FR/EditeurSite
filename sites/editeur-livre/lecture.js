@@ -108,8 +108,10 @@ function appliquerFormatPage(formatKey) {
 
 // ---------- Vues (couverture / intérieur / 4e) ----------
 
+// Comme dans l'éditeur : l'intérieur de la couverture à gauche, la page 1 à
+// droite, puis (2-3), (4-5)… — jamais (1-2).
 function nombreSpreadsApercu() {
-  return Math.max(1, Math.ceil(livre.pages.length / 2));
+  return Math.floor(livre.pages.length / 2) + 1;
 }
 
 function typeVueApercu(idx) {
@@ -121,12 +123,12 @@ function typeVueApercu(idx) {
 
 function donneesInterieur(idx) {
   const pages = livre.pages;
-  const iGauche = (idx - 1) * 2;
-  const iDroite = iGauche + 1;
+  const iDroite = (idx - 1) * 2;
+  const iGauche = iDroite - 1;
   return {
     gauche: pages[iGauche] || null,
     droite: pages[iDroite] || null,
-    numG: iGauche + 1,
+    numG: pages[iGauche] ? iGauche + 1 : "",
     numD: pages[iDroite] ? iDroite + 1 : ""
   };
 }
@@ -240,8 +242,9 @@ function afficherApercu() {
   if (indexApercu === 0) indicateur.textContent = "Couverture";
   else if (indexApercu === derniere) indicateur.textContent = "4e de couverture";
   else {
-    const iG = (indexApercu - 1) * 2, iD = iG + 1;
-    indicateur.textContent = livre.pages[iD] ? `Pages ${iG + 1} - ${iD + 1}` : `Page ${iG + 1}`;
+    const d = donneesInterieur(indexApercu);
+    indicateur.textContent = d.numG !== "" && d.numD !== "" ? `Pages ${d.numG} - ${d.numD}`
+      : `Page ${d.numG !== "" ? d.numG : d.numD}`;
   }
 
   conteneur.appendChild(pageCoteApercu(indexApercu, "gauche"));

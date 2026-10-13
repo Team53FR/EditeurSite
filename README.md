@@ -818,6 +818,28 @@ n'aurait dû, ce qui gonfle à son tour le dos et le palier de marge de reliure.
 Rien n'était rogné, mais rien ne tombait juste. `mesure-pro` a été retiré :
 l'accord se fait maintenant à la source.
 
+**L'aperçu feuillette comme un livre** : à l'ouverture de la couverture, l'**intérieur
+de la couverture** est à gauche et la **page 1 à droite** ; les pages se regardent
+ensuite par paires (2-3), (4-5)… — jamais (1-2), qui n'existe pas sur un livre
+relié (une page de droite est toujours un recto, impair). `donneesInterieur()`
+prend donc le feuillet de droite à `2 × (n − 1)` et celui de gauche juste avant
+(rien à la première double-page : c'est le revers de la couverture). Quand le
+nombre de pages est pair, la dernière double-page montre l'intérieur de la 4e à
+droite. `nombreSpreadsApercu()` vaut donc `⌊pages / 2⌋ + 1`. La lecture
+(`lecture.js`) applique la même règle, sans les gardes.
+
+**Menus déroulants des fenêtres de réglage** (`habillerSelect`, impression.js). La liste
+ouverte d'un `<select>` est dessinée par le système (fond blanc, bleu de sélection) et
+ne s'habille pas en CSS. Dans les fenêtres `.modal-impression` (tranche, couverture,
+KDP), on la remplace par un bouton et une liste aux couleurs du site — un
+`MutationObserver` sur le `<body>` les habille à mesure qu'elles apparaissent. Le
+`<select>` d'origine **reste dans la page, masqué** : c'est lui qui porte la valeur
+et émet `input`/`change`, donc rien de ce qui le lit ou l'écoute n'a changé. Les
+propriétés `value` et `selectedIndex` sont surchargées sur l'instance pour que le
+bouton suive une valeur posée par le code ; la liste se reconstruit à chaque
+ouverture, donc des options ajoutées après coup y figurent. Les menus de la barre
+d'outils ne sont pas concernés (ils ont déjà leur style).
+
 **Pas de mot coupé d'une page à l'autre** (`eviterMotsCoupes`, editeur.js). La
 césure automatique coupe un mot en fin de ligne, ce qui est voulu dans un texte
 justifié ; mais à la dernière ligne d'une page, « disposit- » en bas et « ion » en

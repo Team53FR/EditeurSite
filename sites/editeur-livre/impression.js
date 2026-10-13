@@ -3777,3 +3777,154 @@ function creerPanneauCouverture(livre, mode, f, promessesImages) {
   panneau.classList.add("panneau-couv-pro");
   return panneau;
 }
+
+// =====================================================================
+//  Menus déroulants aux couleurs du site
+// =====================================================================
+//
+// La liste ouverte d'un <select> est dessinée par le système : fond blanc, bleu
+// de sélection, police du système — impossible à habiller en CSS. Dans les fenêtres
+// de réglage (tranche, couverture, KDP) elle détonnait au milieu du reste.
+//
+// On la remplace donc, dans ces fenêtres seulement, par un bouton et une liste à
+// nous. Le <select> d'origine RESTE dans la page, masqué : c'est lui qui porte la
+// valeur, que tout le code existant lit (`select.value`) et écoute (`change`). Le
+// menu ne fait que le piloter, et le suit : une valeur posée par le code
+// (`select.value = …`) met aussi le bouton à jour.
+//
+// La liste se reconstruit à chaque ouverture : des options ajoutées ou retirées par le
+// code après coup y figurent sans qu'on ait rien à prévenir.
+function habillerSelect(select) {
+  if (!select || select.dataset.habille) return;
+  select.dataset.habille = "1";
+
+  const boite = document.createElement("div");
+  boite.className = "sel-boite";
+  const bouton = document.createElement("button");
+  bouton.type = "button";
+  bouton.className = "sel-bouton";
+  bouton.setAttribute("aria-haspopup", "listbox");
+  bouton.setAttribute("aria-expanded", "false");
+  const etiquette = document.createElement("span");
+  etiquette.className = "sel-etiquette";
+  bouton.appendChild(etiquette);
+  const liste = document.createElement("ul");
+  liste.className = "sel-liste";
+  liste.setAttribute("role", "listbox");
+  liste.hidden = true;
+  boite.append(bouton, liste);
+  select.insertAdjacentElement("afterend", boite);
+  select.classList.add("sel-natif");
+
+  // Le libellé d'une étiquette <label> doit toujours nommer le bouton.
+  if (select.id) bouton.id = select.id + "-menu";
+  const nommer = select.closest("label");
+  if (nommer) bouton.setAttribute("aria-label", nommer.textContent.trim());
+
+  let actif = -1;   // index de l'option surlignée à l'ouverture
+
+  const synchroniser = () => {
+    const o = select.options[select.selectedIndex];
+    etiquette.textContent = o ? o.textContent : "";
+    bouton.disabled = select.disabled;
+  };
+
+  const ouvert = () => !liste.hidden;
+  const fermer = (rendreFocus) => {
+    if (!ouvert()) return;
+    liste.hidden = true;
+    bouton.setAttribute("aria-expanded", "false");
+    document.removeEventListener("mousedown", dehors, true);
+    if (rendreFocus) bouton.focus();
+  };
+  const dehors = (e) => { if (!boite.contains(e.target)) fermer(false); };
+
+  const surligner = (i) => {
+    const items = [...liste.children];
+    if (!items.length) return;
+    actif = Math.max(0, Math.min(items.length - 1, i));
+    items.forEach((li, k) => li.classList.toggle("actif", k === actif));
+    items[actif].scrollIntoView({ block: "nearest" });
+  };
+
+  const choisir = (i) => {
+    const o = select.options[i];
+    if (!o || o.disabled) return;
+    const change = select.selectedIndex !== i;
+    select.selectedIndex = i;
+    synchroniser();
+    fermer(true);
+    if (change) {
+      select.dispatchEvent(new Event("input", { bubbles: true }));
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+  };
+
+  const ouvrir = () => {
+    if (select.disabled || ouvert()) return;
+    liste.replaceChildren();
+    [...select.options].forEach((o, i) => {
+      const li = document.createElement("li");
+      li.className = "sel-option" + (i === select.selectedIndex ? " choisie" : "") + (o.disabled ? " inactive" : "");
+      li.setAttribute("role", "option");
+      li.setAttribute("aria-selected", i === select.selectedIndex ? "true" : "false");
+      li.textContent = o.textContent;
+      // mousedown et non click : sinon le bouton perd le focus avant le choix.
+      li.addEventListener("mousedown", (e) => { e.preventDefault(); choisir(i); });
+      li.addEventListener("mousemove", () => { if (!o.disabled && actif !== i) surligner(i); });
+      liste.appendChild(li);
+    });
+    liste.hidden = false;
+    bouton.setAttribute("aria-expanded", "true");
+    surligner(select.selectedIndex);
+    document.addEventListener("mousedown", dehors, true);
+  };
+
+  bouton.addEventListener("click", () => { if (ouvert()) fermer(true); else ouvrir(); });
+  bouton.addEventListener("keydown", (e) => {
+    const touche = e.key;
+    if (!ouvert()) {
+      if (touche === "ArrowDown" || touche === "ArrowUp" || touche === "Enter" || touche === " ") {
+        e.preventDefault();
+        ouvrir();
+      }
+      return;
+    }
+    if (touche === "Escape") { e.preventDefault(); e.stopPropagation(); fermer(true); }
+    else if (touche === "ArrowDown") { e.preventDefault(); surligner(actif + 1); }
+    else if (touche === "ArrowUp") { e.preventDefault(); surligner(actif - 1); }
+    else if (touche === "Home") { e.preventDefault(); surligner(0); }
+    else if (touche === "End") { e.preventDefault(); surligner(liste.children.length - 1); }
+    else if (touche === "Enter" || touche === " ") { e.preventDefault(); choisir(actif); }
+    else if (touche === "Tab") fermer(false);
+  });
+
+  // Le code qui pose une valeur ou un index : le bouton suit.
+  ["value", "selectedIndex"].forEach((nom) => {
+    const d = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, nom);
+    Object.defineProperty(select, nom, {
+      configurable: true,
+      get() { return d.get.call(this); },
+      set(v) { d.set.call(this, v); synchroniser(); }
+    });
+  });
+  select.addEventListener("change", synchroniser);
+  new MutationObserver(synchroniser).observe(select, { attributes: true, attributeFilter: ["disabled"] });
+
+  synchroniser();
+}
+
+// Toute fenêtre de réglage qui apparaît (ou qui est déjà là) est habillée. On
+// observe le <body> plutôt que de brancher chaque fenêtre : il y en a une demi-douzaine,
+// construites chacune à sa manière.
+(function habillerLesMenusDesFenetres() {
+  const traiter = (racine) => {
+    if (!racine || racine.nodeType !== 1) return;
+    const cibles = racine.matches && racine.matches(".modal-impression select") ? [racine] : [];
+    racine.querySelectorAll && racine.querySelectorAll(".modal-impression select").forEach((s) => cibles.push(s));
+    cibles.forEach(habillerSelect);
+  };
+  traiter(document.body);
+  new MutationObserver((lots) => lots.forEach((l) => l.addedNodes.forEach(traiter)))
+    .observe(document.body, { childList: true, subtree: true });
+})();

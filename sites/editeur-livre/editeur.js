@@ -1010,8 +1010,12 @@ function supprimerImageFond() {
 let modeApercu = false;
 let indexApercu = 0; // 0 = couverture ; 1..nbSpreads = pages intérieures ; nbSpreads+1 = 4e de couverture
 
+// Un livre ouvert montre l'INTÉRIEUR de la couverture à gauche et la première
+// page à droite : les pages se regardent par paires (2-3), (4-5)…, jamais (1-2).
+// Il y a donc une double-page de plus que de paires de pages — la dernière
+// montre, quand le nombre de pages est pair, l'intérieur de la 4e à droite.
 function nombreSpreadsApercu() {
-  return Math.max(1, Math.ceil(feuilletsDuLivre(livreActuel()).length / 2));
+  return Math.floor(feuilletsDuLivre(livreActuel()).length / 2) + 1;
 }
 
 
@@ -1053,10 +1057,15 @@ function donneesInterieur(idx) {
   // Les gardes comprises : elles se feuillettent comme le reste, simplement
   // blanches et sans folio (voir feuilletsDuLivre, script.js).
   const feuillets = feuilletsDuLivre(livreActuel());
-  const iGauche = (idx - 1) * 2;
-  const fG = feuillets[iGauche] || null;
-  const fD = feuillets[iGauche + 1] || null;
+  // La page de droite est toujours un recto (impair) : le premier feuillet à la
+  // première double-page, puis un feuillet sur deux. Celle de gauche est le verso
+  // qui la précède — et, à la première double-page, l'intérieur de la couverture.
+  const iDroite = (idx - 1) * 2;
+  const fD = feuillets[iDroite] || null;
+  const fG = iDroite > 0 ? (feuillets[iDroite - 1] || null) : null;
   return {
+    interieurG: iDroite === 0,       // revers de la couverture
+    interieurD: !fD,                 // revers de la 4e de couverture
     gauche: fG ? fG.page : null,
     droite: fD ? fD.page : null,
     numG: fG ? fG.numero : "",
@@ -1095,6 +1104,8 @@ function pageCoteApercu(idx, cote) {
     return cote === "gauche" ? creerPageCouvertureApercu("quatrieme") : creerPageViergeApercu();
   }
   const d = donneesInterieur(idx);
+  if (cote === "gauche" && d.interieurG) return creerPageTexteApercu(null, "", true, "Intérieur de la couverture");
+  if (cote === "droite" && d.interieurD) return creerPageTexteApercu(null, "", true, "Intérieur de la 4e de couverture");
   return cote === "gauche"
     ? creerPageTexteApercu(d.gauche, d.numG, d.gardeG)
     : creerPageTexteApercu(d.droite, d.numD, d.gardeD);
@@ -1228,6 +1239,7 @@ function afficherApercu() {
     const nums = [d.numG, d.numD].filter((n) => n !== "" && n != null);
     indicateur.textContent = nums.length === 2 ? `Pages ${nums[0]} - ${nums[1]}`
       : nums.length === 1 ? `Page ${nums[0]}`
+      : nums.length === 0 && !d.gardeG && !d.gardeD ? "Intérieur de couverture"
       : "Page de garde";
   }
 
@@ -1239,7 +1251,7 @@ function afficherApercu() {
   appliquerFormatPage(livre.format || "149x210");
 }
 
-function creerPageTexteApercu(page, numero, garde) {
+function creerPageTexteApercu(page, numero, garde, mentionPerso) {
   const div = document.createElement("div");
   div.className = "page-livre";
 
@@ -1250,7 +1262,7 @@ function creerPageTexteApercu(page, numero, garde) {
     div.classList.add("page-garde-apercu");
     const mention = document.createElement("div");
     mention.className = "garde-mention";
-    mention.textContent = "Page de garde";
+    mention.textContent = mentionPerso || "Page de garde";
     div.appendChild(mention);
     return div;
   }
