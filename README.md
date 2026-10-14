@@ -841,6 +841,39 @@ refus ne change rien (le menu revient à sa place). Le texte avant et après est
 plus de confirmation : le livre est déjà fait de paragraphes. Il se recompose comme
 l'interligne (`repaginerTout`).
 
+**Un livre réel mélange les structures** (retour : « parfois c'est parfait, de temps en temps
+trop d'espace »). La première version ne traitait que « <br><br> » directement dans un
+`<p>`. Essayées une à une, **sept structures sur neuf** donnaient un écart non uniforme :
+
+| structure | écart mesuré (réglage 0,9 em) | cause |
+|---|---|---|
+| `<br><br>` dans un `<span>` / `<i>` | lignes vides non converties | `<br>` pas enfants directs du `<p>` |
+| `<br>` en fin de mise en forme (`<i>a<br></i><br>`) | idem | idem |
+| `<div>` / `<div><br></div>` | aucun espace du tout | la marge ne vaut que pour les `<p>` |
+| `<p><br></p>` (Entrée deux fois) | **3,25 em** | une ligne entière + deux marges |
+| trois `<br>` | 3,25 em | une ligne vide gardée en plus |
+| mélange des précédents | écarts inégaux | tout cela à la fois |
+
+Le cas le plus courant est le paragraphe vide : en tapant Entrée deux fois dans l'éditeur,
+on obtient `<p>…</p><p><br></p><p>…</p>`, dont l'écart était 0,9 + une ligne + 0,9.
+`convertirLignesVidesEnParagraphes` normalise donc tout : le texte nu de la racine entre dans un
+`<p>` ; les `<div>` deviennent des `<p>` ; les suites de `<br>` sont coupées **où qu'elles
+soient** (par `Range.extractContents`, qui referme et rouvre les mises en forme) ; le
+premier paragraphe vide de chaque suite disparaît (c'est la frontière). Les lignes vides
+en plus de la première sont des blancs voulus (pause, changement de scène) : elles sont
+gardées en `<p class="ligne-vide">`, dont la hauteur est **exactement l'espace réglé** —
+elles suivent le réglage au lieu de peser une ligne de texte. Mesuré : 0,9 / 1,8 / 0,9.
+Vérifié sur 60 livres tirés au hasard (674 conversions) : texte identique, plus aucun double
+`<br>`, aucun `<div>`, et une seconde passe ne change plus rien. Piège rencontré : la
+garde « texte identique » comparait des espaces ramenées à une ; une espace entre deux `<br>`
+disparaissait avec le `<br>`, la garde refusait donc une conversion juste. Elle compare
+maintenant sans aucun blanc. Autre piège : un second lancement d'un script de modification
+réinsérait deux fois la règle CSS — à ne pas faire avec un script qui n'est pas idempotent.
+
+Le réglage est proposé à chaque changement de valeur : si le livre contient encore l'une de
+ces structures (un livre déjà converti par la première version, par exemple), la
+confirmation revient et le normalise ; sinon, aucune confirmation.
+
 **Pourquoi par livre et pas dans chaque paragraphe.** Le réglage est une variable CSS
 posée sur `<html>` : un paragraphe écrit plus tard le suit tout seul, l'aperçu et
 l'impression composent pareil, et la lecture (`lecture.js`) la pose aussi. Il a fallu une

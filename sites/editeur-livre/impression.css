@@ -162,6 +162,13 @@
     margin: 0 0 var(--espace-paragraphe, 6px) 0;
   }
 
+  .texte-impression p.ligne-vide {
+    margin: 0;
+    height: var(--espace-paragraphe, 6px);
+    line-height: 0;
+    overflow: hidden;
+  }
+
   .texte-impression h2 {
     font-size: var(--taille-titre, 20pt);
     font-weight: bold;

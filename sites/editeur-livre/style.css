@@ -444,6 +444,15 @@ button.danger {
   margin: 0 0 var(--espace-paragraphe, 6px) 0;
 }
 
+/* Un blanc voulu en plus de la frontière entre deux paragraphes (une pause, un changement
+   de scène) : sa hauteur est l'espace réglé, ni plus ni moins — pas une ligne de texte. */
+.texte-livre p.ligne-vide {
+  margin: 0;
+  height: var(--espace-paragraphe, 6px);
+  line-height: 0;
+  overflow: hidden;
+}
+
 /* Un mot que la frontière de page aurait coupé (voir eviterMotsCoupes) : il ne
    se coupe plus, et passe en entier sur la page suivante. Pas de style propre
    à l'impression : cette règle vaut pour l'écran comme pour le fichier. */

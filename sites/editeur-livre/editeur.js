@@ -3909,74 +3909,124 @@ function initEspaceParagraphe() {
   menu.value = em === null ? "" : String(ESPACES_PARAGRAPHE.reduce((a, b) => Math.abs(b - em) < Math.abs(a - em) ? b : a));
 }
 
-// Remplace les « lignes vides » (au moins deux <br> d'affilée, directement dans un <p>) par
-// des paragraphes distincts. Rend le HTML et le nombre de séparations converties.
+// Ramène le texte à des paragraphes RÉELS, pour que l'espace réglé s'applique partout et
+// de la même façon. Un livre réel mélange plusieurs structures (essayées une à une : seules
+// deux sur neuf donnaient un écart uniforme) :
 //
-//  - deux <br> = une ligne vide = la frontière entre deux paragraphes ;
-//  - k > 2 <br> : la frontière, plus k-2 paragraphes VIDES — on ne perd pas les blancs voulus ;
-//  - un seul <br> reste où il est : c'est un retour à la ligne dans le paragraphe (vers,
-//    réplique…), pas un changement de paragraphe ;
-//  - chaque nouveau <p> reprend les attributs de l'ancien (style, classe), sauf data-suite,
-//    qui n'appartient qu'au premier : lui seul prolonge la page d'avant.
+//  - « <br><br> » dans un <p>, directement ou dans une mise en forme (« <span> », « <i> ») :
+//    la ligne vide est la frontière entre deux paragraphes ;
+//  - des <div> qui font office de paragraphes (l'Entrée d'avant le réglage de l'éditeur) :
+//    ils deviennent des <p>, les seuls à porter l'espace ;
+//  - des paragraphes VIDES « <p><br></p> » (Entrée deux fois) : le premier de chaque suite
+//    est la frontière, il disparaît. Laissé en place, il ajoutait une ligne entière ET deux
+//    marges : un écart de 3,25 em quand on avait réglé 0,9 ;
+//  - du texte nu à la racine, sans paragraphe.
+//
+// Les lignes vides EN PLUS de la première sont des blancs voulus — une pause, un changement
+// de scène. Elles sont gardées, en paragraphes « ligne-vide » dont la hauteur est l'espace
+// réglé : elles suivent le réglage au lieu de peser une ligne de texte chacune. Un <br>
+// isolé reste un retour à la ligne (vers, réplique). Chaque nouveau <p> reprend style et
+// classe, `data-suite` seulement le premier.
+//
+// Rend { html, compte, lignes, divs, vides, nus } ; compte = 0 : rien à normaliser.
 function convertirLignesVidesEnParagraphes(html) {
   const boite = document.createElement("div");
   boite.innerHTML = html || "";
-  let compte = 0;
+  const stats = { lignes: 0, divs: 0, vides: 0, nus: 0 };
 
-  const estBlanc = (n) => n.nodeType === 3 && !n.data.trim();
-  const estBr = (n) => n.nodeType === 1 && n.nodeName === "BR";
+  const BLOCS = /^(P|DIV|H[1-6]|UL|OL|LI|BLOCKQUOTE|TABLE|PRE|HR|SECTION|ARTICLE|FIGURE)$/;
+  const estBloc = (n) => n.nodeType === 1 && BLOCS.test(n.nodeName);
+  const sansContenu = (n) => !(n.textContent || "").trim() && !(n.querySelector && n.querySelector("img"));
+  const copierAttributs = (de, vers) => [...de.attributes].forEach((a) => vers.setAttribute(a.name, a.value));
+  const espaceur = (modele) => {          // un blanc voulu : sa hauteur est l'espace réglé
+    const p = document.createElement("p");
+    if (modele) copierAttributs(modele, p);
+    p.removeAttribute("data-suite");
+    p.classList.add("ligne-vide");
+    p.appendChild(document.createElement("br"));
+    return p;
+  };
 
-  [...boite.children].forEach((bloc) => {
-    if (bloc.tagName !== "P") return;
-    const noeuds = [...bloc.childNodes];
-
-    const segments = [[]];              // les morceaux de texte, un par futur paragraphe
-    const videsAvant = [0];             // paragraphes vides à poser AVANT chaque segment
-    let i = 0, converti = false;
-    while (i < noeuds.length) {
-      if (estBr(noeuds[i])) {
-        // La suite de <br> (et des blancs qui les séparent) qui commence ici.
-        let j = i, brs = 0, fin = i;
-        while (j < noeuds.length && (estBr(noeuds[j]) || estBlanc(noeuds[j]))) {
-          if (estBr(noeuds[j])) { brs++; fin = j; }
-          j++;
-        }
-        if (brs >= 2) {
-          const debut = segments[segments.length - 1].every(estBlanc);   // la suite commence le paragraphe
-          segments.push([]);
-          // Au début, chaque <br> était une ligne vide ; ailleurs, l'une d'elles devient la frontière.
-          videsAvant.push(debut ? brs : brs - 2);
-          compte++;
-          converti = true;
-          i = fin + 1;
-          continue;
-        }
-        // un <br> isolé : il reste dans le paragraphe
-        for (let k = i; k <= fin; k++) segments[segments.length - 1].push(noeuds[k]);
-        i = fin + 1;
-        continue;
-      }
-      segments[segments.length - 1].push(noeuds[i]);
-      i++;
-    }
-    if (!converti) return;
-
-    const nouveaux = [];
-    const vide = () => { const p = bloc.cloneNode(false); p.removeAttribute("data-suite"); p.appendChild(document.createElement("br")); return p; };
-    let premier = true;
-    segments.forEach((seg, k) => {
-      for (let v = 0; v < videsAvant[k]; v++) nouveaux.push(vide());
-      if (seg.every(estBlanc)) return;                    // un segment vide ne fait pas de paragraphe
-      const p = bloc.cloneNode(false);
-      if (!premier) p.removeAttribute("data-suite");
-      premier = false;
-      seg.forEach((n) => p.appendChild(n));
-      nouveaux.push(p);
-    });
-    nouveaux.forEach((p) => boite.insertBefore(p, bloc));
-    boite.removeChild(bloc);
+  // 0. Le texte nu de la racine entre dans un paragraphe.
+  let courant = null;
+  [...boite.childNodes].forEach((n) => {
+    if (estBloc(n)) { courant = null; return; }
+    if (!courant && n.nodeType === 3 && !n.data.trim()) return;       // blanc entre deux blocs
+    if (!courant) { courant = document.createElement("p"); boite.insertBefore(courant, n); stats.nus++; }
+    courant.appendChild(n);
   });
-  return { html: boite.innerHTML, compte };
+
+  // 1. Les <div> qui font office de paragraphes deviennent des <p>.
+  [...boite.children].forEach((d) => {
+    if (d.tagName !== "DIV" || d.querySelector("p, div, h1, h2, h3, h4, h5, h6, ul, ol, blockquote, table, pre")) return;
+    const p = document.createElement("p");
+    copierAttributs(d, p);
+    while (d.firstChild) p.appendChild(d.firstChild);
+    boite.replaceChild(p, d);
+    stats.divs++;
+  });
+
+  // 2. Les suites de <br>, où qu'elles soient dans le paragraphe : on le coupe à cet endroit.
+  const scinder = (p) => {
+    const brs = [...p.querySelectorAll("br")];
+    if (brs.length < 2) return;
+    // Groupes de <br> qui se suivent DANS L'ORDRE DU TEXTE (seuls des blancs entre eux),
+    // même si une mise en forme se ferme entre deux (« <i>a<br></i><br> »).
+    const groupes = [];
+    let groupe = [brs[0]];
+    for (let i = 1; i < brs.length; i++) {
+      const r = document.createRange();
+      r.setStartAfter(brs[i - 1]);
+      r.setEndBefore(brs[i]);
+      const entre = r.cloneContents();
+      if (!(entre.textContent || "").trim() && !entre.querySelector("img")) groupe.push(brs[i]);
+      else { groupes.push(groupe); groupe = [brs[i]]; }
+    }
+    groupes.push(groupe);
+
+    // Du dernier au premier : couper plus loin ne déplace pas ce qui précède.
+    for (let g = groupes.length - 1; g >= 0; g--) {
+      const k = groupes[g].length;
+      if (k < 2) continue;
+      const r = document.createRange();
+      r.setStartAfter(groupes[g][k - 1]);
+      r.setEnd(p, p.childNodes.length);
+      const suite = r.extractContents();          // ce qui suit, avec ses mises en forme refermées
+      groupes[g].forEach((b) => b.remove());
+
+      const apres = p.cloneNode(false);
+      apres.removeAttribute("data-suite");
+      apres.appendChild(suite);
+
+      const enTete = sansContenu(p);              // la suite de <br> commençait le paragraphe
+      const nouveaux = [];
+      // Au début chaque <br> était une ligne vide ; ailleurs, l'une d'elles devient la frontière.
+      for (let v = 0; v < (enTete ? k : k - 2); v++) nouveaux.push(espaceur(p));
+      if (!sansContenu(apres)) nouveaux.push(apres);
+      stats.lignes++;
+      if (enTete) { nouveaux.forEach((n) => p.before(n)); p.remove(); break; }
+      let ancre = p;
+      nouveaux.forEach((n) => { ancre.after(n); ancre = n; });
+    }
+  };
+  [...boite.children].forEach((bloc) => { if (bloc.tagName === "P") scinder(bloc); });
+
+  // 3. Les paragraphes vides déjà présents : le premier de chaque suite est la frontière.
+  const enfants = [...boite.children];
+  for (let i = 0; i < enfants.length;) {
+    const estVide = (e) => e.tagName === "P" && sansContenu(e) && !e.classList.contains("ligne-vide");
+    if (!estVide(enfants[i])) { i++; continue; }
+    let j = i;
+    while (j < enfants.length && estVide(enfants[j])) j++;
+    if (i > 0 && j < enfants.length) {            // entre deux paragraphes, pas en tête ni en queue
+      enfants[i].remove();
+      stats.vides++;
+      for (let m = i + 1; m < j; m++) enfants[m].classList.add("ligne-vide");
+    }
+    i = j;
+  }
+
+  return Object.assign({ html: boite.innerHTML, compte: stats.lignes + stats.divs + stats.vides + stats.nus }, stats);
 }
 
 // Le texte du livre, espaces ramenées à une, sans le balisage : la conversion ne doit
@@ -3984,7 +4034,7 @@ function convertirLignesVidesEnParagraphes(html) {
 function texteDuLivreSansStructure(html) {
   const d = document.createElement("div");
   d.innerHTML = html || "";
-  return (d.textContent || "").replace(/\s+/g, " ").trim();
+  return (d.textContent || "").replace(/\s+/g, "");
 }
 
 function appliquerEspacementParagraphes(valeur) {
@@ -3999,12 +4049,17 @@ function appliquerEspacementParagraphes(valeur) {
 
   if (conversion.compte > 0) {
     if (texteDuLivreSansStructure(conversion.html) !== texteDuLivreSansStructure(tout)) {
-      alert("Le réglage a été annulé : la conversion des lignes vides aurait modifié le texte. Rien n'a changé.");
+      alert("Le réglage a été annulé : la normalisation aurait modifié le texte. Rien n'a changé.");
       initEspaceParagraphe();
       return;
     }
-    if (!confirm("Les paragraphes de ce livre sont séparés par des lignes vides (" + conversion.compte + " au total).\n\n" +
-        "Pour régler leur espacement, elles vont être converties en vrais paragraphes. " +
+    const detail = [];
+    if (conversion.lignes) detail.push(conversion.lignes + " ligne" + (conversion.lignes > 1 ? "s vides converties" : " vide convertie") + " en paragraphes");
+    if (conversion.vides) detail.push(conversion.vides + " paragraphe" + (conversion.vides > 1 ? "s vides retirés" : " vide retiré") + " (l'espace les remplace)");
+    if (conversion.divs) detail.push(conversion.divs + " bloc" + (conversion.divs > 1 ? "s" : "") + " ramené" + (conversion.divs > 1 ? "s" : "") + " à des paragraphes");
+    if (conversion.nus) detail.push(conversion.nus + " texte" + (conversion.nus > 1 ? "s" : "") + " nu" + (conversion.nus > 1 ? "s" : "") + " mis en paragraphe");
+    if (!confirm("Pour que l'espace entre les paragraphes soit le même partout, le livre va être normalisé :\n\n- " +
+        detail.join("\n- ") + "\n\nLes lignes vides en plus de la première sont gardées, et suivent le réglage. " +
         "Le texte ne change pas, mais la mise en page sera recomposée et l'aspect peut légèrement bouger.\n\nContinuer ?")) {
       initEspaceParagraphe();             // remet le menu comme il était
       return;
