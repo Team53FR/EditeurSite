@@ -824,6 +824,23 @@ function appliquerReductionSommaire() {
   if (modeApercu) afficherApercu();
 }
 
+// Toute la pagination est une MESURE du texte : où tombe chaque ligne, chaque page, chaque
+// mot coupé. EB Garamond se charge en « swap » — le texte s'affiche d'abord dans une police
+// de remplacement, puis change au chargement — : mesuré avant, il l'était avec d'autres
+// largeurs de lettres. Les coupes calculées (et les protections posées) ne correspondaient
+// plus à ce que l'on voyait ensuite. On attend donc les polices avant la première mesure,
+// avec un filet de 2 s pour ne jamais bloquer l'ouverture d'un livre.
+async function attendrePolicesDuLivre() {
+  if (!document.fonts || !document.fonts.load) return;
+  const echantillon = "Aàéèêç«»’…";
+  const charges = Promise.all([
+    document.fonts.load("400 16px 'EB Garamond'", echantillon),
+    document.fonts.load("italic 400 16px 'EB Garamond'", echantillon),
+    document.fonts.load("600 16px 'EB Garamond'", echantillon)
+  ]).catch(() => {});
+  await Promise.race([charges, new Promise((r) => setTimeout(r, 2000))]);
+}
+
 async function chargerLivre() {
   const message = document.getElementById("message");
 
@@ -864,6 +881,9 @@ async function chargerLivre() {
     if (conteneur) conteneur.classList.toggle("sommaire-reduite", sommaireReduite);
     const btnOuvrir = document.getElementById("boutonOuvrirSommaire");
     if (btnOuvrir) btnOuvrir.style.display = sommaireReduite ? "flex" : "none";
+
+    // La police du livre AVANT toute mesure (voir attendrePolicesDuLivre).
+    await attendrePolicesDuLivre();
 
     // Espace au-dessus des titres de chapitre (curseur « Titre »)
     initEspaceTitre();
@@ -3215,9 +3235,17 @@ function coupesDansPages(pages) {
 
 // Seuil horizontal de la frontière entre la colonne k et la suivante (k = 1, 2…).
 // Même arithmétique que seuilsColonnes : au milieu de la gouttière.
+//
+// La zone d'édition est ZOOMÉE (transform: scale) : ses rectangles sont à l'échelle de
+// l'écran alors que la géométrie des colonnes est logique. Le seuil se met donc à
+// l'échelle de l'élément (1 pour le mesureur, qui n'est pas zoomé) — ce qui permet de
+// mesurer la zone VISIBLE elle-même, et non une copie cachée qui pourrait composer
+// autrement (police pas encore chargée, par exemple).
 function seuilFrontiere(el, k) {
   const g = geomEdition;
-  return el.getBoundingClientRect().left + k * (g.largeurColonne + g.gouttiere) - g.gouttiere / 2;
+  const rect = el.getBoundingClientRect();
+  const echelle = el.offsetWidth ? rect.width / el.offsetWidth : 1;
+  return rect.left + (k * (g.largeurColonne + g.gouttiere) - g.gouttiere / 2) * echelle;
 }
 
 // Protège les mots qui tomberaient sur une frontière de colonne, de la première
@@ -3251,18 +3279,15 @@ function eviterMotsCoupes(el, jusqua) {
   return bornes;
 }
 
-// Le contenu d'une double-page tel qu'on l'AFFICHE : mots de frontière protégés.
-// La mesure se fait sur le mesureur (hors zoom), pas sur la zone d'édition — ni le
-// curseur ni l'annuler/rétablir n'y sont touchés : on ne fait que lui donner du
-// HTML déjà composé.
-function avecMotsProteges(html) {
-  const mes = mesureEl();
-  if (!mes || !geomEdition || !html) return html;
-  mes.innerHTML = html;
-  eviterMotsCoupes(mes, 1);
-  const res = mes.innerHTML;
-  mes.innerHTML = "";
-  return res;
+// Y a-t-il, dans la zone d'édition AFFICHÉE, un mot (ou un guillemet) coupé entre ses deux
+// pages et pas encore protégé ? Un seul relevé de position, sans toucher à rien : c'est ce
+// qui permet à gererFlux de ne réafficher la double-page qu'en cas de besoin.
+function frontiereAProteger(ed) {
+  if (!geomEdition || ed.getBoundingClientRect().width === 0) return false;
+  const p = pointCoupe(ed, seuilFrontiere(ed, 1));
+  if (!p) return false;
+  const groupe = groupeALaCoupe(ed, p);
+  return !!groupe && !groupe.deja;
 }
 
 function blocAncetre(node) {
@@ -3496,7 +3521,12 @@ function afficherSpread() {
   const s = numSpread();
   assurerSpread(s);
   const spreads = spreadsLivre();
-  ed.innerHTML = avecMotsProteges(spreads[s] || "");
+  ed.innerHTML = spreads[s] || "";
+  // La protection se pose sur la zone VISIBLE : c'est elle que l'auteur regarde. Elle était
+  // posée sur une copie cachée (le mesureur), qui peut composer autrement — la police du livre
+  // pas encore chargée, par exemple, ou un réglage d'affichage — et la coupe restait alors
+  // sous les yeux. (Sans effet si la zone est cachée : aperçu, couverture.)
+  eviterMotsCoupes(ed, 1);
   const nG = document.getElementById("numeroGauche");
   const nD = document.getElementById("numeroDroite");
   if (nG) nG.textContent = indexSpread + 1;
@@ -3687,6 +3717,24 @@ function gererFlux() {
   // natif et la position du curseur sont donc intacts.
   if (ed.scrollWidth <= ed.clientWidth + 2) {
     spreads[s] = ed.innerHTML;
+
+    // Taper déplace les lignes : un mot peut tomber à cheval sur les deux pages. On le
+    // protège aussitôt, en suivant le curseur (comme la remontée plus bas). Le test est
+    // un simple relevé ; la double-page ne se réaffiche — et l'annuler/rétablir natif ne
+    // se perd — que si une coupe est réellement là. Une fois protégé, le mot est
+    // « déjà » protégé : la vérification suivante passe, il n'y a pas de boucle.
+    if (frontiereAProteger(ed)) {
+      const offset = offsetCaret(ed);
+      afficherSpread();
+      if (offset !== null) {
+        const cible = editeurEl();
+        cible.focus();
+        placerCaretAOffset(cible, offset);
+      }
+      // La protection a pu pousser du texte : on revérifie (débordement, place libre).
+      timerFlux = setTimeout(gererFlux, 0);
+      return;
+    }
 
     // ... sauf si la double-page s'est creusée : il faut alors rapatrier la
     // suite. On ne réécrit la zone d'édition que si quelque chose a

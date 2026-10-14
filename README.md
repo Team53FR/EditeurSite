@@ -938,6 +938,30 @@ page redevient coupable à la ligne. Elles ne changent pas le texte, seulement s
 habillage, et les balises vides que laisse une coupe tombant pile au bord d'un mot
 ne sont pas stockées.
 
+**Dans la zone d'édition elle-même** (retour : « l'of- | frir. » entre les deux pages d'une
+même double-page). Trois défauts, trouvés en reproduisant la capture :
+
+- **la frappe**. Taper déplace les lignes : un mot tombe à cheval sur les deux pages, et
+  rien ne le protégeait avant la prochaine navigation. Mesuré avec l'ancien code : 10
+  coupes apparues en tapant, 8 restaient. `gererFlux` regarde maintenant la frontière
+  (`frontiereAProteger`, un simple relevé de position) et, s'il y en a une, réaffiche la
+  double-page **en suivant le curseur** — comme la remontée de texte. La double-page ne
+  se réaffiche, et l'annuler/rétablir natif ne se perd, que si une coupe est réellement
+  là ; une fois protégé le mot est « déjà » protégé, donc pas de boucle. Le mot reste
+  coupé pendant 350 ms, le temps que la frappe s'arrête. Après : 7 apparues, 7 corrigées,
+  curseur jamais déplacé ;
+- **l'élément mesuré**. La protection d'affichage se posait sur une COPIE cachée (le
+  mesureur), qui peut composer autrement que ce qu'on voit. Elle se pose sur la zone
+  visible. Comme elle est zoomée (`transform: scale`), `seuilFrontiere` met désormais le
+  seuil à l'échelle de l'élément (`rect.width / offsetWidth`) ;
+- **les polices**. EB Garamond se charge en `font-display: swap` : le texte est d'abord
+  composé dans une police de remplacement. Toute la pagination est une mesure, donc
+  mesurée avant le chargement elle l'était avec d'autres largeurs de lettres, et ne
+  correspondait plus à ce qu'on voyait ensuite. `attendrePolicesDuLivre` attend les trois
+  variantes avant la première mesure, avec un filet de 2 s pour ne jamais bloquer
+  l'ouverture. (Hypothèse plausible plutôt que prouvée : je n'ai pas pu reproduire un
+  chargement lent.)
+
 **Guillemets restés seuls.** Même mécanisme pour un « » » en tête de page (séparé de
 sa phrase) ou un « « » en pied de page (séparé de ce qu'il ouvre). Le texte les sépare
 du mot voisin par une espace ordinaire, que le navigateur prend pour un endroit où
