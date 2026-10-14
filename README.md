@@ -870,6 +870,20 @@ disparaissait avec le `<br>`, la garde refusait donc une conversion juste. Elle 
 maintenant sans aucun blanc. Autre piège : un second lancement d'un script de modification
 réinsérait deux fois la règle CSS — à ne pas faire avec un script qui n'est pas idempotent.
 
+**Plafond : un seul blanc voulu par pause** (retour : « j'ai changé en serrés puis de nouveau
+en espacés et j'ai des trous »). Un paragraphe vide pèse une ligne ENTIÈRE plus deux marges :
+`1,45 + 2 × espace` em. Une suite de n paragraphes vides — laissée par la première version de la
+conversion, ou par Entrée tapé plusieurs fois — faisait donc un trou de n fois cela, et d'autant
+plus grand qu'on augmentait l'espace (mesuré à 0,9 em : 3,25 em par paragraphe vide). Le
+premier paragraphe vide d'une suite est la frontière entre deux paragraphes ; il en reste au
+plus **un blanc voulu** (`p.ligne-vide`, hauteur = l'espace réglé) ; les autres disparaissent.
+Même plafond pour les suites de `<br>` (3 ou 6 donnent le même blanc) et pour des
+`ligne-vide` déjà posés qui se suivent. Résultat mesuré à 0,9 : un blanc voulu = 1,8 em
+d'écart, quel que soit le nombre de lignes vides d'origine. C'est une perte voulue
+d'information — « combien de lignes vides » — au profit de « une pause » ; une pause plus
+large se règle avec « Grand espace ». La bascule serrés → espacés → serrés ne change plus la
+structure du livre (comparée octet pour octet), et une seconde normalisation ne trouve rien.
+
 Le réglage est proposé à chaque changement de valeur : si le livre contient encore l'une de
 ces structures (un livre déjà converti par la première version, par exemple), la
 confirmation revient et le normalise ; sinon, aucune confirmation.

@@ -3923,8 +3923,11 @@ function initEspaceParagraphe() {
 //  - du texte nu à la racine, sans paragraphe.
 //
 // Les lignes vides EN PLUS de la première sont des blancs voulus — une pause, un changement
-// de scène. Elles sont gardées, en paragraphes « ligne-vide » dont la hauteur est l'espace
-// réglé : elles suivent le réglage au lieu de peser une ligne de texte chacune. Un <br>
+// de scène. Elles sont gardées, mais PLAFONNÉES à un seul blanc, en paragraphe « ligne-vide »
+// dont la hauteur est l'espace réglé : il suit le réglage au lieu de peser une ligne de
+// texte. Plafonnées, car une suite de paragraphes vides (laissée par la première version de
+// cette conversion, ou par Entrée tapé plusieurs fois) faisait un grand trou — chacun pesait
+// une ligne ET deux marges, donc davantage encore quand on augmentait l'espace. Un <br>
 // isolé reste un retour à la ligne (vers, réplique). Chaque nouveau <p> reprend style et
 // classe, `data-suite` seulement le premier.
 //
@@ -4001,7 +4004,7 @@ function convertirLignesVidesEnParagraphes(html) {
       const enTete = sansContenu(p);              // la suite de <br> commençait le paragraphe
       const nouveaux = [];
       // Au début chaque <br> était une ligne vide ; ailleurs, l'une d'elles devient la frontière.
-      for (let v = 0; v < (enTete ? k : k - 2); v++) nouveaux.push(espaceur(p));
+      for (let v = 0; v < Math.min(1, enTete ? k : k - 2); v++) nouveaux.push(espaceur(p));
       if (!sansContenu(apres)) nouveaux.push(apres);
       stats.lignes++;
       if (enTete) { nouveaux.forEach((n) => p.before(n)); p.remove(); break; }
@@ -4019,12 +4022,26 @@ function convertirLignesVidesEnParagraphes(html) {
     let j = i;
     while (j < enfants.length && estVide(enfants[j])) j++;
     if (i > 0 && j < enfants.length) {            // entre deux paragraphes, pas en tête ni en queue
-      enfants[i].remove();
+      enfants[i].remove();                        // le premier est la frontière
       stats.vides++;
-      for (let m = i + 1; m < j; m++) enfants[m].classList.add("ligne-vide");
+      // Les suivants : un seul blanc voulu est gardé, les autres retirés (voir plus haut).
+      for (let m = i + 1; m < j; m++) {
+        if (m === i + 1) enfants[m].classList.add("ligne-vide");
+        else { enfants[m].remove(); stats.vides++; }
+      }
     }
     i = j;
   }
+
+  let gardé = null;
+  [...boite.children].forEach((e) => {
+    if (e.classList.contains("ligne-vide") && gardé && gardé.classList.contains("ligne-vide")) {
+      e.remove();
+      stats.vides++;
+      return;
+    }
+    gardé = e;
+  });
 
   return Object.assign({ html: boite.innerHTML, compte: stats.lignes + stats.divs + stats.vides + stats.nus }, stats);
 }
