@@ -254,6 +254,7 @@ function versLivreMemoire(r) {
     auteur: r.auteur || "",
     format: r.format || "149x210",
     espaceTitre: r.espace_titre == null ? undefined : Number(r.espace_titre),
+    espaceParagraphe: r.espace_paragraphe == null ? undefined : Number(r.espace_paragraphe),
     serieId: r.serie_id || null,
     tome: r.tome == null ? null : Number(r.tome),
     gardesDebut: Number(r.gardes_debut) || 0,
@@ -281,6 +282,7 @@ function versLigneLivre(livre, horodatage) {
     auteur: livre.auteur || null,
     format: livre.format || "149x210",
     espace_titre: (typeof livre.espaceTitre === "number") ? livre.espaceTitre : null,
+    espace_paragraphe: (typeof livre.espaceParagraphe === "number") ? livre.espaceParagraphe : null,
     // Écrites explicitement plutôt que laissées de côté : cette fonction ne
     // sert qu'à des livres chargés en entier (le garde-fou d'en dessous s'en
     // assure), donc le rattachement est toujours connu — et l'écrire noir sur
@@ -310,7 +312,7 @@ function versLigneLivre(livre, horodatage) {
 // vide — un livre migré depuis l'ancienne base n'a pas encore son cache de
 // pagination, et la bibliothèque affichait alors « 0 p. ».
 const CHAMPS_LIVRE_META =
-  "id,titre,auteur,format,espace_titre,publie,publie_le,couverture,quatrieme,tranche,nb_pages,cree_le,maj_le," +
+  "id,titre,auteur,format,espace_titre,espace_paragraphe,publie,publie_le,couverture,quatrieme,tranche,nb_pages,cree_le,maj_le," +
   "serie_id,tome,gardes_debut,gardes_fin,livre_spreads(count)";
 
 async function chargerBibliothequeMeta() {
@@ -530,7 +532,7 @@ async function enregistrerLivreDistant(livre, majLeConnu) {
 // chargé les double-pages.
 const CHAMPS_MODIFIABLES_LIVRE = {
   titre: "titre", auteur: "auteur", format: "format",
-  espaceTitre: "espace_titre", couverture: "couverture",
+  espaceTitre: "espace_titre", espaceParagraphe: "espace_paragraphe", couverture: "couverture",
   quatrieme: "quatrieme", tranche: "tranche",
   serieId: "serie_id", tome: "tome",
   gardesDebut: "gardes_debut", gardesFin: "gardes_fin"

@@ -867,6 +867,7 @@ async function chargerLivre() {
 
     // Espace au-dessus des titres de chapitre (curseur « Titre »)
     initEspaceTitre();
+    initEspaceParagraphe();
 
     appliquerFormatPage(formatCourant);
     const selFormat = document.getElementById("selectFormat");
@@ -3827,6 +3828,155 @@ function appliquerInterligne(valeur) {
   afficherSommaire();
   majCompteurMots();
   planifierBrouillon();
+}
+
+// ----- Espace entre les paragraphes -----
+//
+// L'interligne règle la distance entre deux LIGNES ; ceci, celle entre deux PARAGRAPHES.
+//
+// Ce livre sépare ses paragraphes par « <br><br> » dans un même <p> : la « ligne vide »
+// n'est qu'une ligne comme les autres, et aucune règle CSS ne la règle — le navigateur
+// ignore tout ce qu'on dit d'un <br> (essayé : display, height, margin, line-height,
+// font-size, sans le moindre effet). Pour régler l'espace, il faut de VRAIS paragraphes :
+// la première fois, les lignes vides sont donc converties en <p> distincts, dont l'espace
+// est la marge du bas. Le texte ne bouge pas d'une lettre.
+//
+// Le réglage est PAR LIVRE (colonne espace_paragraphe, en em) : un paragraphe écrit plus
+// tard suit tout seul, et l'aperçu, l'impression et la lecture composent pareil.
+const ESPACES_PARAGRAPHE = [0, 0.4, 0.9, 1.45, 2];   // em — les valeurs du menu
+
+function appliquerEspaceParagraphe(em) {
+  const racine = document.documentElement.style;
+  if (typeof em === "number") racine.setProperty("--espace-paragraphe", em + "em");
+  else racine.removeProperty("--espace-paragraphe");
+}
+
+function initEspaceParagraphe() {
+  const livre = (typeof indexLivre === "number" && indexLivre !== -1) ? livreActuel() : null;
+  const em = livre && typeof livre.espaceParagraphe === "number" ? livre.espaceParagraphe : null;
+  appliquerEspaceParagraphe(em);
+  const menu = document.getElementById("selectEspacement");
+  if (!menu) return;
+  // Une valeur hors liste (réglage d'une autre version) montre la plus proche.
+  menu.value = em === null ? "" : String(ESPACES_PARAGRAPHE.reduce((a, b) => Math.abs(b - em) < Math.abs(a - em) ? b : a));
+}
+
+// Remplace les « lignes vides » (au moins deux <br> d'affilée, directement dans un <p>) par
+// des paragraphes distincts. Rend le HTML et le nombre de séparations converties.
+//
+//  - deux <br> = une ligne vide = la frontière entre deux paragraphes ;
+//  - k > 2 <br> : la frontière, plus k-2 paragraphes VIDES — on ne perd pas les blancs voulus ;
+//  - un seul <br> reste où il est : c'est un retour à la ligne dans le paragraphe (vers,
+//    réplique…), pas un changement de paragraphe ;
+//  - chaque nouveau <p> reprend les attributs de l'ancien (style, classe), sauf data-suite,
+//    qui n'appartient qu'au premier : lui seul prolonge la page d'avant.
+function convertirLignesVidesEnParagraphes(html) {
+  const boite = document.createElement("div");
+  boite.innerHTML = html || "";
+  let compte = 0;
+
+  const estBlanc = (n) => n.nodeType === 3 && !n.data.trim();
+  const estBr = (n) => n.nodeType === 1 && n.nodeName === "BR";
+
+  [...boite.children].forEach((bloc) => {
+    if (bloc.tagName !== "P") return;
+    const noeuds = [...bloc.childNodes];
+
+    const segments = [[]];              // les morceaux de texte, un par futur paragraphe
+    const videsAvant = [0];             // paragraphes vides à poser AVANT chaque segment
+    let i = 0, converti = false;
+    while (i < noeuds.length) {
+      if (estBr(noeuds[i])) {
+        // La suite de <br> (et des blancs qui les séparent) qui commence ici.
+        let j = i, brs = 0, fin = i;
+        while (j < noeuds.length && (estBr(noeuds[j]) || estBlanc(noeuds[j]))) {
+          if (estBr(noeuds[j])) { brs++; fin = j; }
+          j++;
+        }
+        if (brs >= 2) {
+          const debut = segments[segments.length - 1].every(estBlanc);   // la suite commence le paragraphe
+          segments.push([]);
+          // Au début, chaque <br> était une ligne vide ; ailleurs, l'une d'elles devient la frontière.
+          videsAvant.push(debut ? brs : brs - 2);
+          compte++;
+          converti = true;
+          i = fin + 1;
+          continue;
+        }
+        // un <br> isolé : il reste dans le paragraphe
+        for (let k = i; k <= fin; k++) segments[segments.length - 1].push(noeuds[k]);
+        i = fin + 1;
+        continue;
+      }
+      segments[segments.length - 1].push(noeuds[i]);
+      i++;
+    }
+    if (!converti) return;
+
+    const nouveaux = [];
+    const vide = () => { const p = bloc.cloneNode(false); p.removeAttribute("data-suite"); p.appendChild(document.createElement("br")); return p; };
+    let premier = true;
+    segments.forEach((seg, k) => {
+      for (let v = 0; v < videsAvant[k]; v++) nouveaux.push(vide());
+      if (seg.every(estBlanc)) return;                    // un segment vide ne fait pas de paragraphe
+      const p = bloc.cloneNode(false);
+      if (!premier) p.removeAttribute("data-suite");
+      premier = false;
+      seg.forEach((n) => p.appendChild(n));
+      nouveaux.push(p);
+    });
+    nouveaux.forEach((p) => boite.insertBefore(p, bloc));
+    boite.removeChild(bloc);
+  });
+  return { html: boite.innerHTML, compte };
+}
+
+// Le texte du livre, espaces ramenées à une, sans le balisage : la conversion ne doit
+// rien changer d'autre que la structure.
+function texteDuLivreSansStructure(html) {
+  const d = document.createElement("div");
+  d.innerHTML = html || "";
+  return (d.textContent || "").replace(/\s+/g, " ").trim();
+}
+
+function appliquerEspacementParagraphes(valeur) {
+  const em = parseFloat(valeur);
+  if (!isFinite(em) || modeApercu || modeCouverture) { initEspaceParagraphe(); return; }
+  const livre = livreActuel();
+  flushSpread();
+
+  let tout = "";
+  spreadsLivre().forEach((s) => { tout = fusionnerSuite(tout, s); });
+  const conversion = convertirLignesVidesEnParagraphes(tout);
+
+  if (conversion.compte > 0) {
+    if (texteDuLivreSansStructure(conversion.html) !== texteDuLivreSansStructure(tout)) {
+      alert("Le réglage a été annulé : la conversion des lignes vides aurait modifié le texte. Rien n'a changé.");
+      initEspaceParagraphe();
+      return;
+    }
+    if (!confirm("Les paragraphes de ce livre sont séparés par des lignes vides (" + conversion.compte + " au total).\n\n" +
+        "Pour régler leur espacement, elles vont être converties en vrais paragraphes. " +
+        "Le texte ne change pas, mais la mise en page sera recomposée et l'aspect peut légèrement bouger.\n\nContinuer ?")) {
+      initEspaceParagraphe();             // remet le menu comme il était
+      return;
+    }
+  }
+
+  pendantAttenteLourde("Nouvel espace entre les paragraphes…", () => {
+    if (conversion.compte > 0) livre.spreads = [conversion.html];   // repaginerTout le redécoupe
+    livre.espaceParagraphe = em;
+    appliquerEspaceParagraphe(em);
+    repaginerTout();
+
+    const spreads = spreadsLivre();
+    if (numSpread() >= spreads.length) indexSpread = Math.max(0, (spreads.length - 1) * 2);
+    afficherSpread();
+    afficherSommaire();
+    majCompteurMots();
+    marquerModifie();
+    planifierBrouillon();
+  }, "Tout le texte est recomposé.");
 }
 
 // ----- Navigation -----

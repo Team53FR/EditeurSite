@@ -440,7 +440,8 @@ button.danger {
 .garde-fin   { left: 100%;  margin-left: 10px;  border-radius: 0 3px 3px 0; }
 
 .texte-livre p {
-  margin: 0 0 6px 0;
+  /* Réglable par livre (« Paragraphes » dans la barre d'outils) ; 6 px sans réglage. */
+  margin: 0 0 var(--espace-paragraphe, 6px) 0;
 }
 
 /* Un mot que la frontière de page aurait coupé (voir eviterMotsCoupes) : il ne

@@ -818,6 +818,37 @@ n'aurait dû, ce qui gonfle à son tour le dos et le palier de marge de reliure.
 Rien n'était rogné, mais rien ne tombait juste. `mesure-pro` a été retiré :
 l'accord se fait maintenant à la source.
 
+**L'espace entre les paragraphes** (menu « Paragraphes » à côté de l'interligne ;
+colonne `livres.espace_paragraphe`, en em, bornée à 0–4, `null` = la valeur d'avant). Cinq
+choix : collés (0), serrés (0,4), espacés (0,9), ligne vide (1,45 — l'aspect d'une ligne
+vide), grand espace (2).
+
+**Pourquoi une conversion.** Ce livre sépare ses paragraphes par « <br><br> » dans un
+même `<p>`. La « ligne vide » n'est qu'une ligne comme les autres, et **aucune règle CSS
+ne la règle** : essayé dans Chrome, `display`, `height`, `margin`, `line-height` et
+`font-size` sur `br` n'ont aucun effet sur la mise en page. Pour régler l'espace il faut de
+vrais paragraphes ; à la première utilisation, `convertirLignesVidesEnParagraphes` remplace
+chaque suite de deux `<br>` (directement dans un `<p>`) par une frontière entre deux `<p>`,
+dont l'espace est la marge du bas (`margin: 0 0 var(--espace-paragraphe, 6px)`, dans
+style.css et impression.css). Règles : k > 2 `<br>` gardent k − 2 paragraphes vides (les
+blancs voulus ne se perdent pas) ; un `<br>` isolé reste un retour à la ligne (vers,
+réplique) ; chaque `<p>` reprend style et classe, `data-suite` seulement le premier ; un
+`<br>` dans une mise en forme (`<i>a<br><br>b</i>`) n'est pas touché.
+
+**Garde-fous.** Une confirmation annonce la conversion et le nombre de lignes vides ; un
+refus ne change rien (le menu revient à sa place). Le texte avant et après est comparé
+(espaces ramenées à une) : au moindre écart, rien n'est appliqué. Le réglage suivant n'a
+plus de confirmation : le livre est déjà fait de paragraphes. Il se recompose comme
+l'interligne (`repaginerTout`).
+
+**Pourquoi par livre et pas dans chaque paragraphe.** Le réglage est une variable CSS
+posée sur `<html>` : un paragraphe écrit plus tard le suit tout seul, l'aperçu et
+l'impression composent pareil, et la lecture (`lecture.js`) la pose aussi. Il a fallu une
+colonne (migration `livres_espace_paragraphe`, appliquée avant ce code : un ajout facultatif
+ne gêne pas la version déjà en ligne). Mesuré à l'écran : l'espace entre deux paragraphes
+vaut exactement la valeur choisie, en em de la taille du texte (attention en test : les
+rectangles sont à l'échelle du zoom, `echelleAffichage`).
+
 **L'éditeur sur petit écran** (sous 900 px : `requeteCompacte` dans editeur.js, bloc
 « Petits écrans » de style.css — le seuil est écrit aux deux endroits). Deux défauts
 de fond, un seul remède :

@@ -170,6 +170,15 @@
           <option value="1.45" selected>Interligne 1,5</option>
           <option value="1.8">Interligne 2</option>
         </select>
+        <!-- L'espace entre deux paragraphes, comme l'interligne l'est entre deux lignes. -->
+        <select id="selectEspacement" title="Espace entre les paragraphes" onchange="appliquerEspacementParagraphes(this.value)">
+          <option value="" disabled selected hidden>Paragraphes</option>
+          <option value="0">Paragraphes collés</option>
+          <option value="0.4">Paragraphes serrés</option>
+          <option value="0.9">Paragraphes espacés</option>
+          <option value="1.45">Ligne vide</option>
+          <option value="2">Grand espace</option>
+        </select>
         <span class="separateur-outils"></span>
         <input type="number" id="inputTaille" value="11" min="6" max="72" title="Taille (pt)"
           class="input-taille"

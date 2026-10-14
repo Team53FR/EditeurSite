@@ -47,6 +47,10 @@ async function chargerLecture() {
     // de la table laisse passer un livre publié quel qu'en soit l'auteur, et
     // refuse les autres. Le paramètre « u » des anciens liens est ignoré.
     livre = await chargerLivreComplet(id);
+    // L'espace entre paragraphes réglé par l'auteur : la lecture compose comme l'éditeur.
+    if (typeof livre.espaceParagraphe === "number") {
+      document.documentElement.style.setProperty("--espace-paragraphe", livre.espaceParagraphe + "em");
+    }
     if (!livre.publie) { message.textContent = "Ce livre n'est pas (ou plus) publié."; return; }
   } catch (erreur) {
     message.textContent = erreur.status === 404

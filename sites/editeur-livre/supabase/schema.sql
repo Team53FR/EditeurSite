@@ -48,6 +48,10 @@ create table public.livres (
   auteur        text,
   format        text not null,
   espace_titre  numeric,
+  -- Espace entre les paragraphes, en em (relatif à la taille du texte). Facultatif :
+  -- null = la valeur d'avant ce réglage. Borné : une valeur aberrante ferait
+  -- déborder chaque page.
+  espace_paragraphe numeric check (espace_paragraphe is null or (espace_paragraphe >= 0 and espace_paragraphe <= 4)),
   -- « on delete set null » et NON « cascade » : supprimer une série ne doit
   -- jamais emporter les manuscrits qu'elle rangeait. Les tomes redeviennent
   -- des livres sans série.
