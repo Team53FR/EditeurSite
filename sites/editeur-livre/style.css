@@ -874,6 +874,14 @@ button.danger {
   line-height: 1.25;
 }
 
+/* L'espace entre le titre (ou le sous-titre) et le premier paragraphe : réglable par livre
+   (curseur « Sous-titre »). Posé sur la MARGE DU TITRE et non sur celle du paragraphe : deux
+   marges verticales voisines se confondent en la plus grande, et le titre garde ses 8 px
+   (6 px pour le sous-titre) — on n'aurait alors pas pu descendre en dessous. Un titre suivi
+   d'un sous-titre garde son écart d'avant : ce n'est pas lui que règle le curseur. */
+.texte-livre h2:has(+ p) { margin-bottom: var(--espace-sous-titre, 8px); }
+.texte-livre h3:has(+ p) { margin-bottom: var(--espace-sous-titre, 6px); }
+
 .texte-livre ul,
 .texte-livre ol {
   margin: 0 0 6px 0;

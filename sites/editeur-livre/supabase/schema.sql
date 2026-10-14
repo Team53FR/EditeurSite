@@ -52,6 +52,9 @@ create table public.livres (
   -- null = la valeur d'avant ce réglage. Borné : une valeur aberrante ferait
   -- déborder chaque page.
   espace_paragraphe numeric check (espace_paragraphe is null or (espace_paragraphe >= 0 and espace_paragraphe <= 4)),
+  -- Espace sous le titre ou le sous-titre, avant le premier paragraphe, en px.
+  -- Facultatif : null = la valeur d'avant ce réglage.
+  espace_sous_titre numeric check (espace_sous_titre is null or (espace_sous_titre >= 0 and espace_sous_titre <= 200)),
   -- « on delete set null » et NON « cascade » : supprimer une série ne doit
   -- jamais emporter les manuscrits qu'elle rangeait. Les tomes redeviennent
   -- des livres sans série.

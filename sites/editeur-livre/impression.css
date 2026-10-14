@@ -187,6 +187,10 @@
     line-height: 1.25;
   }
 
+  /* Même règle qu'à l'écran (voir style.css) : l'espace sous le titre ou le sous-titre. */
+  .texte-impression h2:has(+ p) { margin-bottom: var(--espace-sous-titre, 8px); }
+  .texte-impression h3:has(+ p) { margin-bottom: var(--espace-sous-titre, 6px); }
+
   .texte-impression ul,
   .texte-impression ol {
     margin: 0 0 6px 0;

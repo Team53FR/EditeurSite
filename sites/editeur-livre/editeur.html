@@ -197,6 +197,14 @@
           oninput="setEspaceTitre(this.value)">
         <span id="valeurEspaceTitre" class="valeur-espace">65</span>
         <span class="separateur-outils"></span>
+        <!-- Le blanc ENTRE le sous-titre (ou le titre) et le premier paragraphe. -->
+        <span class="etiquette-espace" title="Espace entre le sous-titre et le premier paragraphe">Sous-titre</span>
+        <input type="range" id="sliderEspaceSousTitre" class="slider-espace"
+          min="0" max="80" step="2" value="6"
+          title="Espace entre le sous-titre et le premier paragraphe"
+          oninput="setEspaceSousTitre(this.value)">
+        <span id="valeurEspaceSousTitre" class="valeur-espace">6</span>
+        <span class="separateur-outils"></span>
         <button onmousedown="event.preventDefault()" onclick="basculerRecherche()" title="Rechercher / Remplacer (Ctrl+F)">&#128269;</button>
       </div>
 

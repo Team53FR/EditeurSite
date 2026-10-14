@@ -887,6 +887,7 @@ async function chargerLivre() {
 
     // Espace au-dessus des titres de chapitre (curseur « Titre »)
     initEspaceTitre();
+    initEspaceSousTitre();
     initEspaceParagraphe();
 
     appliquerFormatPage(formatCourant);
@@ -5063,6 +5064,58 @@ function setEspaceTitre(valeur) {
 }
 
 // =====================================================================
+//  Espace entre le sous-titre et le premier paragraphe (curseur « Sous-titre »)
+//
+//  Le blanc sous le titre, ou sous le sous-titre quand il y en a un. Comme celui
+//  AU-DESSUS du titre (« Titre »), il est réglé par livre et s'applique partout à la
+//  fois : zone d'édition, mesureur, aperçu, impression, lecture. Sans réglage, la valeur
+//  est celle d'avant (8 px sous un titre, 6 px sous un sous-titre) et le curseur montre 6.
+// =====================================================================
+
+let timerEspaceSousTitre = null;
+
+function appliquerEspaceSousTitre(px) {
+  const racine = document.documentElement.style;
+  if (typeof px === "number") racine.setProperty("--espace-sous-titre", px + "px");
+  else racine.removeProperty("--espace-sous-titre");
+}
+
+function initEspaceSousTitre() {
+  const livre = (typeof indexLivre === "number" && indexLivre !== -1) ? livreActuel() : null;
+  const px = livre && typeof livre.espaceSousTitre === "number" ? Math.max(0, Math.min(200, livre.espaceSousTitre)) : null;
+  appliquerEspaceSousTitre(px);
+  const curseur = document.getElementById("sliderEspaceSousTitre");
+  if (curseur) curseur.value = px === null ? 6 : px;
+  const valeur = document.getElementById("valeurEspaceSousTitre");
+  if (valeur) valeur.textContent = px === null ? 6 : px;
+}
+
+function setEspaceSousTitre(valeur) {
+  const px = Math.max(0, Math.min(200, parseInt(valeur, 10) || 0));
+  const livre = livreActuel();
+  if (livre) livre.espaceSousTitre = px;
+
+  // Retour visuel immédiat pendant le glissement du curseur.
+  appliquerEspaceSousTitre(px);
+  const etiquette = document.getElementById("valeurEspaceSousTitre");
+  if (etiquette) etiquette.textContent = px;
+  marquerModifie();
+
+  // L'espace change la hauteur occupée : on re-répartit le texte, une fois le curseur relâché.
+  clearTimeout(timerEspaceSousTitre);
+  timerEspaceSousTitre = setTimeout(() => {
+    flushSpread();
+    repaginerTout();
+    const spreads = spreadsLivre();
+    if (numSpread() >= spreads.length) indexSpread = Math.max(0, (spreads.length - 1) * 2);
+    afficherSpread();
+    afficherSommaire();
+    majCompteurMots();
+    planifierBrouillon();
+  }, 350);
+}
+
+// =====================================================================
 //  Réglages du texte des couvertures (police, taille, position)
 //
 //  Les valeurs sont stockées avec les mêmes clés que styleTexteCouv()
@@ -5341,6 +5394,9 @@ function reinitialiserTailles() {
       // format : il revient lui aussi à sa valeur.
       livreActuel().espaceTitre = t.espaceTitre;
       initEspaceTitre();
+      // Le blanc sous les titres aussi : il revient à celui d'avant tout réglage.
+      delete livreActuel().espaceSousTitre;
+      initEspaceSousTitre();
 
       const spreads = spreadsLivre();
       for (let i = 0; i < spreads.length; i++) spreads[i] = nettoyerTaillesHtml(spreads[i]);

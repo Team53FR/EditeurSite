@@ -294,6 +294,7 @@ async function dupliquerLivre(id) {
       format: source.format,
       espaceTitre: source.espaceTitre,
       espaceParagraphe: source.espaceParagraphe,
+      espaceSousTitre: source.espaceSousTitre,
       gardesDebut: source.gardesDebut,
       gardesFin: source.gardesFin,
       couverture: source.couverture ? Object.assign({}, source.couverture) : undefined,

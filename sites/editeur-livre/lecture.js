@@ -48,6 +48,9 @@ async function chargerLecture() {
     // refuse les autres. Le paramètre « u » des anciens liens est ignoré.
     livre = await chargerLivreComplet(id);
     // L'espace entre paragraphes réglé par l'auteur : la lecture compose comme l'éditeur.
+    if (typeof livre.espaceSousTitre === "number") {
+      document.documentElement.style.setProperty("--espace-sous-titre", livre.espaceSousTitre + "px");
+    }
     if (typeof livre.espaceParagraphe === "number") {
       document.documentElement.style.setProperty("--espace-paragraphe", livre.espaceParagraphe + "em");
     }

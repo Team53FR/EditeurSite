@@ -896,6 +896,22 @@ ne gêne pas la version déjà en ligne). Mesuré à l'écran : l'espace entre d
 vaut exactement la valeur choisie, en em de la taille du texte (attention en test : les
 rectangles sont à l'échelle du zoom, `echelleAffichage`).
 
+**Le blanc sous le sous-titre** (curseur « Sous-titre » de la barre d'outils, à côté de « Titre » ;
+0 à 80 px, par pas de 2). C'est l'espace entre le sous-titre — ou le titre, quand il n'y a pas de
+sous-titre — et le premier paragraphe. Variable CSS `--espace-sous-titre` posée sur `<html>`,
+comme les autres réglages d'espace, et colonne `espace_sous_titre` (migration
+`livres_espace_sous_titre`, appliquée avant le code). Sans réglage, rien ne change : 8 px sous un
+titre, 6 px sous un sous-titre, et le curseur affiche 6.
+
+La règle est posée sur la **marge du titre** (`h2:has(+ p)`, `h3:has(+ p)`) et non sur celle du
+paragraphe : deux marges verticales voisines se confondent en la plus grande, donc on n'aurait
+pas pu descendre sous la valeur par défaut. Un titre suivi d'un sous-titre garde son écart
+(8 px) : ce n'est pas lui que règle le curseur. Même règle dans `style.css` et `impression.css`,
+et `lecture.js` pose la variable. Au relâchement du curseur (350 ms), le livre est recomposé,
+car l'espace change la hauteur occupée. Le bouton de remise à zéro des tailles le réinitialise
+aussi. Nécessite `:has()` (navigateurs récents). Mesuré à l'écran : l'écart vaut exactement la
+valeur choisie, de 0 à 80, pour un titre seul comme pour un sous-titre.
+
 **L'éditeur sur petit écran** (sous 900 px : `requeteCompacte` dans editeur.js, bloc
 « Petits écrans » de style.css — le seuil est écrit aux deux endroits). Deux défauts
 de fond, un seul remède :
