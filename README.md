@@ -35,14 +35,18 @@ EditeurSite/
 │   │   ├── index.html
 │   │   ├── supabase/schema.sql
 │   │   └── ...
-│   └── droid-fortnite/   # site "Droid Fortnite" (suivi de Star Wars: Droid Tycoon)
-│       ├── index.html
-│       ├── supabase/schema.sql
-│       └── ...
+│   ├── droid-fortnite/   # site "Droid Fortnite" (suivi de Star Wars: Droid Tycoon)
+│   │   ├── index.html
+│   │   ├── supabase/schema.sql
+│   │   └── ...
+│   └── recto-verso/      # site "Recto-verso" (image au recto, cartes à message au verso)
+│       ├── index.html    # tout se passe dans le navigateur : pas de base, pas de compte requis
+│       ├── style.css
+│       └── app.js
 └── README.md
 ```
 
-Toutes les données (comptes + les 3 sites) vivent dans un seul projet
+Toutes les données (comptes + les 3 sites qui en ont) vivent dans un seul projet
 Supabase — voir « Stockage : Supabase » plus bas. Ces fichiers `.sql` ne sont
 que la définition du schéma (tables, RLS, fonctions), rejouée manuellement
 dans l'éditeur SQL de Supabase à chaque changement ; il n'y a pas de système
@@ -78,7 +82,7 @@ et le portail racine sous `https://<utilisateur>.github.io/EditeurSite/`.
 
 ## Pages légales
 
-Quatre pages à la racine, communes au portail et aux trois sites :
+Quatre pages à la racine, communes au portail et aux quatre sites :
 `mentions-legales.html`, `confidentialite.html`, `cookies.html` et
 `conditions-utilisation.html`. Un seul texte à tenir à jour plutôt qu'un jeu
 par site.
@@ -118,7 +122,7 @@ Trois points de fond, à garder en tête si le site change :
 
 ## Polices
 
-EB Garamond (les trois sites « papier ») et Orbitron (Droid Fortnite) sont
+EB Garamond (les sites « papier », Recto-verso compris) et Orbitron (Droid Fortnite) sont
 servies depuis `polices/` et non depuis Google Fonts. Charger une police
 depuis `fonts.gstatic.com` envoie l'adresse IP du visiteur à Google à chaque
 page, sans consentement possible : c'est un transfert de donnée personnelle
@@ -1528,6 +1532,54 @@ deux rangs en deux temps pour réordonner.
 PNG si l'image redimensionnée contient un pixel non totalement opaque,
 sinon en JPEG (plus léger) — un fond transparent (icône détourée) n'est
 donc pas aplati en noir comme avec un export JPEG systématique.
+
+## Recto-verso (image au recto, cartes à message au verso)
+
+Un site **sans serveur** : `sites/recto-verso/` (`index.html`, `style.css`, `app.js`). L'image est
+lue par `FileReader` et ne quitte jamais le navigateur ; rien n'est gardé sur le site (ni
+base, ni `localStorage`). Il n'ajoute donc aucun appel tiers ni aucun cookie : seule la page
+de confidentialité mentionne qu'il ne conserve rien. Il est inscrit au portail
+(`DEFAULT_SITES`, `ALLURE_SITES`), donc **l'accès « recto-verso » se coche dans la gestion des
+comptes** pour qu'il apparaisse dans le tableau de bord ; la page elle-même s'ouvre sans
+connexion, puisqu'elle ne touche à aucune donnée.
+
+**Ce que fait la page.** Format A3 / A4 / A5, portrait ou paysage. Recto : une image, placée
+en « Remplir » (elle couvre la feuille, rognée) ou « Entière » (avec des bandes de couleur),
+zoom de 100 à 400 %, cadrage en la glissant ; elle ne sort jamais de la feuille en mode
+« Remplir ». La résolution effective est affichée (ppp), avec un avertissement sous 150.
+Verso : une grille de colonnes × lignes (modèles 2×2 à 4×6, jusqu'à 12 × 12) qui occupe toute la
+feuille, une marge réglable, un trait de découpe gris clair (`#cfcfcf`, 0,25 mm) entre
+toutes les cartes et autour de la grille. Chaque carte est un champ de texte libre (police,
+taille, couleur, fond du verso) ; **un texte trop long rapetisse seul, jusqu'à 5 pt**, et la
+carte est cerclée de rouge à l'écran s'il ne tient toujours pas. « Remplir avec une liste »
+répartit un message par ligne sur les cartes, dans l'ordre de lecture. « Retourner la feuille »
+fait pivoter la feuille (rotation 3D autour de l'axe vertical) du recto au verso.
+
+**Tout est en millimètres.** La feuille est dessinée à sa taille réelle (`--W`, `--H`) puis
+réduite à l'écran par un `scale` : la même page sert à l'impression, à l'échelle 1, sans
+deuxième mise en page. `#stylePage` reçoit la règle `@page { size: … }` (une règle `@page`
+ne lit pas de variable CSS). À l'impression, le panneau disparaît, la feuille cesse de
+pivoter et les deux faces sortent l'une après l'autre : page 1 = recto, page 2 = verso. Le
+verso perd 0,3 mm de hauteur à l'impression : une boîte exactement aussi haute que la page
+déborde parfois d'un arrondi et ajoute une troisième page blanche.
+
+**Le verso est dessiné tel qu'on le voit en retournant la feuille** (comme une page qu'on
+tourne) : la carte en haut à gauche du verso est donc derrière la partie en haut à droite du
+recto. C'est ce que fait une impression recto-verso « reliure bord long » en portrait, « bord
+court » en paysage ; le texte d'aide sous la feuille le rappelle.
+
+**Enregistrer le projet** écrit un fichier `recto-verso.json` (réglages, textes et image en
+`data:`) sur l'ordinateur ; **Ouvrir** le relit. À l'ouverture tout est revalidé : version,
+nombres bornés, couleurs en `#rrggbb`, image uniquement `data:image/…`, textes tronqués — un
+fichier piégé ne peut pas injecter de CSS ni d'adresse.
+
+**Vérifié dans le navigateur de l'appli** (mesures en mm à l'écran) : tailles A3/A4/A5 et
+paysage ; carte de 70 × 59,4 mm en 3 × 5 sur A4 ; grille sur toute la feuille ; traits gris clair ;
+image qui couvre la feuille, zoom, glissement borné ; texte long rétréci ; liste répartie ;
+aller-retour du projet ; mise en page d'impression simulée (les règles `@media print`
+appliquées à l'écran : deux faces de 210 × 297 mm, à la suite, sans rotation). **Non vérifié** :
+une vraie impression papier, la boîte d'impression du navigateur (page blanche en trop,
+sens du retournement de la feuille selon l'imprimante) et un téléphone réel.
 
 ## Favicon
 

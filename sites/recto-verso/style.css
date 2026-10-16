@@ -1,0 +1,321 @@
+/* ===== Recto-verso =====
+   Même papier chaud / encre chaude que les autres sites, avec un vert-bleu
+   d'atelier pour les éléments actifs. La feuille, elle, reste blanche : c'est
+   elle qui sera imprimée, pas le thème de l'écran. */
+:root {
+  color-scheme: light dark;
+  --fond: #f4efe4;
+  --carte: #fffdf8;
+  --creux: #ece5d6;
+  --texte: #241d15;
+  --texte-att: #6d6152;
+  --bordure: #d9cdb8;
+  --primaire: #2f7d7a;
+  --primaire-fonce: #256664;
+  --primaire-clair: rgba(47, 125, 122, 0.13);
+  --ombre: 0 2px 10px rgba(60, 42, 20, 0.10);
+  --ombre-feuille: 0 6px 28px rgba(60, 42, 20, 0.22);
+  --serif: "EB Garamond", Georgia, serif;
+  --rayon: 12px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fond: #14110c;
+    --carte: #1c1811;
+    --creux: #201b13;
+    --texte: #f2ebdd;
+    --texte-att: #a2967f;
+    --bordure: #322b20;
+    --primaire: #69b8b3;
+    --primaire-fonce: #86cdc8;
+    --primaire-clair: rgba(105, 184, 179, 0.16);
+    --ombre: 0 4px 18px rgba(0, 0, 0, 0.4);
+    --ombre-feuille: 0 8px 32px rgba(0, 0, 0, 0.55);
+  }
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--fond);
+  color: var(--texte);
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ----- En-tête ----- */
+.entete { padding: 1.1rem 1.25rem 0.4rem; max-width: 1400px; margin: 0 auto; }
+.entete h1 { margin: 0; font-family: var(--serif); font-weight: 600; font-size: 1.7rem; letter-spacing: 0.01em; }
+.entete p { margin: 0.25rem 0 0; color: var(--texte-att); font-size: 0.92rem; max-width: 60ch; }
+
+/* ----- Mise en page : panneau + scène ----- */
+.atelier {
+  display: grid;
+  grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+  gap: 1.25rem;
+  align-items: start;
+  padding: 0.9rem 1.25rem 2rem;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+.panneau { display: flex; flex-direction: column; gap: 0.8rem; }
+.zone-scene {
+  position: sticky; top: 0.75rem;
+  min-width: 0;
+  display: flex; flex-direction: column; align-items: center; gap: 0.8rem;
+}
+
+@media (max-width: 860px) {
+  .atelier { grid-template-columns: minmax(0, 1fr); padding: 0.75rem 1rem 2rem; }
+  .zone-scene { position: static; order: -1; }
+  .entete { padding: 1rem 1rem 0.2rem; }
+}
+
+/* ----- Blocs de réglages ----- */
+.bloc {
+  background: var(--carte);
+  border: 1px solid var(--bordure);
+  border-radius: var(--rayon);
+  box-shadow: var(--ombre);
+  padding: 0.85rem 0.95rem 0.95rem;
+  display: flex; flex-direction: column; gap: 0.7rem;
+}
+.bloc h2 {
+  margin: 0;
+  font-family: var(--serif);
+  font-weight: 600;
+  font-size: 1.15rem;
+}
+.ligne { display: flex; flex-wrap: wrap; align-items: center; gap: 0.55rem; }
+.indice { margin: 0; font-size: 0.8rem; color: var(--texte-att); line-height: 1.4; }
+.indice:empty { display: none; }
+
+/* ----- Boutons ----- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.45rem;
+  padding: 0.6rem 0.95rem;
+  border-radius: 10px;
+  border: none;
+  font: inherit; font-size: 0.92rem; font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.08s ease, background 0.15s ease;
+  -webkit-user-select: none; user-select: none;
+}
+.btn:active { transform: scale(0.97); }
+.btn-primaire { background: var(--primaire); color: #fff; }
+.btn-primaire:hover { background: var(--primaire-fonce); }
+@media (prefers-color-scheme: dark) { .btn-primaire { color: #0d1514; } }
+.btn-secondaire { background: var(--primaire-clair); color: var(--primaire); }
+.btn-secondaire:hover { background: var(--creux); }
+.btn-discret { background: transparent; color: var(--texte-att); border: 1px solid var(--bordure); }
+.btn-discret:hover { color: var(--texte); background: var(--creux); }
+.btn-bloc { width: 100%; padding: 0.75rem; }
+.btn[hidden] { display: none; }
+:focus-visible { outline: 2px solid var(--primaire); outline-offset: 2px; }
+
+/* ----- Boutons segmentés ----- */
+.segment {
+  display: inline-flex;
+  background: var(--creux);
+  border: 1px solid var(--bordure);
+  border-radius: 10px;
+  padding: 2px;
+  gap: 2px;
+}
+.segment button {
+  border: none; background: transparent; color: var(--texte-att);
+  font: inherit; font-size: 0.88rem; font-weight: 600;
+  padding: 0.4rem 0.8rem; border-radius: 8px; cursor: pointer;
+}
+.segment button:hover { color: var(--texte); }
+.segment button[aria-pressed="true"] { background: var(--primaire); color: #fff; }
+@media (prefers-color-scheme: dark) { .segment button[aria-pressed="true"] { color: #0d1514; } }
+.segment-plein { display: flex; }
+.segment-plein button { flex: 1; }
+
+/* ----- Champs ----- */
+.champ-curseur { display: grid; grid-template-columns: 4.2rem minmax(0, 1fr) 3.6rem; align-items: center; gap: 0.6rem; font-size: 0.88rem; }
+.champ-curseur span { color: var(--texte-att); font-weight: 600; }
+.champ-curseur output { text-align: right; font-variant-numeric: tabular-nums; color: var(--texte-att); }
+input[type="range"] { width: 100%; accent-color: var(--primaire); }
+
+.champ-nombre { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.8rem; color: var(--texte-att); font-weight: 600; }
+.champ-nombre input {
+  width: 5rem; padding: 0.5rem 0.6rem;
+  border: 1px solid var(--bordure); border-radius: 10px;
+  background: var(--fond); color: var(--texte);
+  font: inherit; font-size: 1.05rem;
+}
+.ligne-nombres { align-items: flex-end; }
+.croix { padding-bottom: 0.55rem; color: var(--texte-att); font-size: 1.1rem; }
+
+.puces { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.puce {
+  border: 1px solid var(--bordure); background: var(--fond); color: var(--texte);
+  border-radius: 999px; padding: 0.25rem 0.7rem;
+  font: inherit; font-size: 0.82rem; cursor: pointer;
+}
+.puce:hover { background: var(--creux); }
+.puce[aria-pressed="true"] { background: var(--primaire-clair); border-color: var(--primaire); color: var(--primaire); font-weight: 600; }
+
+.case { display: flex; align-items: center; gap: 0.55rem; font-size: 0.9rem; cursor: pointer; }
+.case input { width: 1.05rem; height: 1.05rem; accent-color: var(--primaire); }
+
+.champ-liste { display: grid; grid-template-columns: 4.2rem minmax(0, 1fr); align-items: center; gap: 0.6rem; font-size: 0.88rem; }
+.champ-liste span { color: var(--texte-att); font-weight: 600; }
+.champ-liste select {
+  padding: 0.5rem 0.6rem; border: 1px solid var(--bordure); border-radius: 10px;
+  background: var(--fond); color: var(--texte); font: inherit;
+}
+.champ-couleur { display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.88rem; color: var(--texte-att); font-weight: 600; }
+.champ-couleur[hidden] { display: none; }
+.champ-couleur input { width: 2.4rem; height: 2rem; padding: 0; border: 1px solid var(--bordure); border-radius: 8px; background: none; cursor: pointer; }
+
+.liste-rapide summary { cursor: pointer; font-size: 0.88rem; font-weight: 600; color: var(--primaire); }
+.liste-rapide[open] summary { margin-bottom: 0.6rem; }
+.liste-rapide textarea {
+  width: 100%; margin-bottom: 0.6rem; resize: vertical;
+  padding: 0.6rem 0.7rem; border: 1px solid var(--bordure); border-radius: 10px;
+  background: var(--fond); color: var(--texte); font: inherit; font-size: 0.9rem;
+}
+
+#reglagesImage { display: flex; flex-direction: column; gap: 0.7rem; }
+#reglagesImage[hidden] { display: none; }
+
+/* ----- Barre au-dessus de la scène ----- */
+.barre-scene { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.7rem; }
+
+/* ===== La feuille =====
+   Tout ce qui est DANS la feuille est en millimètres : la même page sert à
+   l'écran (réduite par un « scale ») et à l'impression (à l'échelle 1), sans
+   deuxième mise en page à tenir à jour. --W et --H sont posées par app.js. */
+:root { --W: 210mm; --H: 297mm; }
+
+.scene { position: relative; flex: none; }
+.mise {
+  position: absolute; top: 0; left: 0;
+  width: var(--W); height: var(--H);
+  transform-origin: 0 0;
+  perspective: 2400px;
+}
+.retourne {
+  position: relative;
+  width: 100%; height: 100%;
+  transform-style: preserve-3d;
+  transition: transform 0.75s cubic-bezier(.4, .1, .2, 1);
+}
+.retourne.verso { transform: rotateY(180deg); }
+
+.face {
+  position: absolute; inset: 0;
+  width: var(--W); height: var(--H);
+  overflow: hidden;
+  background: #fff;
+  box-shadow: var(--ombre-feuille);
+  -webkit-backface-visibility: hidden; backface-visibility: hidden;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+}
+.face-verso { transform: rotateY(180deg); }
+
+/* --- Recto --- */
+.face-recto { touch-action: none; }
+.face-recto.avec-image { cursor: grab; }
+.face-recto.glisse { cursor: grabbing; }
+#imageRecto {
+  position: absolute; max-width: none; max-height: none;
+  -webkit-user-select: none; user-select: none; pointer-events: none;
+}
+#imageRecto[hidden] { display: none; }
+.depot {
+  position: absolute; inset: 6mm;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4mm;
+  border: 0.8mm dashed #b9ae9a; border-radius: 6mm;
+  background: transparent; color: #7a6f5d; font: inherit; font-size: 6mm; cursor: pointer;
+  text-align: center;
+}
+.depot svg { width: 18mm; height: 18mm; }
+.depot span { font-size: 4.6mm; }
+.depot:hover, .face-recto.survol .depot { background: rgba(47, 125, 122, 0.08); border-color: #2f7d7a; color: #2f7d7a; }
+.depot[hidden] { display: none; }
+
+/* --- Verso : la grille de cartes ---
+   Les traits de découpe sont portés par les cartes (droite et bas) et par la
+   grille (gauche et haut) : chaque trait n'existe qu'une fois, même entre deux
+   cartes voisines. --t est épaissi à l'écran pour rester visible une fois la
+   feuille réduite, et revient à 0,25 mm à l'impression. */
+.grille {
+  position: absolute;
+  inset: var(--marge, 0mm);
+  display: grid;
+  --t: var(--t-ecran, 0.25mm);
+  border-left: var(--t, 0.25mm) solid var(--trait, #cfcfcf);
+  border-top: var(--t, 0.25mm) solid var(--trait, #cfcfcf);
+}
+.carte {
+  position: relative;
+  display: flex; align-items: center; justify-content: center;
+  padding: 3mm;
+  overflow: hidden;
+  border-right: var(--t, 0.25mm) solid var(--trait, #cfcfcf);
+  border-bottom: var(--t, 0.25mm) solid var(--trait, #cfcfcf);
+  cursor: text;
+}
+.texte {
+  max-width: 100%;
+  min-width: 12mm; min-height: 1.2em;
+  text-align: center;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.25;
+  outline: none;
+  color: var(--couleur-texte, #241d15);
+  font-family: var(--police-texte, "EB Garamond", Georgia, serif);
+  font-style: var(--style-texte, normal);
+}
+.texte:empty::before, .texte.vide::before {
+  content: "Écrire…";
+  color: #b9b2a4; font-style: italic; font-family: var(--serif); font-size: 0.8em;
+}
+.texte.trop-long { outline: 0.6mm solid rgba(190, 70, 50, 0.55); outline-offset: 1mm; }
+.carte:focus-within { background: rgba(47, 125, 122, 0.07); }
+
+/* --- Aide sous la feuille --- */
+.aide-impression { margin: 0; max-width: 62ch; text-align: center; font-size: 0.8rem; color: var(--texte-att); line-height: 1.45; }
+
+@media (prefers-reduced-motion: reduce) { .retourne { transition: none; } }
+
+/* ===== Impression =====
+   Les deux faces sortent l'une après l'autre, à la taille exacte de la feuille :
+   page 1 = recto, page 2 = verso. La taille de page est écrite par app.js dans
+   #stylePage (une règle @page ne sait pas lire de variable). */
+@media print {
+  html, body { background: #fff !important; margin: 0 !important; padding: 0 !important; min-height: 0; }
+  .entete, .panneau, .barre-scene, .aide-impression, .ecran-seulement,
+  .bouton-retour-portail, .pied-legal { display: none !important; }
+
+  .atelier { display: block; padding: 0; margin: 0; max-width: none; }
+  .zone-scene { position: static; display: block; }
+  .scene { width: auto !important; height: auto !important; position: static; }
+  .mise { position: static; width: auto; height: auto; transform: none !important; perspective: none; }
+  .retourne { position: static; width: auto; height: auto; transform: none !important; transform-style: flat; transition: none; }
+
+  .face {
+    position: relative !important; inset: auto;
+    transform: none !important;
+    box-shadow: none;
+    -webkit-backface-visibility: visible; backface-visibility: visible;
+    break-inside: avoid;
+  }
+  .face-recto { break-after: page; page-break-after: always; }
+  /* Dernière page : 0,3 mm de moins. Une boîte exactement aussi haute que la
+     page déborde parfois d'un arrondi, et le navigateur ajoute alors une
+     troisième page blanche. Le recto, suivi d'un saut forcé, n'a pas ce risque. */
+  .face-verso { height: calc(var(--H) - 0.3mm); break-after: avoid; page-break-after: avoid; }
+
+  .grille { --t: 0.25mm; }
+  .texte:empty::before, .texte.vide::before { content: none; }
+  .texte.trop-long { outline: none; }
+  .carte:focus-within { background: none; }
+}

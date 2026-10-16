@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#14110c" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f4efe4">
+<title>Recto-verso</title>
+<link rel="stylesheet" href="../../polices/polices.css">
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="../../icone-192.png">
+<link rel="apple-touch-icon" href="../../icone-192.png">
+<!-- Réglages de la page imprimée (taille exacte de la feuille) : réécrit par app.js. -->
+<style id="stylePage">@page { size: 210mm 297mm; margin: 0; }</style>
+</head>
+<body>
+
+  <header class="entete">
+    <h1>Recto-verso</h1>
+    <p>Une image au recto, des cartes à message au verso. Tout reste dans votre navigateur : l'image n'est envoyée nulle part.</p>
+  </header>
+
+  <main class="atelier">
+
+    <aside class="panneau" id="panneau">
+
+      <section class="bloc">
+        <h2>Feuille</h2>
+        <div class="ligne">
+          <div class="segment" id="segFormat" role="group" aria-label="Format">
+            <button type="button" data-valeur="A3">A3</button>
+            <button type="button" data-valeur="A4">A4</button>
+            <button type="button" data-valeur="A5">A5</button>
+          </div>
+          <div class="segment" id="segOrientation" role="group" aria-label="Orientation">
+            <button type="button" data-valeur="portrait">Portrait</button>
+            <button type="button" data-valeur="paysage">Paysage</button>
+          </div>
+        </div>
+        <p class="indice" id="infoFeuille"></p>
+      </section>
+
+      <section class="bloc">
+        <h2>Recto — l'image</h2>
+        <div class="ligne">
+          <button type="button" class="btn btn-primaire" id="btnImage">Choisir une image…</button>
+          <button type="button" class="btn btn-discret" id="btnRetirerImage" hidden>Retirer</button>
+        </div>
+        <input type="file" id="fichierImage" accept="image/*" hidden>
+        <div id="reglagesImage" hidden>
+          <div class="segment segment-plein" id="segAjustement" role="group" aria-label="Placement de l'image">
+            <button type="button" data-valeur="remplir" title="L'image couvre toute la feuille, quitte à être rognée">Remplir</button>
+            <button type="button" data-valeur="ajuster" title="L'image est entière, avec des bandes de couleur si besoin">Entière</button>
+          </div>
+          <label class="champ-curseur">
+            <span>Zoom</span>
+            <input type="range" id="curseurZoom" min="100" max="400" step="5" value="100">
+            <output id="valZoom">100 %</output>
+          </label>
+          <div class="ligne">
+            <label class="champ-couleur" id="champFondRecto" hidden>
+              <span>Bandes</span>
+              <input type="color" id="fondRecto" value="#ffffff">
+            </label>
+            <button type="button" class="btn btn-discret" id="btnRecentrer">Recentrer</button>
+          </div>
+          <p class="indice" id="infoImage"></p>
+          <p class="indice">Glissez l'image sur la feuille pour la déplacer.</p>
+        </div>
+      </section>
+
+      <section class="bloc">
+        <h2>Verso — les cartes</h2>
+        <div class="ligne ligne-nombres">
+          <label class="champ-nombre"><span>Colonnes</span>
+            <input type="number" id="colonnes" min="1" max="12" value="3" inputmode="numeric"></label>
+          <span class="croix" aria-hidden="true">×</span>
+          <label class="champ-nombre"><span>Lignes</span>
+            <input type="number" id="lignes" min="1" max="12" value="5" inputmode="numeric"></label>
+        </div>
+        <div class="puces" id="modeles" aria-label="Modèles de grille"></div>
+        <p class="indice" id="infoCartes"></p>
+        <label class="champ-curseur">
+          <span>Marge</span>
+          <input type="range" id="curseurMarge" min="0" max="30" step="1" value="0">
+          <output id="valMarge">0 mm</output>
+        </label>
+        <label class="case">
+          <input type="checkbox" id="caseTraits" checked>
+          <span>Traits de découpe (gris clair)</span>
+        </label>
+      </section>
+
+      <section class="bloc">
+        <h2>Texte des cartes</h2>
+        <label class="champ-liste"><span>Police</span>
+          <select id="choixPolice">
+            <option value="garamond">Garamond</option>
+            <option value="garamondItalique">Garamond italique</option>
+            <option value="sans">Sans empattement</option>
+          </select>
+        </label>
+        <label class="champ-curseur">
+          <span>Taille</span>
+          <input type="range" id="curseurTaille" min="6" max="48" step="1" value="16">
+          <output id="valTaille">16 pt</output>
+        </label>
+        <div class="ligne">
+          <label class="champ-couleur"><span>Texte</span><input type="color" id="couleurTexte" value="#241d15"></label>
+          <label class="champ-couleur"><span>Fond du verso</span><input type="color" id="fondVerso" value="#ffffff"></label>
+        </div>
+        <p class="indice">Un texte trop long rapetisse tout seul pour tenir dans sa carte.</p>
+
+        <details class="liste-rapide">
+          <summary>Remplir avec une liste</summary>
+          <textarea id="listeMessages" rows="6" placeholder="Un message par ligne, dans l'ordre des cartes (de gauche à droite, puis ligne par ligne). Une ligne vide laisse la carte vide."></textarea>
+          <div class="ligne">
+            <button type="button" class="btn btn-secondaire" id="btnRepartir">Répartir sur les cartes</button>
+            <button type="button" class="btn btn-discret" id="btnViderCartes">Vider les cartes</button>
+          </div>
+        </details>
+      </section>
+
+      <section class="bloc">
+        <h2>Sortie</h2>
+        <button type="button" class="btn btn-primaire btn-bloc" id="btnImprimer">Imprimer / enregistrer en PDF</button>
+        <div class="ligne">
+          <button type="button" class="btn btn-secondaire" id="btnEnregistrer">Enregistrer le projet</button>
+          <button type="button" class="btn btn-secondaire" id="btnOuvrir">Ouvrir un projet…</button>
+        </div>
+        <input type="file" id="fichierProjet" accept=".json,application/json" hidden>
+        <p class="indice">Le projet est un fichier de votre ordinateur (image comprise). Rien n'est gardé sur le site.</p>
+      </section>
+
+    </aside>
+
+    <section class="zone-scene" id="zone">
+      <div class="barre-scene">
+        <div class="segment" id="segFace" role="group" aria-label="Face affichée">
+          <button type="button" data-valeur="recto">Recto</button>
+          <button type="button" data-valeur="verso">Verso</button>
+        </div>
+        <button type="button" class="btn btn-secondaire" id="btnRetourner">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 0 1 15.5-6.2L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"/><path d="M3 21v-5h5"/></svg>
+          Retourner la feuille
+        </button>
+      </div>
+
+      <div class="scene" id="scene">
+        <div class="mise" id="mise">
+          <div class="retourne" id="retourne">
+
+            <div class="face face-recto" id="faceRecto" aria-label="Recto">
+              <img id="imageRecto" alt="" hidden draggable="false">
+              <button type="button" class="depot ecran-seulement" id="zoneDepot">
+                <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                <strong>Déposez une image ici</strong>
+                <span>ou touchez pour en choisir une</span>
+              </button>
+            </div>
+
+            <div class="face face-verso" id="faceVerso" aria-label="Verso">
+              <div class="grille" id="grille"></div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <p class="aide-impression" id="aideImpression"></p>
+    </section>
+
+  </main>
+
+  <script src="app.js"></script>
+  <script src="retour-portail.js"></script>
+  <script src="../../pied-legal.js"></script>
+</body>
+</html>

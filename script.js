@@ -42,6 +42,13 @@ const DEFAULT_SITES = [
     description: "Suis ta progression dans Star Wars: Droid Tycoon — droidex et paliers de renaissance.",
     icone: "🤖",
     pageArrivee: "sites/droid-fortnite/suivi.html"
+  },
+  {
+    id: "recto-verso",
+    nom: "Recto-verso",
+    description: "Une image au recto, une grille de cartes à message au verso, prête à imprimer et découper.",
+    icone: "🃏",
+    pageArrivee: "sites/recto-verso/index.html"
   }
 ];
 

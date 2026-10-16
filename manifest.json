@@ -1,7 +1,7 @@
 {
   "name": "Site Guide",
   "short_name": "Site Guide",
-  "description": "Le guide de vos sites : un seul compte pour accéder à l'éditeur de livre, à votre bibliothèque et à Droid Fortnite.",
+  "description": "Le guide de vos sites : un seul compte pour accéder à l'éditeur de livre, à votre bibliothèque, à Droid Fortnite et à Recto-verso.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
