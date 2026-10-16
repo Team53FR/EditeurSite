@@ -58,19 +58,26 @@
             <button type="button" data-valeur="ajuster" title="L'image est entière, avec des bandes de couleur si besoin">Entière</button>
           </div>
           <label class="champ-curseur">
-            <span>Zoom</span>
-            <input type="range" id="curseurZoom" min="100" max="400" step="5" value="100">
+            <span>Taille</span>
+            <input type="range" id="curseurZoom" min="10" max="400" step="1" value="100">
             <output id="valZoom">100 %</output>
           </label>
+          <label class="champ-curseur">
+            <span>Rotation</span>
+            <input type="range" id="curseurRotation" min="-180" max="180" step="1" value="0">
+            <output id="valRotation">0°</output>
+          </label>
           <div class="ligne">
-            <label class="champ-couleur" id="champFondRecto" hidden>
-              <span>Bandes</span>
-              <input type="color" id="fondRecto" value="#ffffff">
-            </label>
-            <button type="button" class="btn btn-discret" id="btnRecentrer">Recentrer</button>
+            <button type="button" class="btn btn-discret" id="btnTourneGauche" title="Tourner d'un quart de tour vers la gauche" aria-label="Tourner d'un quart de tour vers la gauche">↺ 90°</button>
+            <button type="button" class="btn btn-discret" id="btnTourneDroite" title="Tourner d'un quart de tour vers la droite" aria-label="Tourner d'un quart de tour vers la droite">↻ 90°</button>
+            <button type="button" class="btn btn-discret" id="btnRecentrer" title="Remet la taille, la rotation et la position de départ">Réinitialiser</button>
           </div>
+          <label class="champ-couleur" id="champFondRecto">
+            <span>Fond (bandes visibles)</span>
+            <input type="color" id="fondRecto" value="#ffffff">
+          </label>
           <p class="indice" id="infoImage"></p>
-          <p class="indice">Glissez l'image sur la feuille pour la déplacer.</p>
+          <p class="indice">Glissez l'image sur la feuille pour la déplacer. « Remplir » et « Entière » donnent la taille de départ, que le curseur « Taille » modifie ensuite.</p>
         </div>
       </section>
 

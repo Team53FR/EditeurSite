@@ -1544,9 +1544,16 @@ comptes** pour qu'il apparaisse dans le tableau de bord ; la page elle-même s'o
 connexion, puisqu'elle ne touche à aucune donnée.
 
 **Ce que fait la page.** Format A3 / A4 / A5, portrait ou paysage. Recto : une image, placée
-en « Remplir » (elle couvre la feuille, rognée) ou « Entière » (avec des bandes de couleur),
-zoom de 100 à 400 %, cadrage en la glissant ; elle ne sort jamais de la feuille en mode
-« Remplir ». La résolution effective est affichée (ppp), avec un avertissement sous 150.
+en « Remplir » (elle couvre la feuille, rognée) ou « Entière » (avec des bandes de couleur), puis
+**taille de 10 à 400 %**, **rotation de -180° à 180°** (curseur, ou quarts de tour ↺ / ↻ ; « Réinitialiser »
+remet tout) et cadrage en la glissant. « Remplir » et « Entière » ne donnent que la taille de départ,
+calculée **avec la rotation** : à 100 %, « Remplir » couvre exactement la feuille à n'importe quel
+angle (il faut que le rectangle tourné contienne la feuille : demi-largeur ≥ (L·|cos| + H·|sin|) / 2,
+et de même pour la hauteur) et « Entière » montre l'image tournée en entier. Au-delà, rien n'est
+imposé : si la taille, l'angle ou la position laissent un bord découvert, un message le dit et le
+**fond** (« Fond (bandes visibles) ») apparaît ; seul le centre de l'image est retenu sur la toile,
+pour qu'on ne la perde pas. La rotation est un `transform: rotate()` autour du centre de l'image,
+identique sur chaque feuille. La résolution effective est affichée (ppp), avec un avertissement sous 150.
 Verso : une grille de colonnes × lignes (modèles 2×2 à 4×6, jusqu'à 12 × 12) qui occupe toute la
 feuille, une marge réglable, un trait de découpe gris clair (`#cfcfcf`, 0,25 mm) entre
 toutes les cartes et autour de la grille. Chaque carte est un champ de texte libre (police,
@@ -1560,7 +1567,7 @@ fait pivoter la feuille (rotation 3D autour de l'axe vertical) du recto au verso
 montre que sa part, pour que l'image se prolonge de l'une à l'autre une fois collées. Chaque feuille
 porte sa propre copie de l'`<img>`, décalée de sa position sur la toile (elles partagent une même
 adresse `blob:`, l'image n'est décodée qu'une fois) : c'est ce qui permet d'imprimer les feuilles
-séparément. Le zoom, le glissement et la résolution (ppp) se calculent sur la toile ; un trait
+séparément. La taille, la rotation, le glissement et la résolution (ppp) se calculent sur la toile ; un trait
 pointillé marque l'endroit du collage, à l'écran seulement. Chaque feuille a **son propre verso** :
 mêmes réglages de grille, textes indépendants (`textes` et `textes2` dans le projet) ; « Remplir avec
 une liste » remplit la feuille 1 puis la feuille 2. Comme une vraie feuille retournée, deux feuilles
@@ -1603,7 +1610,12 @@ appliquées à l'écran : des faces de 210 × 297 mm, à la suite, sans rotation
 feuilles : continuité exacte de l'image (décalage de 210 mm côte à côte, 297 mm empilées, avec
 zoom et glissement), feuille 1 à droite au verso, textes séparés, répartition d'une liste, ordre
 recto 1 / verso 1 / recto 2 / verso 2 et choix d'une seule feuille, projets d'avant les deux
-feuilles toujours lisibles. **Non vérifié** :
+feuilles toujours lisibles. Taille et rotation : « Remplir » couvre les quatre coins à dix angles
+(0°, 1°, 30°, 45°, 89°, 90°, 137°, -75°, ±180°), « Entière » reste entière, la taille de 10 à 400 %
+avec avertissement quand l'image ne couvre plus, les quarts de tour, la réinitialisation ; sur deux
+feuilles et sous rotation, centres décalés d'exactement 210 mm et raccord couvert ; la rotation
+voyage jusqu'aux copies d'impression et dans le projet enregistré (valeurs hors limites bornées,
+projet d'avant la rotation lisible). **Non vérifié** :
 une vraie impression papier, la boîte d'impression du navigateur (page blanche en trop,
 sens du retournement de la feuille selon l'imprimante) et un téléphone réel.
 

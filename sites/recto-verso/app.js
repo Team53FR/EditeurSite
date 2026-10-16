@@ -28,7 +28,7 @@
   const etat = {
     format: "A4", paysage: false, assemblage: "seule",
     image: null, largeurImg: 0, hauteurImg: 0,
-    ajustement: "remplir", zoom: 1, dx: 0, dy: 0, fondRecto: "#ffffff",
+    ajustement: "remplir", zoom: 1, rotation: 0, dx: 0, dy: 0, fondRecto: "#ffffff",
     colonnes: 3, lignes: 5, marge: 0, traits: true,
     police: "garamond", taille: 16, couleur: "#241d15", fondVerso: "#ffffff",
     textes: [],          // messages de la feuille 1, carte par carte
@@ -176,19 +176,22 @@
     $("reglagesImage").hidden = !avec;
     $("btnRetirerImage").hidden = !avec;
     $("btnImage").textContent = avec ? "Changer d'image…" : "Choisir une image…";
-    $("champFondRecto").hidden = etat.ajustement !== "ajuster";
     if (!avec) return;
 
+    // Taille de départ (« Remplir » ou « Entière »), calculée AVEC la rotation : à
+    // zoom 100 %, « Remplir » couvre exactement la toile à n'importe quel angle, et
+    // « Entière » montre l'image tournée en entier. Le curseur « Taille » multiplie ensuite.
     const w = etat.largeurImg, h = etat.hauteurImg;
-    const base = etat.ajustement === "remplir" ? Math.max(CW / w, CH / h) : Math.min(CW / w, CH / h);   // mm par pixel
+    const a = etat.rotation * Math.PI / 180;
+    const c = Math.abs(Math.cos(a)), sn = Math.abs(Math.sin(a));
+    const base = etat.ajustement === "remplir"
+      ? Math.max((CW * c + CH * sn) / w, (CW * sn + CH * c) / h)           // mm par pixel
+      : Math.min(CW / (w * c + h * sn), CH / (w * sn + h * c));
     const s = base * etat.zoom;
     const lw = w * s, lh = h * s;
-    // On ne laisse pas glisser l'image hors de la toile : en mode « remplir »,
-    // elle doit toujours la couvrir entièrement.
-    const maxX = etat.ajustement === "remplir" ? Math.max(0, (lw - CW) / 2) : CW / 2;
-    const maxY = etat.ajustement === "remplir" ? Math.max(0, (lh - CH) / 2) : CH / 2;
-    etat.dx = borne(etat.dx, -maxX, maxX);
-    etat.dy = borne(etat.dy, -maxY, maxY);
+    // Le centre de l'image reste sur la toile (sinon on la perd) ; hors de là, tout est permis.
+    etat.dx = borne(etat.dx, -CW / 2, CW / 2);
+    etat.dy = borne(etat.dy, -CH / 2, CH / 2);
     // Chaque feuille porte sa propre copie de l'image, décalée de sa position sur la
     // toile : c'est ce qui permet d'imprimer les feuilles séparément. Elles
     // partagent la même adresse locale, l'image n'est donc décodée qu'une fois.
@@ -199,11 +202,21 @@
       img.style.height = arrondi(lh, 3) + "mm";
       img.style.left = arrondi((CW - lw) / 2 + etat.dx - o.x, 3) + "mm";
       img.style.top = arrondi((CH - lh) / 2 + etat.dy - o.y, 3) + "mm";
+      img.style.transform = etat.rotation ? "rotate(" + etat.rotation + "deg)" : "";   // autour du centre de l'image
     });
 
+    // L'image couvre-t-elle toute la toile ? On regarde si les quatre coins de la toile
+    // tombent dans le rectangle de l'image, remis droit.
+    const cx = CW / 2 + etat.dx, cy = CH / 2 + etat.dy;
+    const couvre = [[0, 0], [CW, 0], [0, CH], [CW, CH]].every(([px, py]) => {
+      const vx = px - cx, vy = py - cy;
+      const ux = vx * Math.cos(a) + vy * Math.sin(a), uy = -vx * Math.sin(a) + vy * Math.cos(a);
+      return Math.abs(ux) <= lw / 2 + 0.05 && Math.abs(uy) <= lh / 2 + 0.05;
+    });
     const ppp = Math.round(25.4 / s);
     const verdict = ppp >= 250 ? "très bonne netteté" : ppp >= 150 ? "netteté correcte" : "faible : l'impression risque d'être floue";
-    $("infoImage").textContent = w + " × " + h + " px — environ " + ppp + " ppp sur la toile (" + verdict + ").";
+    $("infoImage").textContent = w + " × " + h + " px — environ " + ppp + " ppp sur la toile (" + verdict + ")." +
+      (couvre ? "" : " L'image ne couvre pas toute la feuille : le fond uni apparaît sur les bords.");
   }
 
   function chargerImage(fichier) {
@@ -228,7 +241,7 @@
         etat.image = dataUrl;
         etat.largeurImg = test.naturalWidth;
         etat.hauteurImg = test.naturalHeight;
-        if (recentrer) { etat.dx = 0; etat.dy = 0; etat.zoom = 1; }
+        if (recentrer) { etat.dx = 0; etat.dy = 0; etat.zoom = 1; etat.rotation = 0; }
         synchroniserControles();
         majImage();
         if (apres) apres();
@@ -485,7 +498,8 @@
       etat.paysage = p.paysage === true;
       etat.assemblage = ASSEMBLAGES[p.assemblage] ? p.assemblage : "seule";   // un projet d'avant les deux feuilles n'en a pas
       etat.ajustement = p.ajustement === "ajuster" ? "ajuster" : "remplir";
-      etat.zoom = nombre(p.zoom, 1, 4, 1);
+      etat.zoom = nombre(p.zoom, 0.1, 4, 1);
+      etat.rotation = nombre(p.rotation, -180, 180, 0);    // un projet d'avant la rotation n'en a pas
       etat.dx = nombre(p.dx, -2000, 2000, 0);
       etat.dy = nombre(p.dy, -2000, 2000, 0);
       etat.fondRecto = couleur(p.fondRecto, "#ffffff");
@@ -520,6 +534,8 @@
     marquer("segFace", etat.face);
     $("curseurZoom").value = Math.round(etat.zoom * 100);
     $("valZoom").textContent = Math.round(etat.zoom * 100) + " %";
+    $("curseurRotation").value = Math.round(etat.rotation);
+    $("valRotation").textContent = Math.round(etat.rotation) + "°";
     $("fondRecto").value = etat.fondRecto;
     $("colonnes").value = etat.colonnes;
     $("lignes").value = etat.lignes;
@@ -561,12 +577,23 @@
     el.fichierImage.value = "";
   });
   $("btnRetirerImage").addEventListener("click", () => {
-    etat.image = null; etat.largeurImg = 0; etat.hauteurImg = 0; etat.dx = 0; etat.dy = 0; etat.zoom = 1;
+    etat.image = null; etat.largeurImg = 0; etat.hauteurImg = 0; etat.dx = 0; etat.dy = 0; etat.zoom = 1; etat.rotation = 0;
     if (urlImage) { URL.revokeObjectURL(urlImage); urlImage = null; }
     el.images.forEach((img) => img.removeAttribute("src"));
     synchroniserControles(); majImage();
   });
-  $("btnRecentrer").addEventListener("click", () => { etat.dx = 0; etat.dy = 0; etat.zoom = 1; synchroniserControles(); majImage(); });
+  $("btnRecentrer").addEventListener("click", () => { etat.dx = 0; etat.dy = 0; etat.zoom = 1; etat.rotation = 0; synchroniserControles(); majImage(); });
+  $("curseurRotation").addEventListener("input", (e) => { etat.rotation = Number(e.target.value); $("valRotation").textContent = e.target.value + "°"; majImage(); });
+  // Un quart de tour : on ramène l'angle dans [-180, 180] (180 et -180 sont la même chose).
+  function quartDeTour(sens) {
+    let r = Math.round(etat.rotation / 90) * 90 + sens * 90;     // d'abord au quart de tour le plus proche
+    if (r > 180) r -= 360;
+    if (r < -180) r += 360;
+    etat.rotation = r;
+    synchroniserControles(); majImage();
+  }
+  $("btnTourneGauche").addEventListener("click", () => quartDeTour(-1));
+  $("btnTourneDroite").addEventListener("click", () => quartDeTour(1));
   $("curseurZoom").addEventListener("input", (e) => { etat.zoom = Number(e.target.value) / 100; $("valZoom").textContent = e.target.value + " %"; majImage(); });
   $("fondRecto").addEventListener("input", (e) => { etat.fondRecto = e.target.value; majImage(); });
 
