@@ -1555,13 +1555,35 @@ carte est cerclée de rouge à l'écran s'il ne tient toujours pas. « Remplir a
 répartit un message par ligne sur les cartes, dans l'ordre de lecture. « Retourner la feuille »
 fait pivoter la feuille (rotation 3D autour de l'axe vertical) du recto au verso.
 
-**Tout est en millimètres.** La feuille est dessinée à sa taille réelle (`--W`, `--H`) puis
-réduite à l'écran par un `scale` : la même page sert à l'impression, à l'échelle 1, sans
-deuxième mise en page. `#stylePage` reçoit la règle `@page { size: … }` (une règle `@page`
-ne lit pas de variable CSS). À l'impression, le panneau disparaît, la feuille cesse de
-pivoter et les deux faces sortent l'une après l'autre : page 1 = recto, page 2 = verso. Le
-verso perd 0,3 mm de hauteur à l'impression : une boîte exactement aussi haute que la page
-déborde parfois d'un arrondi et ajoute une troisième page blanche.
+**Deux feuilles collées.** « 2 côte à côte » ou « 2 empilées » : une seule image s'étend sur la
+« toile » (les deux feuilles bout à bout, 420 × 297 mm en A4 côte à côte) et chaque feuille n'en
+montre que sa part, pour que l'image se prolonge de l'une à l'autre une fois collées. Chaque feuille
+porte sa propre copie de l'`<img>`, décalée de sa position sur la toile (elles partagent une même
+adresse `blob:`, l'image n'est décodée qu'une fois) : c'est ce qui permet d'imprimer les feuilles
+séparément. Le zoom, le glissement et la résolution (ppp) se calculent sur la toile ; un trait
+pointillé marque l'endroit du collage, à l'écran seulement. Chaque feuille a **son propre verso** :
+mêmes réglages de grille, textes indépendants (`textes` et `textes2` dans le projet) ; « Remplir avec
+une liste » remplit la feuille 1 puis la feuille 2. Comme une vraie feuille retournée, deux feuilles
+côte à côte changent de place au verso (la feuille 1, à gauche au recto, est à droite au verso) ;
+empilées, elles gardent leur ordre. Les étiquettes « Feuille 1 / 2 » aident à s'y retrouver.
+
+**Les télécharger séparément.** « Sortie » propose « Les deux feuilles », « Feuille 1 seulement »
+ou « Feuille 2 seulement » ; on imprime en « Enregistrer au format PDF » une feuille après l'autre
+pour obtenir deux fichiers. Les pages sortent dans l'ordre d'une impression recto-verso :
+**recto 1, verso 1, recto 2, verso 2**.
+
+**Tout est en millimètres.** La feuille est dessinée à sa taille réelle (`--W`, `--H`, et `--CW`,
+`--CH` pour la toile) puis réduite à l'écran par un `scale`. `#stylePage` reçoit la règle
+`@page { size: … }` d'**une** feuille (une règle `@page` ne lit pas de variable CSS). À l'impression
+(`imprimer()`, et `beforeprint` pour Ctrl+P), `app.js` pose dans `#zoneImpression` une **copie** de
+chaque face, dans l'ordre ci-dessus, en simples blocs l'un après l'autre ; tout le reste de la page
+disparaît. Une copie plutôt qu'un réordonnancement par CSS (`order` en flex ou en grille) : les
+sauts de page dans ces mises en page varient selon les navigateurs, des blocs ordinaires non.
+Chaque face commence une page (`break-before: page`, ignoré pour la toute première) et la dernière
+n'est suivie d'aucun saut. Chaque face perd 0,3 mm de hauteur : une boîte exactement aussi haute
+que la page déborde parfois d'un arrondi et ajoute une page blanche (l'image est posée depuis le
+haut, elle ne bouge pas : seul son dernier 0,3 mm est coupé). Avant d'ouvrir la boîte d'impression,
+le bouton attend le décodage des images copiées.
 
 **Le verso est dessiné tel qu'on le voit en retournant la feuille** (comme une page qu'on
 tourne) : la carte en haut à gauche du verso est donc derrière la partie en haut à droite du
@@ -1577,7 +1599,11 @@ fichier piégé ne peut pas injecter de CSS ni d'adresse.
 paysage ; carte de 70 × 59,4 mm en 3 × 5 sur A4 ; grille sur toute la feuille ; traits gris clair ;
 image qui couvre la feuille, zoom, glissement borné ; texte long rétréci ; liste répartie ;
 aller-retour du projet ; mise en page d'impression simulée (les règles `@media print`
-appliquées à l'écran : deux faces de 210 × 297 mm, à la suite, sans rotation). **Non vérifié** :
+appliquées à l'écran : des faces de 210 × 297 mm, à la suite, sans rotation). Pour les deux
+feuilles : continuité exacte de l'image (décalage de 210 mm côte à côte, 297 mm empilées, avec
+zoom et glissement), feuille 1 à droite au verso, textes séparés, répartition d'une liste, ordre
+recto 1 / verso 1 / recto 2 / verso 2 et choix d'une seule feuille, projets d'avant les deux
+feuilles toujours lisibles. **Non vérifié** :
 une vraie impression papier, la boîte d'impression du navigateur (page blanche en trop,
 sens du retournement de la feuille selon l'imprimante) et un téléphone réel.
 

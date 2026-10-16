@@ -190,13 +190,14 @@ input[type="range"] { width: 100%; accent-color: var(--primaire); }
 /* ===== La feuille =====
    Tout ce qui est DANS la feuille est en millimètres : la même page sert à
    l'écran (réduite par un « scale ») et à l'impression (à l'échelle 1), sans
-   deuxième mise en page à tenir à jour. --W et --H sont posées par app.js. */
-:root { --W: 210mm; --H: 297mm; }
+   deuxième mise en page à tenir à jour. app.js pose --W et --H (une feuille) et
+   --CW et --CH (l'ensemble des feuilles collées : la « toile »). */
+:root { --W: 210mm; --H: 297mm; --CW: 210mm; --CH: 297mm; }
 
 .scene { position: relative; flex: none; }
 .mise {
   position: absolute; top: 0; left: 0;
-  width: var(--W); height: var(--H);
+  width: var(--CW); height: var(--CH);
   transform-origin: 0 0;
   perspective: 2400px;
 }
@@ -208,28 +209,61 @@ input[type="range"] { width: 100%; accent-color: var(--primaire); }
 }
 .retourne.verso { transform: rotateY(180deg); }
 
-.face {
+/* Un « ensemble » = un côté de la toile : une feuille, ou deux collées.
+   Le verso est tourné d'un demi-tour, que le demi-tour de .retourne annule
+   quand on le montre : il se lit donc à l'endroit. Comme une vraie feuille
+   retournée, deux feuilles côte à côte changent de place au verso — la
+   feuille 1, à gauche au recto, est à droite au verso (row-reverse). */
+.ensemble {
   position: absolute; inset: 0;
-  width: var(--W); height: var(--H);
-  overflow: hidden;
+  width: var(--CW); height: var(--CH);
+  display: flex; flex-direction: row;
   background: #fff;
   box-shadow: var(--ombre-feuille);
   -webkit-backface-visibility: hidden; backface-visibility: hidden;
   -webkit-print-color-adjust: exact; print-color-adjust: exact;
 }
-.face-verso { transform: rotateY(180deg); }
+.ensemble-verso { transform: rotateY(180deg); }
+html[data-assemblage="pile"] .ensemble { flex-direction: column; }
+html[data-assemblage="cote"] .ensemble-verso { flex-direction: row-reverse; }
+
+.face {
+  position: relative; flex: none;
+  width: var(--W); height: var(--H);
+  overflow: hidden;
+  background: #fff;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+}
+.face-verso { background: var(--fond-verso, #fff); }
+
+/* Le trait où les deux feuilles se collent (écran seulement). */
+.joint { position: absolute; z-index: 3; pointer-events: none; }
+html[data-assemblage="cote"] .joint {
+  left: var(--W); top: 0; bottom: 0; width: 0;
+  border-left: 0.4mm dashed rgba(50, 50, 50, 0.5); box-shadow: 0.4mm 0 0 rgba(255, 255, 255, 0.55);
+}
+html[data-assemblage="pile"] .joint {
+  top: var(--H); left: 0; right: 0; height: 0;
+  border-top: 0.4mm dashed rgba(50, 50, 50, 0.5); box-shadow: 0 0.4mm 0 rgba(255, 255, 255, 0.55);
+}
+.etiquette-feuille {
+  position: absolute; z-index: 4; top: 1.2mm; left: 1.2mm;
+  padding: 0.5mm 2mm; border-radius: 3mm;
+  background: rgba(47, 125, 122, 0.88); color: #fff;
+  font: 600 3.4mm/1.3 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  pointer-events: none;
+}
 
 /* --- Recto --- */
-.face-recto { touch-action: none; }
-.face-recto.avec-image { cursor: grab; }
-.face-recto.glisse { cursor: grabbing; }
-#imageRecto {
+.ensemble-recto { touch-action: none; }
+.ensemble-recto.avec-image { cursor: grab; }
+.ensemble-recto.glisse { cursor: grabbing; }
+.image-recto {
   position: absolute; max-width: none; max-height: none;
   -webkit-user-select: none; user-select: none; pointer-events: none;
 }
-#imageRecto[hidden] { display: none; }
 .depot {
-  position: absolute; inset: 6mm;
+  position: absolute; inset: 6mm; z-index: 2;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4mm;
   border: 0.8mm dashed #b9ae9a; border-radius: 6mm;
   background: transparent; color: #7a6f5d; font: inherit; font-size: 6mm; cursor: pointer;
@@ -237,7 +271,7 @@ input[type="range"] { width: 100%; accent-color: var(--primaire); }
 }
 .depot svg { width: 18mm; height: 18mm; }
 .depot span { font-size: 4.6mm; }
-.depot:hover, .face-recto.survol .depot { background: rgba(47, 125, 122, 0.08); border-color: #2f7d7a; color: #2f7d7a; }
+.depot:hover, .ensemble-recto.survol .depot { background: rgba(47, 125, 122, 0.08); border-color: #2f7d7a; color: #2f7d7a; }
 .depot[hidden] { display: none; }
 
 /* --- Verso : la grille de cartes ---
@@ -281,41 +315,40 @@ input[type="range"] { width: 100%; accent-color: var(--primaire); }
 .texte.trop-long { outline: 0.6mm solid rgba(190, 70, 50, 0.55); outline-offset: 1mm; }
 .carte:focus-within { background: rgba(47, 125, 122, 0.07); }
 
-/* --- Aide sous la feuille --- */
-.aide-impression { margin: 0; max-width: 62ch; text-align: center; font-size: 0.8rem; color: var(--texte-att); line-height: 1.45; }
+/* --- Aides sous la feuille --- */
+.aide-impression, .legende-feuilles { margin: 0; max-width: 62ch; text-align: center; font-size: 0.8rem; color: var(--texte-att); line-height: 1.45; }
+.legende-feuilles[hidden], #champImpression[hidden], #indiceImpression[hidden] { display: none; }
 
 @media (prefers-reduced-motion: reduce) { .retourne { transition: none; } }
 
+#zoneImpression { display: none; }
+
 /* ===== Impression =====
-   Les deux faces sortent l'une après l'autre, à la taille exacte de la feuille :
-   page 1 = recto, page 2 = verso. La taille de page est écrite par app.js dans
-   #stylePage (une règle @page ne sait pas lire de variable). */
+   app.js remplit #zoneImpression au moment d'imprimer : une copie de chaque face,
+   dans l'ordre recto 1, verso 1, recto 2, verso 2 (c'est l'ordre d'une impression
+   recto-verso), chacune à la taille exacte de la feuille. Le reste de la page
+   disparaît. La taille de page est écrite par app.js dans #stylePage (une règle
+   @page ne sait pas lire de variable). */
 @media print {
   html, body { background: #fff !important; margin: 0 !important; padding: 0 !important; min-height: 0; }
-  .entete, .panneau, .barre-scene, .aide-impression, .ecran-seulement,
-  .bouton-retour-portail, .pied-legal { display: none !important; }
+  .entete, .atelier, .bouton-retour-portail, .pied-legal { display: none !important; }
 
-  .atelier { display: block; padding: 0; margin: 0; max-width: none; }
-  .zone-scene { position: static; display: block; }
-  .scene { width: auto !important; height: auto !important; position: static; }
-  .mise { position: static; width: auto; height: auto; transform: none !important; perspective: none; }
-  .retourne { position: static; width: auto; height: auto; transform: none !important; transform-style: flat; transition: none; }
+  #zoneImpression { display: block; }
+  .copie { display: block; }
 
-  .face {
-    position: relative !important; inset: auto;
-    transform: none !important;
-    box-shadow: none;
-    -webkit-backface-visibility: visible; backface-visibility: visible;
+  /* Chaque face commence une page ; un saut forcé en tête du tout premier
+     élément est ignoré, et la dernière page n'est suivie d'aucun saut — donc pas
+     de page blanche en trop à la fin. 0,3 mm de moins en hauteur : une boîte
+     exactement aussi haute que la page déborde parfois d'un arrondi, et le
+     navigateur ajoute alors une page blanche. L'image est posée depuis le haut :
+     elle ne bouge pas, seul son dernier 0,3 mm est coupé. */
+  .copie .face {
+    height: calc(var(--H) - 0.3mm);
+    break-before: page; page-break-before: always;
     break-inside: avoid;
   }
-  .face-recto { break-after: page; page-break-after: always; }
-  /* Dernière page : 0,3 mm de moins. Une boîte exactement aussi haute que la
-     page déborde parfois d'un arrondi, et le navigateur ajoute alors une
-     troisième page blanche. Le recto, suivi d'un saut forcé, n'a pas ce risque. */
-  .face-verso { height: calc(var(--H) - 0.3mm); break-after: avoid; page-break-after: avoid; }
 
   .grille { --t: 0.25mm; }
   .texte:empty::before, .texte.vide::before { content: none; }
   .texte.trop-long { outline: none; }
-  .carte:focus-within { background: none; }
 }
