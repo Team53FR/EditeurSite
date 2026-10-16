@@ -46,6 +46,22 @@
         </div>
         <p class="indice" id="infoFeuille"></p>
         <p class="indice" id="legendeFeuilles" hidden></p>
+        <div class="correction" id="blocCorrection" hidden>
+          <p class="indice"><strong>Correction de l'imprimante.</strong> L'impression « sans bordure » de certaines imprimantes décale une feuille : l'image ne se raccorde plus d'une feuille à l'autre. Mesurez l'écart sur le papier, puis déplacez l'image de la feuille 2 dans l'autre sens. Exemple : feuille 2 trop à droite de 1 mm, réglez −1 mm. Ce réglage ne touche ni la feuille 1 ni le verso.</p>
+          <label class="champ-curseur">
+            <span>Horizontal</span>
+            <input type="range" id="curseurCorrX" min="-10" max="10" step="0.1" value="0">
+            <output id="valCorrX">0 mm</output>
+          </label>
+          <label class="champ-curseur">
+            <span>Vertical</span>
+            <input type="range" id="curseurCorrY" min="-10" max="10" step="0.1" value="0">
+            <output id="valCorrY">0 mm</output>
+          </label>
+          <div class="ligne">
+            <button type="button" class="btn btn-discret" id="btnCorrection" title="Remet la correction à zéro">Remettre à zéro</button>
+          </div>
+        </div>
       </section>
 
       <section class="bloc">

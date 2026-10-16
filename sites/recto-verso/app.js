@@ -29,6 +29,7 @@
     format: "A4", paysage: false, assemblage: "seule",
     image: null, largeurImg: 0, hauteurImg: 0,
     ajustement: "remplir", zoom: 1, rotation: 0, dx: 0, dy: 0, fondRecto: "#ffffff",
+    corrX: 0, corrY: 0,  // mm : correction de l'imprimante, appliquée à l'image de la feuille 2 seulement
     colonnes: 3, lignes: 5, marge: 0, traits: true,
     police: "garamond", taille: 16, couleur: "#241d15", fondVerso: "#ffffff",
     textes: [],          // messages de la feuille 1, carte par carte
@@ -123,6 +124,7 @@
       : etat.assemblage === "pile"
         ? "Les deux feuilles se collent l'une au-dessus de l'autre : la feuille 1 est en haut, au recto comme au verso."
         : "";
+    $("blocCorrection").hidden = n < 2;
     $("champImpression").hidden = n < 2;
     $("indiceImpression").hidden = n < 2;
     if (n < 2) $("choixImpression").value = "toutes";
@@ -208,11 +210,13 @@
     // partagent la même adresse locale, l'image n'est donc décodée qu'une fois.
     el.images.forEach((img, i) => {
       const o = decalage(i);
+      // Correction de l'imprimante : seule la feuille 2 est déplacée (voir blocCorrection).
+      const c = i === 1 ? { x: etat.corrX, y: etat.corrY } : { x: 0, y: 0 };
       if (img.getAttribute("src") !== (urlImage || etat.image)) img.src = urlImage || etat.image;
       img.style.width = arrondi(lw, 3) + "mm";
       img.style.height = arrondi(lh, 3) + "mm";
-      img.style.left = arrondi((CW - lw) / 2 + etat.dx - o.x, 3) + "mm";
-      img.style.top = arrondi((CH - lh) / 2 + etat.dy - o.y, 3) + "mm";
+      img.style.left = arrondi((CW - lw) / 2 + etat.dx - o.x + c.x, 3) + "mm";
+      img.style.top = arrondi((CH - lh) / 2 + etat.dy - o.y + c.y, 3) + "mm";
       img.style.transform = etat.rotation ? "rotate(" + etat.rotation + "deg)" : "";   // autour du centre de l'image
     });
 
@@ -531,6 +535,8 @@
       etat.dx = nombre(p.dx, -2000, 2000, 0);
       etat.dy = nombre(p.dy, -2000, 2000, 0);
       etat.fondRecto = couleur(p.fondRecto, "#ffffff");
+      etat.corrX = arrondi(nombre(p.corrX, -10, 10, 0), 1);   // un projet d'avant la correction n'en a pas
+      etat.corrY = arrondi(nombre(p.corrY, -10, 10, 0), 1);
       etat.colonnes = Math.round(nombre(p.colonnes, 1, 12, 3));
       etat.lignes = Math.round(nombre(p.lignes, 1, 12, 5));
       etat.marge = nombre(p.marge, 0, 30, 0);
@@ -565,6 +571,10 @@
     $("curseurRotation").value = Math.round(etat.rotation);
     $("valRotation").textContent = Math.round(etat.rotation) + "°";
     $("fondRecto").value = etat.fondRecto;
+    $("curseurCorrX").value = etat.corrX;
+    $("valCorrX").textContent = fr(etat.corrX) + " mm";
+    $("curseurCorrY").value = etat.corrY;
+    $("valCorrY").textContent = fr(etat.corrY) + " mm";
     $("colonnes").value = etat.colonnes;
     $("lignes").value = etat.lignes;
     $("curseurMarge").value = etat.marge;
@@ -624,6 +634,9 @@
   $("btnTourneDroite").addEventListener("click", () => quartDeTour(1));
   $("curseurZoom").addEventListener("input", (e) => { etat.zoom = Number(e.target.value) / 100; $("valZoom").textContent = e.target.value + " %"; majImage(); });
   $("fondRecto").addEventListener("input", (e) => { etat.fondRecto = e.target.value; majImage(); });
+  $("curseurCorrX").addEventListener("input", (e) => { etat.corrX = arrondi(Number(e.target.value), 1); $("valCorrX").textContent = fr(etat.corrX) + " mm"; majImage(); });
+  $("curseurCorrY").addEventListener("input", (e) => { etat.corrY = arrondi(Number(e.target.value), 1); $("valCorrY").textContent = fr(etat.corrY) + " mm"; majImage(); });
+  $("btnCorrection").addEventListener("click", () => { etat.corrX = 0; etat.corrY = 0; synchroniserControles(); majImage(); });
 
   function changerGrille() {
     etat.colonnes = Math.round(borne(Number($("colonnes").value) || 1, 1, 12));
