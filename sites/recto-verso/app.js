@@ -36,6 +36,8 @@
     face: "recto"
   };
   let echelle = 1;                    // réduction de la toile à l'écran
+  let vue = 1;                        // affichage : 1 = la feuille tient dans l'écran, plus = agrandi (défile)
+  const VUE_MAX = 4;
   let urlImage = null;                // adresse locale (blob:) de l'image affichée
 
   const $ = (id) => document.getElementById(id);
@@ -43,6 +45,7 @@
     scene: $("scene"), mise: $("mise"), retourne: $("retourne"),
     ensR: $("ensembleRecto"), ensV: $("ensembleVerso"),
     depot: $("zoneDepot"), zone: $("zone"), impression: $("zoneImpression"),
+    fenetre: $("fenetreScene"), barre: document.querySelector(".barre-scene"),
     fichierImage: $("fichierImage"), fichierProjet: $("fichierProjet"),
     stylePage: $("stylePage"),
     images: [], grilles: []
@@ -137,9 +140,14 @@
     // La page imprimée est UNE feuille, même quand la toile en compte deux.
     el.stylePage.textContent = "@page { size: " + W + "mm " + H + "mm; margin: 0; }";
 
+    // Place disponible : toute la largeur de la zone, et la hauteur de la fenêtre moins la
+    // barre du dessus (la zone reste collée en haut de l'écran). On mesure la zone et non la
+    // fenêtre qui défile : celle-ci rétrécit quand sa barre de défilement apparaît.
     const largeurDispo = Math.max(200, el.zone.clientWidth - 4);
-    const hauteurDispo = Math.max(320, window.innerHeight - 150);
-    echelle = Math.min(largeurDispo / (CW * PX_PAR_MM), hauteurDispo / (CH * PX_PAR_MM));
+    const hauteurDispo = Math.max(320, window.innerHeight - el.barre.offsetHeight - 40);
+    el.fenetre.style.maxHeight = hauteurDispo + "px";
+    const ajuste = Math.min(largeurDispo / (CW * PX_PAR_MM), hauteurDispo / (CH * PX_PAR_MM));
+    echelle = ajuste * vue;
     el.scene.style.width = arrondi(CW * PX_PAR_MM * echelle, 2) + "px";
     el.scene.style.height = arrondi(CH * PX_PAR_MM * echelle, 2) + "px";
     el.mise.style.transform = "scale(" + echelle + ")";
@@ -148,6 +156,9 @@
     racine.setProperty("--t-ecran", arrondi(Math.max(0.25, 1.2 / (echelle * PX_PAR_MM)), 3) + "mm");
 
     const n = nbFeuilles();
+    $("vueAjuster").textContent = vue === 1 ? "Ajusté" : Math.round(vue * 100) + " %";
+    $("vueMoins").disabled = vue <= 1;
+    $("vuePlus").disabled = vue >= VUE_MAX;
     $("infoFeuille").textContent = FORMATS[etat.format].join(" × ") + " mm — " + (etat.paysage ? "paysage" : "portrait") +
       (n > 1 ? " — 2 feuilles collées : " + fr(CW) + " × " + fr(CH) + " mm" : "");
     majImage();
@@ -406,6 +417,23 @@
     for (let i = 0; i < n; i++) textesDe(Math.floor(i / par))[i % par] = (lignes[i] || "").trim();
     construireGrilles();
   }
+
+  // ----- Affichage de la feuille : plus grand, avec défilement -----
+  // On garde au centre de la fenêtre le point qui y était avant le changement.
+  function changerVue(nouvelle) {
+    nouvelle = borne(Math.round(nouvelle * 100) / 100, 1, VUE_MAX);
+    if (nouvelle === vue) return;
+    const f = el.fenetre;
+    const fx = (f.scrollLeft + f.clientWidth / 2) / Math.max(1, f.scrollWidth);
+    const fy = (f.scrollTop + f.clientHeight / 2) / Math.max(1, f.scrollHeight);
+    vue = nouvelle;
+    majFeuille();
+    f.scrollLeft = fx * f.scrollWidth - f.clientWidth / 2;
+    f.scrollTop = fy * f.scrollHeight - f.clientHeight / 2;
+  }
+  $("vuePlus").addEventListener("click", () => changerVue(vue * 1.25));
+  $("vueMoins").addEventListener("click", () => changerVue(vue / 1.25));
+  $("vueAjuster").addEventListener("click", () => changerVue(1));
 
   // ----- Retourner la feuille -----
   function retourner(face) {

@@ -46,31 +46,38 @@ body {
 }
 
 /* ----- En-tête ----- */
-.entete { padding: 1.1rem 1.25rem 0.4rem; max-width: 1400px; margin: 0 auto; }
+.entete { grid-column: 1; grid-row: 1; min-width: 0; }
 .entete h1 { margin: 0; font-family: var(--serif); font-weight: 600; font-size: 1.7rem; letter-spacing: 0.01em; }
 .entete p { margin: 0.25rem 0 0; color: var(--texte-att); font-size: 0.92rem; max-width: 60ch; }
 
 /* ----- Mise en page : panneau + scène ----- */
+/* width: 100% : pied-legal.js met le <body> en colonne flex, où des marges auto font rétrécir
+   un bloc à la largeur de son contenu — la page ne remplissait plus l'écran. */
 .atelier {
+  width: 100%;
   display: grid;
   grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+  grid-template-rows: auto 1fr;
   gap: 1.25rem;
   align-items: start;
   padding: 0.9rem 1.25rem 2rem;
-  max-width: 1400px;
+  max-width: 2600px;       /* la feuille prend toute la place laissée par le panneau */
   margin: 0 auto;
 }
-.panneau { display: flex; flex-direction: column; gap: 0.8rem; }
+.panneau { grid-column: 1; grid-row: 2; display: flex; flex-direction: column; gap: 0.8rem; }
 .zone-scene {
+  grid-column: 2; grid-row: 1 / span 2;
   position: sticky; top: 0.75rem;
   min-width: 0;
   display: flex; flex-direction: column; align-items: center; gap: 0.8rem;
 }
 
 @media (max-width: 860px) {
-  .atelier { grid-template-columns: minmax(0, 1fr); padding: 0.75rem 1rem 2rem; }
-  .zone-scene { position: static; order: -1; }
-  .entete { padding: 1rem 1rem 0.2rem; }
+  .atelier { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; padding: 0.75rem 1rem 2rem; }
+  .entete, .zone-scene, .panneau { grid-column: 1; grid-row: auto; }
+  .entete { order: 0; }
+  .zone-scene { position: static; order: 1; }
+  .panneau { order: 2; }
 }
 
 /* ----- Blocs de réglages ----- */
@@ -186,6 +193,18 @@ input[type="range"] { width: 100%; accent-color: var(--primaire); }
 
 /* ----- Barre au-dessus de la scène ----- */
 .barre-scene { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.7rem; }
+
+/* Affichage de la feuille : « Ajusté » la fait tenir dans l'écran, + l'agrandit au-delà
+   (la fenêtre défile alors). Ne change rien à la feuille imprimée. */
+.vue-zoom { display: inline-flex; border: 1px solid var(--bordure); border-radius: 10px; background: var(--creux); padding: 2px; gap: 2px; }
+.vue-zoom button { border: none; background: transparent; color: var(--texte); font: inherit; font-weight: 600; font-size: 0.9rem; min-width: 2.2rem; padding: 0.4rem 0.6rem; border-radius: 8px; cursor: pointer; }
+.vue-zoom button:hover { background: var(--primaire-clair); color: var(--primaire); }
+.vue-zoom button:disabled { opacity: 0.4; cursor: default; background: transparent; color: var(--texte); }
+#vueAjuster { min-width: 4.4rem; }
+
+/* La fenêtre qui porte la feuille : elle défile quand l'affichage dépasse sa taille. */
+.fenetre-scene { width: 100%; display: flex; overflow: auto; border-radius: 4px; }
+.fenetre-scene .scene { margin: auto; }
 
 /* ===== La feuille =====
    Tout ce qui est DANS la feuille est en millimètres : la même page sert à
@@ -316,8 +335,7 @@ html[data-assemblage="pile"] .joint {
 .carte:focus-within { background: rgba(47, 125, 122, 0.07); }
 
 /* --- Aides sous la feuille --- */
-.aide-impression, .legende-feuilles { margin: 0; max-width: 62ch; text-align: center; font-size: 0.8rem; color: var(--texte-att); line-height: 1.45; }
-.legende-feuilles[hidden], #champImpression[hidden], #indiceImpression[hidden] { display: none; }
+#legendeFeuilles[hidden], #champImpression[hidden], #indiceImpression[hidden] { display: none; }
 
 @media (prefers-reduced-motion: reduce) { .retourne { transition: none; } }
 

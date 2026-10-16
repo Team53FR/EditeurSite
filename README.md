@@ -1574,6 +1574,21 @@ une liste » remplit la feuille 1 puis la feuille 2. Comme une vraie feuille ret
 côte à côte changent de place au verso (la feuille 1, à gauche au recto, est à droite au verso) ;
 empilées, elles gardent leur ordre. Les étiquettes « Feuille 1 / 2 » aident à s'y retrouver.
 
+**Taille de l'affichage.** La feuille est ajustée à l'écran (« Ajusté ») : toute la largeur laissée
+par le panneau, et la hauteur de la fenêtre moins la barre du dessus ; la zone reste collée en haut
+quand on défile. Les boutons **− / Ajusté / +** l'agrandissent par pas de 25 %, jusqu'à 400 %, dans
+une fenêtre qui défile (le point au centre est conservé). C'est un réglage d'écran : il ne change
+rien à la feuille imprimée et n'est pas enregistré dans le projet. Sur grand écran, le titre est
+rangé au-dessus du panneau (dans la grille de `.atelier`) pour que la feuille ait toute la
+hauteur ; sur petit écran il reste en tête de page. Les textes d'aide sont dans le panneau, pas
+sous la feuille, pour ne pas lui prendre de place.
+
+**Piège rencontré : `pied-legal.js` met le `<body>` en colonne flex.** Dans ce cas un bloc avec
+`margin: 0 auto` ne s'étire plus : il se réduit à la largeur de son contenu. La page du site
+tenait ainsi dans environ 1000 px quel que soit l'écran, et la feuille y était minuscule.
+`.atelier` porte donc `width: 100%` (avec un `max-width`). À retenir pour toute page qui centre
+un bloc avec des marges automatiques et charge ce script.
+
 **Les télécharger séparément.** « Sortie » propose « Les deux feuilles », « Feuille 1 seulement »
 ou « Feuille 2 seulement » ; on imprime en « Enregistrer au format PDF » une feuille après l'autre
 pour obtenir deux fichiers. Les pages sortent dans l'ordre d'une impression recto-verso :
