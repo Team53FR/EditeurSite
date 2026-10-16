@@ -55,6 +55,22 @@
   const borne = (v, mini, maxi) => Math.min(maxi, Math.max(mini, v));
   const arrondi = (v, d) => Math.round(v * Math.pow(10, d)) / Math.pow(10, d);
   const fr = (v) => String(arrondi(v, 1)).replace(".", ",");
+
+  // La correction de l'imprimante est un réglage de l'IMPRIMANTE, pas du projet :
+  // on la garde dans ce navigateur, pour ne pas la ressaisir à chaque ouverture ni
+  // pour chaque nouveau projet.
+  const CLE_CORRECTION = "recto-verso.correction";
+  function lireCorrection() {
+    try {
+      const c = JSON.parse(localStorage.getItem(CLE_CORRECTION) || "null");
+      const v = (n) => (typeof n === "number" && isFinite(n) ? arrondi(borne(n, -10, 10), 1) : 0);
+      return c && typeof c === "object" ? { x: v(c.x), y: v(c.y) } : { x: 0, y: 0 };
+    } catch (e) { return { x: 0, y: 0 }; }
+  }
+  function memoriserCorrection() {
+    try { localStorage.setItem(CLE_CORRECTION, JSON.stringify({ x: etat.corrX, y: etat.corrY })); } catch (e) { /* stockage refusé : la correction reste valable pour cette session */ }
+  }
+  { const c = lireCorrection(); etat.corrX = c.x; etat.corrY = c.y; }
   const nbFeuilles = () => ASSEMBLAGES[etat.assemblage] || 1;
   const textesDe = (s) => (s === 0 ? etat.textes : etat.textes2);
 
@@ -535,8 +551,9 @@
       etat.dx = nombre(p.dx, -2000, 2000, 0);
       etat.dy = nombre(p.dy, -2000, 2000, 0);
       etat.fondRecto = couleur(p.fondRecto, "#ffffff");
-      etat.corrX = arrondi(nombre(p.corrX, -10, 10, 0), 1);   // un projet d'avant la correction n'en a pas
-      etat.corrY = arrondi(nombre(p.corrY, -10, 10, 0), 1);
+      // Un projet d'avant la correction n'en a pas : on garde alors celle de l'imprimante.
+      etat.corrX = arrondi(nombre(p.corrX, -10, 10, etat.corrX), 1);
+      etat.corrY = arrondi(nombre(p.corrY, -10, 10, etat.corrY), 1);
       etat.colonnes = Math.round(nombre(p.colonnes, 1, 12, 3));
       etat.lignes = Math.round(nombre(p.lignes, 1, 12, 5));
       etat.marge = nombre(p.marge, 0, 30, 0);
@@ -634,9 +651,9 @@
   $("btnTourneDroite").addEventListener("click", () => quartDeTour(1));
   $("curseurZoom").addEventListener("input", (e) => { etat.zoom = Number(e.target.value) / 100; $("valZoom").textContent = e.target.value + " %"; majImage(); });
   $("fondRecto").addEventListener("input", (e) => { etat.fondRecto = e.target.value; majImage(); });
-  $("curseurCorrX").addEventListener("input", (e) => { etat.corrX = arrondi(Number(e.target.value), 1); $("valCorrX").textContent = fr(etat.corrX) + " mm"; majImage(); });
-  $("curseurCorrY").addEventListener("input", (e) => { etat.corrY = arrondi(Number(e.target.value), 1); $("valCorrY").textContent = fr(etat.corrY) + " mm"; majImage(); });
-  $("btnCorrection").addEventListener("click", () => { etat.corrX = 0; etat.corrY = 0; synchroniserControles(); majImage(); });
+  $("curseurCorrX").addEventListener("input", (e) => { etat.corrX = arrondi(Number(e.target.value), 1); $("valCorrX").textContent = fr(etat.corrX) + " mm"; memoriserCorrection(); majImage(); });
+  $("curseurCorrY").addEventListener("input", (e) => { etat.corrY = arrondi(Number(e.target.value), 1); $("valCorrY").textContent = fr(etat.corrY) + " mm"; memoriserCorrection(); majImage(); });
+  $("btnCorrection").addEventListener("click", () => { etat.corrX = 0; etat.corrY = 0; memoriserCorrection(); synchroniserControles(); majImage(); });
 
   function changerGrille() {
     etat.colonnes = Math.round(borne(Number($("colonnes").value) || 1, 1, 12));
