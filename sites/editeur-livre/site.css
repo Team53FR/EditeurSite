@@ -116,7 +116,29 @@ h1, h2, h3 { font-family: var(--serif); font-weight: 600; line-height: 1.15; mar
   color: var(--ink);
 }
 .marque svg { display: block; }
-.nav-actions { display: flex; align-items: center; gap: 10px; }
+.nav-actions { display: flex; align-items: center; gap: 4px; }
+
+/* Dans la barre, les liens sont de simples liens texte : un cadre autour de chacun
+   (quatre pilules d'affilée) alourdissait la barre au point de toucher le titre.
+   Seule l'action principale — « Se connecter » / « Mes livres » — reste un bouton. */
+.nav-actions .btn-secondaire {
+  border-color: transparent;
+  background: transparent;
+  color: var(--ink-soft);
+  padding: 8px 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.nav-actions .btn-secondaire:hover { background: transparent; color: var(--accent-deep); transform: none; }
+.nav-actions .btn-secondaire[aria-current="page"] {
+  color: var(--accent-deep);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 9px;
+}
+.nav-actions .btn-primaire, .nav-actions .btn-fantome { margin-left: 8px; padding: 9px 20px; white-space: nowrap; }
+.marque { white-space: nowrap; flex: none; }
 
 /* ---------- Hero ---------- */
 
@@ -789,6 +811,11 @@ main.contenu { padding-top: 40px; padding-bottom: 60px; }
 
 /* ---------- Responsive ---------- */
 
+/* Le titre, quatre liens et le bouton ont besoin d'environ 920 px ; en dessous, la barre ne garde
+   que le bouton (l'accueil porte aussi un lien Tarification dans son pied). */
+@media (max-width: 940px) {
+  .nav-liens .btn-secondaire { display: none; }
+}
 @media (max-width: 860px) {
   .hero-grille { grid-template-columns: 1fr; gap: 32px; }
   .hero-illus { order: -1; }

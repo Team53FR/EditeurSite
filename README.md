@@ -1175,9 +1175,12 @@ part tel quel chez l'imprimeur.
 
 ### Tarification (`sites/editeur-livre/tarifs.html`)
 
-Page publique, accessible par l'onglet « 💶 Tarification » de la navigation (accueil, « Monter son
-livre », « Faire imprimer ») et par le pied de l'accueil — la navigation masque ses boutons sur
-petit écran, d'où ce second accès. **C'est une vitrine : aucun abonnement n'existe encore.** Les
+Page publique, accessible par l'onglet « Tarification » de la navigation (accueil, « Monter son livre »,
+« Faire imprimer ») et par le pied de l'accueil. Dans cette navigation, les liens sont de simples
+liens texte (sans cadre ni emoji : quatre pilules d'affilée alourdissaient la barre au point de toucher
+le titre) ; seul « Se connecter » / « Mes livres » reste un bouton, et la page courante est soulignée
+(`aria-current="page"`). Les liens ont besoin d'environ 920 px : sous 940 px, la barre ne garde que le
+bouton (classe `nav-liens` des pages publiques), d'où le second accès par le pied de l'accueil. **C'est une vitrine : aucun abonnement n'existe encore.** Les
 boutons payants sont désactivés (« Bientôt disponible ») et un encadré le dit en tête de page.
 Rien dans le code n'impose les limites annoncées (nombre de livres, livres publiés, fichier pour
 l'imprimeur) : il n'y a ni colonne de formule, ni règle côté base, ni paiement.
