@@ -1173,6 +1173,33 @@ PDF/X-1a, appliquer un profil de sortie. Le panneau de contrôle affiché avant
 génération le dit explicitement, plutôt que de laisser croire que le fichier
 part tel quel chez l'imprimeur.
 
+### Tarification (`sites/editeur-livre/tarifs.html`)
+
+Page publique, accessible par l'onglet « 💶 Tarification » de la navigation (accueil, « Monter son
+livre », « Faire imprimer ») et par le pied de l'accueil — la navigation masque ses boutons sur
+petit écran, d'où ce second accès. **C'est une vitrine : aucun abonnement n'existe encore.** Les
+boutons payants sont désactivés (« Bientôt disponible ») et un encadré le dit en tête de page.
+Rien dans le code n'impose les limites annoncées (nombre de livres, livres publiés, fichier pour
+l'imprimeur) : il n'y a ni colonne de formule, ni règle côté base, ni paiement.
+
+Formules envisagées (TTC) : **Découverte** 0 € (2 livres, écriture, couvertures, aperçu, export
+imprimable) ; **Auteur** 4 €/mois ou 40 €/an (10 livres, fichier pour l'imprimeur, séries, notes,
+3 livres publiés) ; **Atelier** 8 €/mois ou 80 €/an (livres et publications illimités, stockage
+d'images étendu, réponse prioritaire). L'annuel vaut dix mois. Repères de marché relevés à l'écriture
+(sources secondaires, à revérifier) : Reedsy Studio gratuit, Scrivener environ 50 à 60 € une fois,
+Atticus 147 $ une fois, options d'écriture payantes de 5 à 8 $ par mois.
+
+**On ne vend que ce qui existe.** Le fichier pour l'imprimeur ajoute le fond perdu, les repères de
+coupe et le blanc tournant ; la conversion CMJN et PDF/X-1a n'existe pas (voir « Faire imprimer »),
+et la page le dit dans sa FAQ plutôt que de le promettre.
+
+**Avant d'ouvrir de vrais abonnements** (voir `conditions-utilisation.html`, qui dit « projet personnel,
+gratuit et sans activité commerciale », et `mentions-legales.html`) : une activité payante n'est plus
+celle d'un éditeur non professionnel, donc l'anonymat de l'éditeur ne tient plus ; il faut un statut
+d'entreprise, des conditions de vente, la mention de TVA, le droit de rétractation (contenu
+numérique), le médiateur de la consommation et la déclaration du prestataire de paiement dans
+`confidentialite.html`. La bascule mensuel/annuel ne fait que changer du texte affiché.
+
 ## Droid Fortnite (suivi de Star Wars: Droid Tycoon)
 
 **Thème visuel « HUD de space opera »**, inspiré des couleurs réellement

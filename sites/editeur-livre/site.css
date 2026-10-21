@@ -1312,3 +1312,64 @@ code {
   padding: 1px 5px;
   overflow-wrap: anywhere;   /* une formule longue se coupe plutot que de deborder */
 }
+
+/* ---------- Tarification (tarifs.html) ---------- */
+
+.tarifs-section { padding-top: 28px; }
+.tarifs-avis { text-align: center; }
+
+/* Mensuel / Annuel : deux boutons côte à côte, celui du choix en terracotta. */
+.bascule-periode {
+  display: flex; width: max-content; max-width: 100%; margin: 0 auto 34px;
+  background: var(--paper); border: 1px solid var(--line); border-radius: 999px; padding: 4px;
+  box-shadow: var(--ombre-douce);
+}
+.bascule-periode button {
+  border: none; background: transparent; color: var(--ink-soft);
+  font: inherit; font-size: 15px; font-weight: 600;
+  padding: 9px 22px; border-radius: 999px; cursor: pointer;
+}
+.bascule-periode button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+.bascule-bonus { font-size: 12px; font-weight: 600; opacity: .85; margin-left: 4px; }
+
+.plans { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; align-items: stretch; }
+.plan {
+  position: relative;
+  display: flex; flex-direction: column;
+  background: var(--paper); border: 1px solid var(--line); border-radius: 18px;
+  padding: 30px 26px 28px; box-shadow: var(--ombre-douce);
+}
+.plan-vedette { border: 2px solid var(--accent); box-shadow: var(--ombre); }
+.plan-ruban {
+  position: absolute; top: -13px; left: 50%; transform: translateX(-50%);
+  background: var(--accent); color: #fff; font-size: 12px; font-weight: 700; letter-spacing: .04em;
+  padding: 4px 14px; border-radius: 999px; white-space: nowrap;
+}
+.plan h2 { font-size: 28px; margin-bottom: 4px; }
+.plan-pour { margin: 0 0 18px; color: var(--ink-soft); font-size: 15px; min-height: 2.9em; }
+.plan-prix { margin: 0 0 2px; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.plan-montant { font-family: var(--serif); font-size: 52px; font-weight: 600; line-height: 1; color: var(--ink); }
+.plan-periode { color: var(--ink-soft); font-size: 15px; }
+.plan-detail { margin: 0 0 20px; color: var(--ink-soft); font-size: 13.5px; min-height: 2.6em; }
+.plan-cta { justify-content: center; width: 100%; margin-bottom: 22px; }
+.plan-cta:disabled { opacity: .55; cursor: default; transform: none; }
+.plan-liste { list-style: none; margin: 0; padding: 18px 0 0; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 10px; font-size: 15px; }
+.plan-liste li { position: relative; padding-left: 26px; }
+.plan-liste li::before {
+  content: "✓"; position: absolute; left: 0; top: 0; color: var(--accent); font-weight: 700;
+}
+.plan-liste li.plan-non { color: var(--ink-soft); opacity: .75; }
+.plan-liste li.plan-non::before { content: "–"; color: var(--ink-soft); }
+.tarifs-note { text-align: center; color: var(--ink-soft); font-size: 14px; margin: 28px 0 0; }
+
+.faq { background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 0 18px; margin-bottom: 10px; }
+.faq summary { cursor: pointer; font-weight: 600; padding: 14px 0; list-style-position: outside; }
+.faq[open] summary { border-bottom: 1px solid var(--line); margin-bottom: 12px; }
+.faq p { margin: 0 0 14px; color: var(--ink-soft); font-size: 15px; }
+
+@media (max-width: 900px) {
+  .plans { grid-template-columns: minmax(0, 1fr); max-width: 460px; margin: 0 auto; gap: 30px; }
+  .plan-pour, .plan-detail { min-height: 0; }
+  /* la formule recommandée passe en premier, c'est celle qu'on regarde d'abord */
+  .plan-vedette { order: -1; }
+}

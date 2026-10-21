@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tarification — Mon Éditeur De Livre</title>
+<meta name="description" content="Les futures formules de Mon Éditeur De Livre : une offre gratuite pour commencer, deux abonnements pour écrire davantage de livres et les faire imprimer.">
+<link rel="stylesheet" href="../../polices/polices.css">
+<link rel="stylesheet" href="site.css">
+<link rel="icon" href="icone-192.png">
+<link rel="apple-touch-icon" href="icone-192.png">
+</head>
+<body>
+
+  <!-- ===== Navigation ===== -->
+  <nav class="nav">
+    <div class="contenu nav-in">
+      <a href="index.html" class="marque">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#8a4b38" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5.5C10.5 4.3 8.3 3.8 6 4c-1 .1-2 .3-3 .6v14c1-.3 2-.5 3-.6 2.3-.2 4.5.3 6 1.5 1.5-1.2 3.7-1.7 6-1.5 1 .1 2 .3 3 .6V4.6c-1-.3-2-.5-3-.6-2.3-.2-4.5.3-6 1.5Z"/><path d="M12 5.5v14"/></svg>
+        Mon Éditeur De Livre
+      </a>
+      <div class="nav-actions">
+        <a href="index.html" class="btn btn-secondaire">← Accueil</a>
+        <a href="montage.html" class="btn btn-secondaire">🔧 Monter son livre</a>
+        <a href="imprimeur.html" class="btn btn-secondaire">🖨️ Faire imprimer</a>
+        <a href="connexion.html" id="ctaNav" class="btn btn-primaire">Se connecter</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ===== En-tête ===== -->
+  <header class="hero" style="padding-bottom:20px">
+    <div class="contenu" style="text-align:center;max-width:780px">
+      <span class="hero-badge">✦ Tarification</span>
+      <h1 style="font-size:clamp(34px,4.5vw,50px)">Un prix <span class="surligne">juste</span> pour écrire autant que vous voulez</h1>
+      <p class="hero-sous" style="margin:0 auto 8px">
+        Commencez gratuitement avec deux livres. Passez à un abonnement quand vos projets se multiplient,
+        ou quand il est temps de les faire imprimer.
+      </p>
+    </div>
+  </header>
+
+  <!-- ===== Avertissement : les abonnements ne sont pas ouverts ===== -->
+  <section style="padding:8px 0 0">
+    <div class="contenu" style="max-width:780px">
+      <div class="astuce tarifs-avis">
+        <strong>Aperçu des futures formules.</strong>
+        Les abonnements ne sont pas encore ouverts et aucun paiement n'est possible : l'éditeur reste
+        entièrement gratuit pour l'instant. Les prix et les limites ci-dessous sont ceux envisagés ;
+        ils peuvent changer avant l'ouverture.
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Les formules ===== -->
+  <section class="tarifs-section">
+    <div class="contenu">
+
+      <div class="bascule-periode" role="group" aria-label="Période de facturation">
+        <button type="button" data-periode="mois" aria-pressed="true">Mensuel</button>
+        <button type="button" data-periode="an" aria-pressed="false">Annuel <span class="bascule-bonus">2 mois offerts</span></button>
+      </div>
+
+      <div class="plans">
+
+        <!-- Découverte -->
+        <article class="plan">
+          <h2>Découverte</h2>
+          <p class="plan-pour">Pour essayer, ou pour un premier livre.</p>
+          <p class="plan-prix"><span class="plan-montant">0&nbsp;€</span> <span class="plan-periode">pour toujours</span></p>
+          <p class="plan-detail">&nbsp;</p>
+          <a href="connexion.html" class="btn btn-secondaire plan-cta">Commencer gratuitement</a>
+          <ul class="plan-liste">
+            <li><strong>2 livres</strong></li>
+            <li>Écriture paginée et mise en page complète</li>
+            <li>Couvertures, dos et pages de garde</li>
+            <li>Aperçu double-page</li>
+            <li>Export imprimable (livret ou dos collé)</li>
+            <li class="plan-non">Fichier pour l'imprimeur</li>
+            <li class="plan-non">Publication aux lecteurs</li>
+            <li class="plan-non">Séries et notes de travail</li>
+          </ul>
+        </article>
+
+        <!-- Auteur -->
+        <article class="plan plan-vedette">
+          <span class="plan-ruban">Le plus choisi</span>
+          <h2>Auteur</h2>
+          <p class="plan-pour">Pour écrire régulièrement et faire imprimer.</p>
+          <p class="plan-prix"><span class="plan-montant" data-mois="4&nbsp;€" data-an="40&nbsp;€">4&nbsp;€</span> <span class="plan-periode" data-mois="par mois" data-an="par an">par mois</span></p>
+          <p class="plan-detail" data-mois="Sans engagement, résiliable à tout moment" data-an="Soit 3,33&nbsp;€ par mois — 2 mois offerts">Sans engagement, résiliable à tout moment</p>
+          <button type="button" class="btn btn-primaire plan-cta" disabled>Bientôt disponible</button>
+          <ul class="plan-liste">
+            <li><strong>10 livres</strong></li>
+            <li>Tout ce qu'offre Découverte</li>
+            <li><strong>Fichier pour l'imprimeur</strong> : fond perdu, repères de coupe, blanc tournant</li>
+            <li>Séries de livres et ordre des tomes</li>
+            <li>Notes de travail par livre, en onglets</li>
+            <li><strong>3 livres publiés</strong> aux lecteurs</li>
+            <li>Réponse par e-mail</li>
+          </ul>
+        </article>
+
+        <!-- Atelier -->
+        <article class="plan">
+          <h2>Atelier</h2>
+          <p class="plan-pour">Pour une production suivie ou plusieurs projets.</p>
+          <p class="plan-prix"><span class="plan-montant" data-mois="8&nbsp;€" data-an="80&nbsp;€">8&nbsp;€</span> <span class="plan-periode" data-mois="par mois" data-an="par an">par mois</span></p>
+          <p class="plan-detail" data-mois="Sans engagement, résiliable à tout moment" data-an="Soit 6,67&nbsp;€ par mois — 2 mois offerts">Sans engagement, résiliable à tout moment</p>
+          <button type="button" class="btn btn-secondaire plan-cta" disabled>Bientôt disponible</button>
+          <ul class="plan-liste">
+            <li><strong>Livres illimités</strong></li>
+            <li>Tout ce qu'offre Auteur</li>
+            <li><strong>Livres publiés illimités</strong></li>
+            <li>Stockage d'images étendu pour les couvertures</li>
+            <li>Réponse par e-mail prioritaire</li>
+          </ul>
+        </article>
+
+      </div>
+
+      <p class="tarifs-note">
+        Prix en euros, toutes taxes comprises. Un livre déjà écrit n'est jamais supprimé en changeant de formule
+        (voir les questions ci-dessous).
+      </p>
+    </div>
+  </section>
+
+  <!-- ===== Questions fréquentes ===== -->
+  <section class="bande-claire">
+    <div class="contenu" style="max-width:780px">
+      <div class="section-titre">
+        <h2>Questions fréquentes</h2>
+      </div>
+
+      <details class="faq">
+        <summary>Que deviennent mes livres si je repasse en Découverte&nbsp;?</summary>
+        <p>Ils restent là, lisibles et exportables. Seule la création de nouveaux livres au-delà de la limite de la
+           formule gratuite est bloquée, et les livres publiés au-delà de la limite cessent d'être proposés aux
+           lecteurs jusqu'à votre retour.</p>
+      </details>
+      <details class="faq">
+        <summary>Puis-je résilier quand je veux&nbsp;?</summary>
+        <p>Oui. Les abonnements mensuels et annuels se résilient à tout moment ; la formule reste active jusqu'à la
+           fin de la période déjà réglée.</p>
+      </details>
+      <details class="faq">
+        <summary>Pourquoi l'abonnement n'est-il pas encore ouvert&nbsp;?</summary>
+        <p>Cette page présente les formules envisagées. Tant que l'ouverture n'est pas annoncée, tout l'éditeur reste
+           gratuit et sans limite de livres.</p>
+      </details>
+      <details class="faq">
+        <summary>L'abonnement couvre-t-il l'impression papier&nbsp;?</summary>
+        <p>Non. L'éditeur prépare les fichiers ; l'impression et l'envoi sont faits par l'imprimeur de votre choix,
+           qui vous facture de son côté. Voir <a href="imprimeur.html">Faire imprimer</a>.</p>
+      </details>
+      <details class="faq">
+        <summary>Le fichier pour l'imprimeur est-il au format PDF/X-1a&nbsp;?</summary>
+        <p>Pas encore : l'éditeur ajoute le fond perdu, les repères de coupe et le blanc tournant, mais la conversion
+           en CMJN et en PDF/X-1a reste à faire dans un logiciel dédié. Le détail est sur la page
+           <a href="imprimeur.html">Faire imprimer</a>.</p>
+      </details>
+    </div>
+  </section>
+
+  <!-- ===== Appel final ===== -->
+  <section>
+    <div class="contenu" style="text-align:center">
+      <h2 style="font-size:clamp(28px,3.6vw,40px);margin-bottom:14px">Commencez par un livre, on verra pour la suite.</h2>
+      <p style="color:var(--ink-soft);font-size:17px;max-width:32em;margin:0 auto 24px">Aucun paiement, aucune carte bancaire : il suffit de vous connecter.</p>
+      <a href="connexion.html" id="ctaFin" class="btn btn-primaire">Se connecter</a>
+    </div>
+  </section>
+
+  <!-- ===== Pied ===== -->
+  <footer class="pied">
+    <div class="contenu pied-in">
+      <div class="marque">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#8a4b38" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5.5C10.5 4.3 8.3 3.8 6 4c-1 .1-2 .3-3 .6v14c1-.3 2-.5 3-.6 2.3-.2 4.5.3 6 1.5 1.5-1.2 3.7-1.7 6-1.5 1 .1 2 .3 3 .6V4.6c-1-.3-2-.5-3-.6-2.3-.2-4.5.3-6 1.5Z"/><path d="M12 5.5v14"/></svg>
+        Mon Éditeur De Livre
+      </div>
+      <small>Écrit, mis en page et imprimé, depuis votre navigateur.</small>
+    </div>
+  </footer>
+
+  <script>
+    // Bascule mensuel / annuel : on ne fait que changer le texte affiché.
+    (function () {
+      var boutons = document.querySelectorAll(".bascule-periode button");
+      function choisir(periode) {
+        boutons.forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.periode === periode)); });
+        document.querySelectorAll("[data-mois]").forEach(function (e) { e.innerHTML = e.getAttribute("data-" + periode); });
+      }
+      boutons.forEach(function (b) { b.addEventListener("click", function () { choisir(b.dataset.periode); }); });
+    })();
+    // Si une session est déjà ouverte, on invite à rejoindre ses livres.
+    (function(){
+      try {
+        if (localStorage.getItem("team53_token")) {
+          document.querySelectorAll("#ctaNav, #ctaFin").forEach(function(a){ a.setAttribute("href", "bibliotheque.html"); a.textContent = "Mes livres"; });
+        }
+      } catch (e) {}
+    })();
+  </script>
+  <script src="retour-portail.js"></script>
+  <script src="../../pied-legal.js"></script>
+</body>
+</html>
