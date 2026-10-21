@@ -162,6 +162,9 @@ a { color: var(--primaire); }
 .app-header .icone-bouton.deconnexion:hover { color: var(--danger); }
 
 .contenu {
+  /* width: 100% : pied-legal.js met le <body> en colonne flex ; là, « margin: auto » empêche le
+     bloc de s'étirer et le réduit à la largeur de son contenu (voir README, « Piège »). */
+  width: 100%;
   padding: 1.2rem 1rem calc(3rem + var(--safe-bottom));
   max-width: 1000px;
   margin: 0 auto;
@@ -394,6 +397,7 @@ a { color: var(--primaire); }
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
+  width: 100%;
   max-width: 62rem;
   margin: 0 auto;
   padding: calc(1.1rem + var(--safe-top)) 1.5rem 0;
@@ -430,6 +434,7 @@ a { color: var(--primaire); }
 
 /* ----- Titre ----- */
 .tdb-hero {
+  width: 100%;
   max-width: 62rem;
   margin: 0 auto;
   padding: 2.6rem 1.5rem 1.4rem;
@@ -460,6 +465,7 @@ a { color: var(--primaire); }
 
 /* ----- Le sommaire des sites ----- */
 .tdb-sommaire {
+  width: 100%;
   max-width: 62rem;
   margin: 0 auto;
   padding: 0.6rem 1.5rem calc(3rem + var(--safe-bottom));

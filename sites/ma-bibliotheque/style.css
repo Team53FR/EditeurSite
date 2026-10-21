@@ -256,6 +256,9 @@ a { color: var(--primaire); }
 
 /* ===== Contenu ===== */
 .contenu {
+  /* width: 100% : pied-legal.js met le <body> en colonne flex ; là, « margin: auto » empêche le
+     bloc de s'étirer et le réduit à la largeur de son contenu (voir README, « Piège »). */
+  width: 100%;
   padding: 1rem 1rem calc(6rem + var(--safe-bottom));
   max-width: 1000px;
   margin: 0 auto;

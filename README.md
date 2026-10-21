@@ -105,6 +105,17 @@ quatre pages légales ne l'appellent pas non plus — elles portent déjà leurs
 liens les unes vers les autres. Une page qui reçoit le script mais n'en veut
 pas peut aussi porter `data-sans-pied` sur son `<body>`.
 
+**Piège : `pied-legal.js` met le `<body>` en colonne flex** (classe `a-pied-legal`, pour coller le
+pied en bas de page). Dans une colonne flex, un bloc qui a `margin: 0 auto` ne s'étire plus : il se
+réduit à la largeur de son contenu, `max-width` ou pas. Tout bloc de page centré de cette façon
+doit donc aussi porter `width: 100%`. Découvert quand la grille des droïdes est tombée à une seule
+colonne étroite (`.contenu` mesurait 312 px sur un écran de 1900) ; la même cause rétrécissait
+`.contenu` de Ma Bibliothèque, et la barre du haut, le titre et le contenu du portail et de « Mon
+compte » (203 px au lieu de 992). Corrigé dans `style.css` (racine), `sites/ma-bibliotheque/style.css`,
+`sites/droid-fortnite/style.css` et `sites/recto-verso/style.css`. L'éditeur de livre n'est pas
+touché (sa classe `.contenu` avait déjà `width: 100%`). Une nouvelle page qui centre un bloc avec
+des marges automatiques et charge ce script doit faire de même.
+
 Trois points de fond, à garder en tête si le site change :
 
 - **L'éditeur reste anonyme**, ce que la LCEN (art. 6, III, 2°) autorise pour
@@ -1582,12 +1593,6 @@ rien à la feuille imprimée et n'est pas enregistré dans le projet. Sur grand 
 rangé au-dessus du panneau (dans la grille de `.atelier`) pour que la feuille ait toute la
 hauteur ; sur petit écran il reste en tête de page. Les textes d'aide sont dans le panneau, pas
 sous la feuille, pour ne pas lui prendre de place.
-
-**Piège rencontré : `pied-legal.js` met le `<body>` en colonne flex.** Dans ce cas un bloc avec
-`margin: 0 auto` ne s'étire plus : il se réduit à la largeur de son contenu. La page du site
-tenait ainsi dans environ 1000 px quel que soit l'écran, et la feuille y était minuscule.
-`.atelier` porte donc `width: 100%` (avec un `max-width`). À retenir pour toute page qui centre
-un bloc avec des marges automatiques et charge ce script.
 
 **Les télécharger séparément.** « Sortie » propose « Les deux feuilles », « Feuille 1 seulement »
 ou « Feuille 2 seulement » ; on imprime en « Enregistrer au format PDF » une feuille après l'autre

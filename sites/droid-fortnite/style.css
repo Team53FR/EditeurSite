@@ -402,6 +402,9 @@ a { color: var(--primaire); }
 
 /* ===== Contenu ===== */
 .contenu {
+  /* width: 100% : pied-legal.js met le <body> en colonne flex, où margin auto fait rétrécir un
+     bloc à la largeur de son contenu (la grille de droïdes tombait à une seule colonne). */
+  width: 100%;
   padding: 1rem 1rem calc(6rem + var(--safe-bottom));
   max-width: 1000px;
   margin: 0 auto;
