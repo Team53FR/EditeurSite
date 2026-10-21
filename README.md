@@ -1173,6 +1173,58 @@ PDF/X-1a, appliquer un profil de sortie. Le panneau de contrôle affiché avant
 génération le dit explicitement, plutôt que de laisser croire que le fichier
 part tel quel chez l'imprimeur.
 
+### Passe de test complète (octobre 2026)
+
+L'éditeur a été éprouvé sur un vrai roman (« Aeran'Kael : L'Héritage Brisé », 370 pages, 59 chapitres),
+chargé dans l'éditeur réel avec un faux Supabase en mémoire (enregistrement et relecture vérifiés), par
+plusieurs centaines de manipulations : frappe, suppressions, collages, chapitres, recherche, formats,
+gardes, curseurs, outils, aperçu, tous les modes d'impression, mobile. Ce qui en est sorti :
+
+- **Coquilles vides et phrases coupées.** Une coupe de page tombant pile entre deux paragraphes laissait
+  une copie VIDE du paragraphe au bord du morceau (`htmlEntre`). Elles s'accumulaient (+90 à chaque
+  recomposition), décalaient la coupe d'une ligne (« trous » en bas de page) et, en fin de double-page,
+  recevaient au recollage la suite du paragraphe coupé : la phrase se retrouvait en deux paragraphes (21
+  dans ce livre). `htmlEntre` ne les produit plus, `repaginerTout` retire les anciennes
+  (`retirerCoquillesVides`), `fusionnerSuite` verse la suite dans le dernier bloc qui a du contenu.
+  L'outil **Relecture → Phrases coupées en deux** retrouve et recolle ce que l'ancien code a laissé
+  (signe : premier morceau finissant par l'espace de fin de ligne, sans ponctuation, second commençant
+  par une minuscule). La passe de rattrapage de `decouperEnDoublesPages` mesure chaque morceau avec le
+  suivant, comme la remontée à la frappe : plus de trou qu'une frappe viendrait combler.
+- **Une seule marque « suite », sur le premier bloc** (`nettoyerMarquesSuite`) : le navigateur la recopiait
+  sur chaque paragraphe créé par Entrée en haut d'une page, et l'Entrée devenait un retour à la ligne.
+- **Annuler / rétablir à l'échelle du livre.** L'annulation du navigateur se perdait dès que la double-page
+  était réaffichée (texte remonté ou descendu, changement de page) : Ctrl+Z ne faisait plus rien. Un
+  historique (`noterEtat`, `annuler`, `retablir`) note l'état du livre après chaque modification
+  terminée (via `planifierBrouillon`), avec la position du curseur avant et après ; il couvre aussi le
+  format et les espaces. Les tableaux sont recopiés, pas les chaînes. Ctrl+Z dans un autre champ
+  (recherche, notes) ne touche plus au livre ; l'annulation du menu contextuel passe par là aussi.
+- **Bords de page au clavier** (`gererToucheBordDePage`) : Retour arrière en haut de page, Suppr en bas
+  agissent sur le texte des deux double-pages (`effacerAuBord`) ; Page suivante / précédente et les
+  flèches changent de page. Aussi par `beforeinput` : les claviers de téléphone n'envoient pas la touche.
+- **Recoller sans perdre l'espace** (`recollerSansPerdreEspace`) : en recollant deux paragraphes, le
+  navigateur effaçait l'espace de fin du premier (« la ¶ regarder » → « laregarder »).
+- **Texte caché** : une double-page qui ne tient pas sur l'appareil (autre navigateur, autre césure) fait
+  descendre son trop-plein à l'affichage. Le mesureur coupe désormais les mots trop longs comme l'écran
+  (`overflow-wrap: break-word`, que le navigateur donnait d'office à la seule zone éditable), et un mot
+  plus long qu'une ligne n'est plus protégé contre la coupe (il débordait de sa colonne).
+- **Enregistrement** : une PHOTO du livre au clic (`photoLivre`) — une frappe pendant l'envoi laissait le
+  serveur incohérent et était déclarée enregistrée ; un enregistrement à la fois (deux Ctrl+S
+  rapprochés posaient une fausse question de conflit) ; le curseur reste en place ; le brouillon n'est
+  plus recréé après une sauvegarde et ne garde plus les pages dérivées (moitié moins lourd).
+- **Images de couverture** : choisir une couleur de fond, « Supprimer l'image » ou en envoyer une autre
+  effaçait aussitôt le fichier du stockage, avant tout enregistrement. Elles sont mises de côté
+  (`oublierImage`) et effacées après un enregistrement qui ne s'en sert plus ; chaque envoi a un nom
+  unique (`nomImageUnique`), l'adresse réécrite restant une heure en cache.
+- **Impression en pages simples** (mode par défaut) : plantait sur une variable `pages` disparue.
+  **Espaces insécables** (fenêtre des coupes) : fonctions restaurées, le bouton n'appelait plus rien.
+- Divers : interligne sans sélection appliqué au livre (il se posait sur la zone d'édition), style
+  « Titre » = nouvelle page, collage et dépôt en vrais paragraphes (dépôt nettoyé comme le collage),
+  voile sur les recompositions longues, panneau resserré sur les écrans peu hauts, aperçu avec délai de
+  secours, retour à la bibliothèque qui propose d'enregistrer.
+
+Reste tel quel : Entrée au milieu d'un titre de chapitre le coupe en deux chapitres (Ctrl+Z le défait) ;
+deux trous d'une ligne sur 186 double-pages, dus aux veuves et orphelines d'un paragraphe à cheval.
+
 ### Tarification (`sites/editeur-livre/tarifs.html`)
 
 Page publique, accessible par l'onglet « Tarification » de la navigation (accueil, « Monter son livre »,

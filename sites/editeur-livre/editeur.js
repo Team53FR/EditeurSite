@@ -26,6 +26,12 @@ envelopperAttenteLourde({
   appliquerInsecables: ["Espaces insécables…", "Tout le livre est recomposé, puis les pages sont relues."],
   corrigerLesCoupes: ["Correction des coupes de page…", "Tout le livre est recomposé, puis les pages sont relues."],
   fermerApercu: ["Retour à l'édition…"],
+  // Celles-ci aussi recomposent TOUT le livre (trois secondes sur un roman) : sans
+  // voile, la page paraissait figée.
+  remplacerTout: ["Remplacement dans tout le livre…", "Le livre est recomposé."],
+  corrigerTousLesCollages: ["Ajout des espaces…", "Le livre est recomposé."],
+  recollerPhrasesCoupees: ["Recollage des phrases…", "Le livre est recomposé."],
+  appliquerContenuComplet: ["Mise à jour du livre…", "Le livre est recomposé."],
 });
 
 let bibliotheque = null;
@@ -671,6 +677,66 @@ function ouvrirDialogueCoupes(protections, restantes, insecables) {
   });
 }
 
+// Remplace, dans tout le livre, l'espace ordinaire par une espace INSÉCABLE devant « » »
+// et après « « » : la règle typographique française. Une espace insécable ne se coupe
+// jamais, quelle que soit la mise en page : plus de guillemet seul, définitivement.
+//
+// C'est un vrai changement du texte (un caractère invisible), donc une option que l'on
+// choisit, pas quelque chose que la recomposition fait d'elle-même. On travaille nœud de
+// texte par nœud de texte, sans toucher au balisage ; une espace et son guillemet
+// séparés par une mise en forme (« mot<i> »</i> ») sont traités aussi, d'un nœud à l'autre.
+//
+// (Ces deux fonctions avaient disparu lors du passage de l'outil des coupes en deux
+// temps, alors que le bouton « espaces insécables » les appelait toujours : il ne
+// faisait plus qu'une erreur.)
+function rendreInsecablesLesGuillemets(html) {
+  const boite = document.createElement("div");
+  boite.innerHTML = html || "";
+  const noeuds = [];
+  const marche = document.createTreeWalker(boite, NodeFilter.SHOW_TEXT);
+  let n; while ((n = marche.nextNode())) noeuds.push(n);
+
+  let compte = 0;
+  const NBSP = " ";
+  noeuds.forEach((noeud) => {
+    // Dans un même nœud.
+    const apres = noeud.data
+      .replace(/(\S) +»/g, (m, c) => { compte++; return c + NBSP + "»"; })
+      .replace(/« +(?=\S)/g, () => { compte++; return "«" + NBSP; });
+    if (apres !== noeud.data) noeud.data = apres;
+  });
+  // D'un nœud au suivant.
+  for (let i = 0; i + 1 < noeuds.length; i++) {
+    const a = noeuds[i], b = noeuds[i + 1];
+    if (/\S +$/.test(a.data) && /^»/.test(b.data)) { a.data = a.data.replace(/ +$/, NBSP); compte++; }
+    else if (/\S$/.test(a.data) && /^ +»/.test(b.data)) { b.data = b.data.replace(/^ +/, NBSP); compte++; }   // « mot|␣» »
+    else if (/«$/.test(a.data) && /^ +\S/.test(b.data)) { b.data = b.data.replace(/^ +/, NBSP); compte++; }   // « «|␣mot »
+    else if (/« +$/.test(a.data) && /^\S/.test(b.data)) { a.data = a.data.replace(/ +$/, NBSP); compte++; }   // « «␣|mot »
+  }
+  return { html: boite.innerHTML, compte };
+}
+
+function insecablesDansLeLivre() {
+  flushSpread();
+  const livre = livreActuel();
+  let total = 0;
+  livre.spreads = spreadsLivre().map((h) => {
+    const r = rendreInsecablesLesGuillemets(h);
+    total += r.compte;
+    return r.compte ? r.html : h;
+  });
+  if (total) {
+    pagesObsoletes = true;
+    marquerModifie();
+    repaginerTout();
+    afficherSpread();
+    afficherSommaire();
+    majCompteurMots();
+    planifierBrouillon();
+  }
+  return total;
+}
+
 // Le bouton de la fenêtre : applique, puis montre le nouveau bilan.
 function appliquerInsecables() {
   const n = insecablesDansLeLivre();
@@ -909,6 +975,29 @@ async function chargerLivre() {
     zoneEd.addEventListener("blur", sauvegarderSelection);
     zoneEd.addEventListener("input", surSaisie);
     zoneEd.addEventListener("paste", gererCollage);
+    // L'annulation passe par l'historique du livre, y compris quand elle vient du menu
+    // contextuel ou du menu Édition du navigateur (et non du clavier). Avant toute
+    // autre modification, on note où était le curseur : c'est là qu'annuler le ramènera.
+    zoneEd.addEventListener("beforeinput", (e) => {
+      if (e.inputType === "historyUndo") { e.preventDefault(); annuler(); return; }
+      if (e.inputType === "historyRedo") { e.preventDefault(); retablir(); return; }
+      if (!positionAvantSaisie) positionAvantSaisie = positionCourante();
+      // Les claviers de téléphone n'envoient pas la touche Retour arrière (Android la
+      // transmet « non identifiée ») : la prise en charge des bords de page et du
+      // recollage sans perte d'espace passe donc AUSSI par ici. Au clavier physique,
+      // la touche, déjà traitée, empêche cet événement : rien n'est fait deux fois.
+      if ((e.inputType === "deleteContentBackward" || e.inputType === "deleteContentForward") && e.cancelable) {
+        const arriere = e.inputType === "deleteContentBackward";
+        const ed = editeurEl();
+        if (arriere && numSpread() > 0 && curseurAuDebut(ed)) { e.preventDefault(); effacerAuBord("arriere"); return; }
+        if (!arriere && numSpread() + 1 < spreadsLivre().length && curseurALaFin(ed)) { e.preventDefault(); effacerAuBord("avant"); return; }
+        if (recollerSansPerdreEspace(ed, arriere)) { e.preventDefault(); return; }
+      }
+    });
+    zoneEd.addEventListener("keydown", gererToucheBordDePage);
+    zoneEd.addEventListener("dragstart", () => { glisserDepuisLaZone = true; });
+    zoneEd.addEventListener("dragend", () => { glisserDepuisLaZone = false; });
+    zoneEd.addEventListener("drop", gererDepot);
     // Reflet de l'état de la sélection dans la barre d'outils. « selectionchange »
     // est très bavard : on regroupe les rafraîchissements sur l'image suivante.
     let majPrevue = false;
@@ -929,6 +1018,7 @@ async function chargerLivre() {
     afficherSommaire();
     majCompteurMots();
     majBoutonPublier();
+    initialiserHistorique();
 
     // Tutoriel des outils au tout premier passage dans l'éditeur (une seule fois).
     setTimeout(() => lancerTutorielEditeur(false), 600);
@@ -947,15 +1037,45 @@ function gererCollage(e) {
   e.preventDefault();
   const donnees = e.clipboardData || window.clipboardData;
   if (!donnees) return;
+  insererDonnees(donnees);
+}
 
+// Glisser-déposer : un texte venu d'AILLEURS (Word, une page web) passe par le même
+// nettoyage que le collage — sans cela, il entrait avec sa police, sa taille et sa
+// couleur. Un passage du livre qu'on déplace dans la zone, lui, est laissé au
+// navigateur ; un fichier ou une image déposés n'insèrent rien.
+let glisserDepuisLaZone = false;
+
+function gererDepot(e) {
+  if (glisserDepuisLaZone) return;
+  const donnees = e.dataTransfer;
+  if (!donnees) return;
+  e.preventDefault();
+  if (!donnees.getData("text/html") && !donnees.getData("text/plain")) return;
+  const r = document.caretRangeFromPoint ? document.caretRangeFromPoint(e.clientX, e.clientY) : null;
+  const ed = editeurEl();
+  if (!ed) return;
+  ed.focus();
+  if (r && ed.contains(r.startContainer)) {
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(r);
+  }
+  insererDonnees(donnees);
+}
+
+// Insère, à la place de la sélection, le contenu d'un presse-papiers ou d'un dépôt.
+function insererDonnees(donnees) {
   const frag = fragmentDepuisPressePapiers(donnees);
   if (!frag) return;
 
   const sel = window.getSelection();
   if (!sel || sel.rangeCount === 0) return;
+  if (!positionAvantSaisie) positionAvantSaisie = positionCourante();
   const range = sel.getRangeAt(0);
   range.deleteContents(); // remplacer la sélection éventuelle
 
+  const premier = frag.firstChild;
   const dernier = frag.lastChild;
   range.insertNode(frag);
 
@@ -967,11 +1087,41 @@ function gererCollage(e) {
     sel.addRange(range);
   }
 
+  // Les paragraphes de la source arrivent séparés par une ligne vide (<br><br>) dans
+  // le paragraphe où l'on colle. Un livre réglé en « Paragraphes » est fait de VRAIS
+  // paragraphes, dont l'espace est réglé : le texte collé y prenait un autre
+  // espacement que le reste — et un chapitre collé devenait un seul paragraphe. On
+  // le découpe comme le fait ce réglage. (Un retour à la ligne simple reste tel quel.)
+  if (premier && typeof livreActuel().espaceParagraphe === "number") paragraphesDuCollage(premier, dernier);
+
   // insertNode ne déclenche pas 'input' : on enchaîne manuellement
   // (pagination continue, historique, brouillon, compteur, état modifié).
   surSaisie({ inputType: "insertFromPaste" });
 }
 
+
+function paragraphesDuCollage(premier, dernier) {
+  const ed = editeurEl();
+  if (!ed) return;
+  const auPremierNiveau = (n) => { while (n && n.parentNode !== ed) n = n.parentNode; return n; };
+  const debut = auPremierNiveau(premier), fin = auPremierNiveau(dernier) || debut;
+  if (!debut) return;
+  const blocs = [];
+  for (let b = debut; b; b = b.nextSibling) { blocs.push(b); if (b === fin) break; }
+  const offset = offsetCaret(ed);
+  let change = false;
+  blocs.forEach((bloc) => {
+    if (bloc.nodeType !== Node.ELEMENT_NODE || bloc.tagName !== "P" || bloc.classList.contains("ligne-vide")) return;
+    if (bloc.querySelectorAll("br").length < 2) return;
+    const conv = convertirLignesVidesEnParagraphes(bloc.outerHTML);
+    if (!conv.compte) return;
+    const tmp = document.createElement("div");
+    tmp.innerHTML = conv.html;
+    bloc.replaceWith(...tmp.childNodes);
+    change = true;
+  });
+  if (change && offset !== null) placerCaretAOffset(ed, offset);
+}
 
 // Raccourcis clavier globaux de l'éditeur (mode texte uniquement)
 function raccourcisClavier(e) {
@@ -979,6 +1129,12 @@ function raccourcisClavier(e) {
   const ctrl = e.ctrlKey || e.metaKey;
   if (!ctrl) return;
   const touche = e.key.toLowerCase();
+  // Dans un autre champ (recherche, remplacement, titre de couverture…), Ctrl+Z
+  // annule la frappe de CE champ : il ne doit pas défaire le livre.
+  const t = e.target;
+  const autreChamp = t && t !== document.body && !(editeurEl() && editeurEl().contains(t)) &&
+    (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable);
+  if ((touche === "z" || touche === "y") && autreChamp) return;
   if (touche === "z" && !e.shiftKey) { e.preventDefault(); annuler(); }
   else if ((touche === "z" && e.shiftKey) || touche === "y") { e.preventDefault(); retablir(); }
   else if (touche === "f") { e.preventDefault(); basculerRecherche(true); }
@@ -1001,6 +1157,28 @@ function appliquerStyle(baliseKey) {
   restaurerSelection();
   const balise = baliseKey === "h2" ? "H2" : baliseKey === "h3" ? "H3" : "P";
   document.execCommand("formatBlock", false, balise);
+
+  // Un « Titre » est un titre de CHAPITRE : comme ceux de « + Chapitre », il
+  // commence une nouvelle page. Sans cela, le chapitre apparaissait au sommaire
+  // mais démarrait au milieu d'une page, à l'écran comme à l'impression. À
+  // l'inverse, un titre redevenu paragraphe ou sous-titre perd ce saut.
+  const ed = editeurEl();
+  const sel = window.getSelection();
+  if (ed && sel && sel.rangeCount) {
+    const r = sel.getRangeAt(0);
+    ed.querySelectorAll("p, h2, h3").forEach((b) => {
+      if (!r.intersectsNode(b)) return;
+      if (b.tagName === "H2") {
+        b.classList.add("chapitre");
+        b.style.breakBefore = "column";
+      } else {
+        b.classList.remove("chapitre");
+        if (!b.className) b.removeAttribute("class");
+        b.style.breakBefore = "";
+        if (!b.getAttribute("style")) b.removeAttribute("style");
+      }
+    });
+  }
 
   // Une taille posée à la main (font-size en ligne) survit au changement de
   // bloc et l'emporterait sur la taille du type : un titre resterait en 11 pt.
@@ -1049,7 +1227,7 @@ function nettoyerTaillesBlocsSelection() {
 function appliquerPolice(police) {
   restaurerSelection();
   const sel = window.getSelection();
-  if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
+  if (!sel || sel.rangeCount === 0 || sel.isCollapsed) { demanderSelection(); return; }
   const range = sel.getRangeAt(0);
   const fragment = range.extractContents();
   fragment.querySelectorAll("span[style]").forEach(el => {
@@ -1070,19 +1248,41 @@ function appliquerPolice(police) {
 }
 
 
+// La sélection du texte, gardée quand on ouvre un menu de la barre (qui prend le
+// focus). Le simple curseur compte aussi : « Interligne » ou « Titre » s'appliquent au
+// paragraphe où il se trouve. Seule une sélection DANS la zone d'édition est gardée —
+// sans quoi une sélection ancienne, d'une autre page, était réappliquée ailleurs.
 function sauvegarderSelection() {
   const sel = window.getSelection();
-  if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
+  const ed = editeurEl();
+  if (sel && sel.rangeCount > 0 && ed && ed.contains(sel.getRangeAt(0).commonAncestorContainer)) {
     selectionSauvegardee = sel.getRangeAt(0).cloneRange();
   }
 }
 
 function restaurerSelection() {
   if (!selectionSauvegardee) return false;
+  const ed = editeurEl();
+  // La double-page a pu être réaffichée depuis : la sélection pointe alors des nœuds
+  // qui ne sont plus à l'écran. On l'oublie.
+  if (!ed || !ed.contains(selectionSauvegardee.startContainer) || !ed.contains(selectionSauvegardee.endContainer)) {
+    selectionSauvegardee = null;
+    return false;
+  }
   const sel = window.getSelection();
   sel.removeAllRanges();
   sel.addRange(selectionSauvegardee);
   return true;
+}
+
+// La police et la taille ne s'appliquent qu'à un texte sélectionné : le dire, plutôt
+// que de ne rien faire en silence.
+function demanderSelection() {
+  const message = document.getElementById("message");
+  if (!message) return;
+  const texte = "Sélectionnez d'abord le texte à modifier.";
+  message.textContent = texte;
+  setTimeout(() => { if (message.textContent === texte) message.textContent = ""; }, 2500);
 }
 
 function appliquerTaille(pt) {
@@ -1091,7 +1291,7 @@ function appliquerTaille(pt) {
 
   restaurerSelection();
   const sel = window.getSelection();
-  if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
+  if (!sel || sel.rangeCount === 0 || sel.isCollapsed) { demanderSelection(); return; }
 
   const range = sel.getRangeAt(0);
 
@@ -1142,10 +1342,11 @@ async function gererConflitSauvegarde() {
   if (ecraser) {
     try {
       // Sans date connue, l'enregistrement ne compare plus rien : il écrase.
-      majLeConnu = await enregistrerLivreDistant(livreActuel(), null);
+      const photo = photoLivre();
+      majLeConnu = await enregistrerLivreDistant(photo.livre, null);
+      effacerImagesOubliees(photo.livre);
       message.textContent = "Sauvegardé (version distante écrasée).";
-      marquerSauvegarde();
-      effacerBrouillon();
+      if (photoToujoursAJour(photo)) { marquerSauvegarde(); effacerBrouillon(); }
     } catch (erreur) {
       message.textContent = erreur.message;
     }
@@ -1156,8 +1357,16 @@ async function gererConflitSauvegarde() {
   }
 }
 
-function retourBibliotheque() {
+async function retourBibliotheque() {
   flushSpread();
+  if (modifie) {
+    // Plutôt que l'avertissement générique du navigateur (« Quitter le site ? »),
+    // la vraie question : enregistrer d'abord ?
+    if (!confirm("Ce livre a des modifications non enregistrées.\n\n" +
+        "OK = les enregistrer, puis revenir à la bibliothèque.\nAnnuler = rester ici.")) return;
+    await sauvegarder();
+    if (modifie) return;            // l'enregistrement a échoué : le message est affiché, on reste
+  }
   window.location.href = "bibliotheque.html";
 }
 
@@ -1530,14 +1739,45 @@ function initGlissementImageCouverture() {
   }, { passive: false });
 }
 
+// ----- Images retirées : effacées du stockage seulement une fois le livre ENREGISTRÉ -----
+//
+// Retirer une image (choisir une couleur de fond, « Supprimer l'image », en envoyer une
+// autre) l'effaçait aussitôt du stockage — avant tout enregistrement. Essayer une
+// pastille de couleur suffisait à perdre son image de couverture, définitivement ; et
+// quitter sans enregistrer laissait le livre enregistré pointer vers un fichier disparu.
+// Elle est maintenant mise de côté, et n'est effacée qu'après un enregistrement du livre
+// qui ne s'en sert plus.
+const imagesAEffacer = new Set();
+
+function oublierImage(chemin) {
+  if (!chemin) return;
+  imagesAEffacer.add(chemin);
+}
+
+function effacerImagesOubliees(livreEnregistre) {
+  if (!imagesAEffacer.size) return;
+  const gardees = new Set(["couverture", "quatrieme", "tranche"]
+    .map((k) => livreEnregistre[k] && livreEnregistre[k].imageChemin).filter(Boolean));
+  imagesAEffacer.forEach((chemin) => {
+    if (gardees.has(chemin)) return;
+    supprimerImageStorage(chemin).catch(() => {});
+    delete cacheImagesURL[chemin];
+  });
+  imagesAEffacer.clear();
+}
+
+// Un nom NOUVEAU à chaque envoi. Réécrire le même fichier gardait la même adresse, que
+// le stockage fait conserver une heure en cache : la bibliothèque et la lecture
+// montraient encore l'ancienne image après son remplacement.
+function nomImageUnique(livreId, sorte, extension) {
+  return obtenirPrefixeImagesUtilisateur() + "/" + livreId + "_" + sorte + "_" + Date.now().toString(36) + "." + extension;
+}
+
 function setCouleurFond(couleur) {
   const livre = livreActuel();
   const data = modeCouverture === "couverture" ? livre.couverture : livre.quatrieme;
 
-  if (data.imageChemin) {
-    supprimerImageStorage(data.imageChemin).catch(() => {});
-    delete cacheImagesURL[data.imageChemin];
-  }
+  oublierImage(data.imageChemin);
 
   data.fond = couleur;
   data.image = null;
@@ -1579,13 +1819,9 @@ function chargerImageFond(event) {
     messageCouv.textContent = "Envoi de l'image en cours...";
     try {
       // L'envoi renvoie l'URL publique : c'est elle qu'on range dans le livre.
-      const chemin = await uploaderImageStorage(
-        `${obtenirPrefixeImagesUtilisateur()}/${livre.id}_${modeCourant}.${extension}`, dataUrl);
+      const chemin = await uploaderImageStorage(nomImageUnique(livre.id, modeCourant, extension), dataUrl);
 
-      if (ancienChemin && ancienChemin !== chemin) {
-        supprimerImageStorage(ancienChemin).catch(() => {});
-        delete cacheImagesURL[ancienChemin];
-      }
+      if (ancienChemin && ancienChemin !== chemin) oublierImage(ancienChemin);
 
       data.imageChemin = chemin;
       data.image = null;
@@ -1610,10 +1846,7 @@ function supprimerImageFond() {
   const livre = livreActuel();
   const data = modeCouverture === "couverture" ? livre.couverture : livre.quatrieme;
 
-  if (data.imageChemin) {
-    supprimerImageStorage(data.imageChemin).catch(() => {});
-    delete cacheImagesURL[data.imageChemin];
-  }
+  oublierImage(data.imageChemin);
 
   data.image = null;
   data.imageChemin = null;
@@ -1828,13 +2061,20 @@ function animerFlip(direction, from, to) {
   [ombreAvant, ombreArriere].forEach(o =>
     o.animate([{ opacity: 0 }, { opacity: 0.85 }, { opacity: 0 }], reglages)
   );
+  // Une seule fois, et au plus tard un peu après la durée prévue : une animation
+  // suspendue (onglet en arrière-plan, économiseur de batterie…) bloquait sinon
+  // l'aperçu, « Suivant » et « Précédent » restant sans effet.
+  let termine = false;
   const terminer = () => {
+    if (termine) return;
+    termine = true;
     indexApercu = to;
     afficherApercu();
     animationEnCours = false;
   };
   anim.onfinish = terminer;
   anim.oncancel = terminer;
+  setTimeout(terminer, reglages.duration + 400);
 }
 
 function afficherApercu() {
@@ -1997,6 +2237,10 @@ let modifie = false;
 function marquerModifie() {
   modifie = true;
   majIndicateur();
+  // Où était l'auteur quand la modification a commencé : c'est là qu'Annuler le
+  // ramènera. (La frappe le note déjà avant d'agir ; les boutons de la barre, les
+  // remplacements, les outils passent par ici.)
+  if (!positionAvantSaisie && !restaurationEnCours && etatsHistorique.length) positionAvantSaisie = positionCourante();
 }
 
 function marquerSauvegarde() {
@@ -2027,18 +2271,33 @@ function cleBrouillon() {
 function planifierBrouillon() {
   clearTimeout(timerBrouillon);
   timerBrouillon = setTimeout(sauvegarderBrouillon, 1500);
+  // Toute modification terminée passe par ici : c'est aussi le moment de la noter
+  // dans l'historique (annuler / rétablir).
+  planifierEtat();
 }
 
+// Le brouillon garde le livre SANS ses pages dérivées (la moitié du poids : elles se
+// recalculent), et seulement s'il y a quelque chose à protéger. Une frappe juste
+// avant d'enregistrer laissait sinon son minuteur réécrire un brouillon APRÈS la
+// sauvegarde : à la réouverture, l'éditeur proposait de « restaurer un brouillon
+// non enregistré » alors que tout l'était.
 function sauvegarderBrouillon() {
-  if (indexLivre === -1) return;
+  if (indexLivre === -1 || !modifie) return;
   flushSpread();
+  const livre = Object.assign({}, livreActuel(), { pages: undefined });
   try {
-    localStorage.setItem(cleBrouillon(), JSON.stringify({ t: Date.now(), livre: livreActuel() }));
+    localStorage.setItem(cleBrouillon(), JSON.stringify({ t: Date.now(), livre }));
   } catch (e) { /* quota dépassé ou stockage indisponible : on ignore */ }
 }
 
 function effacerBrouillon() {
+  clearTimeout(timerBrouillon);
   try { localStorage.removeItem(cleBrouillon()); } catch (e) {}
+}
+
+// Ce qui distingue deux versions d'un livre, hors données dérivées ou de service.
+function signatureLivre(livre) {
+  return JSON.stringify(Object.assign({}, livre, { pages: undefined, nbPages: undefined, dateModif: undefined }));
 }
 
 function verifierBrouillon() {
@@ -2051,7 +2310,7 @@ function verifierBrouillon() {
   if (!data || !data.livre) { effacerBrouillon(); return; }
 
   // Brouillon identique à la version distante : rien à restaurer
-  if (JSON.stringify(data.livre) === JSON.stringify(livreActuel())) { effacerBrouillon(); return; }
+  if (signatureLivre(data.livre) === signatureLivre(livreActuel())) { effacerBrouillon(); return; }
 
   const date = new Date(data.t).toLocaleString("fr-FR");
   const restaurer = confirm(
@@ -2061,6 +2320,11 @@ function verifierBrouillon() {
   );
   if (restaurer) {
     bibliotheque.livres[indexLivre] = data.livre;
+    // Les pages dérivées ne sont pas dans le brouillon : elles se recalculent.
+    if (!Array.isArray(data.livre.pages) || !data.livre.pages.length) {
+      data.livre.pages = [{ id: "p1", contenu: "" }];
+      pagesObsoletes = true;
+    }
     indexSpread = 0;
     marquerModifie();
   } else {
@@ -2862,6 +3126,202 @@ function corrigerTousLesCollages() {
   }
 }
 
+// =====================================================================
+//  Outil de relecture : les phrases coupées en deux paragraphes
+//
+//  Une ancienne version de l'éditeur, en recollant les pages, pouvait verser la
+//  suite d'un paragraphe coupé entre deux pages dans un nouveau paragraphe : la
+//  phrase continuait à la ligne, « …se pressaient dans la cour » / « pavée, leurs
+//  voix… ». La cause est corrigée (voir fusionnerSuite) ; cet outil retrouve ce
+//  qu'elle a laissé dans les livres, et le recolle.
+//
+//  Le signe est net : le premier morceau finit par l'espace de fin de ligne où la
+//  page était coupée, sans ponctuation de fin de phrase, et le second commence par
+//  une minuscule. Une vraie fin de paragraphe ne ressemble pas à cela.
+// =====================================================================
+
+const FIN_DE_PHRASE_COUPEE = /[.!?…»:;"”)\]]\s*$/;
+const DEBUT_MINUSCULE = /^\s*[a-zàâäçéèêëîïôöûùüÿœæ]/;
+
+// Les paires de paragraphes (de premier niveau) qui ne sont qu'une phrase coupée.
+function phrasesCoupeesDans(conteneur) {
+  const paires = [];
+  // Les coquilles vides (voir htmlEntre) ne séparent rien à l'œil : une phrase coupée
+  // en a souvent une entre ses deux morceaux.
+  const blocs = [...conteneur.children].filter((e) => !estCoquilleVide(e));
+  for (let i = 0; i + 1 < blocs.length; i++) {
+    const a = blocs[i], b = blocs[i + 1];
+    if (a.tagName !== "P" || b.tagName !== "P") continue;
+    if (a.classList.contains("ligne-vide") || b.classList.contains("ligne-vide")) continue;
+    const ta = a.textContent || "", tb = b.textContent || "";
+    if (!ta.trim() || !tb.trim() || a.lastElementChild && a.lastElementChild.tagName === "BR" && !a.lastChild.textContent) continue;
+    if (FIN_DE_PHRASE_COUPEE.test(ta) || !DEBUT_MINUSCULE.test(tb)) continue;
+    if (!/\s$/.test(ta) && !/^\s/.test(tb)) continue;     // pas d'espace à la jonction : un mot coupé, on n'y touche pas
+    paires.push({ a, b });
+  }
+  return paires;
+}
+
+function ouvrirPhrasesCoupees() {
+  if (modeApercu || modeCouverture) return;
+  flushSpread();
+  const boite = document.createElement("div");
+  boite.innerHTML = contenuCompletLivre();
+  const paires = phrasesCoupeesDans(boite);
+
+  // Pour chacune : où commence le second morceau dans le texte du livre (pour y aller)
+  // et de quoi la reconnaître dans la liste.
+  const offsetDe = (el) => {
+    const r = document.createRange();
+    r.setStart(boite, 0);
+    r.setStartBefore(boite.firstChild || boite);
+    r.setEndBefore(el);
+    return r.toString().length;
+  };
+  const trouvailles = paires.map(({ a, b }) => {
+    const ta = a.textContent, tb = b.textContent;
+    const fin = ta.slice(-40);
+    return {
+      offset: offsetDe(b),
+      // La jonction elle-même, pour la retrouver dans les double-pages : la position
+      // seule ne suffit pas, le livre recollé ayant perdu des blancs invisibles entre
+      // les blocs que les double-pages, elles, gardent.
+      jonction: fin + tb.slice(0, 40),
+      dansJonction: fin.length,
+      avant: "…" + ta.replace(/\s+$/, "").slice(-38).replace(/^\S*\s/, ""),
+      apres: tb.trim().slice(0, 38).replace(/\s\S*$/, "") + "…"
+    };
+  });
+  ouvrirDialoguePhrasesCoupees(trouvailles);
+}
+
+function fermerDialoguePhrasesCoupees() {
+  const d = document.getElementById("dialoguePhrases");
+  if (d) d.remove();
+}
+
+function ouvrirDialoguePhrasesCoupees(trouvailles) {
+  fermerDialoguePhrasesCoupees();
+  const n = trouvailles.length;
+  let html = '<div class="modal-impression-carte ci-carte" role="dialog" aria-modal="true">' +
+    '<button class="mi-fermer" aria-label="Fermer">&#10005;</button>' +
+    "<h3>Phrases coupées en deux</h3>";
+  if (!n) {
+    html += '<p class="mi-intro">Aucune phrase passée à la ligne au milieu : tout est en ordre.</p>' +
+      '<div class="ci-actions"><button class="ci-annuler">Fermer</button></div></div>';
+  } else {
+    html += '<p class="mi-intro">' + n + (n > 1 ? " phrases continuent" : " phrase continue") +
+      " dans un nouveau paragraphe, comme si elle avait été coupée par un retour à la ligne. " +
+      "Cliquez sur une ligne pour y aller (le curseur est posé au début du second morceau : " +
+      "<b>Retour arrière</b> le recolle), ou recollez-les toutes d&rsquo;un coup.</p>" +
+      '<div class="renom-liste esp-liste">';
+    trouvailles.forEach((t, i) => {
+      html += '<button type="button" class="esp-ligne" data-i="' + i + '" title="Aller à ce passage">' +
+        '<span class="esp-extrait">' +
+          '<span class="esp-avant">' + echapperTitre(t.avant) + "</span>" +
+          '<span class="esp-trou" aria-label="paragraphe en trop">&para;</span>' +
+          '<span class="esp-apres">' + echapperTitre(t.apres) + "</span>" +
+        "</span></button>";
+    });
+    html += "</div>" +
+      '<div class="ci-actions">' +
+        '<button class="ci-annuler">Fermer</button>' +
+        '<button class="ci-generer">Recoller les ' + n + "</button>" +
+      "</div>";
+  }
+  html += "</div>";
+
+  const fond = document.createElement("div");
+  fond.id = "dialoguePhrases";
+  fond.className = "modal-impression";
+  fond.innerHTML = html;
+  fond.addEventListener("click", (e) => { if (e.target === fond) fermerDialoguePhrasesCoupees(); });
+  document.body.appendChild(fond);
+  fond.querySelector(".mi-fermer").onclick = fermerDialoguePhrasesCoupees;
+  fond.querySelector(".ci-annuler").onclick = fermerDialoguePhrasesCoupees;
+
+  fond.querySelectorAll(".esp-ligne").forEach((b) => {
+    b.onclick = () => {
+      fermerDialoguePhrasesCoupees();
+      allerAJonction(trouvailles[Number(b.dataset.i)]);
+    };
+  });
+  const bouton = fond.querySelector(".ci-generer");
+  if (bouton) bouton.onclick = () => { fermerDialoguePhrasesCoupees(); recollerPhrasesCoupees(); };
+}
+
+// Va à une position du texte du livre (en caractères depuis le début) et y pose le
+// curseur — au début de ce qui suit si la position tombe entre deux paragraphes.
+// Va au début du second morceau d'une phrase coupée : on cherche la jonction dans le
+// texte des double-pages mises bout à bout.
+function allerAJonction(t) {
+  flushSpread();
+  const textes = spreadsLivre().map(texteBrutPage);
+  const i = textes.join("").indexOf(t.jonction);
+  if (i === -1) { allerAOffsetDuLivre(t.offset); return; }
+  let reste = i + t.dansJonction, s = 0;
+  for (; s < textes.length - 1 && reste >= textes[s].length; s++) reste -= textes[s].length;
+  allerAPage(s * 2);
+  const ed = editeurEl();
+  if (!ed) return;
+  ed.focus();
+  placerCaretAOffset(ed, reste, true);
+  const sel = window.getSelection();
+  if (sel.rangeCount && typeof eclairerRange === "function") eclairerRange(sel.getRangeAt(0));
+}
+
+function allerAOffsetDuLivre(offset) {
+  flushSpread();
+  const spreads = spreadsLivre();
+  let reste = offset, s = 0;
+  for (; s < spreads.length - 1; s++) {
+    const l = texteBrutPage(spreads[s]).length;
+    if (reste < l) break;
+    reste -= l;
+  }
+  allerAPage(s * 2);
+  const ed = editeurEl();
+  if (!ed) return;
+  ed.focus();
+  placerCaretAOffset(ed, reste, true);
+  const sel = window.getSelection();
+  if (sel.rangeCount && typeof eclairerRange === "function") eclairerRange(sel.getRangeAt(0));
+}
+
+function recollerPhrasesCoupees() {
+  flushSpread();
+  const boite = document.createElement("div");
+  boite.innerHTML = contenuCompletLivre();
+  const paires = phrasesCoupeesDans(boite);
+  // De la fin vers le début : un paragraphe recollé peut lui-même finir par une
+  // phrase coupée (trois morceaux) — chaque paire reste valable.
+  for (let k = paires.length - 1; k >= 0; k--) {
+    const { a, b } = paires[k];
+    while (b.firstChild) a.appendChild(b.firstChild);
+    b.remove();
+  }
+  if (paires.length) {
+    const livre = livreActuel();
+    livre.spreads = [boite.innerHTML];
+    repaginerTout();
+    const spreads = spreadsLivre();
+    if (numSpread() >= spreads.length) indexSpread = Math.max(0, (spreads.length - 1) * 2);
+    afficherSpread();
+    afficherSommaire();
+    majCompteurMots();
+    marquerModifie();
+    planifierBrouillon();
+  }
+  const message = document.getElementById("message");
+  if (message) {
+    message.textContent = paires.length
+      ? paires.length + (paires.length > 1 ? " phrases recollées." : " phrase recollée.") + " Ctrl+Z pour revenir en arrière."
+      : "Aucune phrase coupée en deux.";
+    const pose = message.textContent;
+    setTimeout(() => { if (message.textContent === pose) message.textContent = ""; }, 4000);
+  }
+}
+
 // Remplacement insensible à la casse dans une chaîne, avec comptage
 function remplacerInsensible(texte, recherche, remplacement) {
   const rechercheBas = recherche.toLowerCase();
@@ -2900,13 +3360,15 @@ function offsetCaret(conteneur) {
 }
 
 // Place le curseur à une position caractère donnée dans un élément
-function placerCaretAOffset(conteneur, offset) {
+// `apres` : pile à la frontière de deux nœuds de texte (fin d'un paragraphe, début du
+// suivant), choisir le début du second plutôt que la fin du premier.
+function placerCaretAOffset(conteneur, offset, apres) {
   const walker = document.createTreeWalker(conteneur, NodeFilter.SHOW_TEXT);
   let total = 0, dernier = null, noeud;
   while ((noeud = walker.nextNode())) {
     dernier = noeud;
     const len = noeud.textContent.length;
-    if (total + len >= offset) {
+    if (apres ? total + len > offset : total + len >= offset) {
       const range = document.createRange();
       range.setStart(noeud, Math.max(0, Math.min(len, offset - total)));
       range.collapse(true);
@@ -3180,6 +3642,7 @@ function groupeALaCoupe(el, p) {
 // Enveloppe chaque morceau. À rebours : couper un nœud ne déplace que sa queue,
 // les nœuds d'avant (et leurs index) restent donc valables.
 function envelopperMot(morceaux) {
+  const balises = [];
   for (let i = morceaux.length - 1; i >= 0; i--) {
     const { node, de, fin } = morceaux[i];
     let milieu = node;
@@ -3189,7 +3652,9 @@ function envelopperMot(morceaux) {
     balise.className = "sans-cesure";
     milieu.parentNode.insertBefore(balise, milieu);
     balise.appendChild(milieu);
+    balises.push(balise);
   }
+  return balises;
 }
 
 // Ce que la recomposition a protégé, relevé sur les doubles-pages enregistrées :
@@ -3272,7 +3737,19 @@ function eviterMotsCoupes(el, jusqua) {
       if (!p) break;
       const groupe = groupeALaCoupe(el, p);
       if (!groupe || groupe.deja) break;
-      envelopperMot(groupe.morceaux);
+      const balises = envelopperMot(groupe.morceaux);
+      // Un mot plus long qu'une ligne (« Aaaaaaah ! » de cent lettres, une adresse sans
+      // barre) ne peut pas passer en entier sur la page suivante : lui interdire de se
+      // couper le faisait déborder de sa colonne, et la fin de la double-page passait
+      // hors de vue. On le laisse se couper.
+      const echelle = el.offsetWidth ? el.getBoundingClientRect().width / el.offsetWidth : 1;
+      const largeur = balises.reduce((t, b) => t + b.getBoundingClientRect().width, 0);
+      if (largeur > geomEdition.largeurColonne * echelle + 1) {
+        balises.forEach((b) => b.replaceWith(...b.childNodes));
+        el.normalize();
+        p = pointCoupe(el, seuilFrontiere(el, k));
+        break;
+      }
     }
     bornes.push(p);
     if (!p) break;
@@ -3337,10 +3814,75 @@ function htmlEntre(el, a, b, marquerSuite) {
   // tout ancêtre que la borne traverse. Inutile à stocker.
   d.querySelectorAll("span.sans-cesure").forEach((b) => { if (!b.textContent) b.remove(); });
 
-  if (marquerSuite && a && !estDebutDeBloc(a.node, a.offset) && d.firstElementChild) {
-    d.firstElementChild.setAttribute("data-suite", "1");
+  // Même chose à l'échelle du paragraphe. Une borne qui tombe PILE au bord d'un
+  // paragraphe — à la fin de celui où tombe `a`, au début de celui où tombe `b`,
+  // ce qui arrive à chaque coupe entre deux paragraphes — en laisse une copie VIDE
+  // au bord du morceau. Gardées, ces coquilles s'accumulaient : une de plus à
+  // chaque recomposition (aperçu, impression, format…), quatre-vingt-dix par
+  // passage sur un roman. Invisibles mais pas sans effet : elles décalaient la
+  // coupe d'une ligne (des « trous » en bas de page), et une coquille en fin de
+  // double-page recevait au recollage la suite du paragraphe coupé — la phrase
+  // se retrouvait en deux paragraphes (voir fusionnerSuite).
+  let suite = !!(marquerSuite && a && !estDebutDeBloc(a.node, a.offset));
+  if (a && d.firstChild && d.firstChild.nodeType === Node.ELEMENT_NODE && estCoquilleVide(d.firstChild)) {
+    d.firstChild.remove();
+    suite = false;                       // `a` était en fin de paragraphe : ce qui suit en commence un autre
+  }
+  if (b) {
+    let dernier = d.lastChild;
+    while (dernier && dernier.nodeType === Node.TEXT_NODE && !dernier.data.trim()) dernier = dernier.previousSibling;
+    if (dernier && dernier.nodeType === Node.ELEMENT_NODE && estCoquilleVide(dernier)) dernier.remove();
+  }
+
+  // La marque « suite » se pose sur le premier NŒUD, et seulement s'il est un bloc.
+  // firstElementChild sautait un texte nu de tête et marquait le paragraphe d'après
+  // — un vrai début de paragraphe —, que le recollage fondait alors dans le
+  // précédent : deux phrases collées sans espace.
+  // Une marque recopiée d'un bloc d'ailleurs ne vaut rien ici : seule celle du
+  // premier bloc a un sens. Celle du premier, pour un morceau qui commence au début
+  // (`a` absent), est celle de la double-page d'origine : on la garde.
+  nettoyerMarquesSuite(d);
+  if (a && d.firstChild && d.firstChild.nodeType === Node.ELEMENT_NODE) {
+    if (suite) d.firstChild.setAttribute("data-suite", "1");
+    else d.firstChild.removeAttribute("data-suite");
   }
   return d.innerHTML;
+}
+
+// La marque « suite » (data-suite) dit qu'un bloc CONTINUE le dernier de la
+// double-page d'avant : elle n'a de sens que sur le premier bloc d'une double-page.
+// Le navigateur, lui, la recopie sur chaque paragraphe qu'il crée à partir du
+// premier : Entrée en haut d'une page qui continue un paragraphe donnait deux blocs
+// marqués, et au recollage le nouveau paragraphe se fondait dans l'ancien (l'Entrée
+// devenait un simple retour à la ligne). Une marque égarée plus loin aurait, après
+// une coupe, recollé deux paragraphes distincts. On ne garde que la première.
+function nettoyerMarquesSuite(conteneur) {
+  conteneur.querySelectorAll("[data-suite]").forEach((e) => {
+    if (e !== conteneur.firstElementChild || e !== conteneur.firstChild) e.removeAttribute("data-suite");
+  });
+}
+
+// Un bloc sans rien dedans : ni texte, ni retour à la ligne, ni image. Le « blanc
+// voulu » (p.ligne-vide) n'en est pas un : sa hauteur est l'espace réglé, même vide.
+function estCoquilleVide(el) {
+  return el.nodeType === Node.ELEMENT_NODE &&
+    /^(P|H1|H2|H3|H4|LI|DIV|BLOCKQUOTE)$/.test(el.tagName) &&
+    !el.classList.contains("ligne-vide") &&
+    !(el.textContent || "").trim() &&
+    !el.querySelector("br, img");
+}
+
+const BALISES_BLOC = /^(P|DIV|H[1-6]|UL|OL|LI|BLOCKQUOTE|TABLE|PRE|HR|SECTION|ARTICLE|FIGURE)$/;
+
+// Retire les coquilles vides de premier niveau d'un texte (voir htmlEntre) : celles
+// que les recompositions passées ont laissées dans les livres.
+function retirerCoquillesVides(html) {
+  if (!html || !/<(p|h[1-6]|li|div|blockquote)( [^>]*)?><\/\1>/i.test(html)) return html;
+  const d = document.createElement("div");
+  d.innerHTML = html;
+  let retire = false;
+  [...d.children].forEach((e) => { if (estCoquilleVide(e)) { e.remove(); retire = true; } });
+  return retire ? d.innerHTML : html;
 }
 
 // Recolle deux morceaux : si le 1er bloc de b est marqué « suite », il
@@ -3350,14 +3892,44 @@ function fusionnerSuite(a, b) {
   if (!b) return a || "";
   const da = document.createElement("div"); da.innerHTML = a;
   const db = document.createElement("div"); db.innerHTML = b;
-  const dernier = da.lastElementChild;
   const premier = db.firstElementChild;
-  if (dernier && premier && premier.getAttribute("data-suite") === "1" && dernier.tagName === premier.tagName) {
+  // Une suite n'en est une qu'en TÊTE du morceau : précédée d'un texte nu, la
+  // verser dans le bloc d'avant ferait passer ce texte derrière elle.
+  let tete = db.firstChild;
+  while (tete && tete !== premier && tete.nodeType === Node.TEXT_NODE && !tete.data.trim()) tete = tete.nextSibling;
+  if (premier && premier.getAttribute("data-suite") === "1" && tete === premier) {
     premier.removeAttribute("data-suite");
-    while (premier.firstChild) dernier.appendChild(premier.firstChild);
-    db.removeChild(premier);
-    while (db.firstChild) da.appendChild(db.firstChild);
-    return da.innerHTML;
+
+    // Le bloc que la suite prolonge : le dernier qui a du CONTENU. Une coquille vide
+    // laissée en fin de morceau par une ancienne coupe n'en est pas un ; verser la
+    // suite dedans coupait la phrase en deux paragraphes (« …réduire tout cela à
+    // une » / « note de bas de page… »). On les retire au passage.
+    let cible = da.lastChild;
+    while (cible && ((cible.nodeType === Node.TEXT_NODE && !cible.data.trim()) || estCoquilleVide(cible))) {
+      const avant = cible.previousSibling;
+      cible.remove();
+      cible = avant;
+    }
+
+    // Du texte nu (ou une mise en forme nue) en fin de morceau : la suite le
+    // prolonge. Les réunir dans un même bloc plutôt que verser la suite dans le
+    // dernier paragraphe, ce qui la placerait AVANT ce texte (texte réordonné).
+    if (cible && !(cible.nodeType === Node.ELEMENT_NODE && BALISES_BLOC.test(cible.tagName))) {
+      const enLigne = [];
+      for (let n = cible; n && !(n.nodeType === Node.ELEMENT_NODE && BALISES_BLOC.test(n.tagName)); n = n.previousSibling) enLigne.unshift(n);
+      const bloc = document.createElement(premier.tagName.toLowerCase());
+      da.insertBefore(bloc, enLigne[0]);
+      enLigne.forEach((n) => bloc.appendChild(n));
+      cible = bloc;
+    }
+
+    if (cible && cible.tagName === premier.tagName) {
+      while (premier.firstChild) cible.appendChild(premier.firstChild);
+      db.removeChild(premier);
+      while (db.firstChild) da.appendChild(db.firstChild);
+      return da.innerHTML;
+    }
+    return da.innerHTML + db.innerHTML;
   }
   if (premier && premier.getAttribute("data-suite")) premier.removeAttribute("data-suite");
   return da.innerHTML + db.innerHTML;
@@ -3426,13 +3998,22 @@ function decouperEnDoublesPages(html) {
   // On repasse donc derrière, en reportant ce qui dépasse — le mécanisme de
   // gererFlux, mais sur un découpage déjà presque juste : en pratique deux ou
   // trois morceaux sur des dizaines sont touchés.
+  //
+  // Et dans les DEUX sens. Chaque morceau est mesuré avec le suivant, comme le fait
+  // la remontée à la frappe (unePasseDeCompaction) : un morceau qui, seul, tient une
+  // ligne de PLUS que dans le flux continu — veuves et orphelines, marges en haut de
+  // colonne, un mot protégé — gardait sinon un trou d'une ligne en bas de page, que
+  // la première frappe venait combler en déplaçant le texte sous les yeux de
+  // l'auteur. Même coût : une mesure par morceau, sur un peu plus de texte.
   for (let i = 0; i < morceaux.length && i < 5000; i++) {
-    const part = calculerPartition(morceaux[i]);
-    if (!part.overflow || !texteBrutPage(part.overflow).trim()) continue;
+    const suivant = morceaux[i + 1] || "";
+    const avecSuivant = !!suivant;
+    const part = calculerPartition(avecSuivant ? fusionnerSuite(morceaux[i], suivant) : morceaux[i]);
+    const reste = part.overflow && texteBrutPage(part.overflow).trim() ? part.overflow : "";
+    if (!avecSuivant && !reste) continue;          // le dernier morceau tient : rien à faire
     morceaux[i] = retirerTitresVides(part.garde);
-    const suite = fusionnerSuite(part.overflow, morceaux[i + 1] || "");
-    if (i + 1 < morceaux.length) morceaux[i + 1] = suite;
-    else morceaux.push(suite);
+    if (i + 1 < morceaux.length) morceaux[i + 1] = reste;
+    else if (reste) morceaux.push(reste);
   }
 
   while (morceaux.length > 1 && !texteBrutPage(morceaux[morceaux.length - 1]).trim()) morceaux.pop();
@@ -3535,6 +4116,34 @@ function afficherSpread() {
   majBoutonsNavigation();
   majGardesEdition();
   majBasculePages();
+
+  // Une double-page qui ne tient pas dans ses deux pages : sa fin serait CACHÉE (la
+  // zone ne défile pas). Cela arrive au livre mis en page sur un autre appareil —
+  // un autre navigateur, un téléphone, une césure différente — où la même page
+  // compte une ligne de plus. Le texte n'était pas perdu, mais invisible tant qu'on
+  // ne tapait rien sur cette page. On le fait descendre aussitôt sur la suivante,
+  // comme après une frappe. (Une seule fois par affichage : si le contenu ne peut
+  // pas être coupé — une image trop grande —, on ne boucle pas.)
+  if (!soinDebordementEnCours && ed.getBoundingClientRect().width > 0 && ed.scrollWidth > ed.clientWidth + 2) {
+    clearTimeout(timerSoinDebordement);
+    timerSoinDebordement = setTimeout(() => {
+      if (modeApercu || modeCouverture) return;
+      const zone = editeurEl();
+      if (!zone || zone.scrollWidth <= zone.clientWidth + 2) return;
+      // Seul du TEXTE au-delà de la page de droite est caché. Un blanc de fin de
+      // scène qui dépasse ne cache rien : inutile de recomposer à chaque affichage.
+      if (!texteCacheDans(zone)) return;
+      soinDebordementEnCours = true;
+      try { gererFlux(); } finally { soinDebordementEnCours = false; }
+    }, 0);
+  }
+}
+let soinDebordementEnCours = false;
+let timerSoinDebordement = null;
+
+// Y a-t-il du texte au-delà de la fin de la double-page (la 2e frontière de colonne) ?
+function texteCacheDans(ed) {
+  return !!(geomEdition && pointCoupe(ed, seuilFrontiere(ed, 2)));
 }
 
 // Montre les gardes sur le côté du livre : celles du début à gauche de
@@ -3588,6 +4197,7 @@ function flushSpread() {
   // La découpe est le rôle de gererFlux, qui, lui, réaffiche la double-page et
   // suit le curseur. Les opérations qui exigent un découpage exact
   // (sauvegarde, aperçu, impression, changement de format) repaginent déjà.
+  nettoyerMarquesSuite(ed);
   spreads[s] = ed.innerHTML;
   regenererPagesSpread(s);
   // Les pages des doubles-pages modifiées viennent d'être régénérées ci-dessus :
@@ -3598,6 +4208,7 @@ function flushSpread() {
 // ----- Saisie : auto-flow du débordement (le texte continue tout seul) -----
 
 function surSaisie() {
+  fluxEnAttente = true;
   marquerModifie();
   planifierBrouillon();
   planifierCompteurMots();
@@ -3708,6 +4319,7 @@ function compacterDepuis(s) {
 }
 
 function gererFlux() {
+  fluxEnAttente = false;
   const ed = editeurEl();
   if (!ed || indexLivre === -1) return;
   const s = numSpread();
@@ -3716,6 +4328,7 @@ function gererFlux() {
 
   // Pas de débordement : on enregistre sans rien réécrire — l'annuler/rétablir
   // natif et la position du curseur sont donc intacts.
+  nettoyerMarquesSuite(ed);
   if (ed.scrollWidth <= ed.clientWidth + 2) {
     spreads[s] = ed.innerHTML;
 
@@ -3816,51 +4429,210 @@ function gererFlux() {
   }
 }
 
-// ----- Historique : désormais NATIF -----
-// Les anciennes fonctions d'historique maison sont neutralisées (elles lisaient
-// des éléments qui n'existent plus). enregistrerHistorique() est conservée comme
-// point d'accroche : les fonctions de formatage l'appellent déjà, on s'en sert
-// pour planifier l'enregistrement du texte.
-
+// enregistrerHistorique() est le point d'accroche des fonctions de formatage :
+// elles l'appellent après avoir modifié la zone d'édition, pour que le texte soit
+// découpé et enregistré comme après une frappe.
 function enregistrerHistorique() {
+  fluxEnAttente = true;
   clearTimeout(timerFlux);
   timerFlux = setTimeout(gererFlux, 350);
 }
 
-// ----- Annuler / rétablir : natifs -----
+// ----- Annuler / rétablir : à l'échelle du LIVRE -----
+//
+// L'annulation du navigateur ne connaît que la zone d'édition, et l'éditeur la
+// réécrit sans cesse : à chaque changement de page, à chaque fois que le texte
+// remonte ou descend d'une double-page. Après cela, Ctrl+Z ne faisait plus rien —
+// le paragraphe effacé par erreur était perdu, sauf à quitter sans enregistrer.
+//
+// L'historique est donc tenu ici : un état du livre (ses double-pages, ses pages
+// dérivées, ses réglages de mise en page) est noté quand une modification est
+// terminée — une rafale de frappe, un collage, un remplacement, une suppression de
+// chapitre… Les chaînes ne sont pas recopiées (seuls les tableaux le sont) : un
+// état ne coûte que deux tableaux de références.
+//
+// Annuler revient à l'état précédent et replace le curseur là où il était AVANT la
+// modification annulée ; rétablir repasse à l'état suivant, curseur là où il était
+// APRÈS.
+const HISTORIQUE_MAX = 300;
+let etatsHistorique = [];
+let posHistorique = -1;
+let positionAvantSaisie = null;    // où était le curseur au début de la modification en cours
+let timerHistorique = null;
+let fluxEnAttente = false;         // une frappe attend d'être découpée (gererFlux)
+let restaurationEnCours = false;
+
+function positionCourante() {
+  const ed = editeurEl();
+  return { index: indexSpread, offset: ed ? offsetCaret(ed) : null };
+}
+
+// Ce qui, hors du texte, change la mise en page : à remettre avec lui.
+function reglagesMiseEnPage(livre) {
+  return { format: livre.format, espaceTitre: livre.espaceTitre, espaceSousTitre: livre.espaceSousTitre, espaceParagraphe: livre.espaceParagraphe };
+}
+
+function etatDuLivre() {
+  const livre = livreActuel();
+  return { spreads: spreadsLivre().slice(), pages: (livre.pages || []).slice(), reglages: reglagesMiseEnPage(livre) };
+}
+
+function memeEtat(e, livre) {
+  const sp = spreadsLivre();
+  if (e.spreads.length !== sp.length) return false;
+  for (let i = 0; i < sp.length; i++) if (e.spreads[i] !== sp[i]) return false;
+  return JSON.stringify(e.reglages) === JSON.stringify(reglagesMiseEnPage(livre));
+}
+
+// Le livre ouvert est le point de départ : on ne peut pas annuler au-delà.
+function initialiserHistorique() {
+  clearTimeout(timerHistorique);
+  const e = etatDuLivre();
+  e.avant = null;
+  e.apres = positionCourante();
+  etatsHistorique = [e];
+  posHistorique = 0;
+  positionAvantSaisie = null;
+}
+
+function planifierEtat() {
+  clearTimeout(timerHistorique);
+  timerHistorique = setTimeout(noterEtat, 450);
+}
+
+// Note l'état du livre s'il a changé depuis le dernier noté. Jamais au milieu d'une
+// frappe : tant que gererFlux n'a pas découpé la double-page, on repasse plus tard.
+function noterEtat() {
+  clearTimeout(timerHistorique);
+  if (indexLivre === -1 || restaurationEnCours || !etatsHistorique.length) return;
+  if (fluxEnAttente) { timerHistorique = setTimeout(noterEtat, 200); return; }
+  const livre = livreActuel();
+  const courant = etatsHistorique[posHistorique];
+  if (courant && memeEtat(courant, livre)) { positionAvantSaisie = null; return; }
+  const e = etatDuLivre();
+  e.avant = positionAvantSaisie || (courant && courant.apres) || null;
+  e.apres = positionCourante();
+  etatsHistorique.length = posHistorique + 1;     // une nouvelle modification efface ce qu'on pouvait rétablir
+  etatsHistorique.push(e);
+  if (etatsHistorique.length > HISTORIQUE_MAX) etatsHistorique.shift();
+  posHistorique = etatsHistorique.length - 1;
+  positionAvantSaisie = null;
+}
+
+// La modification en cours (une frappe pas encore découpée, un état pas encore
+// noté) compte comme un pas : on la termine avant d'annuler ou de rétablir.
+function terminerModificationEnCours() {
+  if (fluxEnAttente) { clearTimeout(timerFlux); gererFlux(); }
+  noterEtat();
+}
 
 function annuler() {
-  if (modeApercu || modeCouverture) return;
-  const ed = editeurEl();
-  if (ed) ed.focus();
-  document.execCommand("undo");
-  surSaisie();
+  if (modeApercu || modeCouverture || !etatsHistorique.length) return;
+  terminerModificationEnCours();
+  if (posHistorique <= 0) { signalerHistorique("Rien à annuler."); return; }
+  const defait = etatsHistorique[posHistorique];
+  posHistorique--;
+  const cible = etatsHistorique[posHistorique];
+  restaurerEtat(cible, defait.avant || cible.apres);
 }
 
 function retablir() {
-  if (modeApercu || modeCouverture) return;
-  const ed = editeurEl();
-  if (ed) ed.focus();
-  document.execCommand("redo");
-  surSaisie();
+  if (modeApercu || modeCouverture || !etatsHistorique.length) return;
+  terminerModificationEnCours();
+  if (posHistorique >= etatsHistorique.length - 1) { signalerHistorique("Rien à rétablir."); return; }
+  posHistorique++;
+  const cible = etatsHistorique[posHistorique];
+  restaurerEtat(cible, cible.apres);
+}
+
+function signalerHistorique(texte) {
+  const message = document.getElementById("message");
+  if (!message) return;
+  message.textContent = texte;
+  setTimeout(() => { if (message.textContent === texte) message.textContent = ""; }, 1500);
+}
+
+function restaurerEtat(etat, position) {
+  restaurationEnCours = true;
+  try {
+    const livre = livreActuel();
+    clearTimeout(timerFlux);
+    fluxEnAttente = false;
+
+    // Les réglages de mise en page d'abord : les double-pages ont été découpées pour eux.
+    const r = etat.reglages || {};
+    const avant = reglagesMiseEnPage(livre);
+    if (JSON.stringify(r) !== JSON.stringify(avant)) {
+      livre.format = r.format;
+      ["espaceTitre", "espaceSousTitre", "espaceParagraphe"].forEach((k) => {
+        if (typeof r[k] === "number") livre[k] = r[k]; else delete livre[k];
+      });
+      initEspaceTitre();
+      initEspaceSousTitre();
+      initEspaceParagraphe();
+      if (r.format !== avant.format) {
+        appliquerFormatPage(r.format || "149x210");
+        const sel = document.getElementById("selectFormat");
+        if (sel) sel.textContent = libelleFormat(r.format || "149x210");
+      }
+    }
+
+    livre.spreads = etat.spreads.slice();
+    livre.pages = etat.pages.slice();
+    pagesObsoletes = false;
+
+    const n = livre.spreads.length;
+    let i = position && typeof position.index === "number" ? position.index : indexSpread;
+    i = Math.max(0, Math.min(i, (n - 1) * 2));
+    indexSpread = i - (i % 2);
+    afficherSpread();
+    const ed = editeurEl();
+    if (ed) {
+      ed.focus();
+      if (position && position.offset != null) placerCaretAOffset(ed, position.offset);
+    }
+    afficherSommaire();
+    majCompteurMots();
+    recalerDefilement();
+    marquerModifie();
+    planifierBrouillon();
+  } finally {
+    restaurationEnCours = false;
+  }
 }
 
 // ----- Interligne : s'applique dans la zone unique -----
 
 function appliquerInterligne(valeur) {
-  restaurerSelection();
   const conteneur = editeurEl();
   if (!conteneur) return;
+  const restauree = restaurerSelection();
   const sel = window.getSelection();
   let cibles = [];
-  if (sel && sel.rangeCount > 0) {
+  if (restauree && sel && sel.rangeCount > 0 && conteneur.contains(sel.getRangeAt(0).commonAncestorContainer)) {
     const range = sel.getRangeAt(0);
     conteneur.querySelectorAll("p, h2, h3, li").forEach(bloc => {
-      if (range.intersectsNode(bloc)) cibles.push(bloc);
+      if (range.intersectsNode(bloc) && !bloc.classList.contains("ligne-vide")) cibles.push(bloc);
     });
   }
-  if (cibles.length === 0) cibles = [conteneur];
-  cibles.forEach(bloc => { bloc.style.lineHeight = valeur; });
+  // Jamais sur la zone d'édition elle-même : ce réglage-là n'était ni enregistré, ni
+  // connu du mesureur qui découpe les pages — chaque double-page débordait à l'écran,
+  // sa fin cachée, et tout disparaissait au rechargement.
+  conteneur.style.lineHeight = "";
+  if (cibles.length) {
+    cibles.forEach(bloc => { bloc.style.lineHeight = valeur; });
+  } else {
+    // Rien de sélectionné dans le texte : tout le livre, paragraphe par paragraphe.
+    flushSpread();
+    const spreads = spreadsLivre();
+    spreads.forEach((html, i) => {
+      const d = document.createElement("div");
+      d.innerHTML = html;
+      d.querySelectorAll("p, h2, h3, li").forEach(bloc => { if (!bloc.classList.contains("ligne-vide")) bloc.style.lineHeight = valeur; });
+      spreads[i] = d.innerHTML;
+    });
+    afficherSpread();
+  }
   marquerModifie();
 
   // L'interligne change la hauteur occupée par le texte : il faut re-répartir
@@ -4133,6 +4905,271 @@ function pageSuivante() {
   }
 }
 
+// ----- Aux bords de la double-page : le clavier ne s'arrête plus au pli -----
+//
+// La zone d'édition ne montre qu'une double-page : pour le navigateur, le texte
+// commence et finit là. Retour arrière tout en haut, Suppr tout en bas, les flèches
+// et Page suivante / précédente butaient donc sur le bord — impossible d'effacer
+// la dernière lettre de la page d'avant depuis celle d'après, ni de recoller deux
+// paragraphes séparés par un changement de page, ni de passer à la page suivante
+// sans la souris. Ces touches sont prises en charge ici, sur le texte continu.
+
+// Le curseur (replié) est-il tout au début de la zone — rien avant lui ?
+function curseurAuDebut(ed) {
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount || !sel.isCollapsed) return false;
+  const r = sel.getRangeAt(0);
+  if (!ed.contains(r.startContainer)) return false;
+  const avant = document.createRange();
+  avant.selectNodeContents(ed);
+  avant.setEnd(r.startContainer, r.startOffset);
+  const f = avant.cloneContents();
+  return !(f.textContent || "").length && !f.querySelector("br, img");
+}
+
+// …tout à la fin — rien après lui, sinon un retour à la ligne de fin de paragraphe ?
+function curseurALaFin(ed) {
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount || !sel.isCollapsed) return false;
+  const r = sel.getRangeAt(0);
+  if (!ed.contains(r.startContainer)) return false;
+  const apres = document.createRange();
+  apres.selectNodeContents(ed);
+  apres.setStart(r.startContainer, r.startOffset);
+  const f = apres.cloneContents();
+  return !(f.textContent || "").length && !f.querySelector("img");
+}
+
+function gererToucheBordDePage(e) {
+  if (modeApercu || modeCouverture || e.altKey || e.ctrlKey || e.metaKey) return;
+  const ed = editeurEl();
+  if (!ed) return;
+  const n = spreadsLivre().length, s = numSpread();
+
+  if (e.key === "Backspace" && s > 0 && curseurAuDebut(ed)) {
+    e.preventDefault();
+    effacerAuBord("arriere");
+  } else if ((e.key === "Backspace" || e.key === "Delete") && recollerSansPerdreEspace(ed, e.key === "Backspace")) {
+    e.preventDefault();
+  } else if (e.key === "Delete" && s + 1 < n && curseurALaFin(ed)) {
+    e.preventDefault();
+    effacerAuBord("avant");
+  } else if (e.shiftKey) {
+    return;                                  // étendre une sélection : on laisse faire
+  } else if (e.key === "PageDown" && s + 1 < n) {
+    e.preventDefault();
+    allerAuBordDe(s + 1, "debut");
+  } else if (e.key === "PageUp" && s > 0) {
+    e.preventDefault();
+    allerAuBordDe(s - 1, "debut");
+  } else if ((e.key === "ArrowRight" || e.key === "ArrowDown") && s + 1 < n && curseurALaFin(ed)) {
+    e.preventDefault();
+    allerAuBordDe(s + 1, "debut");
+  } else if ((e.key === "ArrowLeft" || e.key === "ArrowUp") && s > 0 && curseurAuDebut(ed)) {
+    e.preventDefault();
+    allerAuBordDe(s - 1, "fin");
+  } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+    // Sur la dernière ligne (ou la première), la flèche ne mène nulle part dans la zone :
+    // si le curseur n'a pas bougé, on change de page.
+    const sel = window.getSelection();
+    if (!sel.rangeCount) return;
+    const r = sel.getRangeAt(0);
+    const noeud = r.startContainer, pos = r.startOffset;
+    const versLeBas = e.key === "ArrowDown";
+    setTimeout(() => {
+      const sel2 = window.getSelection();
+      if (!sel2.rangeCount || !sel2.isCollapsed) return;
+      const r2 = sel2.getRangeAt(0);
+      if (r2.startContainer !== noeud || r2.startOffset !== pos) return;
+      if (versLeBas && numSpread() + 1 < spreadsLivre().length) allerAuBordDe(numSpread() + 1, "debut");
+      else if (!versLeBas && numSpread() > 0) allerAuBordDe(numSpread() - 1, "fin");
+    }, 0);
+  }
+}
+
+// Recoller deux paragraphes SANS perdre l'espace de la jonction.
+//
+// Retour arrière au début d'un paragraphe (ou Suppr à la fin du précédent) les
+// recolle — mais le navigateur, au passage, efface l'espace qui finissait le
+// premier : en bout de ligne, elle est invisible, et il la croit superflue. « ne
+// pas la ¶ regarder » devenait « ne pas laregarder ». C'est le cas de toute phrase
+// coupée par une page (la coupe tombe après l'espace de fin de ligne), et c'est
+// ainsi que des mots se retrouvaient collés après une correction. Ici, quand l'un
+// des deux côtés porte cette espace, on recolle nous-mêmes, à l'identique.
+function recollerSansPerdreEspace(ed, enArriere) {
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount || !sel.isCollapsed) return false;
+  const r = sel.getRangeAt(0);
+  if (!ed.contains(r.startContainer)) return false;
+  let bloc = r.startContainer.nodeType === Node.ELEMENT_NODE ? r.startContainer : r.startContainer.parentElement;
+  while (bloc && bloc.parentElement !== ed) bloc = bloc.parentElement;
+  if (!bloc || bloc.tagName !== "P" || bloc.classList.contains("ligne-vide")) return false;
+
+  // Au début de son paragraphe (Retour arrière) ou à sa fin (Suppr) ?
+  const borne = document.createRange();
+  borne.selectNodeContents(bloc);
+  if (enArriere) borne.setEnd(r.startContainer, r.startOffset);
+  else borne.setStart(r.startContainer, r.startOffset);
+  const f = borne.cloneContents();
+  if ((f.textContent || "").length || f.querySelector("img, br")) return false;
+
+  // Les coquilles vides (invisibles) entre les deux ne comptent pas : on les saute.
+  let a = enArriere ? bloc.previousElementSibling : bloc;
+  let b = enArriere ? bloc : bloc.nextElementSibling;
+  if (enArriere) while (a && estCoquilleVide(a)) a = a.previousElementSibling;
+  else while (b && estCoquilleVide(b)) b = b.nextElementSibling;
+  if (!a || !b || a.tagName !== "P" || b.tagName !== "P") return false;
+  if (a.classList.contains("ligne-vide") || b.classList.contains("ligne-vide")) return false;
+  const ta = a.textContent || "", tb = b.textContent || "";
+  if (!ta.trim() || !tb.trim()) return false;              // un paragraphe vide : le navigateur fait bien
+  if (!/\s$/.test(ta) && !/^\s/.test(tb)) return false;    // pas d'espace à préserver : le navigateur fait bien
+
+  if (!positionAvantSaisie) positionAvantSaisie = positionCourante();
+  const offset = offsetCaret(ed);
+  // Un <br> de fin du premier paragraphe n'est qu'une ligne vide de remplissage : il
+  // ne doit pas finir au milieu de la phrase recollée.
+  if (a.lastChild && a.lastChild.nodeName === "BR") a.lastChild.remove();
+  while (a.nextElementSibling && a.nextElementSibling !== b) a.nextElementSibling.remove();
+  while (b.firstChild) a.appendChild(b.firstChild);
+  b.remove();
+  placerCaretAOffset(ed, offset);
+  surSaisie();
+  return true;
+}
+
+function allerAuBordDe(spread, bord) {
+  allerAPage(spread * 2);
+  const ed = editeurEl();
+  if (!ed) return;
+  ed.focus();
+  placerCaretAOffset(ed, bord === "debut" ? 0 : texteBrutPage(ed.innerHTML).length);
+}
+
+// Le premier / dernier bloc d'un morceau (on saute les blancs entre les balises).
+function premierBloc(d) {
+  let n = d.firstChild;
+  while (n && n.nodeType === Node.TEXT_NODE && !n.data.trim()) n = n.nextSibling;
+  return n && n.nodeType === Node.ELEMENT_NODE ? n : null;
+}
+function dernierBloc(d) {
+  let n = d.lastChild;
+  while (n && n.nodeType === Node.TEXT_NODE && !n.data.trim()) n = n.previousSibling;
+  return n && n.nodeType === Node.ELEMENT_NODE ? n : null;
+}
+
+// Un bloc qui ne montre rien d'autre qu'une ligne vide (ou un blanc voulu).
+function blocVisuellementVide(b) {
+  return b && !(b.textContent || "").trim() && !b.querySelector("img");
+}
+
+// Efface le dernier « caractère » d'un morceau : sa dernière lettre, ou son dernier
+// retour à la ligne s'il vient après. Les lettres doubles (emoji) partent entières.
+function effacerDernierCaractere(d) {
+  const marche = document.createTreeWalker(d, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
+  let dernier = null, n;
+  while ((n = marche.nextNode())) {
+    if ((n.nodeType === Node.TEXT_NODE && n.data.length) || n.nodeName === "BR") dernier = n;
+  }
+  if (!dernier) return false;
+  if (dernier.nodeName === "BR") { dernier.remove(); return true; }
+  const lettres = Array.from(dernier.data);
+  lettres.pop();
+  dernier.data = lettres.join("");
+  return true;
+}
+
+function effacerPremierCaractere(d) {
+  const marche = document.createTreeWalker(d, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
+  let n;
+  while ((n = marche.nextNode())) {
+    if (n.nodeName === "BR") { n.remove(); return true; }
+    if (n.nodeType === Node.TEXT_NODE && n.data.length) {
+      const lettres = Array.from(n.data);
+      lettres.shift();
+      n.data = lettres.join("");
+      return true;
+    }
+  }
+  return false;
+}
+
+// Retour arrière en haut de page (« arriere ») ou Suppr en bas de page (« avant ») :
+// on agit sur le texte des DEUX double-pages qui se touchent, puis on les recompose.
+function effacerAuBord(sens) {
+  flushSpread();
+  if (!positionAvantSaisie) positionAvantSaisie = positionCourante();
+  const spreads = spreadsLivre();
+  const i = sens === "arriere" ? numSpread() - 1 : numSpread();   // la frontière est entre i et i + 1
+  if (i < 0 || i + 1 >= spreads.length) return;
+
+  const da = document.createElement("div"); da.innerHTML = spreads[i];
+  const db = document.createElement("div"); db.innerHTML = spreads[i + 1];
+  const finA = dernierBloc(da), debutB = premierBloc(db);
+  const debutBEstSuite = debutB && debutB.getAttribute("data-suite") === "1";
+  let fait = false;
+  let curseurApres = false;     // le curseur va au DÉBUT de ce qui suit la frontière, pas à la fin de ce qui précède
+
+  if (debutBEstSuite) {
+    // Le même paragraphe continue de part et d'autre : on efface une lettre.
+    fait = sens === "arriere" ? effacerDernierCaractere(da) : effacerPremierCaractere(debutB);
+  } else if (sens === "arriere" && blocVisuellementVide(finA)) {
+    finA.remove(); fait = true; curseurApres = true;  // une ligne vide juste avant : elle s'en va
+  } else if (sens === "avant" && blocVisuellementVide(debutB)) {
+    debutB.remove(); fait = true;
+  } else if (finA && debutB && finA.tagName === debutB.tagName) {
+    // Deux paragraphes : on les recolle (le second devient la suite du premier).
+    debutB.setAttribute("data-suite", "1"); fait = true;
+  }
+  const jonction = texteBrutPage(da.innerHTML).length;   // le curseur, dans le texte des deux double-pages
+
+  if (!fait) {
+    // Rien à effacer de ce côté (un titre contre un paragraphe, par exemple) : on va
+    // simplement au bord de la page voisine, comme le ferait une flèche.
+    allerAuBordDe(sens === "arriere" ? i : i + 1, sens === "arriere" ? "fin" : "debut");
+    return;
+  }
+
+  // Les deux double-pages, recomposées ensemble…
+  const part = calculerPartition(fusionnerSuite(da.innerHTML, db.innerHTML));
+  spreads[i] = retirerTitresVides(part.garde);
+  spreads[i + 1] = part.overflow || "";
+  // …ce qui déborde descend (cascade, comme gererFlux)…
+  let derniere = i + 1;
+  for (let k = i + 1, securite = 0; k < spreads.length && securite < 2000; k++, securite++) {
+    const suite = calculerPartition(spreads[k]);
+    if (!suite.overflow || !texteBrutPage(suite.overflow).trim()) break;
+    spreads[k] = retirerTitresVides(suite.garde);
+    assurerSpread(k + 1);
+    spreads[k + 1] = fusionnerSuite(suite.overflow, spreads[k + 1] || "");
+    derniere = k + 1;
+  }
+  // …et ce qui peut remonter remonte : une double-page vidée en route disparaît.
+  let decalage = false;
+  if (!texteBrutPage(spreads[i + 1]).trim() && i + 2 < spreads.length) { spreads.splice(i + 1, 1); decalage = true; }
+  derniere = Math.max(derniere, compacterDepuis(i + 1 < spreads.length ? i + 1 : i));
+  // Les pages dérivées des seules double-pages touchées (toutes, si une a disparu au milieu).
+  if (decalage) { pagesObsoletes = true; regenererToutesPages(); }
+  else for (let j = i; j <= derniere && j < spreads.length; j++) regenererPagesSpread(j);
+  nettoyerPagesVidesFin();
+
+  // Le curseur à la jonction. Pile entre deux blocs, la même position du texte est à
+  // la fin de l'un ou au début de l'autre : après une ligne vide effacée, c'est au
+  // début du paragraphe qu'on attend le curseur (un second Retour arrière le recolle).
+  const longueurGarde = texteBrutPage(spreads[i]).length;
+  const surLaPage = jonction < longueurGarde || (jonction === longueurGarde && !curseurApres);
+  const cible = surLaPage ? i : Math.min(i + 1, spreads.length - 1);
+  indexSpread = cible * 2;
+  afficherSpread();
+  const ed = editeurEl();
+  ed.focus();
+  placerCaretAOffset(ed, cible === i ? jonction : jonction - longueurGarde, curseurApres);
+  afficherSommaire();
+  majCompteurMots();
+  recalerDefilement();
+  marquerModifie();
+  planifierBrouillon();
+}
+
 // ----- Sommaire : liste des CHAPITRES -----
 // Un chapitre = un titre (h2) dans le texte continu. On les retrouve dans les
 // pages dérivées, ce qui donne directement le numéro de page de chacun.
@@ -4278,7 +5315,7 @@ function supprimerChapitre(indexChapitre) {
   if (!confirm(
       "Supprimer le chapitre « " + cible.titre + " » ?\n\n" +
       "Son titre et tout son contenu seront supprimés (" + mots + " mot" + (mots > 1 ? "s" : "") + ").\n" +
-      "Cette action ne peut pas être annulée avec Ctrl+Z.")) {
+      "Vous pourrez revenir en arrière avec Ctrl+Z (Annuler).")) {
     return;
   }
 
@@ -4631,7 +5668,7 @@ function ajouterChapitre() {
   sel.removeAllRanges();
   sel.addRange(range);
 
-  // insertHTML : opération unique, donc annulable nativement (Ctrl+Z)
+  // insertHTML : une seule opération, que l'historique du livre annule d'un coup (Ctrl+Z)
   document.execCommand(
     "insertHTML", false,
     '<h2 class="chapitre" style="break-before:column;">Nouveau chapitre</h2><p><br></p>'
@@ -4731,6 +5768,8 @@ function repaginerTout() {
   let tout = "";
   for (const s of spreads) tout = fusionnerSuite(tout, s);
   tout = retirerTitresVides(tout);   // pas de coquilles reportées d'un découpage à l'autre
+  // Ni de paragraphes vides : ceux que les recompositions d'avant ont semés (voir htmlEntre).
+  tout = retirerCoquillesVides(tout);
 
   // Chaque coupe peut laisser un titre vide en fin de page : decouperEnDoublesPages
   // nettoie chaque morceau, sinon les coquilles se multiplient à chaque
@@ -4837,8 +5876,62 @@ function surlignerMatch(match) {
 
 // ----- Sauvegarde : on régénère les pages dérivées avant d'écrire -----
 
+// ----- Ce qui part au serveur : une PHOTO du livre -----
+//
+// L'envoi dure (plusieurs secondes pour un roman sur une connexion lente) et se
+// fait en deux temps : la fiche du livre, puis le texte. On envoie donc l'état du
+// livre AU MOMENT DU CLIC, et non l'objet vivant : une frappe pendant l'envoi
+// partait sinon dans le texte mais pas dans les pages, laissant au serveur un livre
+// incohérent. Et l'on ne déclare « Enregistré » que si rien n'a bougé depuis : ce
+// qui a été tapé pendant l'envoi restait sinon marqué comme enregistré — sans
+// avertissement à la fermeture, et brouillon effacé.
+function photoLivre() {
+  const livre = livreActuel();
+  return {
+    livre: Object.assign({}, livre, { spreads: spreadsLivre().slice(), pages: (livre.pages || []).slice() }),
+    reglages: signatureLivre(Object.assign({}, livre, { spreads: undefined }))
+  };
+}
+
+function photoToujoursAJour(photo) {
+  const sp = spreadsLivre();
+  if (sp.length !== photo.livre.spreads.length) return false;
+  for (let i = 0; i < sp.length; i++) if (sp[i] !== photo.livre.spreads[i]) return false;
+  return photo.reglages === signatureLivre(Object.assign({}, livreActuel(), { spreads: undefined }));
+}
+
+// Un enregistrement à la fois. Deux partant ensemble (Ctrl+S deux fois, le bouton puis
+// Ctrl+S) lisaient la même date de version : le second, trouvant celle que le premier
+// venait d'écrire, croyait le livre modifié AILLEURS et posait la question du conflit
+// — « Annuler » rechargeait alors la page. Le second attend le premier, puis repart
+// s'il reste quelque chose à envoyer.
+let sauvegardeEnCours = null;
+let sauvegardeARefaire = false;
+
 async function sauvegarder() {
+  if (sauvegardeEnCours) {
+    sauvegardeARefaire = true;
+    return sauvegardeEnCours;
+  }
+  sauvegardeEnCours = sauvegarderMaintenant();
+  try {
+    await sauvegardeEnCours;
+  } finally {
+    sauvegardeEnCours = null;
+  }
+  if (sauvegardeARefaire) {
+    sauvegardeARefaire = false;
+    if (modifie) await sauvegarder();
+  }
+}
+
+async function sauvegarderMaintenant() {
   const message = document.getElementById("message");
+
+  // Le curseur reste où il est : la double-page est réaffichée plus bas.
+  const zone = editeurEl();
+  const avecCurseur = zone && document.activeElement === zone;
+  const curseur = avecCurseur ? offsetCaret(zone) : null;
 
   // Seule la double-page en cours d'édition peut déborder (flushSpread ne
   // découpe pas). gererFlux la découpe et poursuit la cascade si besoin :
@@ -4863,6 +5956,11 @@ async function sauvegarder() {
   while (spreads.length > 1 && !texteBrutPage(spreads[spreads.length - 1]).trim()) spreads.pop();
   if (numSpread() >= spreads.length) indexSpread = Math.max(0, (spreads.length - 1) * 2);
   afficherSpread();
+  if (avecCurseur && curseur !== null) {
+    const ed = editeurEl();
+    ed.focus();
+    placerCaretAOffset(ed, curseur);
+  }
   afficherSommaire();
   // Le tableau de pages vient d'être resynchronisé avec les doubles-pages : le
   // compteur doit en rendre compte, sans quoi il garde le total d'avant et
@@ -4870,11 +5968,18 @@ async function sauvegarder() {
   // compté est ainsi exactement ce qui est enregistré.
   majCompteurMots();
 
+  const photo = photoLivre();
   try {
-    majLeConnu = await enregistrerLivreDistant(livreActuel(), majLeConnu);
-    message.textContent = "Sauvegardé avec succès.";
-    marquerSauvegarde();
-    effacerBrouillon();
+    majLeConnu = await enregistrerLivreDistant(photo.livre, majLeConnu);
+    effacerImagesOubliees(photo.livre);
+    if (photoToujoursAJour(photo)) {
+      message.textContent = "Sauvegardé avec succès.";
+      marquerSauvegarde();
+      effacerBrouillon();
+    } else {
+      message.textContent = "Sauvegardé. Ce que vous avez écrit pendant l'envoi reste à enregistrer.";
+      planifierBrouillon();
+    }
   } catch (erreur) {
     if (erreur.conflit) { gererConflitSauvegarde(); return; }
     message.textContent = erreur.message;
@@ -5051,7 +6156,7 @@ function setEspaceTitre(valeur) {
   // L'espace change la hauteur occupée : on re-répartit le texte, mais
   // seulement une fois le curseur relâché (sinon on repaginerait à chaque pixel).
   clearTimeout(timerEspaceTitre);
-  timerEspaceTitre = setTimeout(() => {
+  timerEspaceTitre = setTimeout(() => pendantAttenteLourde("Nouvel espace au-dessus des titres…", () => {
     flushSpread();
     repaginerTout();
     const spreads = spreadsLivre();
@@ -5060,7 +6165,7 @@ function setEspaceTitre(valeur) {
     afficherSommaire();
     majCompteurMots();
     planifierBrouillon();
-  }, 350);
+  }, "Le livre est recomposé."), 350);
 }
 
 // =====================================================================
@@ -5103,7 +6208,7 @@ function setEspaceSousTitre(valeur) {
 
   // L'espace change la hauteur occupée : on re-répartit le texte, une fois le curseur relâché.
   clearTimeout(timerEspaceSousTitre);
-  timerEspaceSousTitre = setTimeout(() => {
+  timerEspaceSousTitre = setTimeout(() => pendantAttenteLourde("Nouvel espace sous les titres…", () => {
     flushSpread();
     repaginerTout();
     const spreads = spreadsLivre();
@@ -5112,7 +6217,7 @@ function setEspaceSousTitre(valeur) {
     afficherSommaire();
     majCompteurMots();
     planifierBrouillon();
-  }, 350);
+  }, "Le livre est recomposé."), 350);
 }
 
 // =====================================================================
@@ -5273,13 +6378,15 @@ async function basculerPublication() {
     // Le drapeau part avec le livre, en une seule écriture. On régénère
     // TOUTES les pages dérivées d'abord : ce sont elles que le lecteur
     // affichera, il ne sait pas les recalculer (voir supabase/schema.sql).
+    if (sauvegardeEnCours) await sauvegardeEnCours;    // pas deux envois en même temps
     flushSpread();
     regenererToutesPages();
     livre.publie = publier;
     livre.publieLe = publier ? new Date().toISOString() : null;
-    majLeConnu = await enregistrerLivreDistant(livre, majLeConnu);
-    marquerSauvegarde();
-    effacerBrouillon();
+    const photo = photoLivre();
+    majLeConnu = await enregistrerLivreDistant(photo.livre, majLeConnu);
+    effacerImagesOubliees(photo.livre);
+    if (photoToujoursAJour(photo)) { marquerSauvegarde(); effacerBrouillon(); }
 
     if (message) message.textContent = publier
       ? "Livre publié : les autres pourront le lire."

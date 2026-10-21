@@ -863,14 +863,18 @@ function exporterImpression(modeRectoVerso) {
   // de la pile avant l'encollage.
   // Les gardes sont de vraies feuilles : elles s'impriment (blanches) et
   // décalent le recto-verso de tout ce qui suit.
-  feuilletsDuLivre(livre).forEach((feuillet) => {
+  const feuillets = feuilletsDuLivre(livre);
+  feuillets.forEach((feuillet) => {
     ajouterPage(creerPageTexteImpression(
       feuillet.page, feuillet.numero, f, margeInt, margeExt, feuillet.position));
   });
 
   // Un nombre impair laisserait le dernier verso à imprimer dans le vide :
-  // la feuille blanche ferme la pile proprement.
-  if (pages.length % 2 === 1) ajouterPage(creerPageBlancheImpression(f));
+  // la feuille blanche ferme la pile proprement. (On compte les feuillets —
+  // gardes comprises —, et non plus une variable `pages` disparue avec les
+  // gardes en feuilles : l'impression en pages simples, le mode par défaut,
+  // s'arrêtait là sur une erreur, sans rien imprimer.)
+  if (feuillets.length % 2 === 1) ajouterPage(creerPageBlancheImpression(f));
 
   const message = document.getElementById("message");
   if (message) message.textContent = "Préparation de l'impression...";
@@ -3616,10 +3620,8 @@ function ouvrirTranche() {
   fond.querySelector("#trImageRetirer").onclick = () => {
     const ancien = t.imageChemin;
     t.imageChemin = null;
-    if (ancien) {
-      supprimerImageStorage(ancien).catch(() => {});
-      delete cacheImagesURL[ancien];
-    }
+    // Effacée du stockage une fois le livre enregistré sans elle (voir oublierImage).
+    oublierImage(ancien);
     marquerModifie();
     planifierBrouillon();
     majImage();
@@ -3691,12 +3693,8 @@ function envoyerImageTranche(event, livre, tranche, surFin, note) {
     ouvrirAttente("Envoi de l'image…", "Le transfert d'une image prend quelques secondes.");
     if (note) note.textContent = "Envoi de l'image en cours…";
     try {
-      const chemin = await uploaderImageStorage(
-        obtenirPrefixeImagesUtilisateur() + "/" + livre.id + "_tranche." + extension, dataUrl);
-      if (ancien && ancien !== chemin) {
-        supprimerImageStorage(ancien).catch(() => {});
-        delete cacheImagesURL[ancien];
-      }
+      const chemin = await uploaderImageStorage(nomImageUnique(livre.id, "tranche", extension), dataUrl);
+      if (ancien && ancien !== chemin) oublierImage(ancien);
       tranche.imageChemin = chemin;
       cacheImagesURL[chemin] = dataUrl;   // aperçu immédiat, sans requête
       marquerModifie();

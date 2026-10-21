@@ -364,6 +364,12 @@ button.danger {
   text-align: justify;
   hyphens: auto;
   -webkit-hyphens: auto;
+  /* Un mot plus long qu'une ligne se coupe au bord de la colonne. Le navigateur le
+     fait d'office dans une zone éditable — mais pas dans le MESUREUR, qui ne l'est
+     pas : il laissait le mot déborder sur une seule ligne, croyait la page moins
+     pleine qu'à l'écran, et la fin de la double-page passait hors de vue. Écrit ici,
+     la règle vaut partout pareil : édition, mesureur, lecture. */
+  overflow-wrap: break-word;
   font-family: "EB Garamond", Georgia, serif;
   /* Taille du texte courant : posée par le format du livre (voir
      appliquerTypoFormat), avec celle du roman en secours. */
@@ -1357,6 +1363,15 @@ button.danger {
 }
 
 /* Réglage de l'espace au-dessus des titres, dans la barre d'outils */
+/* L'étiquette, son curseur et sa valeur passent à la ligne ENSEMBLE : la barre, en se
+   repliant, laissait « Titre » seul au bout d'une ligne et son curseur sur la suivante. */
+.groupe-espace {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
 .etiquette-espace {
   font-size: 11px;
   font-weight: 600;
@@ -3012,6 +3027,22 @@ button.danger {
 
 .sommaire { overflow-y: auto; }
 .sommaire ul { min-height: 64px; }
+
+/* Sur un écran d'ordinateur peu haut (un portable de 768 px), les boutons du haut du
+   panneau prenaient presque tout : quatre chapitres visibles sur soixante. On les
+   resserre — l'étiquette du format disparaît (le bouton dit le format), « + Chapitre »
+   et « Relecture » partagent une rangée — pour rendre la place à la liste. */
+.rangee-chapitre { display: contents; }
+@media (min-width: 901px) and (max-height: 900px) {
+  .sommaire .sommaire-couvertures { gap: 4px; }
+  .sommaire .btn-couv { padding: 5px 4px; }
+  .sommaire .label-format { display: none; }
+  .sommaire .sommaire-separateur { margin: 5px 0; }
+  .rangee-chapitre { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px; }
+  .rangee-chapitre .btn-chapitre, .rangee-chapitre .bloc-outils { margin-bottom: 0 !important; }
+  .rangee-chapitre .btn-outils { height: 100%; }
+  .sommaire #listePages li { padding-top: 5px; padding-bottom: 5px; }
+}
 .sommaire-separateur { margin: 8px 0; }
 .sommaire-entete { margin-bottom: 8px; }
 .sommaire-outils { margin: 8px 0 0; }

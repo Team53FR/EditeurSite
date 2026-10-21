@@ -154,6 +154,7 @@
     text-align: justify;
     hyphens: auto;
     -webkit-hyphens: auto;
+    overflow-wrap: break-word;     /* comme à l'écran (voir .texte-livre, style.css) */
     orphans: 1;
     widows: 1;
   }

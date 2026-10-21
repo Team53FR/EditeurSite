@@ -85,6 +85,9 @@
       <div class="sommaire-separateur"></div>
 
       <div class="sommaire-section">Chapitres</div>
+      <!-- Sans effet sur un grand écran (display: contents) ; sur un écran peu haut, les
+           deux boutons passent côte à côte pour laisser la place à la liste des chapitres. -->
+      <div class="rangee-chapitre">
       <button onclick="ajouterChapitre()" class="secondaire petit btn-chapitre" title="Ajouter un chapitre (démarre sur une nouvelle page)">+ Chapitre</button>
 
       <!-- Les outils qui relisent le livre entier sont regroupés : ils servent
@@ -122,7 +125,12 @@
             <span class="outil-icone" aria-hidden="true">␣</span>
             <span class="outil-texte"><strong>Espaces après les points</strong><small>Repérer « lui-même.Dégager » et ajouter les espaces</small></span>
           </button>
+          <button type="button" class="outil" role="menuitem" onclick="lancerOutilLivre(ouvrirPhrasesCoupees)">
+            <span class="outil-icone" aria-hidden="true">¶</span>
+            <span class="outil-texte"><strong>Phrases coupées en deux</strong><small>Une phrase passée à la ligne comme un nouveau paragraphe, et la recoller</small></span>
+          </button>
         </div>
+      </div>
       </div>
 
       <ul id="listePages"></ul>
@@ -190,20 +198,24 @@
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><text x="12" y="16" font-size="9" stroke="none" fill="currentColor" text-anchor="middle" font-family="serif">A</text></svg>
         </button>
         <span class="separateur-outils"></span>
-        <span class="etiquette-espace" title="Espace au-dessus des titres de chapitre">Titre</span>
-        <input type="range" id="sliderEspaceTitre" class="slider-espace"
-          min="0" max="160" step="5" value="65"
-          title="Espace au-dessus des titres de chapitre"
-          oninput="setEspaceTitre(this.value)">
-        <span id="valeurEspaceTitre" class="valeur-espace">65</span>
+        <span class="groupe-espace">
+          <span class="etiquette-espace" title="Espace au-dessus des titres de chapitre">Titre</span>
+          <input type="range" id="sliderEspaceTitre" class="slider-espace"
+            min="0" max="160" step="5" value="65"
+            title="Espace au-dessus des titres de chapitre"
+            oninput="setEspaceTitre(this.value)">
+          <span id="valeurEspaceTitre" class="valeur-espace">65</span>
+        </span>
         <span class="separateur-outils"></span>
         <!-- Le blanc ENTRE le sous-titre (ou le titre) et le premier paragraphe. -->
-        <span class="etiquette-espace" title="Espace entre le sous-titre et le premier paragraphe">Sous-titre</span>
-        <input type="range" id="sliderEspaceSousTitre" class="slider-espace"
-          min="0" max="80" step="2" value="6"
-          title="Espace entre le sous-titre et le premier paragraphe"
-          oninput="setEspaceSousTitre(this.value)">
-        <span id="valeurEspaceSousTitre" class="valeur-espace">6</span>
+        <span class="groupe-espace">
+          <span class="etiquette-espace" title="Espace entre le sous-titre et le premier paragraphe">Sous-titre</span>
+          <input type="range" id="sliderEspaceSousTitre" class="slider-espace"
+            min="0" max="80" step="2" value="6"
+            title="Espace entre le sous-titre et le premier paragraphe"
+            oninput="setEspaceSousTitre(this.value)">
+          <span id="valeurEspaceSousTitre" class="valeur-espace">6</span>
+        </span>
         <span class="separateur-outils"></span>
         <button onmousedown="event.preventDefault()" onclick="basculerRecherche()" title="Rechercher / Remplacer (Ctrl+F)">&#128269;</button>
       </div>
