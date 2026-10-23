@@ -3520,7 +3520,8 @@ function ouvrirTranche() {
 
       "</div>" +
       '<div class="tranche-apercu">' +
-        '<div class="tranche-scene" id="trScene"></div>' +
+        '<div class="tranche-zone" id="trZone"><div class="tranche-scene" id="trScene"></div></div>' +
+        '<label class="tranche-zoom">Zoom <input type="range" id="trZoom" min="1" max="3" step="0.25" value="1"></label>' +
         "<small id='trLegende'></small>" +
         '<p class="aide-champ" id="trNoteDos"></p>' +
       "</div>" +
@@ -3590,11 +3591,14 @@ function ouvrirTranche() {
     // la légende donnant l'épaisseur réelle juste en dessous.
     const dosApercu = Math.max(dosMm, 3);
     const dos = construireDosLivre(provisoire, dosApercu, f.haut, null);
-    const echelle = HAUTEUR_APERCU_DOS / (f.haut * PX_PAR_MM);
+    // Zoom : le dos grandit, la zone garde sa hauteur et défile.
+    const zoom = parseFloat(val("trZoom")) || 1;
+    const echelle = HAUTEUR_APERCU_DOS * zoom / (f.haut * PX_PAR_MM);
     dos.style.transform = "scale(" + echelle + ")";
     dos.style.transformOrigin = "top left";
-    scene.style.height = HAUTEUR_APERCU_DOS + "px";
+    scene.style.height = (HAUTEUR_APERCU_DOS * zoom) + "px";
     scene.style.width = (dosApercu * PX_PAR_MM * echelle) + "px";
+    fond.querySelector("#trZone").style.maxHeight = HAUTEUR_APERCU_DOS + "px";
     scene.appendChild(dos);
 
     // La pastille : « Fond » n'a pas de sens pour un numéro seul, et l'aide dit

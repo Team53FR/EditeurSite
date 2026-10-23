@@ -2302,7 +2302,12 @@ button.danger {
 .tranche-reglages .aide-champ { font-size: 0.76rem; opacity: 0.72; margin: 0.2rem 0 0; line-height: 1.35; }
 
 /* L'aperçu : le vrai dos, réduit. La scène ne fait que réserver la place. */
-.tranche-apercu { display: flex; flex-direction: column; align-items: center; gap: 0.4rem; width: 11rem; position: sticky; top: 0.5rem; }
+.tranche-apercu { display: flex; flex-direction: column; align-items: center; gap: 0.4rem; width: 13rem; position: sticky; top: 0.5rem; }
+/* Le dos zoomé dépasse la zone : elle défile au lieu de grandir. */
+.tranche-zone { max-width: 100%; overflow: auto; padding: 4px; }
+.tranche-zone > .tranche-scene { margin: 0 auto; }
+.tranche-zoom { display: flex; align-items: center; gap: 0.4rem; font-size: 0.78rem; }
+.tranche-zoom input { width: 6.5rem; }
 .tranche-scene {
   position: relative;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
