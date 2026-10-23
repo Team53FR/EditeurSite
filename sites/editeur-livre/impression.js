@@ -3217,6 +3217,12 @@ function donneesTranche(livre) {
     pastilleForme: t.pastilleForme === "rond" || t.pastilleForme === "nu" ? t.pastilleForme : "bande",
     // « 2 » ou « II » : la façon d'écrire un numéro tapé en chiffres.
     pastilleChiffres: t.pastilleChiffres === "romain" ? "romain" : "arabe",
+    // Une image à la place de l'aplat de couleur, découpée selon la forme
+    // (rond ou rectangle). Largeur (diamètre pour le rond) et hauteur en mm ;
+    // 0 = toute la largeur du dos, et pour la hauteur les proportions de l'image.
+    pastilleImageChemin: t.pastilleImageChemin || null,
+    pastilleImageTaille: Number(t.pastilleImageTaille) > 0 ? Number(t.pastilleImageTaille) : 0,
+    pastilleImageHauteur: Number(t.pastilleImageHauteur) > 0 ? Number(t.pastilleImageHauteur) : 0,
     surtitre: typeof t.surtitre === "string" ? t.surtitre : "",
     surtitreTaille: Number(t.surtitreTaille) > 0 ? Number(t.surtitreTaille) : 6,
     credits: typeof t.credits === "string" ? t.credits : "",
@@ -3275,13 +3281,38 @@ function construireDosLivre(livre, dosMm, hautMm, promessesImages) {
   // 2) Pastille : le numéro de tome, droit. Trois apparences : une bande de
   //    couleur sur toute la largeur du dos, un rond de couleur, ou le numéro
   //    seul, sans aplat, sur le fond du dos.
-  if (r.pastille.trim()) {
+  //    Une image remplace l'aplat de couleur (rond ou rectangle, pas pour le
+  //    numéro seul) ; le numéro, s'il y en a un, se pose par-dessus.
+  const avecImage = r.pastilleForme !== "nu" && !!r.pastilleImageChemin;
+  if (r.pastille.trim() || avecImage) {
     const p = document.createElement("div");
     p.className = "dos-pastille dos-pastille-" + r.pastilleForme;
-    if (r.pastilleForme !== "nu") p.style.background = r.pastilleFond;
     p.style.color = r.pastilleTexte;
     p.style.fontSize = r.pastilleTaille + "pt";
-    p.textContent = textePastille(r.pastille, r.pastilleChiffres);
+    const texte = textePastille(r.pastille, r.pastilleChiffres);
+
+    if (avecImage) {
+      p.classList.add("dos-pastille-image");
+      p.style.width = r.pastilleImageTaille > 0 ? r.pastilleImageTaille + "mm" : "100%";
+      // Rond : aspect-ratio du CSS. Rectangle : la hauteur donnée, sinon celle
+      // que l'image impose en gardant ses proportions.
+      const hauteurFixe = r.pastilleForme === "bande" && r.pastilleImageHauteur > 0;
+      if (hauteurFixe) p.style.height = r.pastilleImageHauteur + "mm";
+      else if (r.pastilleForme === "bande") p.classList.add("dos-pastille-image-libre");
+      const img = document.createElement("img");
+      img.alt = "";
+      p.appendChild(img);
+      if (texte) {
+        const t = document.createElement("span");
+        t.className = "dos-pastille-texte";
+        t.textContent = texte;
+        p.appendChild(t);
+      }
+      chargerImageCouverture(img, r.pastilleImageChemin, promessesImages);
+    } else {
+      if (r.pastilleForme !== "nu") p.style.background = r.pastilleFond;
+      p.textContent = texte;
+    }
     dos.appendChild(p);
   }
 
@@ -3441,6 +3472,13 @@ function ouvrirTranche() {
             ? '<button type="button" class="btn-lien" id="trPastilleTome">Reprendre le tome ' + livre.tome + "</button>"
             : "") +
         "</div>" +
+        '<div class="tranche-duo">' +
+          '<label class="btn-fichier">Image de pastille' +
+            '<input type="file" id="trPastilleImage" accept="image/*" hidden></label>' +
+          '<button type="button" class="btn-lien" id="trPastilleImageRetirer">Retirer</button>' +
+          nombre("trPastilleImageTaille", "Largeur (mm)", d.pastilleImageTaille, 0, 100) +
+          nombre("trPastilleImageHauteur", "Hauteur (mm)", d.pastilleImageHauteur, 0, 100) +
+        "</div>" +
         '<p class="aide-champ" id="trPastilleAide"></p>' +
       "</fieldset>" +
 
@@ -3516,6 +3554,8 @@ function ouvrirTranche() {
     pastilleTaille: num("trPastilleTaille", d.pastilleTaille),
     pastilleForme: val("trPastilleForme"),
     pastilleChiffres: val("trPastilleChiffres"),
+    pastilleImageTaille: num("trPastilleImageTaille", 0),
+    pastilleImageHauteur: num("trPastilleImageHauteur", 0),
     surtitre: val("trSurtitre"),
     surtitreTaille: num("trSurtitreTaille", d.surtitreTaille),
     contenu: val("trContenu"),
@@ -3536,7 +3576,10 @@ function ouvrirTranche() {
     // L'image reste celle qui est enregistrée : elle s'envoie à part, pas au
     // moment d'appuyer sur « Enregistrer ».
     const provisoire = Object.assign({}, livre,
-      { tranche: Object.assign({}, r, { imageChemin: t.imageChemin || null }) });
+      { tranche: Object.assign({}, r, {
+        imageChemin: t.imageChemin || null,
+        pastilleImageChemin: t.pastilleImageChemin || null
+      }) });
     const scene = fond.querySelector("#trScene");
     scene.innerHTML = "";
 
@@ -3554,9 +3597,22 @@ function ouvrirTranche() {
     // La pastille : « Fond » n'a pas de sens pour un numéro seul, et l'aide dit
     // ce que le chiffre deviendra.
     const forme = r.pastilleForme;
-    fond.querySelector("#trPastilleFond").disabled = forme === "nu";
+    const imagePropre = !!t.pastilleImageChemin;
+    const imageActive = imagePropre && forme !== "nu";
+    // « Fond » ne sert plus quand une image remplit la forme ; la hauteur ne
+    // sert qu'au rectangle (le rond a la même hauteur que sa largeur).
+    fond.querySelector("#trPastilleFond").disabled = forme === "nu" || imageActive;
+    fond.querySelector("#trPastilleImage").disabled = forme === "nu";
+    fond.querySelector("#trPastilleImageRetirer").style.display = imagePropre ? "" : "none";
+    fond.querySelector("#trPastilleImageTaille").disabled = !imageActive;
+    fond.querySelector("#trPastilleImageHauteur").disabled = !imageActive || forme !== "bande";
     fond.querySelector("#trPastilleAide").textContent =
-      (forme === "nu" ? "Le numéro seul, sur le fond du dos : choisissez-lui une couleur lisible. "
+      (imageActive
+        ? (forme === "rond"
+            ? "L'image dans un rond : la largeur est le diamètre, 0 = toute la largeur du dos. "
+            : "L'image dans un rectangle : 0 en largeur = toute la largeur du dos, 0 en hauteur = les proportions de l'image. ") +
+          "Le numéro, s'il y en a un, se pose par-dessus. "
+        : forme === "nu" ? "Le numéro seul, sur le fond du dos : choisissez-lui une couleur lisible. "
         : forme === "rond" ? "Le numéro dans un rond de couleur. "
         : "Le numéro sur une bande de couleur, d'un bord à l'autre du dos. ") +
       (r.pastilleChiffres === "romain"
@@ -3628,6 +3684,20 @@ function ouvrirTranche() {
     rafraichir();
   };
 
+  // Image de la pastille : un fichier à part de celui du bandeau, dans le même
+  // dossier, avec la même règle (effacé seulement une fois le livre enregistré).
+  fond.querySelector("#trPastilleImage").addEventListener("change", (e) => {
+    envoyerImageTranche(e, livre, t, rafraichir,
+      fond.querySelector("#trPastilleAide"), "pastilleImageChemin", "pastille");
+  });
+  fond.querySelector("#trPastilleImageRetirer").onclick = () => {
+    oublierImage(t.pastilleImageChemin);
+    t.pastilleImageChemin = null;
+    marquerModifie();
+    planifierBrouillon();
+    rafraichir();
+  };
+
   majImage();
   rafraichir();
 
@@ -3650,6 +3720,8 @@ function ouvrirTranche() {
     t.pastilleTaille = r.pastilleTaille;
     t.pastilleForme = r.pastilleForme;
     t.pastilleChiffres = r.pastilleChiffres;
+    t.pastilleImageTaille = r.pastilleImageTaille;
+    t.pastilleImageHauteur = r.pastilleImageHauteur;
     t.surtitre = r.surtitre;
     t.surtitreTaille = r.surtitreTaille;
     t.taille = r.taille;
@@ -3676,12 +3748,15 @@ function ouvrirTranche() {
 // Envoi de l'image de tranche. Elle vit dans le même dossier que celles des
 // couvertures, sous un nom qui lui est propre : remplacer l'une ne touche
 // jamais l'autre.
-function envoyerImageTranche(event, livre, tranche, surFin, note) {
+//
+// `cle` dit quel champ de la tranche reçoit le chemin (le bandeau par défaut,
+// ou l'image de la pastille), `sorte` le nom de fichier qui lui correspond.
+function envoyerImageTranche(event, livre, tranche, surFin, note, cle = "imageChemin", sorte = "tranche") {
   const fichier = event.target.files[0];
   event.target.value = "";
   if (!fichier) return;
 
-  const ancien = tranche.imageChemin;
+  const ancien = tranche[cle];
 
   const lecteur = new FileReader();
   lecteur.onload = async (e) => {
@@ -3693,9 +3768,9 @@ function envoyerImageTranche(event, livre, tranche, surFin, note) {
     ouvrirAttente("Envoi de l'image…", "Le transfert d'une image prend quelques secondes.");
     if (note) note.textContent = "Envoi de l'image en cours…";
     try {
-      const chemin = await uploaderImageStorage(nomImageUnique(livre.id, "tranche", extension), dataUrl);
+      const chemin = await uploaderImageStorage(nomImageUnique(livre.id, sorte, extension), dataUrl);
       if (ancien && ancien !== chemin) oublierImage(ancien);
-      tranche.imageChemin = chemin;
+      tranche[cle] = chemin;
       cacheImagesURL[chemin] = dataUrl;   // aperçu immédiat, sans requête
       marquerModifie();
       planifierBrouillon();

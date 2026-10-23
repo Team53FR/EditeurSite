@@ -327,6 +327,17 @@ async function dupliquerLivre(id) {
         manquantes.push(face === "quatrieme" ? "4e de couverture" : face);
       }
     }
+    // L'image de la pastille de tranche est un fichier à part : copiée aussi.
+    if (nouveau.tranche && nouveau.tranche.pastilleImageChemin) {
+      try {
+        nouveau.tranche.pastilleImageChemin = await copierImageStorage(
+          nouveau.tranche.pastilleImageChemin,
+          cheminVisuelCopie(nouveau.tranche.pastilleImageChemin, nouvelId, "pastille"));
+      } catch (e) {
+        delete nouveau.tranche.pastilleImageChemin;
+        manquantes.push("pastille de tranche");
+      }
+    }
 
     // Les notes appartiennent au livre : le doublon les reprend, comme son texte.
     // Elles sont lues AVANT la création (rien ne dépend encore du nouveau livre)
@@ -1264,6 +1275,9 @@ async function supprimerLivre(id) {
       if (data && data.imageChemin) {
         supprimerImageStorage(data.imageChemin).catch(() => {});
       }
+    }
+    if (livre.tranche && livre.tranche.pastilleImageChemin) {
+      supprimerImageStorage(livre.tranche.pastilleImageChemin).catch(() => {});
     }
   } catch (erreur) {
     message.textContent = erreur.message;

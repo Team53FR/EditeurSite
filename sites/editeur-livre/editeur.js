@@ -1758,6 +1758,9 @@ function effacerImagesOubliees(livreEnregistre) {
   if (!imagesAEffacer.size) return;
   const gardees = new Set(["couverture", "quatrieme", "tranche"]
     .map((k) => livreEnregistre[k] && livreEnregistre[k].imageChemin).filter(Boolean));
+  // La tranche porte une seconde image : celle de la pastille.
+  const pastille = livreEnregistre.tranche && livreEnregistre.tranche.pastilleImageChemin;
+  if (pastille) gardees.add(pastille);
   imagesAEffacer.forEach((chemin) => {
     if (gardees.has(chemin)) return;
     supprimerImageStorage(chemin).catch(() => {});
