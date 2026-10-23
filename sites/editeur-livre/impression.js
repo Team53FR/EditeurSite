@@ -3396,7 +3396,10 @@ function chargerImageCouverture(img, chemin, promessesImages) {
 // réel, construit par le même code que la planche d'impression, simplement
 // réduit à l'échelle.
 
-const HAUTEUR_APERCU_DOS = 300; // px
+// Le plus grand possible, sans sortir de l'écran : un dos de 20 mm ne fait que
+// quelques dizaines de pixels de large, à 300 px de haut les détails (la
+// pastille, le titre) y étaient illisibles.
+const HAUTEUR_APERCU_DOS = Math.max(300, Math.min(560, Math.round(window.innerHeight * 0.6))); // px
 
 function ouvrirTranche() {
   if (modeApercu || modeCouverture) return;
