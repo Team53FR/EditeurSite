@@ -1135,25 +1135,55 @@ function creerPageTexteImpression(page, numero, f, margeInt, margeExt, position)
   return div;
 }
 
-function creerCouvertureImpression(livre, mode, f, promessesImages) {
+// `debord` (mm, 0 par défaut) : fond perdu à ajouter en tête, en pied et du côté
+// extérieur du panneau (à droite pour la 1re, à gauche pour la 4e). Le panneau
+// rendu est alors plus grand que le format rogné, et c'est l'IMAGE qui s'étend
+// dans ce débord — pas une simple bande de couleur : les imprimeurs et KDP
+// exigent que l'illustration elle-même dépasse la coupe. Les textes, eux, ne
+// bougent pas : ils restent placés par rapport au format rogné.
+function creerCouvertureImpression(livre, mode, f, promessesImages, debord) {
   const data = mode === "couverture" ? livre.couverture : livre.quatrieme;
+  const b = debord > 0 ? debord : 0;
+  // L'image se cadre dans la boîte débord comprise.
+  const boite = { larg: f.larg + b, haut: f.haut + 2 * b };
+  const fondCouleur = (data && data.fond) || "#1a1a2e";
 
   const div = document.createElement("div");
   div.className = "page-impression couverture-impression";
   div.style.width = f.larg + "mm";
   div.style.height = f.haut + "mm";
-  div.style.background = (data && data.fond) || "#1a1a2e";
+  div.style.background = fondCouleur;
+
+  // Sans débord, l'image vit dans la page rognée comme avant ; avec, dans une
+  // enveloppe plus grande qui porte le fond et l'image, la page rognée (textes
+  // seuls, transparente) se posant par-dessus.
+  let hote = div;
+  let enveloppe = null;
+  if (b) {
+    enveloppe = document.createElement("div");
+    enveloppe.className = "couverture-impression";
+    enveloppe.style.width = boite.larg + "mm";
+    enveloppe.style.height = boite.haut + "mm";
+    enveloppe.style.background = fondCouleur;
+    enveloppe.style.position = "relative";
+    div.className = "couverture-impression";
+    div.style.background = "transparent";
+    div.style.position = "absolute";
+    div.style.left = (mode === "quatrieme" ? b : 0) + "mm";
+    div.style.top = b + "mm";
+    hote = enveloppe;
+  }
 
   if (data && data.imageChemin) {
     const img = document.createElement("img");
     img.className = "image-couverture-impression";
-    div.appendChild(img);
+    hote.appendChild(img);
 
     const promesse = new Promise((resoudre) => {
       const secours = setTimeout(resoudre, 8000);
       img.onload = () => {
         clearTimeout(secours);
-        positionnerImageImpression(img, data, f);
+        positionnerImageImpression(img, data, f, b ? boite : null);
         resoudre();
       };
       img.onerror = () => { clearTimeout(secours); img.remove(); resoudre(); };
@@ -1184,17 +1214,24 @@ function creerCouvertureImpression(livre, mode, f, promessesImages) {
     div.insertAdjacentHTML("beforeend", htmlResumeCouv(data, couleurTexte, "resume-impression"));
   }
 
+  if (enveloppe) {
+    enveloppe.appendChild(div);
+    return enveloppe;
+  }
   return div;
 }
 
 // Reproduit le cadrage choisi dans l'éditeur (contain + zoom + déplacement),
 // en convertissant les offsets écran (px à la taille d'édition) vers la
 // taille physique de la page imprimée.
-function positionnerImageImpression(img, data, f) {
+// `boite` : la zone où l'image se cadre quand elle dépasse le format rogné
+// (fond perdu). Les déplacements restent convertis à l'échelle de la PAGE.
+function positionnerImageImpression(img, data, f, boite) {
   if (!img.naturalWidth || !img.naturalHeight) return;
 
-  const largPage = f.larg * MM_EN_PX;
-  const hautPage = f.haut * MM_EN_PX;
+  const cadre = boite || f;
+  const largPage = cadre.larg * MM_EN_PX;
+  const hautPage = cadre.haut * MM_EN_PX;
 
   const echelleBase = Math.min(largPage / img.naturalWidth, hautPage / img.naturalHeight);
   const largAffichee = img.naturalWidth * echelleBase;
@@ -1203,7 +1240,7 @@ function positionnerImageImpression(img, data, f) {
   const centreY = (hautPage - hautAffichee) / 2;
 
   const pageEcran = [...document.querySelectorAll(".page-livre")].find(el => el.clientWidth > 0);
-  const facteur = pageEcran ? largPage / pageEcran.clientWidth : 1;
+  const facteur = pageEcran ? (f.larg * MM_EN_PX) / pageEcran.clientWidth : 1;
 
   const offsetX = (data.imgOffsetX || 0) * facteur;
   const offsetY = (data.imgOffsetY || 0) * facteur;
@@ -2788,7 +2825,7 @@ function ouvrirControleKDP(cible, livre, pagesEcran, pagesPro, marges) {
     "Pages simples, jamais en planches" + (couverture ? " — sauf la couverture, fournie ouverte à plat, comme KDP l'exige" : ""),
     "Format exact " + fmt.larg.toFixed(2).replace(".", ",") + " × " + fmt.haut.toFixed(2).replace(".", ",") + " mm, sans marge technique ni repère : c'est ce que KDP demande",
     couverture
-      ? "Fond perdu de " + KDP_FOND_PERDU_MM + " mm sur les quatre bords, couleur de fond comprise"
+      ? "Fond perdu de " + KDP_FOND_PERDU_MM + " mm sur les quatre bords : l'illustration de la couverture, de la 4e et le bandeau du dos s'y étendent jusqu'au bord"
       : "Vos marges, décalées vers l'extérieur pour la reliure : " +
         mm(marges.interieure) + " mm au petit fond (minimum KDP " +
         mm(kdpMargeReliure(nbPages)) + " mm pour " + nbPages + " pages), " +
@@ -2999,23 +3036,18 @@ function creerPageKDP(contenu, numero, marges, fmt, position) {
 function creerCouverturePlatKDP(livre, dosMm, promessesImages) {
   const f = formatKDPDuLivre(livre);
   const largTrim = 2 * f.larg + dosMm;
-  const feuille = creerFeuillePro(largTrim, f.haut, KDP_FOND_PERDU_MM);
-  const zone = creerZoneRognePro(largTrim, f.haut, KDP_FOND_PERDU_MM);
+  const b = KDP_FOND_PERDU_MM;
+  const feuille = creerFeuillePro(largTrim, f.haut, b);
+  // Le support EST le format rogné + 3,2 mm de fond perdu : la zone prend toute
+  // la feuille, et chaque panneau y étend son illustration jusqu'au bord. Une
+  // simple bande de couleur unie ne suffit pas : KDP refuse alors le fichier
+  // (« l'image ou le fond doit être étendu au-delà des limites de coupe »).
+  const zone = creerZoneRognePro(largTrim + 2 * b, f.haut + 2 * b, 0);
   zone.classList.add("couv-plat");
 
-  const fondCouleur = (livre.couverture && livre.couverture.fond) || "#1a1a2e";
-  const debord = document.createElement("div");
-  debord.className = "debord-pro";
-  debord.style.left = "0mm";
-  debord.style.top = "0mm";
-  debord.style.width = (largTrim + 2 * KDP_FOND_PERDU_MM) + "mm";
-  debord.style.height = (f.haut + 2 * KDP_FOND_PERDU_MM) + "mm";
-  debord.style.background = fondCouleur;
-  feuille.appendChild(debord);
-
-  zone.appendChild(creerPanneauCouverture(livre, "quatrieme", f, promessesImages));
-  zone.appendChild(recouvrirJointuresDos(construireDosLivre(livre, dosMm, f.haut, promessesImages), dosMm));
-  zone.appendChild(creerPanneauCouverture(livre, "couverture", f, promessesImages));
+  zone.appendChild(creerPanneauCouverture(livre, "quatrieme", f, promessesImages, b));
+  zone.appendChild(recouvrirJointuresDos(construireDosLivre(livre, dosMm, f.haut, promessesImages, b), dosMm));
+  zone.appendChild(creerPanneauCouverture(livre, "couverture", f, promessesImages, b));
 
   feuille.appendChild(zone);
   return feuille;
@@ -3247,12 +3279,18 @@ function tranchePorteTexte(reglages, dosMm) {
 // L'ordre des blocs est celui d'un livre en rayon : le bandeau d'image en
 // tête, la pastille de tome, le titre au centre, les crédits en dessous, la
 // marque de l'éditeur au pied.
-function construireDosLivre(livre, dosMm, hautMm, promessesImages) {
+//
+// `debordMm` : fond perdu à ajouter en tête et en pied. Le fond et le bandeau
+// d'image s'y étendent jusqu'au bord de la feuille ; tout le reste (pastille,
+// titre, crédits, éditeur) reste à sa place par rapport au format rogné.
+function construireDosLivre(livre, dosMm, hautMm, promessesImages, debordMm) {
   const r = donneesTranche(livre);
+  const b = debordMm > 0 ? debordMm : 0;
   const dos = document.createElement("div");
   dos.className = "dos-pro";
   dos.style.width = dosMm + "mm";
-  dos.style.height = hautMm + "mm";
+  dos.style.height = (hautMm + 2 * b) + "mm";
+  dos.style.paddingBottom = b + "mm";
   dos.style.background = r.fond;
   dos.style.color = r.texte;
 
@@ -3271,11 +3309,14 @@ function construireDosLivre(livre, dosMm, hautMm, promessesImages) {
   if (r.bandeau > 0 && cheminBandeau) {
     const bande = document.createElement("div");
     bande.className = "dos-bandeau";
-    bande.style.height = r.bandeau + "mm";
+    // Le bandeau commence au bord de la feuille : le fond perdu en plus.
+    bande.style.height = (r.bandeau + b) + "mm";
     const img = document.createElement("img");
     bande.appendChild(img);
     dos.appendChild(bande);
     chargerImageCouverture(img, cheminBandeau, promessesImages);
+  } else {
+    dos.style.paddingTop = b + "mm";
   }
 
   // 2) Pastille : le numéro de tome, droit. Trois apparences : une bande de
@@ -3799,27 +3840,18 @@ function envoyerImageTranche(event, livre, tranche, surFin, note, cle = "imageCh
 function creerCouverturePlat(livre, f, dosMm, promessesImages, pourImprimeur) {
   const largTrim = 2 * f.larg + dosMm;
   const feuille = creerFeuillePro(largTrim, f.haut);
-  const zone = creerZoneRognePro(largTrim, f.haut);
+  // La zone couvre le format rogné ET son fond perdu : les illustrations des
+  // panneaux et le dos s'y étendent jusqu'au bord (voir creerCouvertureImpression).
+  const zone = creerZoneRognePro(largTrim + 2 * FOND_PERDU_MM, f.haut + 2 * FOND_PERDU_MM,
+    MARGE_TECHNIQUE_MM - FOND_PERDU_MM);
   zone.classList.add("couv-plat");
 
-  // Le fond déborde dans le fond perdu : la zone de 5 mm ne doit jamais
-  // rester blanche une fois rognée. Le débord est posé sur la FEUILLE et non
-  // dans la zone rognée, qui est en overflow:hidden et le découperait.
-  const fondCouleur = (livre.couverture && livre.couverture.fond) || "#1a1a2e";
-  const debord = document.createElement("div");
-  debord.className = "debord-pro";
-  debord.style.left   = (MARGE_TECHNIQUE_MM - FOND_PERDU_MM) + "mm";
-  debord.style.top    = (MARGE_TECHNIQUE_MM - FOND_PERDU_MM) + "mm";
-  debord.style.width  = (largTrim + 2 * FOND_PERDU_MM) + "mm";
-  debord.style.height = (f.haut + 2 * FOND_PERDU_MM) + "mm";
-  debord.style.background = fondCouleur;
-  feuille.appendChild(debord);
+  zone.appendChild(creerPanneauCouverture(livre, "quatrieme", f, promessesImages, FOND_PERDU_MM));
 
-  zone.appendChild(creerPanneauCouverture(livre, "quatrieme", f, promessesImages));
+  zone.appendChild(recouvrirJointuresDos(
+    construireDosLivre(livre, dosMm, f.haut, promessesImages, FOND_PERDU_MM), dosMm));
 
-  zone.appendChild(recouvrirJointuresDos(construireDosLivre(livre, dosMm, f.haut, promessesImages), dosMm));
-
-  zone.appendChild(creerPanneauCouverture(livre, "couverture", f, promessesImages));
+  zone.appendChild(creerPanneauCouverture(livre, "couverture", f, promessesImages, FOND_PERDU_MM));
 
   feuille.appendChild(zone);
   if (pourImprimeur) ajouterReperesCoupe(feuille, largTrim, f.haut);
@@ -3851,8 +3883,8 @@ function ajouterLegendeCouverture(feuilleP, papier, largSupport, hautSupport, do
 }
 
 // Un panneau de couverture au format rogné, réutilisant le rendu existant.
-function creerPanneauCouverture(livre, mode, f, promessesImages) {
-  const panneau = creerCouvertureImpression(livre, mode, f, promessesImages);
+function creerPanneauCouverture(livre, mode, f, promessesImages, debord) {
+  const panneau = creerCouvertureImpression(livre, mode, f, promessesImages, debord);
   panneau.classList.remove("page-impression");
   panneau.classList.add("panneau-couv-pro");
   return panneau;
