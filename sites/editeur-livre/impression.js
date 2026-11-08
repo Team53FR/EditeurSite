@@ -3256,8 +3256,16 @@ function donneesTranche(livre) {
     // Quelle partie de l'image reste visible, en % (0 = gauche / haut,
     // 100 = droite / bas). Par défaut le haut, centré : l'ancien
     // « object-position: center top ».
+    //
+    // Attention : une position ne peut déplacer l'image que dans le sens où
+    // celle-ci DÉBORDE de la bande. Un cadrage « remplir » ajuste l'image au
+    // plus juste : sur un dos étroit elle déborde sur les côtés et pas du
+    // tout en hauteur, si bien que la position ↕ n'a rien à parcourir. C'est
+    // le zoom ci-dessous qui crée du jeu dans les deux sens.
     bandeauPosX: pourcentTranche(t.bandeauPosX, 50),
     bandeauPosY: pourcentTranche(t.bandeauPosY, 0),
+    bandeauZoom: Number(t.bandeauZoom) > 0
+      ? Math.min(4, Math.max(0.3, Number(t.bandeauZoom))) : 1,
     // Image du bandeau : la sienne si on lui en a donné une, sinon celle de
     // la couverture, qui se prolonge alors sur le dos.
     imageChemin: t.imageChemin || null,
@@ -3339,6 +3347,21 @@ function construireDosLivre(livre, dosMm, hautMm, promessesImages, debordMm) {
     // aucun moyen de choisir ce qu'on gardait.
     img.style.objectFit = r.bandeauCadrage === "contenir" ? "contain" : "cover";
     img.style.objectPosition = r.bandeauPosX + "% " + r.bandeauPosY + "%";
+    // Le zoom agrandit la BOÎTE de l'image au-delà de la bande, et on la
+    // décale pour montrer la part choisie. Sans lui, « remplir » ajuste
+    // l'image au plus juste : elle ne déborde que dans un sens, et la
+    // position de l'autre sens n'a rien à parcourir.
+    //
+    // Les deux mécanismes se composent sans se contredire : object-position
+    // règle le débordement dû aux proportions, left/top celui dû au zoom, et
+    // tous deux tirent vers le même bord. À zoom 1, left/top valent 0 et l'on
+    // retrouve exactement le comportement d'avant.
+    const z = r.bandeauZoom;
+    img.style.position = "absolute";
+    img.style.width  = (100 * z) + "%";
+    img.style.height = (100 * z) + "%";
+    img.style.left = (-(z - 1) * r.bandeauPosX) + "%";
+    img.style.top  = (-(z - 1) * r.bandeauPosY) + "%";
     bande.appendChild(img);
     dos.appendChild(bande);
     chargerImageCouverture(img, cheminBandeau, promessesImages);
@@ -3493,10 +3516,11 @@ function ouvrirTranche() {
     '<label class="tr-champ"><span>' + libelle + "</span>" +
     '<input id="' + id + '" value="' + echapperTitre(valeur) + '" ' + (attrs || "") + "></label>";
 
-  const nombre = (id, libelle, valeur, min, max) =>
+  // `pas` : le zoom se règle plus finement qu'un nombre de millimètres.
+  const nombre = (id, libelle, valeur, min, max, pas) =>
     '<label class="tr-champ tr-court"><span>' + libelle + "</span>" +
     '<input type="number" id="' + id + '" value="' + valeur + '" min="' + min +
-    '" max="' + max + '" step="0.5"></label>';
+    '" max="' + max + '" step="' + (pas || 0.5) + '"></label>';
 
   let html = '<div class="modal-impression-carte ci-carte tr-carte" role="dialog" aria-modal="true">' +
     '<button class="mi-fermer" aria-label="Fermer">&#10005;</button>' +
@@ -3524,6 +3548,7 @@ function ouvrirTranche() {
             '<option value="remplir">Remplir la bande</option>' +
             '<option value="contenir">Image entière</option>' +
           "</select></label>" +
+          nombre("trBandeauZoom", "Zoom (×)", d.bandeauZoom, 0.3, 4, 0.05) +
           nombre("trBandeauPosX", "Position ↔ (%)", d.bandeauPosX, 0, 100) +
           nombre("trBandeauPosY", "Position ↕ (%)", d.bandeauPosY, 0, 100) +
         "</div>" +
@@ -3633,6 +3658,7 @@ function ouvrirTranche() {
     bandeauCadrage: val("trBandeauCadrage"),
     bandeauPosX: num("trBandeauPosX", d.bandeauPosX),
     bandeauPosY: num("trBandeauPosY", d.bandeauPosY),
+    bandeauZoom: num("trBandeauZoom", d.bandeauZoom) || 1,
     pastille: val("trPastille"),
     pastilleFond: val("trPastilleFond"),
     pastilleTexte: val("trPastilleTexte"),
@@ -3749,17 +3775,28 @@ function ouvrirTranche() {
     fond.querySelector("#trBandeau").disabled = source === "aucune";
     // Les réglages de cadrage n'ont rien à régler sans image, ni sans bandeau.
     const sansBandeau = source === "aucune" || num("trBandeau", 0) <= 0;
-    ["trBandeauCadrage", "trBandeauPosX", "trBandeauPosY"].forEach((id) => {
+    ["trBandeauCadrage", "trBandeauZoom", "trBandeauPosX", "trBandeauPosY"].forEach((id) => {
       fond.querySelector("#" + id).disabled = sansBandeau;
     });
+    // Une position ne déplace l'image que dans le sens où celle-ci déborde.
+    // Le dire noir sur blanc : sans cela on tourne un bouton qui ne fait
+    // rien, et l'on croit l'outil cassé.
+    const zoome = num("trBandeauZoom", 1) > 1.001;
+    const remplit = val("trBandeauCadrage") !== "contenir";
+    const libre = zoome
+      ? "Les deux positions agissent."
+      : remplit
+        ? "Au zoom ×1, « Remplir » ajuste l'image au plus juste : seule la position ↔ agit. " +
+          "Zoomez pour pouvoir la déplacer aussi vers le haut ou le bas."
+        : "Au zoom ×1, « Image entière » laisse du jeu en hauteur : seule la position ↕ agit. " +
+          "Zoomez pour pouvoir la déplacer aussi vers la gauche ou la droite.";
     fond.querySelector("#trBandeauAide").textContent = sansBandeau
       ? ""
-      : (val("trBandeauCadrage") === "contenir"
-          ? "L'image entière tient dans la bande ; ce qui reste prend la couleur de fond. "
-          : "L'image couvre toute la bande et déborde sur les côtés. ") +
+      : (remplit
+          ? "L'image couvre toute la bande et déborde du cadre. "
+          : "L'image entière tient dans la bande ; ce qui reste prend la couleur de fond. ") +
         "Un dos est étroit : « Remplir » y coupe beaucoup, souvent la tête d'un " +
-        "personnage. Les deux positions choisissent la partie gardée — ↔ 50 % " +
-        "et ↕ 0 % donnent le haut de l'image, centré.";
+        "personnage. " + libre + " ↔ 50 % et ↕ 0 % donnent le haut de l'image, centré.";
     fond.querySelector("#trImageRetirer").style.display = propre ? "" : "none";
     fond.querySelector("#trImageNote").textContent =
       source === "sienne"
@@ -3803,7 +3840,7 @@ function ouvrirTranche() {
   // elle doit suivre ces deux champs, que le rafraîchissement de l'aperçu ne
   // touche pas. (Posés ici, et pas plus haut : majImage n'existe qu'à partir
   // de sa déclaration.)
-  ["trBandeau", "trBandeauCadrage"].forEach((id) => {
+  ["trBandeau", "trBandeauCadrage", "trBandeauZoom"].forEach((id) => {
     const c = fond.querySelector("#" + id);
     c.addEventListener("input", majImage);
     c.addEventListener("change", majImage);
@@ -3828,6 +3865,7 @@ function ouvrirTranche() {
     t.bandeauCadrage = r.bandeauCadrage;
     t.bandeauPosX = r.bandeauPosX;
     t.bandeauPosY = r.bandeauPosY;
+    t.bandeauZoom = r.bandeauZoom;
     t.pastille = r.pastille;
     t.pastilleFond = r.pastilleFond;
     t.pastilleTexte = r.pastilleTexte;

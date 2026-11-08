@@ -478,8 +478,10 @@
   -webkit-print-color-adjust: exact;
 }
 
-/* Bandeau : le haut de l'image de couverture, prolongé sur le dos. */
-.dos-bandeau { flex-shrink: 0; overflow: hidden; }
+/* Bandeau : le haut de l'image de couverture, prolongé sur le dos.
+   `position: relative` : l'image s'y place en absolu dès qu'on la zoome,
+   pour montrer la part choisie (voir construireDosLivre). */
+.dos-bandeau { flex-shrink: 0; overflow: hidden; position: relative; }
 .dos-bandeau img {
   width: 100%; height: 100%;
   object-fit: cover;
