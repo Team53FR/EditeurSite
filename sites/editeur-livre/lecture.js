@@ -219,7 +219,7 @@ function positionnerImageApercu(img, data, url, page, chemin, dejaRetente) {
   img.onload = () => {
     const cw = page.clientWidth, ch = page.clientHeight;
     if (!cw || !ch) return;
-    const echelleBase = Math.min(cw / img.naturalWidth, ch / img.naturalHeight);
+    const echelleBase = echelleCadrage(data, cw, ch, img.naturalWidth, img.naturalHeight);
     const zoom = data.imgZoom || 1;
     const la = img.naturalWidth * echelleBase, ha = img.naturalHeight * echelleBase;
     const cx = (cw - la) / 2, cy = (ch - ha) / 2;

@@ -1133,9 +1133,9 @@ function dimensionsPageReference(formatKey) {
   return { largPx, hautPx };
 }
 
-// Affiche l'image de couverture exactement comme dans l'éditeur : image entière
-// (comme object-fit: contain), avec le zoom et le décalage choisis, le tout
-// mis à l'échelle pour tenir dans la vignette.
+// Affiche l'image de couverture exactement comme dans l'éditeur : le cadrage
+// choisi (image entière ou page remplie, voir echelleCadrage), avec le zoom et
+// le décalage, le tout mis à l'échelle pour tenir dans la vignette.
 async function chargerImageCouvVignette(couvDiv, url, formatKey, data) {
   // `imageChemin` porte désormais l'URL publique : plus rien à aller
   // chercher, le navigateur charge l'image lui-même (et la met en cache).
@@ -1160,7 +1160,7 @@ async function chargerImageCouvVignette(couvDiv, url, formatKey, data) {
   img.style.top = "0";
   img.style.left = "0";
   img.onload = () => {
-    const echelleBase = Math.min(ref.largPx / img.naturalWidth, ref.hautPx / img.naturalHeight);
+    const echelleBase = echelleCadrage(data, ref.largPx, ref.hautPx, img.naturalWidth, img.naturalHeight);
     const largeurAffichee = img.naturalWidth * echelleBase;
     const hauteurAffichee = img.naturalHeight * echelleBase;
     const centreX = (ref.largPx - largeurAffichee) / 2;

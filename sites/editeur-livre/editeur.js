@@ -1453,6 +1453,7 @@ function previewCouverture() {
   if (cheminImage) {
     zoneZoom.style.display = "flex";
     aide.style.display = "block";
+    majControlesCadrage(data);
     slider.value = data.imgZoom;
     valeurZoom.textContent = Math.round(data.imgZoom * 100) + "%";
 
@@ -1476,6 +1477,8 @@ function previewCouverture() {
     img.removeAttribute("src");
     zoneZoom.style.display = "none";
     aide.style.display = "none";
+    const zoneCadrage = document.getElementById("zoneCadrageImage");
+    if (zoneCadrage) zoneCadrage.style.display = "none";
   }
 
   // Sauvegarder auteur dans le livre
@@ -1578,9 +1581,9 @@ function afficherImageCouverture(url, chemin) {
   img.src = url;
 }
 
-// Calcule la taille "image entière visible" (comme object-fit: contain) puis
-// applique le zoom et le déplacement choisis par-dessus, sans jamais perdre
-// de pixels de l'image d'origine.
+// Part du cadrage choisi — image entière ou page remplie, voir
+// echelleCadrage — puis applique le zoom et le déplacement par-dessus, sans
+// jamais perdre de pixels de l'image d'origine.
 // Adapte zoom + décalage quand la taille de page change (ex. changement de
 // format) pour que l'image occupe VISUELLEMENT la même place qu'avant :
 // on mémorise la taille de page pour laquelle le cadrage a été réglé
@@ -1593,8 +1596,8 @@ function adapterCadrageImage(data, img, cw, ch) {
 
   const bw = data.imgBaseW, bh = data.imgBaseH;
   if (bw && bh && (bw !== cw || bh !== ch)) {
-    const sOld = Math.min(bw / img.naturalWidth, bh / img.naturalHeight);
-    const sNew = Math.min(cw / img.naturalWidth, ch / img.naturalHeight);
+    const sOld = echelleCadrage(data, bw, bh, img.naturalWidth, img.naturalHeight);
+    const sNew = echelleCadrage(data, cw, ch, img.naturalWidth, img.naturalHeight);
     // taux de recouvrement de la dimension la moins couverte (0..1 = bandes, >=1 = couvre)
     const recOld = Math.min(img.naturalWidth * sOld / bw, img.naturalHeight * sOld / bh);
     const recNew = Math.min(img.naturalWidth * sNew / cw, img.naturalHeight * sNew / ch);
@@ -1630,10 +1633,8 @@ function repositionnerImageCouverture() {
   adapterCadrageImage(data, img, conteneur.clientWidth, conteneur.clientHeight);
   clampOffsetsCouv(data, conteneur.clientWidth, conteneur.clientHeight);
 
-  const echelleBase = Math.min(
-    conteneur.clientWidth / img.naturalWidth,
-    conteneur.clientHeight / img.naturalHeight
-  );
+  const echelleBase = echelleCadrage(
+    data, conteneur.clientWidth, conteneur.clientHeight, img.naturalWidth, img.naturalHeight);
   const largeurAffichee = img.naturalWidth * echelleBase;
   const hauteurAffichee = img.naturalHeight * echelleBase;
 
@@ -1645,6 +1646,70 @@ function repositionnerImageCouverture() {
 
   img.style.transform = `translate(${centreX + data.imgOffsetX}px, ${centreY + data.imgOffsetY}px) scale(${data.imgZoom})`;
   img.style.cursor = "grab";
+}
+
+// « Contenir » ou « remplir », et ce que cela implique à l'impression.
+//
+// Le message n'est pas décoratif : c'est le seul endroit où l'on apprend
+// qu'une couverture jolie à l'écran peut être refusée par l'imprimeur. Amazon
+// KDP a renvoyé ce livre pour cette raison exacte — « l'image doit être
+// agrandie de 3,2 mm sur l'ensemble des bords ».
+const CADRAGES_COUV = {
+  contenir: {
+    bouton: "btnCadrageContenir",
+    note: "L'image entre entière ; le reste de la page prend la couleur de fond. " +
+          "Un imprimeur ou Amazon KDP peut refuser la couverture : l'illustration " +
+          "s'arrête avant la coupe."
+  },
+  remplir: {
+    bouton: "btnCadrageRemplir",
+    note: "L'image couvre toute la page, fond perdu compris — ce qu'exigent " +
+          "l'imprimeur et Amazon KDP. Les bords de l'image sortent du cadre."
+  }
+};
+
+function cadrageDe(data) {
+  return (data && data.cadrage === "remplir") ? "remplir" : "contenir";
+}
+
+function majControlesCadrage(data) {
+  const zone = document.getElementById("zoneCadrageImage");
+  if (!zone) return;
+  zone.style.display = "block";
+  const choisi = cadrageDe(data);
+  Object.keys(CADRAGES_COUV).forEach((cle) => {
+    const b = document.getElementById(CADRAGES_COUV[cle].bouton);
+    if (!b) return;
+    b.classList.toggle("actif", cle === choisi);
+    b.setAttribute("aria-pressed", cle === choisi ? "true" : "false");
+  });
+  const note = document.getElementById("noteCadrage");
+  if (note) {
+    note.textContent = CADRAGES_COUV[choisi].note;
+    note.classList.toggle("cadrage-alerte", choisi === "contenir");
+  }
+}
+
+function setCadrageCouv(valeur) {
+  const livre = livreActuel();
+  const data = modeCouverture === "couverture" ? livre.couverture : livre.quatrieme;
+  if (!data) return;
+  const nouveau = valeur === "remplir" ? "remplir" : "contenir";
+  if (cadrageDe(data) === nouveau) return;
+  data.cadrage = nouveau;
+  // Changer de cadrage change l'échelle de base : un zoom et un décalage
+  // hérités de l'autre mode n'y veulent plus rien dire, et l'image
+  // partirait hors du cadre. On repart du cadrage nu.
+  data.imgZoom = 1;
+  data.imgOffsetX = 0;
+  data.imgOffsetY = 0;
+  // imgBaseW/H mémorisent la boîte du dernier cadrage pour reporter le zoom
+  // d'un format à l'autre (voir adapterCadrageImage) : les garder ici ferait
+  // recalculer un report qui n'a plus lieu d'être.
+  delete data.imgBaseW;
+  delete data.imgBaseH;
+  marquerModifie();
+  previewCouverture();
 }
 
 function clampOffsetsCouv(data, largeurConteneur, hauteurConteneur) {
@@ -2203,7 +2268,8 @@ function positionnerImageApercu(img, data, url, page, chemin, dejaRetente) {
     const hauteurConteneur = page.clientHeight;
     if (!largeurConteneur || !hauteurConteneur) return;
     adapterCadrageImage(data, img, largeurConteneur, hauteurConteneur);
-    const echelleBase = Math.min(largeurConteneur / img.naturalWidth, hauteurConteneur / img.naturalHeight);
+    const echelleBase = echelleCadrage(
+      data, largeurConteneur, hauteurConteneur, img.naturalWidth, img.naturalHeight);
     const zoom = data.imgZoom || 1;
     const largeurAffichee = img.naturalWidth * echelleBase;
     const hauteurAffichee = img.naturalHeight * echelleBase;

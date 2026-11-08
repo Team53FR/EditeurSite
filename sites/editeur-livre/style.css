@@ -668,6 +668,52 @@ button.danger {
   margin: 4px 0 0 0;
 }
 
+/* Cadrage de l'image de couverture : contenir / remplir. Deux boutons
+   accolés plutôt qu'une liste — il n'y a que deux réponses, et elles
+   gagnent à être lisibles côte à côte. */
+.cadrage-couv {
+  margin-top: 6px;
+}
+
+.cadrage-choix {
+  display: flex;
+  gap: 0;
+}
+
+.cadrage-bouton {
+  flex: 1;
+  padding: 5px 8px;
+  font: inherit;
+  font-size: 12px;
+  border: 1px solid #ccc;
+  background: #fff;
+  color: #444;
+  cursor: pointer;
+}
+.cadrage-bouton:first-child  { border-radius: 6px 0 0 6px; }
+.cadrage-bouton:last-child   { border-radius: 0 6px 6px 0; border-left: none; }
+.cadrage-bouton:hover        { background: #f3f3f3; }
+.cadrage-bouton.actif {
+  background: #4a4a6a;
+  border-color: #4a4a6a;
+  color: #fff;
+}
+/* Le bouton actif garde sa bordure franche même à droite, où elle est
+   retirée pour accoler les deux. */
+.cadrage-bouton.actif:last-child { border-left: 1px solid #4a4a6a; }
+
+.cadrage-note {
+  font-size: 11px;
+  color: #888;
+  margin: 4px 0 0 0;
+  line-height: 1.35;
+}
+/* « Contenir » est un choix légitime à l'écran, mais c'est celui qui fait
+   refuser un fichier par l'imprimeur : la note le dit en couleur d'alerte. */
+.cadrage-note.cadrage-alerte {
+  color: #9a5b00;
+}
+
 .ligne-toggle {
   margin-top: 4px;
 }

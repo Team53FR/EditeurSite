@@ -656,6 +656,33 @@ async function marquerTutoVuDistant(champ) {
   }
 }
 
+// ===== Cadrage d'une image de couverture =====
+//
+// Deux façons de poser une image dans une page, et le choix n'est pas
+// qu'une affaire de goût :
+//
+//   « contenir » — l'image entre tout entière, au prix de bandes de couleur
+//       de fond sur deux côtés. C'était le seul mode jusqu'ici.
+//   « remplir »  — l'image couvre toute la page, fond perdu compris, au prix
+//       de ce qui dépasse du cadre.
+//
+// L'impression exige le second dès que l'illustration doit aller jusqu'au
+// bord : un imprimeur rogne à un millimètre près, et Amazon KDP refuse le
+// fichier dont l'image s'arrête avant la coupe. Avec « contenir », une photo
+// 16:10 sur une page de 15 × 21 cm laisse six centimètres d'aplat en tête et
+// en pied — mesuré, et c'est ce qui a fait refuser une couverture.
+//
+// Ici, dans script.js, parce que CINQ rendus lisent la même donnée :
+// l'éditeur, son aperçu, la liseuse, la vignette de la bibliothèque et
+// l'impression. Un cadrage qui ne vaudrait que pour l'un d'eux ferait mentir
+// l'écran sur le fichier imprimé — exactement le piège d'origine.
+function echelleCadrage(data, largeurBoite, hauteurBoite, largeurImage, hauteurImage) {
+  if (!largeurImage || !hauteurImage) return 1;
+  const sx = largeurBoite / largeurImage;
+  const sy = hauteurBoite / hauteurImage;
+  return (data && data.cadrage === "remplir") ? Math.max(sx, sy) : Math.min(sx, sy);
+}
+
 // ===== Mise en forme du titre / de l'auteur sur une couverture =====
 // Partagé par l'éditeur, l'aperçu, l'impression ET la vignette de la
 // bibliothèque, pour que les quatre rendus ne divergent jamais.

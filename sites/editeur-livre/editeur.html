@@ -435,6 +435,15 @@
 
             <label class="label-couv">Image de fond</label>
             <input type="file" id="inputImage" accept="image/*" onchange="chargerImageFond(event)" class="input-fichier">
+            <div class="cadrage-couv" id="zoneCadrageImage" style="display:none;">
+              <div class="cadrage-choix" role="group" aria-label="Cadrage de l'image">
+                <button type="button" id="btnCadrageContenir" class="cadrage-bouton"
+                        onclick="setCadrageCouv('contenir')">Contenir</button>
+                <button type="button" id="btnCadrageRemplir" class="cadrage-bouton"
+                        onclick="setCadrageCouv('remplir')">Remplir</button>
+              </div>
+              <p class="cadrage-note" id="noteCadrage"></p>
+            </div>
             <div class="zoom-controle" id="zoneZoomImage" style="display:none;">
               <span style="font-size:14px;">🔍</span>
               <input type="range" id="sliderZoom" min="0.3" max="3" step="0.01" value="1" oninput="setZoomImage(this.value)">

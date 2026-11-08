@@ -1233,7 +1233,10 @@ function positionnerImageImpression(img, data, f, boite) {
   const largPage = cadre.larg * MM_EN_PX;
   const hautPage = cadre.haut * MM_EN_PX;
 
-  const echelleBase = Math.min(largPage / img.naturalWidth, hautPage / img.naturalHeight);
+  // Même règle qu'à l'écran — « contenir » ou « remplir » (voir
+  // echelleCadrage). C'est ici que le choix décide si l'illustration atteint
+  // le fond perdu, donc si KDP accepte le fichier.
+  const echelleBase = echelleCadrage(data, largPage, hautPage, img.naturalWidth, img.naturalHeight);
   const largAffichee = img.naturalWidth * echelleBase;
   const hautAffichee = img.naturalHeight * echelleBase;
   const centreX = (largPage - largAffichee) / 2;
