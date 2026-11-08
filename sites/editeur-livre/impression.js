@@ -3220,6 +3220,13 @@ function textePastille(texte, chiffres) {
   return t;
 }
 
+// Un pourcentage de position, borné à 0..100. Zéro est une valeur légitime
+// (le bord haut ou gauche) : le test « > 0 » employé ailleurs la perdrait.
+function pourcentTranche(valeur, defaut) {
+  const n = Number(valeur);
+  return isFinite(n) ? Math.min(100, Math.max(0, n)) : defaut;
+}
+
 function donneesTranche(livre) {
   const t = (livre && livre.tranche) || {};
   const couv = (livre && livre.couverture) || {};
@@ -3239,6 +3246,18 @@ function donneesTranche(livre) {
     // Blocs facultatifs, dans l'ordre où ils se posent sur le dos.
     // Tous vides par défaut : un livre déjà écrit ne change pas d'aspect.
     bandeau: Number(t.bandeau) > 0 ? Number(t.bandeau) : 0,
+    // Cadrage de l'image DANS le bandeau. « remplir » recadre pour couvrir
+    // toute la bande : c'est ce que le bandeau a toujours fait, et ça reste
+    // le défaut. Un dos est étroit — souvent moins de deux centimètres — donc
+    // remplir y rogne énormément sur les côtés, au point de couper la tête
+    // d'un personnage. « contenir » fait entrer l'image entière, le reste de
+    // la bande prenant la couleur de fond du dos.
+    bandeauCadrage: t.bandeauCadrage === "contenir" ? "contenir" : "remplir",
+    // Quelle partie de l'image reste visible, en % (0 = gauche / haut,
+    // 100 = droite / bas). Par défaut le haut, centré : l'ancien
+    // « object-position: center top ».
+    bandeauPosX: pourcentTranche(t.bandeauPosX, 50),
+    bandeauPosY: pourcentTranche(t.bandeauPosY, 0),
     // Image du bandeau : la sienne si on lui en a donné une, sinon celle de
     // la couverture, qui se prolonge alors sur le dos.
     imageChemin: t.imageChemin || null,
@@ -3315,6 +3334,11 @@ function construireDosLivre(livre, dosMm, hautMm, promessesImages, debordMm) {
     // Le bandeau commence au bord de la feuille : le fond perdu en plus.
     bande.style.height = (r.bandeau + b) + "mm";
     const img = document.createElement("img");
+    // Le cadrage était figé dans la feuille de style (cover, center top) :
+    // sur un dos étroit, l'image s'y trouvait rognée des deux côtés sans
+    // aucun moyen de choisir ce qu'on gardait.
+    img.style.objectFit = r.bandeauCadrage === "contenir" ? "contain" : "cover";
+    img.style.objectPosition = r.bandeauPosX + "% " + r.bandeauPosY + "%";
     bande.appendChild(img);
     dos.appendChild(bande);
     chargerImageCouverture(img, cheminBandeau, promessesImages);
@@ -3495,6 +3519,15 @@ function ouvrirTranche() {
             '<input type="file" id="trImage" accept="image/*" hidden></label>' +
           '<button type="button" class="btn-lien" id="trImageRetirer">Retirer</button>' +
         "</div>" +
+        '<div class="tranche-duo">' +
+          '<label>Cadrage <select id="trBandeauCadrage">' +
+            '<option value="remplir">Remplir la bande</option>' +
+            '<option value="contenir">Image entière</option>' +
+          "</select></label>" +
+          nombre("trBandeauPosX", "Position ↔ (%)", d.bandeauPosX, 0, 100) +
+          nombre("trBandeauPosY", "Position ↕ (%)", d.bandeauPosY, 0, 100) +
+        "</div>" +
+        '<p class="aide-champ" id="trBandeauAide"></p>' +
         '<p class="aide-champ" id="trImageNote"></p>' +
       "</fieldset>" +
 
@@ -3583,6 +3616,7 @@ function ouvrirTranche() {
   document.body.appendChild(fond);
 
   fond.querySelector("#trSens").value = d.sens;
+  fond.querySelector("#trBandeauCadrage").value = d.bandeauCadrage;
   fond.querySelector("#trPastilleForme").value = d.pastilleForme;
   fond.querySelector("#trPastilleChiffres").value = d.pastilleChiffres;
 
@@ -3596,6 +3630,9 @@ function ouvrirTranche() {
     fond: val("trFond"),
     texte: val("trTexte"),
     bandeau: aImage ? num("trBandeau", 0) : 0,
+    bandeauCadrage: val("trBandeauCadrage"),
+    bandeauPosX: num("trBandeauPosX", d.bandeauPosX),
+    bandeauPosY: num("trBandeauPosY", d.bandeauPosY),
     pastille: val("trPastille"),
     pastilleFond: val("trPastilleFond"),
     pastilleTexte: val("trPastilleTexte"),
@@ -3710,6 +3747,19 @@ function ouvrirTranche() {
     const propre = !!t.imageChemin;
     const source = propre ? "sienne" : (aImage ? "couverture" : "aucune");
     fond.querySelector("#trBandeau").disabled = source === "aucune";
+    // Les réglages de cadrage n'ont rien à régler sans image, ni sans bandeau.
+    const sansBandeau = source === "aucune" || num("trBandeau", 0) <= 0;
+    ["trBandeauCadrage", "trBandeauPosX", "trBandeauPosY"].forEach((id) => {
+      fond.querySelector("#" + id).disabled = sansBandeau;
+    });
+    fond.querySelector("#trBandeauAide").textContent = sansBandeau
+      ? ""
+      : (val("trBandeauCadrage") === "contenir"
+          ? "L'image entière tient dans la bande ; ce qui reste prend la couleur de fond. "
+          : "L'image couvre toute la bande et déborde sur les côtés. ") +
+        "Un dos est étroit : « Remplir » y coupe beaucoup, souvent la tête d'un " +
+        "personnage. Les deux positions choisissent la partie gardée — ↔ 50 % " +
+        "et ↕ 0 % donnent le haut de l'image, centré.";
     fond.querySelector("#trImageRetirer").style.display = propre ? "" : "none";
     fond.querySelector("#trImageNote").textContent =
       source === "sienne"
@@ -3749,6 +3799,16 @@ function ouvrirTranche() {
     rafraichir();
   };
 
+  // L'aide du bandeau dépend de la hauteur demandée et du cadrage choisi :
+  // elle doit suivre ces deux champs, que le rafraîchissement de l'aperçu ne
+  // touche pas. (Posés ici, et pas plus haut : majImage n'existe qu'à partir
+  // de sa déclaration.)
+  ["trBandeau", "trBandeauCadrage"].forEach((id) => {
+    const c = fond.querySelector("#" + id);
+    c.addEventListener("input", majImage);
+    c.addEventListener("change", majImage);
+  });
+
   majImage();
   rafraichir();
 
@@ -3765,6 +3825,9 @@ function ouvrirTranche() {
     t.contenu = r.contenu.trim() === parDefaut ? "" : r.contenu;
 
     t.bandeau = r.bandeau;
+    t.bandeauCadrage = r.bandeauCadrage;
+    t.bandeauPosX = r.bandeauPosX;
+    t.bandeauPosY = r.bandeauPosY;
     t.pastille = r.pastille;
     t.pastilleFond = r.pastilleFond;
     t.pastilleTexte = r.pastilleTexte;
