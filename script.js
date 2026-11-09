@@ -49,6 +49,13 @@ const DEFAULT_SITES = [
     description: "Une image au recto, une grille de cartes à message au verso, prête à imprimer et découper.",
     icone: "🃏",
     pageArrivee: "sites/recto-verso/index.html"
+  },
+  {
+    id: "worldmap",
+    nom: "WorldMap",
+    description: "Dessinez des cartes de mondes et de régions de fantasy, avec un zoom infini pour tout détailler.",
+    icone: "🗺️",
+    pageArrivee: "sites/worldmap/index.html"
   }
 ];
 

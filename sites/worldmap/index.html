@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0d16">
+<title>WorldMap</title>
+<link rel="stylesheet" href="../../polices/polices.css">
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="../../icone-192.png">
+<link rel="apple-touch-icon" href="../../icone-192.png">
+</head>
+<body class="page-galerie">
+
+  <header class="entete-galerie">
+    <div>
+      <h1>WorldMap</h1>
+      <p>Dessinez des cartes de mondes et de régions de fantasy, et zoomez à l'infini pour en détailler chaque coin. Tout reste dans votre navigateur.</p>
+    </div>
+    <div class="actions-galerie">
+      <button type="button" class="btn btn-primaire" id="btnNouvelle">+ Nouvelle carte</button>
+      <button type="button" class="btn" id="btnImporter">Importer…</button>
+      <input type="file" id="fichierImport" accept=".json,application/json" hidden>
+    </div>
+  </header>
+
+  <main class="contenu-galerie">
+    <p class="message" id="message" role="status"></p>
+    <div class="grille-cartes" id="grille"></div>
+    <div class="vide" id="vide" hidden>
+      <p>Aucune carte pour l'instant.</p>
+      <p class="doux">Créez-en une vierge, ou laissez WorldMap générer un monde que vous retoucherez ensuite.</p>
+    </div>
+  </main>
+
+  <dialog id="dlgNouvelle" class="dialogue">
+    <form method="dialog" id="formNouvelle">
+      <h2>Nouvelle carte</h2>
+
+      <label class="champ">
+        <span>Nom</span>
+        <input type="text" id="nNom" maxlength="80" placeholder="Les Terres d'Aeran" autocomplete="off">
+      </label>
+
+      <fieldset class="champ-groupe">
+        <legend>Taille</legend>
+        <div class="choix" id="nTailles">
+          <button type="button" class="choix-btn" data-l="800" data-h="560"><strong>Région</strong><small>800 × 560 km</small></button>
+          <button type="button" class="choix-btn" data-l="2400" data-h="1680"><strong>Royaume</strong><small>2 400 × 1 680 km</small></button>
+          <button type="button" class="choix-btn actif" data-l="6000" data-h="4200"><strong>Continent</strong><small>6 000 × 4 200 km</small></button>
+          <button type="button" class="choix-btn" data-l="14000" data-h="9800"><strong>Monde</strong><small>14 000 × 9 800 km</small></button>
+        </div>
+        <div class="ligne-champs">
+          <label class="champ champ-court"><span>Largeur (km)</span><input type="number" id="nLarg" min="50" max="40000" value="6000"></label>
+          <label class="champ champ-court"><span>Hauteur (km)</span><input type="number" id="nHaut" min="50" max="40000" value="4200"></label>
+        </div>
+      </fieldset>
+
+      <fieldset class="champ-groupe">
+        <legend>Style</legend>
+        <div class="choix" id="nThemes">
+          <button type="button" class="choix-btn actif" data-theme="atlas"><span class="pastille" style="background:#3f7a9c"></span><strong>Atlas</strong><small>Mers bleues, couleurs franches</small></button>
+          <button type="button" class="choix-btn" data-theme="illustre"><span class="pastille" style="background:#e6cd97"></span><strong>Illustré</strong><small>Parchemin, côtes bleutées, relief</small></button>
+          <button type="button" class="choix-btn" data-theme="parchemin"><span class="pastille" style="background:#dac79d"></span><strong>Parchemin</strong><small>Papier ancien, teintes chaudes</small></button>
+        </div>
+      </fieldset>
+
+      <fieldset class="champ-groupe">
+        <legend>Départ</legend>
+        <div class="choix" id="nDepart">
+          <button type="button" class="choix-btn actif" data-depart="vide"><strong>Mer vide</strong><small>Une page blanche à peindre</small></button>
+          <button type="button" class="choix-btn" data-depart="aleatoire"><strong>Monde aléatoire</strong><small>Un continent à retoucher</small></button>
+        </div>
+      </fieldset>
+
+      <p class="message" id="nMessage" role="alert"></p>
+      <div class="actions-dialogue">
+        <button type="button" class="btn" id="nAnnuler">Annuler</button>
+        <button type="submit" class="btn btn-primaire" id="nCreer">Créer la carte</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="../../pied-legal.js"></script>
+  <script src="retour-portail.js"></script>
+  <script src="stockage.js"></script>
+  <script src="moteur.js"></script>
+  <script src="generateur.js"></script>
+  <script src="galerie.js"></script>
+</body>
+</html>

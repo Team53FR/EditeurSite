@@ -39,10 +39,14 @@ EditeurSite/
 │   │   ├── index.html
 │   │   ├── supabase/schema.sql
 │   │   └── ...
-│   └── recto-verso/      # site "Recto-verso" (image au recto, cartes à message au verso)
-│       ├── index.html    # tout se passe dans le navigateur : pas de base, pas de compte requis
-│       ├── style.css
-│       └── app.js
+│   ├── recto-verso/      # site "Recto-verso" (image au recto, cartes à message au verso)
+│   │   ├── index.html    # tout se passe dans le navigateur : pas de base, pas de compte requis
+│   │   ├── style.css
+│   │   └── app.js
+│   └── worldmap/         # site "WorldMap" (cartes de mondes et de régions de fantasy)
+│       ├── index.html    # galerie ; l'éditeur est editeur.html
+│       ├── moteur.js     # rendu vectoriel, zoom infini ; cartes en IndexedDB, pas de compte
+│       └── ...
 └── README.md
 ```
 
@@ -1720,6 +1724,93 @@ voyage jusqu'aux copies d'impression et dans le projet enregistré (valeurs hors
 projet d'avant la rotation lisible). **Non vérifié** :
 une vraie impression papier, la boîte d'impression du navigateur (page blanche en trop,
 sens du retournement de la feuille selon l'imprimante) et un téléphone réel.
+
+## WorldMap (cartes de fantasy)
+
+`sites/worldmap/` — un éditeur de cartes de mondes et de régions. Comme Recto-verso, tout se
+passe dans le navigateur : **pas de compte requis, rien n'est envoyé nulle part**. Les cartes
+vivent dans IndexedDB (`stockage.js` : un magasin `cartes` pour les cartes entières, un magasin
+`meta` pour la galerie, afin de ne pas relire des cartes complètes rien que pour les lister).
+Sauvegarde automatique 1,5 s après la dernière modification ; export PNG (2 048 à 8 192 px) et
+fichier `.worldmap.json` (réimportable depuis la galerie).
+
+| Fichier | Rôle |
+|---|---|
+| `index.html` / `galerie.js` | Galerie « Mes cartes » (tuiles à vignette), création (taille, style, mer vide ou monde aléatoire), import/export, duplication |
+| `editeur.html` / `editeur.js` | Éditeur : vue, outils, historique, panneaux, enregistrement, export |
+| `moteur.js` | Rendu (`Moteur.dessiner`), matériaux, décors, thèmes, types de lieux. Fonction pure : même rendu pour l'écran, les vignettes et les exports |
+| `generateur.js` | Monde aléatoire (bruit fractal), produit de vrais traits de pinceau |
+| `stockage.js` | IndexedDB |
+
+**Le zoom « infini » tient au vectoriel.** Une carte n'est pas une image : ce sont des objets en
+unités du monde (des **km**) — traits de pinceau, tracés, noms, lieux — redessinés à chaque
+image. Le pinceau se règle en **pixels écran** : zoomer avant de peindre donne un trait plus fin
+dans le monde, d'où le détail à volonté. Le niveau de zoom est plafonné à ×3 000 (1 pixel ≈ un
+mètre sur une carte de 6 000 km) : au-delà, les nombres flottants 32 bits du canvas ne suffisent
+plus à placer les points sans tremblement.
+
+**« Niveau » = zoom relatif à la vue d'ensemble** (`Moteur.zoomAjuste`) : 1 = la carte entière,
+10 = dix fois plus près. Il ne dépend ni de la taille de l'écran ni de celle de la carte, si bien
+que les lieux visibles à la vue d'ensemble le sont aussi sur un téléphone ou dans un export. Chaque
+type de lieu a son niveau d'apparition (capitale : toujours ; ville : ×0,6 ; village : ×2,5…),
+réglable lieu par lieu.
+
+**Terre et eau.** Les matériaux « terre » colorent ; « Eau » (et la gomme) **creuse** la terre déjà
+peinte, sur une couche à part. De là le trait de côte et le halo d'eau peu profonde, obtenus avec
+des ombres portées de la silhouette de la couche. Les décors (arbres, montagnes, collines, dunes…)
+sont semés le long du trait avec un hasard dérivé de (graine du trait, rang) : ils ne bougent pas
+quand on zoome, et ne sont pas dessinés quand ils feraient moins de 3 px.
+
+**Thèmes** (`Moteur.THEMES`) : Atlas, Parchemin et Illustré. Illustré va vers le rendu des cartes de
+fantasy peintes : la « mer » est le papier (taches accrochées au monde, bords sombres), le bleu ne
+vit qu'autour des côtes (ombre portée de la silhouette, deux passes), une falaise décalée vers le bas
+donne du relief à la terre, et un cadre à double filet orne les coins. Les décors ont été enrichis
+(arbres feuillus à trois verts, montagnes hachurées). Les lieux y sont de petits **dessins** au
+lieu de pictogrammes (`iconeIllustree` : château, ville, village, forteresse, port avec bateau,
+ruines, donjon, temple, tour, mine), chacun dans une boîte de 100 × 100 mise à l'échelle ;
+`Moteur.tailleIcone(lieu, theme)` et `Moteur.iconeAuto` choisissent pictogramme ou dessin selon le
+thème (`lieuxIllustres`), et l'éditeur s'en sert pour la sélection, le curseur et la palette.
+
+**Rivières qui serpentent.** Le tracé posé ne donne que le cours général : `serpenter()` (moteur.js)
+le lisse (Catmull-Rom, qui passe par les points posés) puis y ajoute des méandres — deux ondes de
+longueurs voisines, la longueur d'onde valant une quinzaine de largeurs de rivière, le décalage
+s'éteignant aux deux bouts pour que source et embouchure restent où l'on a cliqué. Déterministe
+(graine = identifiant) et mis en cache par rivière (`WeakMap`). Champs de la ligne : `meandre`
+(0 à 1, 0 = droite) et `delta` (la rivière passe de 35 % à 125 % de sa largeur, tracée par
+tronçons, contours d'abord pour éviter les raccords). `Moteur.pointsAffiches(ligne)` donne le tracé
+tel qu'il est dessiné : c'est lui, et non les points de contrôle, que l'éditeur utilise pour cliquer
+une rivière. Les rivières sans ces champs (cartes d'avant) restent droites.
+
+**Terrain** : « Volcan » (aiguilles d'obsidienne, fissures de lave, cailloux sombres), massifs de
+montagnes (un grand pic entre deux petits), forêts en canopée plus dense. Le monde aléatoire
+normalise l'altitude sur le sommet de la carte (sinon les cimes recouvraient presque tout ou rien),
+pose un volcan sur un massif et fait **descendre des rivières** de la montagne à la mer en suivant
+la pente (voisin le plus bas encore inexploré, rejet des tracés qui tournent en rond).
+
+**Murailles, navires, côtes.** Le tracé « Muraille » dessine une ombre au sol, un contour, la
+pierre, des créneaux en tirets sur le faîte, puis des tours à toit conique aux deux bouts et tous
+les neuf largeurs (`tracerMuraille`, qui réutilise `tourPierre` des lieux illustrés ; trop petites
+à l'écran, tours et créneaux disparaissent). « Navire » est un type de lieu (dessin : coque,
+deux voiles, fanion, sillage d'écume). Les **vagues** du thème Illustré (`th.vagues`) sont des
+filets à distance fixe en pixels de la côte : la silhouette de la terre est élargie (copies
+décalées dans 12 directions) puis amputée de la même silhouette moins épaisse, il reste un
+anneau, teinté ; travaillé à demi-résolution. Les disques d'un **nuage** (monde généré) sont
+tracés comme des polygones irréguliers (rayon de 78 à 112 %, graine du trait) : les côtes
+gagnent des anses et des caps au lieu d'une suite de cercles. Le monde aléatoire pose aussi
+quelques îlots et des navires en pleine mer (loin du cadre, des côtes et les uns des autres).
+
+**Pendant un déplacement**, le rendu passe en mode « rapide » (sans décors ni effets) puis se
+redessine en entier 170 ms après le dernier geste.
+
+Textes et icônes sont dessinés en pixels écran, après le reste : nets à toute échelle, et sans les
+problèmes de très petites polices des canvas.
+
+**Ajouté au portail** (`DEFAULT_SITES`, id `worldmap`). Comme Recto-verso, il ne lit pas la session
+et ne touche pas Supabase ; l'entrée du tableau de bord reste soumise à `acces` comme les autres.
+
+**Pistes** : minicarte, courbes de niveau, texte courbe suivant un tracé, calques, biomes qui se
+fondent, mode « région » détaillé à partir d'un détail de la grande carte, synchronisation avec
+un compte (Supabase) pour retrouver ses cartes d'un appareil à l'autre.
 
 ## Favicon
 
