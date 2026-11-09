@@ -160,6 +160,7 @@
         carte.lignes = Array.isArray(carte.lignes) ? carte.lignes : [];
         carte.etiquettes = Array.isArray(carte.etiquettes) ? carte.etiquettes : [];
         carte.lieux = Array.isArray(carte.lieux) ? carte.lieux : [];
+        carte.lacs = Array.isArray(carte.lacs) ? carte.lacs : [];
         carte.id = Stockage.nouvelId();
         carte.nom = String(carte.nom || "Carte importée").slice(0, 80);
         carte.majLe = Date.now();
@@ -224,7 +225,7 @@
       largeur: largeur,
       hauteur: hauteur,
       theme: actif($("nThemes"), "data-theme") || "atlas",
-      traits: [], lignes: [], etiquettes: [], lieux: [],
+      traits: [], lignes: [], etiquettes: [], lieux: [], lacs: [],
       vue: null,
       creeLe: Date.now(),
       majLe: Date.now(),

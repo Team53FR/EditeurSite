@@ -1799,8 +1799,98 @@ tracés comme des polygones irréguliers (rayon de 78 à 112 %, graine du trait)
 gagnent des anses et des caps au lieu d'une suite de cercles. Le monde aléatoire pose aussi
 quelques îlots et des navires en pleine mer (loin du cadre, des côtes et les uns des autres).
 
-**Pendant un déplacement**, le rendu passe en mode « rapide » (sans décors ni effets) puis se
-redessine en entier 170 ms après le dernier geste.
+**Décors peints.** Arbres, conifères, pics, collines, dunes, marais et herbes sont peints **une seule
+fois** dans de petits canvas (`peintArbre`, `peintMontagne`…) : dégradés, ombre au sol, touches de
+lumière, pas de contour de dessin animé. On les colle ensuite par centaines (`colle`), avec quatre
+définitions (64 à 512 px) choisies d'après le zoom (`ZPX`). Plus beau, et plus rapide que de retracer
+chaque arbre. Seul le volcan reste en vectoriel.
+
+**Pose des décors (`semer` puis `poserDecors`).** Les décors de tous les traits sont d'abord semés,
+puis posés ensemble, avec trois règles : un décor ne pousse que là où son terrain est resté visible
+(le masque le dit : pas sous un terrain peint après lui, ni dans l'eau, un lac, une rivière, ni sur
+une route) ; il ne chevauche pas ses voisins (les plus grands d'abord, `espace` par type) ; on peint
+du fond vers l'avant, tous terrains confondus. Les montagnes sont des arêtes à deux ou trois sommets,
+neige suivant le relief. **Transitions** : `fondreTransitions` recopie la couche de terre floutée par-
+dessus elle-même en « source-atop » — les couleurs se mélangent aux frontières, la côte reste nette.
+
+**Masque des matériaux.** Canal rouge : le terrain (code par matériau) ; transparent : l'eau — mer,
+gomme, mais aussi lacs et rivières, creusés un peu plus larges que le dessin ; canal vert : les routes
+et leurs abords, AJOUTÉES en « lighter » sans rien effacer (sous une route, l'eau reste de l'eau).
+Résolution : moitié de l'écran, une lecture de pixels par image.
+
+**Routes et ponts.** « Route » (terre battue : bas-côtés sombres, chaussée, milieu usé, ornières) et
+« Sentier » (pointillé) ondulent légèrement d'elles-mêmes (`forceMeandres`). Un **pont** est la route
+elle-même au-dessus de l'eau : `dessinerPonts` suit la route, repère au masque les tronçons sur l'eau
+(mer, lac, rivière), réunit ceux que sépare moins de trois largeurs de terre (une rivière qui serpente
+ne donne qu'un pont), les prolonge un peu sur les rives, et trace le tablier le long de ce tronçon —
+courbe comprise (`pontLe` : garde-corps, planches en pointillé perpendiculaire, poteaux).
+
+**Cohérence (voies, lacs, détails).** Le masque des matériaux déborde de l'écran d'un cinquième de
+chaque côté, et `materiauEn` distingue « eau » (null) de « inconnu » (undefined, hors masque) : la
+confusion faisait naître des ponts au bord de l'écran. Les voies sont tracées ensemble, couche par
+couche (`tracerVoies` : bas-côtés, chaussées, milieux, ornières), si bien qu'un embranchement se fond
+dans la route qu'il rejoint ; dans l'éditeur, un point posé près d'une voie (ou d'une rivière pour
+une rivière) s'y **accroche** (`accrocher`, anneau doré sous le curseur). Les **lacs** sont peints
+dans la couche de terre en « source-atop » : ils n'existent que sur la terre (jamais sur la mer ni
+le trait de côte) et passent sous les arbres de la rive. Les **détails du zoom** (`preparerDetails`)
+sont choisis avant les décors, qui s'en écartent (`genePourDetails`) ; leur taille suit celle de leur
+case (38 à 110 px), et chacun est relié par un chemin à la voie la plus proche, sinon au lieu voisin,
+seulement si le chemin reste à terre — il n'y a plus de réseau de chemins tiré au hasard.
+
+**Eaux douces.** Lacs et rivières **creusent la terre** comme la mer (`creuserEaux`) : la côte, le halo
+et la falaise les bordent d'eux-mêmes, et là où une rivière ou un lac touche la mer il n'y a plus de
+frontière. Pour les thèmes dont la mer est du papier (Illustré, Parchemin), `eauxDouces` peint leur eau
+SOUS la terre (visible seulement dans le creux) ; le thème Atlas n'en a pas besoin. Une seule forme
+de rivière (`traceRiviereEau`) sert au creusement, à l'eau douce et au masque.
+
+**Petits lieux stables.** `terrainEn(carte, x, y)` répond sans écran ni masque (index en grille de
+chaque trait, `indexTrait`), si bien qu'un petit lieu ne dépend que de sa case (octave, colonne,
+rangée) : il apparaît en fondu quand son octave devient assez grande, puis ne bouge plus. Son chemin
+mène à la voie la plus proche, sinon au petit lieu le plus proche d'une octave aussi grossière ou plus
+— jamais plus fine : en zoomant, les nouveaux lieux s'accrochent aux anciens et aucun chemin ne
+change de destination. Deux cases de marge autour de l'écran : le chemin d'un lieu hors champ reste
+visible.
+
+**Lacs** : contours fermés (`carte.lacs`), dessinés à main levée avec l'outil Lacs (K), puis déplaçables,
+remodelables (sommets, double-clic pour en ajouter) et redimensionnables. Rive de sable, eau en
+dégradé, ombre intérieure, rides.
+
+**Détails qui apparaissent en zoomant** (`dessinerDetails`) : chemins, cabanes, campements, fermes,
+menhirs, grottes, ruines, oasis, cabanes sur pilotis. Rien n'est enregistré : tout vient d'une graine
+(identifiant de la carte) dans une grille d'« octaves » (chaque octave est deux fois plus fine, et
+n'apparaît, en fondu, que si ses cases font au moins 96 px). Le matériau sous chaque point vient du
+**masque des matériaux** (`construireMasque`) : tous les traits repeints en petit, chacun d'une
+couleur-code, puis une seule lecture de pixels par image. Les chemins relient les bords actifs de
+chaque case à son centre ; les bords étant partagés entre cases voisines, les chemins sont continus.
+Seulement à partir du niveau ×2,8 et jamais pendant un déplacement.
+
+**Interface** : thème « atelier du cartographe » en CSS pur (bois à fibres, parchemin au bruit SVG
+intégré, filets d'or, sceaux de cire, boutons de laiton), icônes d'outils en SVG.
+
+**Clic droit sur un lieu** : menu *Renommer / Éditer la ville / Supprimer* (`ouvrirMenu`). « Éditer la
+ville » crée au premier appel la **carte du lieu** (`carteDuLieu` : une plaine à l'échelle du lieu,
+de 0,3 à 4 km selon le type, même style que la carte mère ; le trait de fond porte `sansDecor` pour
+ne pas semer des touffes géantes) et la relie : `lieu.carteId` côté mère, `carte.parent = { carteId,
+lieuId, nom }` côté fille, d'où le bouton « ↑ Carte mère » dans la barre. Les appels suivants
+rouvrent la carte ; si elle a été supprimée, elle est recréée. La carte courante est enregistrée
+avant de changer de page (`allerVers`).
+
+**Outils** : après avoir posé un lieu ou un nom, on revient à l'outil Sélection (sinon le fantôme de
+l'icône restait collé au curseur) ; Échap quitte aussi l'outil. Le cercle de sélection d'un lieu, ou
+le cadre d'un nom, n'est plus dessiné quand l'objet est masqué par le zoom.
+
+**Fluidité.** L'éditeur calcule le rendu complet dans une image de travail plus grande que l'écran
+(marge de 15 % de chaque côté) et la recopie à l'écran. Pendant un geste (déplacement, molette,
+pincement), il ne recalcule rien : il recopie cette même image décalée et mise à l'échelle — moins
+d'une milliseconde, et c'est la vraie carte, pas un brouillon simplifié qui changerait d'aspect. Le
+rendu complet (environ 75 ms) suit 140 ms après le dernier geste. Le mode `rapide` du moteur n'est
+plus utilisé par l'éditeur.
+
+**Eau douce du style Illustré** : peinte à part puis gardée seulement dans le contour de la terre
+d'avant le creusement (une rivière tracée jusqu'à la mer n'y déborde plus en pointe). La mer de ce
+style est un bleu-gris de vieille carte au large et un bleu franc le long des côtes, le même que les
+rivières. Les chemins entre deux petits lieux ont un coude qui dépend de la paire, pas du sens : deux
+lieux qui se choisissent l'un l'autre n'ont qu'un seul chemin.
 
 Textes et icônes sont dessinés en pixels écran, après le reste : nets à toute échelle, et sans les
 problèmes de très petites polices des canvas.

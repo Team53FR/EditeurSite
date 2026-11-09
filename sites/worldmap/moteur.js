@@ -30,22 +30,25 @@
     atlas: {
       nom: "Atlas", mer: "#3f7a9c", mer2: "#336a8a", glow: "rgba(160,214,232,0.62)",
       encre: "#1f2a33", hors: "#10151a", halo: "rgba(240,246,248,0.78)", teinte: null,
-      riviere: "#2f77a6", route: "#7a5230", texteMer: "#1d4a68",
+      riviere: "#2f77a6", route: "#7a5230", texteMer: "#1d4a68", lacClair: "#6fb3e0", lacFonce: "#2f6fa6",
       grille: "rgba(255,255,255,0.22)", cadre: "#0b0f13"
     },
     parchemin: {
       nom: "Parchemin", mer: "#dac79d", mer2: "#cdb98c", glow: "rgba(238,226,192,0.85)",
       encre: "#3a2a1a", hors: "#1d1710", halo: "rgba(243,230,196,0.82)", teinte: "rgba(226,190,124,0.42)",
-      riviere: "#587f8f", route: "#5a3d22", texteMer: "#566b6b",
+      riviere: "#587f8f", route: "#5a3d22", texteMer: "#566b6b", lacClair: "#9ab9c0", lacFonce: "#587f8f", eauDouce: "#7f9fa6",
       grille: "rgba(58,42,26,0.22)", cadre: "#2a1d10"
     },
     // Le style des cartes illustrées : la « mer » est le parchemin lui-même, le
     // bleu ne vit qu'autour des côtes ; la terre a une falaise, un cadre orné.
     illustre: {
-      nom: "Illustré", mer: "#e6cd97", mer2: "#dcbf84",
-      glow: "rgba(30,116,214,0.92)", glowPx: 44, glowDouble: true,
+      // La mer : un bleu-gris de vieille carte au large (on voit bien que c'est de l'eau), un
+      // bleu franc le long des côtes — le même que l'eau des rivières, pour qu'elles s'y
+      // jettent sans frontière.
+      nom: "Illustré", mer: "#a9bec0", mer2: "#91aab3",
+      glow: "rgba(36,112,200,0.95)", glowPx: 64, glowDouble: true,
       encre: "#2a1c0e", hors: "#1d1710", halo: "rgba(246,234,204,0.88)", teinte: "rgba(235,200,130,0.26)",
-      riviere: "#2f86d6", route: "#6b4a2b", texteMer: "#2c5d91",
+      riviere: "#2f86d6", route: "#6b4a2b", texteMer: "#2c5d91", lacClair: "#4f9fe0", lacFonce: "#1f6cc2", eauDouce: "#2f7cc9",
       grille: "rgba(58,42,26,0.25)", cadre: "#3a2a14",
       falaise: "#3a2a14", papier: true, orne: true, lieuxIllustres: true,
       vagues: [{ r: 10, a: 0.5 }, { r: 22, a: 0.28 }], vagueCouleur: "rgb(16,64,140)"
@@ -60,7 +63,7 @@
     { id: "taiga",    nom: "Taïga",          couleur: "#4f7f5c", decor: "taiga",    type: "terre" },
     { id: "colline",  nom: "Collines",       couleur: "#b6b46c", decor: "colline",  type: "terre" },
     { id: "montagne", nom: "Montagnes",      couleur: "#9a9486", decor: "montagne", type: "terre" },
-    { id: "cime",     nom: "Cimes neigeuses", couleur: "#e4eaec", decor: "cime",    type: "terre" },
+    { id: "cime",     nom: "Cimes neigeuses", couleur: "#d6dde0", decor: "cime",    type: "terre" },
     { id: "volcan",   nom: "Volcan",         couleur: "#8a6b49", decor: "volcan",   type: "terre" },
     { id: "desert",   nom: "Désert",         couleur: "#e0c887", decor: "dune",     type: "terre" },
     { id: "steppe",   nom: "Steppe",         couleur: "#c9b872", decor: "herbe",    type: "terre" },
@@ -72,140 +75,234 @@
   var MAT = {};
   MATERIAUX.forEach(function (m) { MAT[m.id] = m; });
 
-  // ----- Décors : les petits dessins semés sur un trait -----
-  // Tous se dessinent en coordonnées du monde, centrés sur (x, y), de taille s.
-  function cercle(ctx, x, y, r) { ctx.moveTo(x + r, y); ctx.arc(x, y, r, 0, TAU); }
+  // ----- Décors : peints une fois, semés ensuite -----
+  //
+  // Chaque décor (arbre, conifère, pic, colline, dune…) est PEINTÉ une seule fois dans un
+  // petit canvas — dégradés, ombre au sol, touches de lumière, aucun contour de dessin
+  // animé — puis simplement collé des centaines de fois. C'est plus beau, et bien plus
+  // rapide que de retracer chaque arbre à chaque image. Quatre définitions (64, 128, 256
+  // et 512 px) suivent le zoom, pour que rien ne devienne flou en s'approchant.
+  var SPRITES = {};
+  var ZPX = 1;   // pixels de l'appareil par unité du monde, pendant le rendu en cours
 
-  // Un arbre feuillu : une touffe de disques, trois verts au hasard, une lumière
-  // en haut à gauche et une ombre en bas.
-  function foret(ctx, x, y, s, r) {
-    if (r > 0.88) { taiga(ctx, x, y, s, r); return; }
-    ctx.lineWidth = s * 0.06;
-    ctx.fillStyle = r < 0.3 ? "#376d34" : r < 0.6 ? "#3f7c3a" : "#336636";
-    ctx.strokeStyle = "rgba(18,42,16,0.92)";
-    ctx.beginPath();
-    cercle(ctx, x - s * 0.2, y - s * 0.02, s * 0.3);
-    cercle(ctx, x + s * 0.2, y - s * 0.02, s * 0.3);
-    cercle(ctx, x, y - s * 0.27, s * 0.34);
-    cercle(ctx, x - s * 0.08, y + s * 0.1, s * 0.28);
-    cercle(ctx, x + s * 0.1, y + s * 0.1, s * 0.27);
-    ctx.fill();
-    ctx.stroke();
-    ctx.fillStyle = "rgba(14,36,14,0.32)";
-    ctx.beginPath();
-    cercle(ctx, x + s * 0.12, y + s * 0.14, s * 0.2);
-    ctx.fill();
-    ctx.fillStyle = "rgba(196,232,128,0.26)";
-    ctx.beginPath();
-    cercle(ctx, x - s * 0.1, y - s * 0.34, s * 0.17);
-    cercle(ctx, x - s * 0.24, y - s * 0.06, s * 0.1);
-    ctx.fill();
+  function tailleSprite(px) { return px <= 64 ? 64 : px <= 128 ? 128 : px <= 256 ? 256 : 512; }
+
+  function spriteCanvas(type, v, S) {
+    var cle = type + "|" + v + "|" + S;
+    if (SPRITES[cle]) return SPRITES[cle];
+    var c = document.createElement("canvas");
+    c.width = c.height = S;
+    var g = c.getContext("2d");
+    g.translate(S / 2, S / 2);
+    g.scale(S / 100, S / 100);          // une boîte de 100 × 100 centrée ; le sol est vers y = +31
+    g.lineJoin = g.lineCap = "round";
+    PEINTRES[type](g, v);
+    SPRITES[cle] = c;
+    return c;
   }
 
-  function taiga(ctx, x, y, s) {
-    ctx.lineWidth = s * 0.08;
-    ctx.fillStyle = "#2f6a45";
-    ctx.strokeStyle = "rgba(18,44,28,0.9)";
-    ctx.beginPath();
-    ctx.moveTo(x, y - s * 0.55);
-    ctx.lineTo(x + s * 0.3, y + s * 0.3);
-    ctx.lineTo(x - s * 0.3, y + s * 0.3);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
+  function ombreDecor(g, cx, cy, rx, ry, a) {
+    g.fillStyle = "rgba(14,26,10," + a + ")";
+    g.beginPath(); g.ellipse(cx, cy, rx, ry, 0, 0, TAU); g.fill();
   }
 
-  function colline(ctx, x, y, s) {
-    ctx.lineWidth = s * 0.07;
-    ctx.strokeStyle = "rgba(70,62,30,0.85)";
-    ctx.fillStyle = "rgba(210,206,128,0.95)";
-    ctx.beginPath();
-    ctx.moveTo(x - s * 0.5, y + s * 0.18);
-    ctx.quadraticCurveTo(x, y - s * 0.6, x + s * 0.5, y + s * 0.18);
-    ctx.fill();
-    ctx.stroke();
-  }
-
-  function pic(ctx, x, y, s, r, neige) {
-    var w = s * (0.55 + r * 0.2), h = s * (0.62 + r * 0.25);
-    ctx.lineJoin = "round";
-    ctx.lineWidth = s * 0.06;
-    ctx.strokeStyle = "rgba(52,48,40,0.95)";
-    ctx.fillStyle = neige ? "#dfe6e8" : "#a39d8d";
-    ctx.beginPath();
-    ctx.moveTo(x - w, y + h * 0.5);
-    ctx.lineTo(x, y - h * 0.5);
-    ctx.lineTo(x + w, y + h * 0.5);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = neige ? "#aebbc2" : "#7d7767";
-    ctx.beginPath();
-    ctx.moveTo(x, y - h * 0.5);
-    ctx.lineTo(x + w, y + h * 0.5);
-    ctx.lineTo(x + w * 0.12, y + h * 0.5);
-    ctx.closePath();
-    ctx.fill();
-    // Hachures sur la face dans l'ombre, parallèles à son arête claire.
-    ctx.lineWidth = s * 0.035;
-    ctx.strokeStyle = neige ? "rgba(70,86,98,0.55)" : "rgba(34,30,24,0.5)";
-    ctx.beginPath();
-    var sommetY = y - h * 0.5, baseY = y + h * 0.5;
-    [0.34, 0.56, 0.78].forEach(function (t) {
-      ctx.moveTo(x + (w - 0) * t, sommetY + (baseY - sommetY) * t);
-      ctx.lineTo(x + w * 0.12 * t, sommetY + (baseY - sommetY) * t);
+  function peintArbre(g, v) {
+    var R = function (i) { return alea(500 + v, i); };
+    var T = [["#a8cc5c", "#548f39", "#27552b"], ["#b4cf62", "#5f9c3b", "#2f5e2c"], ["#8fb74f", "#498638", "#224a2c"],
+             ["#c0d46c", "#68a23f", "#376531"], ["#9abf56", "#4f8e3c", "#26522c"]][v % 5];
+    ombreDecor(g, 7, 29, 31, 8, 0.4);
+    g.fillStyle = "#4b3623";
+    g.beginPath(); g.moveTo(-3.6, 31); g.lineTo(-2.2, 4); g.lineTo(2.2, 4); g.lineTo(3.6, 31); g.closePath(); g.fill();
+    [[-17, 3, 23], [17, 1, 22], [-9, 15, 20], [11, 14, 19], [0, -19, 26], [0, -3, 25]].forEach(function (b, i) {
+      var cx = b[0] + (R(i) - 0.5) * 6, cy = b[1] + (R(i + 9) - 0.5) * 6, r = b[2] * (0.9 + R(i + 18) * 0.2);
+      var gr = g.createRadialGradient(cx - r * 0.3, cy - r * 0.38, r * 0.1, cx, cy, r);
+      gr.addColorStop(0, T[0]); gr.addColorStop(0.55, T[1]); gr.addColorStop(1, T[2]);
+      g.fillStyle = gr;
+      g.beginPath(); g.arc(cx, cy, r, 0, TAU); g.fill();
     });
-    ctx.stroke();
-    ctx.lineWidth = s * 0.06;
-    ctx.strokeStyle = "rgba(52,48,40,0.95)";
-    ctx.beginPath();
-    ctx.moveTo(x - w, y + h * 0.5);
-    ctx.lineTo(x, y - h * 0.5);
-    ctx.lineTo(x + w, y + h * 0.5);
-    ctx.closePath();
-    ctx.stroke();
-    if (!neige) {
-      ctx.fillStyle = "#f4f7f8";
-      ctx.beginPath();
-      ctx.moveTo(x, y - h * 0.5);
-      ctx.lineTo(x - w * 0.26, y - h * 0.5 + h * 0.28);
-      ctx.lineTo(x + w * 0.04, y - h * 0.5 + h * 0.2);
-      ctx.lineTo(x + w * 0.26, y - h * 0.5 + h * 0.28);
-      ctx.closePath();
-      ctx.fill();
+    for (var i = 0; i < 30; i++) {          // le feuillage : des touches claires et sombres
+      var a = R(40 + i) * TAU, d = Math.sqrt(R(80 + i)) * 31;
+      g.fillStyle = i % 3 ? "rgba(218,240,132,0.3)" : "rgba(10,38,14,0.3)";
+      g.beginPath(); g.ellipse(Math.cos(a) * d, -5 + Math.sin(a) * d * 0.85, 3.3, 2.2, R(120 + i) * 3, 0, TAU); g.fill();
     }
   }
-  // Un pic seul, ou — une fois sur cinq — un massif : un grand pic encadré de deux
-  // plus petits, ce qui donne aux chaînes de montagnes leur rythme irrégulier.
-  function montagne(ctx, x, y, s, r) {
-    if (r > 0.8) {
-      pic(ctx, x - s * 0.5, y + s * 0.14, s * 0.55, r, false);
-      pic(ctx, x + s * 0.52, y + s * 0.12, s * 0.5, 1 - r, false);
-      pic(ctx, x, y - s * 0.02, s * 1.2, r, false);
-    } else pic(ctx, x, y, s, r, false);
-  }
-  function cime(ctx, x, y, s, r) { pic(ctx, x, y, s, r, true); }
 
-  function dune(ctx, x, y, s) {
-    ctx.lineWidth = s * 0.07;
-    ctx.lineCap = "round";
-    ctx.strokeStyle = "rgba(150,118,52,0.85)";
-    ctx.beginPath();
-    ctx.moveTo(x - s * 0.5, y + s * 0.1);
-    ctx.quadraticCurveTo(x - s * 0.2, y - s * 0.3, x, y + s * 0.05);
-    ctx.quadraticCurveTo(x + s * 0.2, y + s * 0.3, x + s * 0.5, y - s * 0.05);
-    ctx.stroke();
+  function peintConifere(g, v) {
+    var R = function (i) { return alea(600 + v, i); };
+    ombreDecor(g, 6, 29, 26, 7, 0.4);
+    g.fillStyle = "#44301f"; g.fillRect(-2.6, 20, 5.2, 11);
+    for (var k = 0; k < 4; k++) {
+      var y0 = 27 - k * 16.5, w = 29 - k * 6 + (R(k) - 0.5) * 3, h = 25;
+      var gr = g.createLinearGradient(-w, 0, w, 0);
+      gr.addColorStop(0, "#63a06a"); gr.addColorStop(0.5, "#2f6a42"); gr.addColorStop(1, "#173c29");
+      g.fillStyle = gr;
+      g.beginPath();
+      g.moveTo(0, y0 - h);
+      g.lineTo(w, y0 - 1.5);
+      for (var j = 4; j >= 0; j--) g.lineTo(-w + (2 * w) * j / 4, y0 + (j % 2 ? 2.5 : -1.5));
+      g.closePath(); g.fill();
+      g.strokeStyle = "rgba(190,230,170,0.22)"; g.lineWidth = 1.2;
+      g.beginPath(); g.moveTo(0, y0 - h + 2); g.lineTo(-w * 0.78, y0 - 3); g.stroke();
+    }
   }
 
-  function marais(ctx, x, y, s) {
-    ctx.lineWidth = s * 0.07;
-    ctx.lineCap = "round";
-    ctx.strokeStyle = "rgba(48,78,52,0.9)";
-    ctx.beginPath();
-    ctx.moveTo(x - s * 0.15, y + s * 0.1); ctx.lineTo(x - s * 0.2, y - s * 0.3);
-    ctx.moveTo(x, y + s * 0.1); ctx.lineTo(x, y - s * 0.4);
-    ctx.moveTo(x + s * 0.15, y + s * 0.1); ctx.lineTo(x + s * 0.2, y - s * 0.3);
-    ctx.moveTo(x - s * 0.4, y + s * 0.18); ctx.lineTo(x + s * 0.4, y + s * 0.18);
-    ctx.stroke();
+  // Une arête, pas un cône : deux ou trois sommets d'inégale hauteur, une silhouette
+  // irrégulière, la face au soleil (à gauche) claire et l'autre dans l'ombre, des ravines,
+  // et une neige qui suit le relief au lieu d'un chapeau posé dessus.
+  function peintMontagne(g, v, neige) {
+    var R = function (i) { return alea(700 + v + (neige ? 50 : 0), i); };
+    var base = 31, W = 46, i;
+    var nb = 2 + Math.floor(R(1) * 2);
+    var sommets = [];
+    for (i = 0; i < nb; i++) {
+      if (i === 0) sommets.push({ x: (R(2) - 0.5) * 10, h: 60 + R(4) * 14, w: 30 + R(6) * 8 });
+      else sommets.push({ x: (i % 2 ? -1 : 1) * (15 + R(3 + i) * 12), h: 30 + R(5 + i) * 18, w: 17 + R(7 + i) * 8 });
+    }
+    var N = 46, prof = [];
+    for (i = 0; i <= N; i++) {
+      var x = -W + 2 * W * i / N, h = 0;
+      sommets.forEach(function (s) {
+        var hh = s.h * Math.max(0, 1 - Math.pow(Math.abs(x - s.x) / s.w, 1.15));
+        if (hh > h) h = hh;
+      });
+      if (h > 0) h += (R(20 + i) - 0.5) * 3.4 * Math.min(1, h / 12);
+      prof.push([x, base - Math.max(0, h)]);
+    }
+    var silhouette = function () {
+      g.beginPath();
+      g.moveTo(-W, base);
+      prof.forEach(function (p) { g.lineTo(p[0], p[1]); });
+      g.lineTo(W, base);
+      g.closePath();
+    };
+    ombreDecor(g, 8, 30, 46, 8, 0.28);
+    var gr = g.createLinearGradient(-W, -40, W, 30);
+    gr.addColorStop(0, "#d3ccb8"); gr.addColorStop(0.55, "#a39a85"); gr.addColorStop(1, "#6a6252");
+    silhouette(); g.fillStyle = gr; g.fill();
+    g.save();
+    silhouette(); g.clip();
+    sommets.forEach(function (s) {
+      g.fillStyle = "rgba(34,28,20,0.3)";                      // le versant à l'ombre
+      g.beginPath(); g.moveTo(s.x, base - s.h - 2); g.lineTo(s.x + s.w * 1.05, base); g.lineTo(s.x + s.w * 0.08, base); g.closePath(); g.fill();
+      g.strokeStyle = "rgba(255,250,235,0.35)"; g.lineWidth = 1.2; // l'arête éclairée
+      g.beginPath(); g.moveTo(s.x, base - s.h); g.lineTo(s.x + s.w * 0.08, base - s.h * 0.35); g.stroke();
+    });
+    g.strokeStyle = "rgba(40,34,26,0.28)"; g.lineWidth = 1;     // les ravines
+    g.beginPath();
+    for (i = 0; i < 10; i++) {
+      var s0 = sommets[i % nb], x1 = s0.x + (R(60 + i) - 0.5) * s0.w * 0.6, y1 = base - s0.h * (0.5 + R(70 + i) * 0.3);
+      g.moveTo(x1, y1);
+      g.quadraticCurveTo(x1 + (R(80 + i) - 0.5) * 6, (y1 + base) / 2, x1 + (R(90 + i) - 0.3) * 14, base - 2);
+    }
+    g.stroke();
+    var limite = neige ? 0.42 : 0.7;                             // au-dessus de cette fraction, il neige
+    sommets.forEach(function (s, k) {
+      if (!neige && k > 0 && s.h < 44) return;                  // les petits sommets restent nus
+      var hNeige = s.h * limite;
+      var haut = prof.filter(function (p) { return base - p[1] > hNeige && Math.abs(p[0] - s.x) < s.w; });
+      if (haut.length < 2) return;
+      var gn = g.createLinearGradient(s.x - s.w * 0.5, base - s.h, s.x + s.w * 0.6, base - hNeige);
+      gn.addColorStop(0, "#ffffff"); gn.addColorStop(1, "#c3d2df");
+      g.fillStyle = gn;
+      g.beginPath();
+      g.moveTo(haut[0][0], haut[0][1]);
+      haut.forEach(function (p) { g.lineTo(p[0], p[1]); });
+      var xd = haut[haut.length - 1][0], xg = haut[0][0];
+      for (var j = 1; j < 7; j++) g.lineTo(xd + (xg - xd) * j / 7, base - hNeige + (j % 2 ? 3 + R(100 + j + k * 10) * 5 : -1));
+      g.closePath();
+      g.fill();
+      g.save();
+      g.clip();
+      g.fillStyle = "rgba(86,116,146,0.3)";                      // l'ombre sur la neige
+      g.beginPath(); g.moveTo(s.x, base - s.h - 2); g.lineTo(s.x + s.w, base); g.lineTo(s.x + s.w * 0.08, base); g.closePath(); g.fill();
+      g.restore();
+    });
+    g.restore();
+    silhouette(); g.strokeStyle = "rgba(46,40,30,0.42)"; g.lineWidth = 1; g.stroke();
+  }
+
+  function peintColline(g, v) {
+    var R = function (i) { return alea(800 + v, i); };
+    ombreDecor(g, 6, 28, 40, 7, 0.26);
+    // Une colline basse et douce, plus large que haute, au sommet décentré.
+    var w = 42 + R(1) * 8, h = 20 + R(2) * 9, dec = (R(3) - 0.5) * 0.5;
+    var forme = function () {
+      g.beginPath(); g.moveTo(-w, 29);
+      g.bezierCurveTo(-w * (0.65 - dec), 29 - h * 1.3, w * (0.35 + dec), 29 - h * 1.4, w, 29);
+      g.closePath();
+    };
+    var gr = g.createLinearGradient(-w * 0.6, -h * 0.4, w * 0.7, 30);
+    gr.addColorStop(0, "#cfd384"); gr.addColorStop(0.5, "#a3ab5a"); gr.addColorStop(1, "#6f7a3c");
+    forme(); g.fillStyle = gr; g.fill();
+    g.save(); forme(); g.clip();
+    g.fillStyle = "rgba(40,48,16,0.18)";                       // le versant à l'ombre
+    g.beginPath(); g.ellipse(w * 0.55, 26, w * 0.6, h * 1.1, 0, 0, TAU); g.fill();
+    for (var i = 0; i < 26; i++) {
+      g.strokeStyle = i % 3 ? "rgba(96,110,40,0.45)" : "rgba(236,232,150,0.45)";
+      g.lineWidth = 1.2;
+      var x = (R(20 + i) - 0.5) * 2 * w * 0.9, y = 29 - R(50 + i) * h * 0.85;
+      g.beginPath(); g.moveTo(x, y); g.lineTo(x + (R(80 + i) - 0.5) * 5, y - 3.2); g.stroke();
+    }
+    g.restore();
+  }
+
+  function peintDune(g, v) {
+    var R = function (i) { return alea(900 + v, i); };
+    ombreDecor(g, 4, 28, 42, 6, 0.2);
+    var gr = g.createLinearGradient(-40, -10, 30, 30);
+    gr.addColorStop(0, "#f4e2a8"); gr.addColorStop(1, "#cdb06a");
+    g.fillStyle = gr;
+    g.beginPath(); g.moveTo(-42, 28); g.bezierCurveTo(-28, 2 + R(1) * 6, 0, -6 + R(2) * 6, 12, 12); g.bezierCurveTo(22, 22, 34, 20, 44, 28); g.closePath(); g.fill();
+    g.beginPath(); g.moveTo(-12, 28); g.bezierCurveTo(0, 12, 14, 6 + R(3) * 6, 28, 18); g.bezierCurveTo(36, 24, 42, 26, 46, 28); g.closePath();
+    g.fillStyle = "rgba(205,176,106,0.75)"; g.fill();
+    g.strokeStyle = "rgba(150,108,40,0.4)"; g.lineWidth = 1.2;       // l'arête de la dune
+    g.beginPath(); g.moveTo(-34, 22); g.bezierCurveTo(-24, 6, -2, -2, 12, 12); g.stroke();
+  }
+
+  function peintMarais(g, v) {
+    var R = function (i) { return alea(1000 + v, i); };
+    g.fillStyle = "rgba(30,66,68,0.55)";
+    g.beginPath(); g.ellipse(0, 24, 36, 10, 0, 0, TAU); g.fill();
+    g.fillStyle = "rgba(130,180,170,0.35)";
+    g.beginPath(); g.ellipse(-6, 22, 22, 5, 0, 0, TAU); g.fill();
+    for (var i = 0; i < 9; i++) {
+      var x = (R(i) - 0.5) * 56, h = 14 + R(10 + i) * 16, c = (R(20 + i) - 0.5) * 9;
+      g.strokeStyle = i % 2 ? "#3d5c35" : "#6d8c4f"; g.lineWidth = 1.8;
+      g.beginPath(); g.moveTo(x, 28); g.quadraticCurveTo(x + c, 28 - h * 0.55, x + c * 1.6, 28 - h); g.stroke();
+      if (i % 3 === 0) { g.fillStyle = "#5b3f26"; g.beginPath(); g.ellipse(x + c * 1.6, 28 - h - 2, 1.8, 4, 0, 0, TAU); g.fill(); }
+    }
+  }
+
+  function peintHerbe(g, v) {
+    var R = function (i) { return alea(1100 + v, i); };
+    for (var i = 0; i < 7; i++) {
+      var x = (R(i) - 0.5) * 30, h = 10 + R(10 + i) * 10, c = (R(20 + i) - 0.5) * 12;
+      g.strokeStyle = i % 2 ? "rgba(76,118,46,0.85)" : "rgba(132,170,76,0.8)";
+      g.lineWidth = 2.6;
+      g.beginPath(); g.moveTo(x, 30); g.quadraticCurveTo(x + c * 0.4, 30 - h * 0.6, x + c, 30 - h); g.stroke();
+    }
+  }
+
+  var PEINTRES = {
+    arbre: peintArbre, conifere: peintConifere,
+    montagne: function (g, v) { peintMontagne(g, v, false); },
+    cime: function (g, v) { peintMontagne(g, v, true); },
+    colline: peintColline, dune: peintDune, marais: peintMarais, herbe: peintHerbe
+  };
+  var VARIANTES = { arbre: 6, conifere: 4, montagne: 6, cime: 6, colline: 4, dune: 4, marais: 3, herbe: 3 };
+
+  // Colle un décor peint : (x, y) est le point où il touche le sol, s la taille de sa boîte.
+  function colle(ctx, type, v, x, y, s) {
+    var S = tailleSprite(s * ZPX);
+    ctx.drawImage(spriteCanvas(type, v, S), x - s / 2, y - s * 0.81, s, s);
+  }
+  function sprite(type) {
+    var n = VARIANTES[type];
+    return function (ctx, x, y, s, r) { colle(ctx, type, Math.min(n - 1, Math.floor(r * n)), x, y, s); };
+  }
+  function foret(ctx, x, y, s, r) {
+    if (r > 0.9) colle(ctx, "conifere", Math.floor((r - 0.9) * 40) % VARIANTES.conifere, x, y, s);
+    else colle(ctx, "arbre", Math.min(VARIANTES.arbre - 1, Math.floor(r / 0.9 * VARIANTES.arbre)), x, y, s);
   }
 
   // Terres volcaniques : aiguilles d'obsidienne, fissures de lave, cailloux sombres.
@@ -269,33 +366,27 @@
     }
   }
 
-  function herbe(ctx, x, y, s) {
-    ctx.lineWidth = s * 0.12;
-    ctx.lineCap = "round";
-    ctx.strokeStyle = "rgba(60,96,40,0.55)";
-    ctx.beginPath();
-    ctx.moveTo(x - s * 0.35, y - s * 0.3); ctx.lineTo(x, y); ctx.lineTo(x + s * 0.35, y - s * 0.3);
-    ctx.stroke();
-  }
-
   // `taille` : taille d'un décor par rapport à celle du pinceau ; `k` : combien
   // par pas de pinceau ; `pas` : écart entre deux pas, en tailles de pinceau.
+  // `espace` : distance minimale entre deux décors, en fraction de leur taille moyenne
+  // (les arbres se serrent en canopée, les montagnes se laissent de la place).
   var DECORS = {
-    herbe:    { taille: 0.12, k: 2,   pas: 0.5,  dessiner: herbe },
-    foret:    { taille: 0.32, k: 6,   pas: 0.3,  dessiner: foret },
-    taiga:    { taille: 0.3,  k: 4.5, pas: 0.32, dessiner: taiga },
-    colline:  { taille: 0.30, k: 2,   pas: 0.4,  dessiner: colline },
-    montagne: { taille: 0.42, k: 1.9, pas: 0.38, dessiner: montagne },
-    cime:     { taille: 0.42, k: 1.9, pas: 0.38, dessiner: cime },
-    volcan:   { taille: 0.42, k: 2.4, pas: 0.38, dessiner: volcan },
-    dune:     { taille: 0.30, k: 2,   pas: 0.4,  dessiner: dune },
-    marais:   { taille: 0.24, k: 2,   pas: 0.4,  dessiner: marais }
+    herbe:    { taille: 0.16, k: 2,   pas: 0.5,  espace: 0.6,  dessiner: sprite("herbe") },
+    foret:    { taille: 0.42, k: 7,   pas: 0.3,  espace: 0.42, dessiner: foret },
+    taiga:    { taille: 0.42, k: 6,   pas: 0.3,  espace: 0.42, dessiner: sprite("conifere") },
+    colline:  { taille: 0.46, k: 3,   pas: 0.4,  espace: 0.62, dessiner: sprite("colline") },
+    montagne: { taille: 0.72, k: 2.4, pas: 0.36, espace: 0.58, dessiner: sprite("montagne") },
+    cime:     { taille: 0.72, k: 2.4, pas: 0.36, espace: 0.58, dessiner: sprite("cime") },
+    volcan:   { taille: 0.42, k: 3,   pas: 0.38, espace: 0.55, dessiner: volcan },
+    dune:     { taille: 0.46, k: 3,   pas: 0.4,  espace: 0.62, dessiner: sprite("dune") },
+    marais:   { taille: 0.36, k: 3,   pas: 0.4,  espace: 0.6,  dessiner: sprite("marais") }
   };
 
   // ----- Types d'objets -----
   var TYPES_LIGNES = {
     riviere:   { nom: "Rivière",   px: 2.4 },
-    route:     { nom: "Route",     px: 1.8 },
+    route:     { nom: "Route",     px: 3 },
+    sentier:   { nom: "Sentier",   px: 1.4 },
     muraille:  { nom: "Muraille",  px: 5 },
     frontiere: { nom: "Frontière", px: 2.4 }
   };
@@ -369,11 +460,13 @@
   }
 
   // ----- Traits de pinceau -----
-  function tracerTrait(lc, t, mat) {
+  // `couleur` : remplace celle du matériau (le masque des matériaux peint chaque matériau
+  // d'une couleur-code pour savoir, plus tard, ce qu'il y a sous un point).
+  function tracerTrait(lc, t, mat, couleur) {
     var p = t.pts;
     var terre = mat.type === "terre";
     lc.globalCompositeOperation = terre ? "source-over" : "destination-out";
-    lc.fillStyle = lc.strokeStyle = terre ? mat.couleur : "#000";
+    lc.fillStyle = lc.strokeStyle = terre ? (couleur || mat.couleur) : "#000";
     lc.lineWidth = t.taille;
     lc.lineCap = "round";
     lc.lineJoin = "round";
@@ -406,28 +499,28 @@
     lc.globalCompositeOperation = "source-over";
   }
 
-  var tampon = [];
-  function decorer(lc, t, mat, zoom, X0, Y0, X1, Y1) {
+  // Sème les décors d'un trait dans `liste`, sans les dessiner : ils seront posés tous
+  // ensemble par poserDecors, une fois connus le terrain final et les voisins.
+  function semer(t, mat, zoom, X0, Y0, X1, Y1, liste) {
     var d = DECORS[mat.decor];
-    if (!d) return;
+    if (!d || t.sansDecor) return;         // `sansDecor` : un fond de terre, pas un coup de pinceau
     var s = t.taille * d.taille;
     if (s * zoom < 3) return;              // trop petit pour être lisible : à plat
     var seed = t.seed | 0;
-    var rayon = t.taille * 0.5 * 0.88;
+    var rayon = t.taille * 0.5 * 0.92;
     var p = t.pts;
     var nuage = !!t.nuage;
     // Un nuage de disques (carte générée) recouvre déjà ses voisins : moins de décors par disque.
     var k = nuage ? Math.max(1, d.k * 0.5) : d.k;
     var entier = Math.floor(k), frac = k - entier;
-    tampon.length = 0;
 
     function emettre(cx, cy, idx) {
-      if (cx < X0 - rayon || cx > X1 + rayon || cy < Y0 - rayon || cy > Y1 + rayon) return;
+      if (cx < X0 - rayon - s || cx > X1 + rayon + s || cy < Y0 - rayon - s || cy > Y1 + rayon + s) return;
       var n = entier + (frac > 0 && alea(seed, idx * 16 + 15) < frac ? 1 : 0);
       for (var q = 0; q < n; q++) {
         var a = alea(seed, idx * 16 + q * 3), b = alea(seed, idx * 16 + q * 3 + 1), c = alea(seed, idx * 16 + q * 3 + 2);
         var ang = a * TAU, r = Math.sqrt(b) * rayon;
-        tampon.push(cx + Math.cos(ang) * r, cy + Math.sin(ang) * r, s * (0.75 + 0.5 * c), c);
+        liste.push({ x: cx + Math.cos(ang) * r, y: cy + Math.sin(ang) * r, s: s * (0.75 + 0.5 * c), r: c, d: d, mat: t.mat });
       }
     }
 
@@ -447,17 +540,73 @@
         parcouru += L;
       }
     }
+  }
 
-    var n4 = tampon.length / 4;
-    if (!n4) return;
-    var ordre = new Array(n4);
-    for (var o = 0; o < n4; o++) ordre[o] = o;
-    // De haut en bas : un décor plus bas recouvre celui du dessus.
-    ordre.sort(function (a, b) { return tampon[a * 4 + 1] - tampon[b * 4 + 1]; });
-    for (var m = 0; m < n4; m++) {
-      var q4 = ordre[m] * 4;
-      d.dessiner(lc, tampon[q4], tampon[q4 + 1], tampon[q4 + 2], tampon[q4 + 3]);
+  // Pose les décors semés, en trois règles :
+  //  - un décor ne pousse que là où SON terrain est resté visible : pas sous un terrain
+  //    peint après lui (fini les sapins coupés net par la neige), ni dans l'eau, un lac,
+  //    une rivière, ni sur une route (le masque le dit) ;
+  //  - il ne chevauche pas ses voisins : les plus grands d'abord (une montagne garde sa
+  //    place), chaque type demande son espace (`espace`, une fraction de la taille), un peu
+  //    moins en profondeur qu'en largeur, comme des objets posés au sol ;
+  //  - on peint du fond vers l'avant, tous terrains confondus.
+  function poserDecors(lc, liste, masque, details) {
+    if (!liste.length) return;
+    liste.sort(function (a, b) { return b.s - a.s; });
+    var cellule = liste[0].s, grille = {}, gardes = [];
+    for (var i = 0; i < liste.length; i++) {
+      var st = liste[i];
+      if (masque) {
+        var sous = materiauEn(masque, st.x, st.y);
+        if (sous !== undefined && sous !== st.mat) continue;   // inconnu (hors masque) : on le garde
+        // Ni le pied ni le corps du décor sur une route : une montagne coupée par la
+        // chaussée n'a pas de sens.
+        if (routeEn(masque, st.x, st.y) || routeEn(masque, st.x, st.y - st.s * 0.35)) continue;
+      }
+      // Ni sur un petit lieu ni sur son chemin.
+      if (genePourDetails(details, st.x, st.y, st.s)) continue;
+      var gx = Math.floor(st.x / cellule), gy = Math.floor(st.y / cellule), libre = true;
+      for (var ax = gx - 1; ax <= gx + 1 && libre; ax++) {
+        for (var ay = gy - 1; ay <= gy + 1 && libre; ay++) {
+          var voisins = grille[ax + "," + ay];
+          if (!voisins) continue;
+          for (var k = 0; k < voisins.length; k++) {
+            var o = voisins[k];
+            var min = (st.s + o.s) * 0.5 * Math.max(st.d.espace, o.d.espace);
+            var dx = st.x - o.x, dy = (st.y - o.y) * 0.85;
+            if (dx * dx + dy * dy < min * min) { libre = false; break; }
+          }
+        }
+      }
+      if (!libre) continue;
+      var cle = gx + "," + gy;
+      (grille[cle] || (grille[cle] = [])).push(st);
+      gardes.push(st);
     }
+    gardes.sort(function (a, b) { return a.y - b.y; });
+    for (var j = 0; j < gardes.length; j++) gardes[j].d.dessiner(lc, gardes[j].x, gardes[j].y, gardes[j].s, gardes[j].r);
+  }
+
+  // Les terrains se fondent les uns dans les autres : la couche de terre est recopiée
+  // floutée PAR-DESSUS elle-même (« source-atop » : seulement là où il y a déjà de la
+  // terre), si bien que les couleurs se mélangent aux frontières alors que la côte, elle,
+  // reste nette. Le fondu vaut à peu près 1/600 de la carte, borné à l'écran.
+  function fondreTransitions(lc, cvT, carte, z, dpr, pw, ph, cle) {
+    if (!("filter" in lc)) return;
+    var flou = Math.min(22 * dpr, Math.max(2 * dpr, Math.max(carte.largeur, carte.hauteur) / 600 * z));
+    var copie = couche(cle + "-fondu", pw, ph);
+    var cc = copie.getContext("2d");
+    cc.setTransform(1, 0, 0, 1, 0, 0);
+    cc.clearRect(0, 0, pw, ph);
+    cc.drawImage(cvT, 0, 0);
+    lc.save();
+    lc.setTransform(1, 0, 0, 1, 0, 0);
+    lc.globalCompositeOperation = "source-atop";
+    lc.filter = "blur(" + flou.toFixed(1) + "px)";
+    lc.drawImage(copie, 0, 0);
+    lc.restore();
+    lc.filter = "none";
+    lc.globalCompositeOperation = "source-over";
   }
 
   // ----- Grain du papier, posé sur la terre -----
@@ -503,7 +652,8 @@
   // ----- Lignes : rivières, routes, frontières -----
   function styleLigne(l, th) {
     if (l.type === "riviere") return { c: l.couleur || th.riviere, tiret: null, lisse: l.lisse !== false, min: 1.4, halo: false };
-    if (l.type === "route") return { c: l.couleur || th.route, tiret: [3.2, 2.4], lisse: l.lisse !== false, min: 1.2, halo: false };
+    if (l.type === "route") return { c: l.couleur || "#d9c48e", tiret: null, lisse: true, min: 2.4, halo: false };
+    if (l.type === "sentier") return { c: l.couleur || "#b79a62", tiret: null, lisse: true, min: 1.3, halo: false };
     if (l.type === "muraille") return { c: l.couleur || "#c9c2b0", tiret: null, lisse: false, min: 3, halo: false };
     return { c: l.couleur || "#8a2b2b", tiret: [5, 2.2, 1.2, 2.2], lisse: !!l.lisse, min: 1.6, halo: true };
   }
@@ -542,7 +692,7 @@
     return 0.5 * (2 * b + (-a + c) * t + (2 * a - 5 * b + 4 * c - d) * t2 + (-a + 3 * b - 3 * c + d) * t3);
   }
 
-  function serpenter(l) {
+  function serpenter(l, force) {
     var p = l.pts, n = p.length / 2, i, s;
     var dense = [];
     for (i = 0; i < n - 1; i++) {
@@ -560,7 +710,7 @@
     if (!(total > 0)) return p;
 
     var onde = Math.max((l.taille || 1) * 14, total / 60);
-    var amp = onde * 0.3 * (l.meandre || 0);
+    var amp = onde * 0.3 * force;
     var h = hashTexte(String(l.id || "")), ph1 = alea(h, 1) * TAU, ph2 = alea(h, 2) * TAU;
     var out = [];
     for (i = 0; i < m; i++) {
@@ -576,38 +726,92 @@
   }
 
   // Les points tels qu'ils sont dessinés (et donc tels qu'on les clique).
+  // Force des méandres : une rivière la règle (0 = droite) ; routes et sentiers ondulent
+  // légèrement d'eux-mêmes, comme un chemin tracé à la main plutôt qu'à la règle.
+  function forceMeandres(l) {
+    if (l.type === "riviere") return l.meandre || 0;
+    if (l.type === "route") return typeof l.meandre === "number" ? l.meandre : 0.16;
+    if (l.type === "sentier") return typeof l.meandre === "number" ? l.meandre : 0.26;
+    return 0;
+  }
+
   function pointsAffiches(l) {
-    if (l.type !== "riviere" || !l.pts || l.pts.length < 4 || !(l.meandre > 0 || l.delta)) return l.pts;
-    var cle = l.pts.join(",") + "|" + l.meandre + "|" + l.taille + "|" + l.id;
+    if (!l.pts || l.pts.length < 4) return l.pts;
+    // Routes, sentiers et rivières passent tous par le lissage (et leurs méandres).
+    if (l.type !== "route" && l.type !== "sentier" && l.type !== "riviere") return l.pts;
+    var force = forceMeandres(l);
+    var cle = l.pts.join(",") + "|" + force + "|" + l.taille + "|" + l.id;
     var c = cacheRivieres && cacheRivieres.get(l);
     if (c && c.cle === cle) return c.out;
-    var out = serpenter(l);
+    var out = serpenter(l, force);
     if (cacheRivieres) cacheRivieres.set(l, { cle: cle, out: out });
     return out;
   }
 
-  // Une rivière s'élargit de la source (35 %) à l'embouchure (125 %) : tracée par
-  // tronçons de largeur croissante, les contours d'abord (sans quoi chaque
-  // tronçon mordrait sur le remplissage du précédent).
-  function tracerRiviere(ctx, l, st, lw, vue) {
+  // La forme d'une rivière, tracée avec le style courant du contexte : elle s'élargit de la
+  // source (35 %) à l'embouchure (125 %), par tronçons. Sert à creuser la terre, à peindre
+  // l'eau douce et à remplir le masque — une seule forme pour les trois.
+  // `extra` : largeur ajoutée ; `min` : largeur minimale (unités du monde).
+  function traceRiviereEau(c, l, vue, extra, min) {
     var d = pointsAffiches(l), m = d.length / 2;
     if (m < 2) return;
+    var lw = Math.max(l.taille || 0, 1.4 / vue.zoom);
     var troncons = l.delta ? Math.min(28, Math.max(1, Math.floor(m / 6))) : 1;
-    function passe(extra, couleur) {
-      ctx.strokeStyle = couleur;
-      for (var k = 0; k < troncons; k++) {
-        var a = Math.floor(k * (m - 1) / troncons), b = Math.floor((k + 1) * (m - 1) / troncons);
-        var t = (k + 0.5) / troncons;
-        ctx.lineWidth = (l.delta ? lw * (0.35 + 0.9 * t) : lw) + extra;
-        ctx.beginPath();
-        ctx.moveTo(d[2 * a], d[2 * a + 1]);
-        for (var j = a + 1; j <= b; j++) ctx.lineTo(d[2 * j], d[2 * j + 1]);
+    c.lineCap = c.lineJoin = "round";
+    c.setLineDash([]);
+    for (var k = 0; k < troncons; k++) {
+      var a = Math.floor(k * (m - 1) / troncons), b = Math.floor((k + 1) * (m - 1) / troncons);
+      var t = (k + 0.5) / troncons;
+      c.lineWidth = Math.max(l.delta ? lw * (0.35 + 0.9 * t) : lw, min || 0) + (extra || 0);
+      c.beginPath();
+      c.moveTo(d[2 * a], d[2 * a + 1]);
+      for (var j = a + 1; j <= b; j++) c.lineTo(d[2 * j], d[2 * j + 1]);
+      c.stroke();
+    }
+  }
+
+  // Lacs et rivières CREUSENT la terre, exactement comme la mer : la côte, le halo d'eau
+  // peu profonde et la falaise les bordent d'eux-mêmes, et là où une rivière (ou un lac)
+  // touche la mer, il n'y a plus de frontière — c'est la même eau.
+  function creuserEaux(lc, carte, vue, X0, Y0, X1, Y1) {
+    lc.globalCompositeOperation = "destination-out";
+    lc.fillStyle = lc.strokeStyle = "#000";
+    (carte.lacs || []).forEach(function (lac) {
+      if (lac.pts && lac.pts.length >= 6 && cheminFerme(lc, lac.pts)) lc.fill();
+    });
+    (carte.lignes || []).forEach(function (l) {
+      if (l.type !== "riviere" || !l.pts || l.pts.length < 4) return;
+      traceRiviereEau(lc, l, vue, 0, 1.3 / vue.zoom);
+    });
+    lc.globalCompositeOperation = "source-over";
+  }
+
+  // Sous la terre (donc visible seulement là où elle est creusée) : l'eau douce, pour les
+  // thèmes dont la « mer » est du papier. Sans elle, un lac du style Illustré aurait un
+  // cœur de parchemin. Le thème Atlas n'en a pas besoin : sa mer est déjà bleue.
+  function eauxDouces(ctx, carte, vue, th, X0, Y0, X1, Y1) {
+    if (!th.eauDouce) return;
+    (carte.lacs || []).forEach(function (lac) {
+      if (!lac.pts || lac.pts.length < 6) return;
+      var bb = boiteTrait(lac.pts, 0);
+      if (!chevauche(bb, X0, Y0, X1, Y1)) return;
+      var cx = (bb[0] + bb[2]) / 2, cy = (bb[1] + bb[3]) / 2, ray = Math.max(bb[2] - bb[0], bb[3] - bb[1]) / 2;
+      var gr = ctx.createRadialGradient(cx - ray * 0.2, cy - ray * 0.25, ray * 0.05, cx, cy, ray * 1.05);
+      gr.addColorStop(0, th.lacClair);
+      gr.addColorStop(1, th.eauDouce);
+      if (cheminFerme(ctx, lac.pts)) {
+        ctx.fillStyle = gr;
+        ctx.fill();
+        ctx.strokeStyle = th.eauDouce;
+        ctx.lineWidth = 4 / vue.zoom;
         ctx.stroke();
       }
-    }
-    ctx.setLineDash([]);
-    passe(2 / vue.zoom, "rgba(14,42,84,0.7)");
-    passe(0, st.c);
+    });
+    ctx.strokeStyle = th.eauDouce;
+    (carte.lignes || []).forEach(function (l) {
+      if (l.type !== "riviere" || !l.pts || l.pts.length < 4) return;
+      traceRiviereEau(ctx, l, vue, 3 / vue.zoom, 1.3 / vue.zoom);
+    });
   }
 
   // Muraille : ombre au sol, contour, pierre, créneaux en tirets sur le faîte, puis des
@@ -670,9 +874,673 @@
     });
   }
 
-  function dessinerLignes(ctx, carte, vue, th, X0, Y0, X1, Y1) {
+  // ----- Routes et sentiers -----
+  //
+  // Une route de terre battue : fossés sombres de chaque côté, chaussée sableuse, milieu
+  // plus clair (usé par les roues), et — assez grande — quelques pavés. Un sentier est
+  // un simple filet de pas, en pointillé.
+  //
+  // Toutes les voies sont tracées ENSEMBLE, couche par couche : d'abord tous les
+  // bas-côtés, puis toutes les chaussées, puis les milieux usés et les ornières. Ainsi,
+  // là où un embranchement rejoint une route, les deux chaussées se fondent en une seule
+  // au lieu que le bord sombre de l'une passe en travers de l'autre.
+  // `voies` : [{ l, st, lw }].
+  function tracerVoies(ctx, voies, vue) {
+    if (!voies.length) return;
+    var u = 1 / vue.zoom;
+    voies.forEach(function (v) { v.d = pointsAffiches(v.l); v.sentier = v.l.type === "sentier"; });
+    var chemin = function (d) {
+      ctx.beginPath();
+      ctx.moveTo(d[0], d[1]);
+      for (var i = 2; i < d.length; i += 2) ctx.lineTo(d[i], d[i + 1]);
+    };
+    ctx.setLineDash([]);
+    ctx.lineCap = ctx.lineJoin = "round";
+    // 1) Les bas-côtés.
+    voies.forEach(function (v) {
+      chemin(v.d);
+      ctx.strokeStyle = v.sentier ? "rgba(70,48,24,0.32)" : "rgba(60,40,18,0.5)";
+      ctx.lineWidth = v.lw + (v.sentier ? 1.6 : 2.4) * u;
+      ctx.stroke();
+    });
+    // 2) Les chaussées : les sentiers d'abord, les routes par-dessus.
+    voies.filter(function (v) { return v.sentier; }).concat(voies.filter(function (v) { return !v.sentier; })).forEach(function (v) {
+      chemin(v.d);
+      ctx.strokeStyle = v.st.c;
+      ctx.lineWidth = v.lw;
+      if (v.sentier) ctx.setLineDash([v.lw * 2.4, v.lw * 1.2]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    });
+    // 3) Le milieu des routes, plus clair, usé par les roues.
+    voies.forEach(function (v) {
+      if (v.sentier) return;
+      chemin(v.d);
+      ctx.strokeStyle = "rgba(255,246,214,0.32)";
+      ctx.lineWidth = v.lw * 0.5;
+      ctx.stroke();
+    });
+    // 4) Les ornières : deux sillons de charrette (et non un marquage au sol, qui ferait
+    //    route moderne).
+    voies.forEach(function (v) {
+      if (v.sentier || v.lw * vue.zoom < 4.5) return;
+      [-0.24, 0.24].forEach(function (k) {
+        var o = decaler(v.d, v.lw * k);
+        chemin(o);
+        ctx.strokeStyle = "rgba(110,80,42,0.3)";
+        ctx.lineWidth = v.lw * 0.09;
+        ctx.stroke();
+      });
+    });
+  }
+
+  // Une polyligne décalée latéralement de `e` (à droite du sens de parcours).
+  function decaler(d, e) {
+    var out = [], m = d.length / 2;
+    for (var i = 0; i < m; i++) {
+      var a = Math.max(0, i - 1), b = Math.min(m - 1, i + 1);
+      var tx = d[2 * b] - d[2 * a], ty = d[2 * b + 1] - d[2 * a + 1], l = Math.hypot(tx, ty) || 1;
+      out.push(d[2 * i] - ty / l * e, d[2 * i + 1] + tx / l * e);
+    }
+    return out;
+  }
+
+  // ----- Lacs -----
+  //
+  // Un lac est un contour fermé, lissé. Il creuse la terre comme la mer (creuserEaux) :
+  // sa rive, son halo et sa falaise sont ceux de la côte.
+  function cheminFerme(ctx, p) {
+    var n = p.length / 2;
+    if (n < 3) return false;
+    ctx.beginPath();
+    ctx.moveTo((p[2 * n - 2] + p[0]) / 2, (p[2 * n - 1] + p[1]) / 2);
+    for (var i = 0; i < n; i++) {
+      var j = (i + 1) % n;
+      ctx.quadraticCurveTo(p[2 * i], p[2 * i + 1], (p[2 * i] + p[2 * j]) / 2, (p[2 * i + 1] + p[2 * j + 1]) / 2);
+    }
+    ctx.closePath();
+    return true;
+  }
+
+  function dansPolygone(x, y, p) {
+    var dedans = false, n = p.length / 2;
+    for (var i = 0, j = n - 1; i < n; j = i++) {
+      var xi = p[2 * i], yi = p[2 * i + 1], xj = p[2 * j], yj = p[2 * j + 1];
+      if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) dedans = !dedans;
+    }
+    return dedans;
+  }
+
+  // ----- Ce qu'il y a sous un point : le masque des matériaux -----
+  //
+  // Pour poser un pont sur la mer, ou un campement dans la forêt, il faut savoir quel
+  // matériau recouvre un point. Les traits sont tous repeints, en petit (un tiers de la
+  // définition), chacun d'une couleur-code ; l'eau creuse comme à l'écran. Une lecture de
+  // pixels, une fois par image : bien moins cher que de tester chaque trait un à un.
+  //
+  // Le masque déborde de l'écran d'un cinquième de chaque côté : ce qui se trouve juste
+  // au-delà du bord (le bout d'une route, la base d'une montagne) doit être connu, sans
+  // quoi « hors du masque » se confondait avec « dans l'eau » — et des ponts naissaient
+  // au bord de l'écran.
+  function construireMasque(carte, vue, pw, ph, tx, ty, z, X0, Y0, X1, Y1) {
+    var ech = 2, marge = Math.round(Math.max(pw, ph) * 0.2);
+    var mw = Math.max(1, Math.ceil((pw + 2 * marge) / ech)), mh = Math.max(1, Math.ceil((ph + 2 * marge) / ech));
+    var mx = marge / z;                  // la même marge, en unités du monde
+    X0 -= mx; Y0 -= mx; X1 += mx; Y1 += mx;
+    tx += marge; ty += marge;
+    var cv = couche("masque", mw, mh);
+    var c = cv.getContext("2d", { willReadFrequently: true });
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.globalCompositeOperation = "source-over";
+    c.clearRect(0, 0, mw, mh);
+    c.setTransform(z / ech, 0, 0, z / ech, tx / ech, ty / ech);
+    c.save();
+    c.beginPath();
+    c.rect(0, 0, carte.largeur, carte.hauteur);
+    c.clip();
+    var traits = carte.traits || [];
+    for (var i = 0; i < traits.length; i++) {
+      var t = traits[i], mat = MAT[t.mat];
+      if (!mat || !t.bb || !chevauche(t.bb, X0, Y0, X1, Y1)) continue;
+      tracerTrait(c, t, mat, "rgb(" + ((MATERIAUX.indexOf(mat) + 1) * 18) + ",0,0)");
+    }
+
+    var u = ech / z;                     // un pixel du masque, en unités du monde
+    // Lacs et rivières : c'est de l'eau, on creuse — un peu plus large que le dessin,
+    // pour qu'aucun arbre ne pousse les racines dans l'eau.
+    c.globalCompositeOperation = "destination-out";
+    c.fillStyle = c.strokeStyle = "#000";
+    c.lineCap = c.lineJoin = "round";
+    (carte.lacs || []).forEach(function (lac) {
+      if (!lac.pts || lac.pts.length < 6 || !cheminFerme(c, lac.pts)) return;
+      c.fill();
+      c.lineWidth = 3 * u;
+      c.stroke();
+    });
+    (carte.lignes || []).forEach(function (l) {
+      if (l.type !== "riviere" || !l.pts || l.pts.length < 4) return;
+      traceRiviereEau(c, l, vue, 3 * u, 2.5 * u);
+    });
+    // Routes et sentiers : un drapeau dans le canal vert, AJOUTÉ (« lighter ») sans rien
+    // effacer — sous une route, l'eau reste de l'eau (d'où les ponts) et la terre reste
+    // la terre ; les décors, eux, s'en écartent.
+    c.globalCompositeOperation = "lighter";
+    c.strokeStyle = "rgb(0,255,0)";
+    (carte.lignes || []).forEach(function (l) {
+      if ((l.type !== "route" && l.type !== "sentier") || !l.pts || l.pts.length < 4) return;
+      var d = pointsAffiches(l), lw = Math.max(l.taille || 0, (l.type === "sentier" ? 1.3 : 2.4) / vue.zoom);
+      c.lineWidth = lw + 8 * u;
+      c.beginPath();
+      c.moveTo(d[0], d[1]);
+      for (var q = 2; q < d.length; q += 2) c.lineTo(d[q], d[q + 1]);
+      c.stroke();
+    });
+    c.globalCompositeOperation = "source-over";
+    c.restore();
+    return { data: c.getImageData(0, 0, mw, mh).data, mw: mw, mh: mh, ech: ech, tx: tx, ty: ty, z: z };
+  }
+
+  // L'identifiant du matériau sous un point du monde ; null : de l'eau (mer, lac, rivière) ;
+  // undefined : on ne sait pas (pas de masque, ou point hors du masque). Les deux derniers
+  // ne se confondent JAMAIS : « inconnu » n'est pas « de l'eau ».
+  function materiauEn(masque, wx, wy) {
+    if (!masque) return undefined;
+    var sx = Math.floor((wx * masque.z + masque.tx) / masque.ech), sy = Math.floor((wy * masque.z + masque.ty) / masque.ech);
+    if (sx < 0 || sy < 0 || sx >= masque.mw || sy >= masque.mh) return undefined;
+    var i = (sy * masque.mw + sx) * 4;
+    if (masque.data[i + 3] < 128) return null;
+    var m = MATERIAUX[Math.round(masque.data[i] / 18) - 1];
+    return m ? m.id : null;
+  }
+
+  // Y a-t-il une route (ou ses abords) sous ce point ?
+  function routeEn(masque, wx, wy) {
+    if (!masque) return false;
+    var sx = Math.floor((wx * masque.z + masque.tx) / masque.ech), sy = Math.floor((wy * masque.z + masque.ty) / masque.ech);
+    if (sx < 0 || sy < 0 || sx >= masque.mw || sy >= masque.mh) return false;
+    return masque.data[(sy * masque.mw + sx) * 4 + 1] > 128;
+  }
+
+  // ----- Ponts -----
+  //
+  // Un pont n'est pas un objet posé à côté de la route : c'est la route elle-même, le temps
+  // de franchir l'eau. On suit donc la route (son tracé affiché, méandres compris), on
+  // repère les tronçons au-dessus de l'eau (mer, lac, rivière : le masque le dit), on
+  // réunit ceux que sépare à peine une langue de terre (une rivière qui serpente sous la
+  // route ne donne qu'un pont), on les prolonge un peu sur chaque rive, et le tablier est
+  // tracé le long de ce tronçon de route — courbe comprise — à peine plus large qu'elle.
+
+  // Le morceau d'une polyligne compris entre les abscisses s0 et s1 (en longueur parcourue).
+  function sousChemin(d, cum, s0, s1) {
+    var out = [], m = d.length / 2;
+    var point = function (s) {
+      var i = 1;
+      while (i < m - 1 && cum[i] < s) i++;
+      var a = cum[i - 1], b = cum[i], f = b > a ? (s - a) / (b - a) : 0;
+      f = Math.max(0, Math.min(1, f));
+      return [d[2 * i - 2] + (d[2 * i] - d[2 * i - 2]) * f, d[2 * i - 1] + (d[2 * i + 1] - d[2 * i - 1]) * f];
+    };
+    var p0 = point(s0);
+    out.push(p0[0], p0[1]);
+    for (var i = 0; i < m; i++) if (cum[i] > s0 && cum[i] < s1) out.push(d[2 * i], d[2 * i + 1]);
+    var p1 = point(s1);
+    out.push(p1[0], p1[1]);
+    return out;
+  }
+
+  // Le tablier, le long du chemin `p` : ombre sur l'eau, garde-corps (le bord sombre),
+  // planches (un pointillé aussi large que le tablier, donc perpendiculaire au tracé),
+  // poteaux aux deux bouts.
+  function pontLe(ctx, p, W, vue) {
+    var u = 1 / vue.zoom, n = p.length / 2;
+    if (n < 2) return;
+    var chemin = function () {
+      ctx.beginPath();
+      ctx.moveTo(p[0], p[1]);
+      for (var i = 2; i < p.length; i += 2) ctx.lineTo(p[i], p[i + 1]);
+    };
+    ctx.save();
+    ctx.setLineDash([]);
+    ctx.lineCap = "butt";
+    ctx.lineJoin = "round";
+    ctx.save();
+    ctx.translate(W * 0.16, W * 0.34);
+    chemin(); ctx.strokeStyle = "rgba(6,28,60,0.32)"; ctx.lineWidth = W; ctx.stroke();
+    ctx.restore();
+    chemin(); ctx.strokeStyle = "#3e2a16"; ctx.lineWidth = W; ctx.stroke();
+    chemin(); ctx.strokeStyle = "#9c7748"; ctx.lineWidth = W * 0.72; ctx.stroke();
+    if (W * vue.zoom >= 5) {
+      chemin();
+      ctx.strokeStyle = "rgba(62,40,18,0.55)";
+      ctx.lineWidth = W * 0.72;
+      ctx.setLineDash([Math.max(0.5 * u, W * 0.05), Math.max(1.5 * u, W * 0.2)]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    if (W * vue.zoom >= 7) {
+      ctx.fillStyle = "#2a1a0b";
+      var q = W * 0.2;
+      [[0, 1], [n - 1, n - 2]].forEach(function (e) {
+        var x = p[2 * e[0]], y = p[2 * e[0] + 1], dx = x - p[2 * e[1]], dy = y - p[2 * e[1] + 1], l = Math.hypot(dx, dy) || 1;
+        var nx = -dy / l * W / 2, ny = dx / l * W / 2;
+        ctx.fillRect(x + nx - q / 2, y + ny - q / 2, q, q);
+        ctx.fillRect(x - nx - q / 2, y - ny - q / 2, q, q);
+      });
+    }
+    ctx.restore();
+  }
+
+  function dessinerPonts(ctx, carte, vue, th, masque) {
+    if (!masque) return;                               // pendant un déplacement : pas de ponts
+    var L = carte.largeur, H = carte.hauteur;
+    (carte.lignes || []).forEach(function (r) {
+      if ((r.type !== "route" && r.type !== "sentier") || !r.pts || r.pts.length < 4) return;
+      var d = pointsAffiches(r), m = d.length / 2;
+      var lw = Math.max(r.taille || 0, (r.type === "sentier" ? 1.3 : 2.4) / vue.zoom);
+      // Un peu plus large que la route ET que ses bas-côtés : la route y entre sans déborder.
+      var W = Math.max(lw * (r.type === "sentier" ? 1.6 : 1.3), lw + 3.2 / vue.zoom);
+      // Abscisses cumulées le long de la route.
+      var cum = [0];
+      for (var i = 1; i < m; i++) cum[i] = cum[i - 1] + Math.hypot(d[2 * i] - d[2 * i - 2], d[2 * i + 1] - d[2 * i - 1]);
+      var total = cum[m - 1];
+      if (!(total > 0)) return;
+      // Échantillonnage : de l'eau sous la route ?
+      var pas = Math.max(lw * 0.4, 1.2 / vue.zoom), troncons = [], debut = -1, seg = 1;
+      for (var s = 0; s <= total + pas * 0.5; s += pas) {
+        var sc = Math.min(s, total);
+        while (seg < m - 1 && cum[seg] < sc) seg++;
+        var a = cum[seg - 1], b = cum[seg], f = b > a ? (sc - a) / (b - a) : 0;
+        var x = d[2 * seg - 2] + (d[2 * seg] - d[2 * seg - 2]) * f, y = d[2 * seg - 1] + (d[2 * seg + 1] - d[2 * seg - 1]) * f;
+        var eau = x >= 0 && y >= 0 && x <= L && y <= H && materiauEn(masque, x, y) === null;
+        if (eau && debut < 0) debut = sc;
+        if (!eau && debut >= 0) { troncons.push([debut, sc]); debut = -1; }
+      }
+      if (debut >= 0) troncons.push([debut, total]);
+      if (!troncons.length) return;
+      // Une langue de terre de moins de trois largeurs entre deux eaux : un seul pont.
+      var fusion = [troncons[0].slice()];
+      for (var k = 1; k < troncons.length; k++) {
+        var der = fusion[fusion.length - 1];
+        if (troncons[k][0] - der[1] < lw * 3) der[1] = troncons[k][1];
+        else fusion.push(troncons[k].slice());
+      }
+      fusion.forEach(function (t) {
+        var s0 = Math.max(0, t[0] - lw * 0.9), s1 = Math.min(total, t[1] + lw * 0.9);
+        if (s1 - s0 < lw) return;
+        pontLe(ctx, sousChemin(d, cum, s0, s1), W, vue);
+      });
+    });
+  }
+
+  // ----- Détails qui apparaissent en zoomant -----
+  //
+  // Chemins et petits lieux (cabanes, campements, fermes, menhirs, grottes…) ne sont écrits
+  // nulle part : ils sont tirés du hasard, dans une grille d'« octaves » — chaque octave est
+  // une grille deux fois plus fine que la précédente, et n'apparaît (en fondu) que lorsque
+  // ses cases deviennent assez grandes à l'écran. Plus on zoome, plus il y en a, à
+  // l'endroit où le terrain s'y prête (un camp en forêt, une ferme en plaine…), et toujours
+  // au même endroit : tout vient d'une graine, pas d'un état.
+  var POIS = {   // matériau → [type, probabilité par case]
+    foret:    [["cabane", 0.07], ["camp", 0.05], ["ruines", 0.02]],
+    taiga:    [["cabane", 0.07], ["camp", 0.05]],
+    plaine:   [["ferme", 0.1], ["menhirs", 0.02]],
+    steppe:   [["ferme", 0.06], ["camp", 0.03]],
+    colline:  [["menhirs", 0.06], ["cabane", 0.03]],
+    montagne: [["grotte", 0.06], ["cabane", 0.02]],
+    cime:     [["grotte", 0.03]],
+    volcan:   [["grotte", 0.04]],
+    desert:   [["ruines", 0.05], ["oasis", 0.03]],
+    marais:   [["pilotis", 0.07]],
+    glace:    [["camp", 0.03]]
+  };
+  var NIVEAU_DETAILS = 2.8;
+
+  function dessinerPOI(ctx, type, x, y, s, th) {
+    ctx.save();
+    ctx.translate(x, y - s * 0.3);
+    ctx.scale(s / 100, s / 100);
+    ctx.lineJoin = ctx.lineCap = "round";
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = th.encre;
+    var c = ctx;
+    switch (type) {
+      case "cabane":
+        ombreSol(c, 2, 30, 34, 7);
+        c.fillStyle = BOIS; c.beginPath(); c.rect(-20, 6, 40, 24); c.fill(); c.stroke();
+        c.strokeStyle = "rgba(40,26,10,0.5)"; c.beginPath(); c.moveTo(-20, 14); c.lineTo(20, 14); c.moveTo(-20, 22); c.lineTo(20, 22); c.stroke();
+        c.strokeStyle = th.encre; c.fillStyle = "#5b3d22";
+        c.beginPath(); c.moveTo(-26, 8); c.lineTo(0, -16); c.lineTo(26, 8); c.closePath(); c.fill(); c.stroke();
+        c.fillStyle = "#2a1c10"; c.fillRect(-5, 16, 10, 14);
+        c.strokeStyle = "rgba(120,120,120,0.55)"; c.lineWidth = 2.4;
+        c.beginPath(); c.moveTo(12, -10); c.quadraticCurveTo(18, -24, 10, -34); c.quadraticCurveTo(4, -42, 12, -50); c.stroke();
+        break;
+      case "camp":
+        ombreSol(c, 0, 30, 38, 7);
+        c.fillStyle = "#e9dcb8";
+        c.beginPath(); c.moveTo(-28, 30); c.lineTo(-10, -12); c.lineTo(8, 30); c.closePath(); c.fill(); c.stroke();
+        c.fillStyle = "#2a1c10"; c.beginPath(); c.moveTo(-14, 30); c.lineTo(-10, 8); c.lineTo(-6, 30); c.closePath(); c.fill();
+        c.fillStyle = "#d9caa0";
+        c.beginPath(); c.moveTo(6, 30); c.lineTo(20, 0); c.lineTo(34, 30); c.closePath(); c.fill(); c.stroke();
+        c.strokeStyle = "#4a331c"; c.lineWidth = 2.4;
+        c.beginPath(); c.moveTo(-2, 34); c.lineTo(12, 30); c.moveTo(12, 34); c.lineTo(-2, 30); c.stroke();
+        c.fillStyle = "#ff9a2a"; c.beginPath(); c.moveTo(2, 30); c.quadraticCurveTo(-2, 22, 5, 16); c.quadraticCurveTo(7, 24, 10, 30); c.closePath(); c.fill();
+        break;
+      case "ferme":
+        ombreSol(c, 0, 31, 42, 7);
+        c.strokeStyle = "rgba(60,48,16,0.5)"; c.lineWidth = 1;
+        [["#b9b84a", -44, 20], ["#8fae45", -44, 10], ["#c8b04a", 18, 22], ["#9cb74b", 20, 12]].forEach(function (f) {
+          c.fillStyle = f[0]; c.beginPath(); c.moveTo(f[1], f[2]); c.lineTo(f[1] + 28, f[2] - 3); c.lineTo(f[1] + 26, f[2] + 7); c.lineTo(f[1] - 3, f[2] + 9); c.closePath(); c.fill(); c.stroke();
+        });
+        c.lineWidth = 1.5; c.strokeStyle = th.encre;
+        maison(c, 0, 26, 28, 18);
+        break;
+      case "menhirs":
+        ombreSol(c, 2, 31, 30, 6);
+        [[-16, 8, 11, 30], [0, 0, 13, 40], [17, 10, 10, 26]].forEach(function (p) {
+          c.fillStyle = "#a9a392";
+          c.beginPath(); c.moveTo(p[0] - p[2] / 2, 31); c.lineTo(p[0] - p[2] / 2 + 1, 31 - p[3] * 0.8); c.quadraticCurveTo(p[0], 31 - p[3] - 2, p[0] + p[2] / 2 - 1, 31 - p[3] * 0.85); c.lineTo(p[0] + p[2] / 2, 31); c.closePath(); c.fill(); c.stroke();
+          c.fillStyle = OMBRE; c.fillRect(p[0], 31 - p[3] * 0.85, p[2] / 2, p[3] * 0.85);
+        });
+        break;
+      case "grotte":
+        ombreSol(c, 0, 31, 36, 6);
+        c.fillStyle = "#8f897c";
+        c.beginPath(); c.moveTo(-34, 31); c.quadraticCurveTo(-36, -18, 0, -20); c.quadraticCurveTo(36, -18, 34, 31); c.closePath(); c.fill(); c.stroke();
+        c.fillStyle = "#1f150b"; c.beginPath(); c.moveTo(-11, 31); c.lineTo(-11, 14); c.arc(0, 14, 11, Math.PI, 0); c.lineTo(11, 31); c.closePath(); c.fill();
+        break;
+      case "ruines":
+        ombreSol(c, 0, 31, 36, 6);
+        c.fillStyle = "#b3ab98";
+        c.beginPath(); c.moveTo(-30, 31); c.lineTo(-30, 8); c.lineTo(-22, 2); c.lineTo(-16, 10); c.lineTo(-8, 4); c.lineTo(-2, 31); c.closePath(); c.fill(); c.stroke();
+        c.beginPath(); c.moveTo(6, 31); c.lineTo(8, 14); c.lineTo(18, 18); c.lineTo(26, 8); c.lineTo(32, 31); c.closePath(); c.fill(); c.stroke();
+        break;
+      case "oasis":
+        c.fillStyle = "#3d8fc4"; c.beginPath(); c.ellipse(0, 26, 30, 8, 0, 0, TAU); c.fill(); c.stroke();
+        [[-18, 24, -34], [16, 24, -42]].forEach(function (p) {
+          c.strokeStyle = "#5a3d22"; c.lineWidth = 3; c.beginPath(); c.moveTo(p[0], p[1]); c.quadraticCurveTo(p[0] + 4, p[1] / 2, p[0] + 2, p[2]); c.stroke();
+          c.strokeStyle = "#3f7a34"; c.lineWidth = 3.2;
+          for (var a = 0; a < 5; a++) { c.beginPath(); c.moveTo(p[0] + 2, p[2]); c.quadraticCurveTo(p[0] + 2 + (a - 2) * 9, p[2] - 8, p[0] + 2 + (a - 2) * 13, p[2] + 6); c.stroke(); }
+        });
+        break;
+      case "pilotis":
+        c.fillStyle = "rgba(30,66,68,0.6)"; c.beginPath(); c.ellipse(0, 30, 34, 8, 0, 0, TAU); c.fill();
+        c.strokeStyle = "#4a331c"; c.lineWidth = 3;
+        c.beginPath(); c.moveTo(-18, 12); c.lineTo(-18, 32); c.moveTo(18, 12); c.lineTo(18, 32); c.moveTo(0, 12); c.lineTo(0, 32); c.stroke();
+        c.lineWidth = 1.5; c.strokeStyle = th.encre;
+        c.fillStyle = BOIS; c.beginPath(); c.rect(-22, -6, 44, 18); c.fill(); c.stroke();
+        c.fillStyle = "#5b3d22"; c.beginPath(); c.moveTo(-28, -4); c.lineTo(0, -26); c.lineTo(28, -4); c.closePath(); c.fill(); c.stroke();
+        break;
+    }
+    ctx.restore();
+  }
+
+  // Projection d'un point sur un segment : distance et point le plus proche.
+  function projSegment(px, py, ax, ay, bx, by) {
+    var dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy;
+    var t = l2 ? Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / l2)) : 0;
+    var x = ax + dx * t, y = ay + dy * t;
+    return { d: Math.hypot(px - x, py - y), x: x, y: y };
+  }
+
+  // ----- Le terrain sous un point, sans écran -----
+  //
+  // Le masque ne connaît que ce qui est (presque) à l'écran. Les petits lieux et leurs
+  // chemins, eux, doivent exister partout et toujours au même endroit : un chemin qui part
+  // d'une cabane visible vers une ferme hors champ ne doit pas changer de destination quand
+  // on déplace la vue. D'où cette interrogation directe des objets de la carte, rendue
+  // rapide par un index en grille de chaque trait (calculé une fois, gardé tant que le
+  // trait ne change pas).
+  var indexTraits = typeof WeakMap !== "undefined" ? new WeakMap() : null;
+
+  function indexTrait(t) {
+    var p = t.pts, cle = p.length + "|" + t.taille + "|" + p[0] + "|" + p[p.length - 1];
+    var c = indexTraits && indexTraits.get(t);
+    if (c && c.cle === cle) return c;
+    var cell = Math.max(t.taille, 1e-9), r = t.taille / 2, grille = {}, i;
+    var ajoute = function (gx, gy, v) { var k = gx + "," + gy; (grille[k] || (grille[k] = [])).push(v); };
+    if (t.nuage || p.length <= 2) {
+      for (i = 0; i < p.length; i += 2) ajoute(Math.floor(p[i] / cell), Math.floor(p[i + 1] / cell), i);
+    } else {
+      for (i = 0; i + 3 < p.length; i += 2) {
+        var gx0 = Math.floor((Math.min(p[i], p[i + 2]) - r) / cell), gx1 = Math.floor((Math.max(p[i], p[i + 2]) + r) / cell);
+        var gy0 = Math.floor((Math.min(p[i + 1], p[i + 3]) - r) / cell), gy1 = Math.floor((Math.max(p[i + 1], p[i + 3]) + r) / cell);
+        for (var gx = gx0; gx <= gx1; gx++) for (var gy = gy0; gy <= gy1; gy++) ajoute(gx, gy, i);
+      }
+    }
+    c = { cle: cle, cell: cell, grille: grille };
+    if (indexTraits) indexTraits.set(t, c);
+    return c;
+  }
+
+  function couvre(t, x, y) {
+    var ix = indexTrait(t), r = t.taille / 2, p = t.pts, dabs = t.nuage || p.length <= 2;
+    var gx = Math.floor(x / ix.cell), gy = Math.floor(y / ix.cell);
+    for (var ax = gx - 1; ax <= gx + 1; ax++) {
+      for (var ay = gy - 1; ay <= gy + 1; ay++) {
+        var l = ix.grille[ax + "," + ay];
+        if (!l) continue;
+        for (var q = 0; q < l.length; q++) {
+          var i = l[q];
+          if (dabs) { if (Math.hypot(p[i] - x, p[i + 1] - y) <= r * 0.92) return true; }
+          else if (projSegment(x, y, p[i], p[i + 1], p[i + 2], p[i + 3]).d <= r) return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  var boitesAffichees = typeof WeakMap !== "undefined" ? new WeakMap() : null;
+  function boiteAffichee(d) {
+    var b = boitesAffichees && boitesAffichees.get(d);
+    if (!b) { b = boiteTrait(d, 0); if (boitesAffichees) boitesAffichees.set(d, b); }
+    return b;
+  }
+
+  // L'identifiant du terrain sous un point du monde, ou null : de l'eau (mer, gomme, lac,
+  // rivière) ou hors de la carte.
+  function terrainEn(carte, x, y) {
+    if (x < 0 || y < 0 || x > carte.largeur || y > carte.hauteur) return null;
+    var i, lacs = carte.lacs || [];
+    for (i = 0; i < lacs.length; i++) {
+      var lp = lacs[i].pts;
+      if (!lp || lp.length < 6) continue;
+      var lb = boiteTrait(lp, 0);              // pas de cache : un lac se remodèle sur place
+      if (x >= lb[0] && x <= lb[2] && y >= lb[1] && y <= lb[3] && dansPolygone(x, y, lp)) return null;
+    }
     var lignes = carte.lignes || [];
-    ["riviere", "route", "muraille", "frontiere"].forEach(function (type) {
+    for (i = 0; i < lignes.length; i++) {
+      var rv = lignes[i];
+      if (rv.type !== "riviere" || !rv.pts || rv.pts.length < 4) continue;
+      var d = pointsAffiches(rv), b = boiteAffichee(d), lw = (rv.taille || 0) * 0.7;
+      if (x < b[0] - lw || x > b[2] + lw || y < b[1] - lw || y > b[3] + lw) continue;
+      for (var q = 0; q + 3 < d.length; q += 2) if (projSegment(x, y, d[q], d[q + 1], d[q + 2], d[q + 3]).d <= lw) return null;
+    }
+    var traits = carte.traits || [];
+    for (i = traits.length - 1; i >= 0; i--) {
+      var t = traits[i];
+      if (!t.bb) t.bb = boiteTrait(t.pts, t.taille);
+      if (x < t.bb[0] || x > t.bb[2] || y < t.bb[1] || y > t.bb[3]) continue;
+      if (!couvre(t, x, y)) continue;
+      var m = MAT[t.mat];
+      return !m || m.type === "eau" ? null : m.id;
+    }
+    return null;
+  }
+
+  // La voie (route ou sentier) la plus proche de (x, y) dans le rayon `rayon`.
+  function voieProche(carte, x, y, rayon) {
+    var best = null, dMin = rayon;
+    (carte.lignes || []).forEach(function (l) {
+      if ((l.type !== "route" && l.type !== "sentier") || !l.pts || l.pts.length < 4) return;
+      var d = pointsAffiches(l), b = boiteAffichee(d);
+      if (x < b[0] - dMin || x > b[2] + dMin || y < b[1] - dMin || y > b[3] + dMin) return;
+      for (var q = 0; q + 3 < d.length; q += 2) {
+        var r = projSegment(x, y, d[q], d[q + 1], d[q + 2], d[q + 3]);
+        if (r.d < dMin) { dMin = r.d; best = { x: r.x, y: r.y, d: r.d, l: l }; }
+      }
+    });
+    return best;
+  }
+
+  // ----- Les petits lieux qui apparaissent en zoomant -----
+  //
+  // Un petit lieu dépend de SA case (octave k, colonne i, rangée j) et de rien d'autre : ni
+  // de la vue, ni du zoom, ni des cases voisines affichées. Il apparaît (en fondu) quand
+  // les cases de son octave deviennent assez grandes à l'écran, et reste ensuite à sa place.
+  // Son chemin mène à la voie la plus proche, sinon au petit lieu le plus proche d'une
+  // octave AUSSI GROSSIÈRE OU PLUS que la sienne — jamais plus fine : en zoomant, de
+  // nouveaux lieux s'accrochent aux anciens, mais aucun chemin existant ne change de but.
+  function poiCase(carte, memo, seed, g0, k, i, j) {
+    var cle = k + "|" + i + "|" + j;
+    if (cle in memo) return memo[cle];
+    var res = null;
+    var g = g0 / Math.pow(2, k), sk = seed + k * 7919;
+    var h = function (n) { return alea(sk + n * 131, (i * 73856093) ^ (j * 19349663)); };
+    var px = (i + 0.2 + 0.6 * h(20)) * g, py = (j + 0.2 + 0.6 * h(21)) * g;
+    var mat = terrainEn(carte, px, py), table = mat && POIS[mat];
+    if (table) {
+      var r = h(22), cumul = 0, type = null;
+      for (var n = 0; n < table.length; n++) { cumul += table[n][1] * 1.7; if (r < cumul) { type = table[n][0]; break; } }
+      if (type && !voieProche(carte, px, py, g * 0.12)) {
+        res = { x: px, y: py, type: type, k: k, g: g, graine: h(24), echelle: 0.9 + 0.2 * h(23) };
+        // Pas collé à un lieu de l'auteur, ni à un petit lieu d'une octave plus grossière.
+        var lieux = carte.lieux || [];
+        for (var q = 0; q < lieux.length && res; q++) if (Math.hypot(lieux[q].x - px, lieux[q].y - py) < g * 0.5) res = null;
+        for (var kk = 0; kk < k && res; kk++) {
+          var gg = g0 / Math.pow(2, kk), ci = Math.floor(px / gg), cj = Math.floor(py / gg);
+          for (var a = ci - 1; a <= ci + 1 && res; a++) {
+            for (var b = cj - 1; b <= cj + 1 && res; b++) {
+              var o = poiCase(carte, memo, seed, g0, kk, a, b);
+              if (o && Math.hypot(o.x - px, o.y - py) < g * 0.45) res = null;
+            }
+          }
+        }
+      }
+    }
+    memo[cle] = res;
+    return res;
+  }
+
+  function cheminDe(carte, memo, seed, g0, p) {
+    var R = p.g * 1.3, cible = null, dMin = R;
+    var v = voieProche(carte, p.x, p.y, R);
+    if (v) { cible = [v.x, v.y]; dMin = v.d; }
+    else {
+      for (var kk = 0; kk <= p.k; kk++) {
+        var gg = g0 / Math.pow(2, kk);
+        var a0 = Math.floor((p.x - R) / gg), a1 = Math.floor((p.x + R) / gg), b0 = Math.floor((p.y - R) / gg), b1 = Math.floor((p.y + R) / gg);
+        for (var a = a0; a <= a1; a++) {
+          for (var b = b0; b <= b1; b++) {
+            var o = poiCase(carte, memo, seed, g0, kk, a, b);
+            if (!o || o === p) continue;
+            var e = Math.hypot(o.x - p.x, o.y - p.y);
+            if (e > 0 && e < dMin) { dMin = e; cible = [o.x, o.y]; }
+          }
+        }
+      }
+    }
+    if (!cible) return null;
+    // Le coude du chemin dépend de la PAIRE de lieux, pas du sens : si deux lieux se
+    // choisissent l'un l'autre, leurs deux chemins sont la même courbe (et non deux arcs
+    // qui dessineraient un fuseau).
+    var A = [p.x, p.y], B = cible;
+    var premier = (A[0] < B[0] || (A[0] === B[0] && A[1] < B[1])) ? A : B, second = premier === A ? B : A;
+    var h1 = alea(seed + 9, Math.floor(premier[0] * 977) ^ Math.floor(second[1] * 613));
+    var h2 = alea(seed + 10, Math.floor(second[0] * 977) ^ Math.floor(premier[1] * 613));
+    var mx = (p.x + cible[0]) / 2 + (h1 - 0.5) * dMin * 0.4;
+    var my = (p.y + cible[1]) / 2 + (h2 - 0.5) * dMin * 0.4;
+    var trace = [];
+    for (var s = 0; s <= 12; s++) {
+      var t = s / 12, aa = (1 - t) * (1 - t), bb = 2 * t * (1 - t), cc = t * t;
+      var x = aa * p.x + bb * mx + cc * cible[0], y = aa * p.y + bb * my + cc * cible[1];
+      if (s > 0 && s < 12 && terrainEn(carte, x, y) === null) return null;   // de l'eau sur le trajet : pas de chemin
+      trace.push(x, y);
+    }
+    return trace;
+  }
+
+  // Les petits lieux et leurs chemins pour cette vue : calculés AVANT les décors (qui
+  // doivent s'en écarter), dessinés après. On prend aussi deux cases de marge autour de
+  // l'écran, pour que le chemin d'une cabane juste hors champ soit bien visible.
+  function preparerDetails(carte, vue, th, masque, tx, ty, z, pw, ph, dpr) {
+    var L = carte.largeur, H = carte.hauteur, M = Math.max(L, H);
+    var seed = hashTexte(String(carte.id || "x")) & 0x3fffffff;
+    var g0 = M / 16, memo = {}, places = [];
+    for (var k = 0; k < 18; k++) {
+      var g = g0 / Math.pow(2, k), cellPx = g * z;
+      if (cellPx < 96 * dpr) break;                              // les octaves suivantes sont plus fines encore
+      var fondu = Math.min(1, (cellPx - 96 * dpr) / (80 * dpr));
+      var i0 = Math.max(0, Math.floor(-tx / cellPx) - 2), i1 = Math.min(Math.ceil(L / g), Math.floor((pw - tx) / cellPx) + 2);
+      var j0 = Math.max(0, Math.floor(-ty / cellPx) - 2), j1 = Math.min(Math.ceil(H / g), Math.floor((ph - ty) / cellPx) + 2);
+      if ((i1 - i0 + 1) * (j1 - j0 + 1) > 1500) continue;
+      var taille = Math.min(110 * dpr, Math.max(38 * dpr, cellPx * 0.16));
+      for (var i = i0; i <= i1; i++) {
+        for (var j = j0; j <= j1; j++) {
+          var p = poiCase(carte, memo, seed, g0, k, i, j);
+          if (!p) continue;
+          var place = { x: p.x, y: p.y, type: p.type, taille: taille * p.echelle, fondu: fondu, g: p.g };
+          place.trace = cheminDe(carte, memo, seed, g0, p);
+          place.largeur = Math.max(1.6 * dpr, Math.min(5 * dpr, place.taille * 0.07));
+          places.push(place);
+        }
+      }
+    }
+    return { places: places, z: z, tx: tx, ty: ty };
+  }
+
+  // Un décor tombe-t-il sur un petit lieu ou sur son chemin ? (Il s'en écarte alors.)
+  function genePourDetails(details, x, y, s) {
+    if (!details) return false;
+    var z = details.z;
+    for (var i = 0; i < details.places.length; i++) {
+      var p = details.places[i], rayon = p.taille / z * 0.55 + s * 0.3;
+      if (Math.abs(p.x - x) < rayon && Math.abs(p.y - y) < rayon && Math.hypot(p.x - x, p.y - y) < rayon) return true;
+      if (!p.trace) continue;
+      var marge = p.largeur / z + s * 0.25;
+      for (var q = 0; q + 3 < p.trace.length; q += 2) {
+        if (projSegment(x, y, p.trace[q], p.trace[q + 1], p.trace[q + 2], p.trace[q + 3]).d < marge) return true;
+      }
+    }
+    return false;
+  }
+
+  function dessinerDetails(ctx, details, th, carte) {
+    if (!details || !details.places.length) return;
+    var z = details.z, tx = details.tx, ty = details.ty;
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.beginPath();
+    ctx.rect(tx, ty, carte.largeur * z, carte.hauteur * z);
+    ctx.clip();
+    ctx.lineCap = ctx.lineJoin = "round";
+    // Les chemins, comme les sentiers de l'auteur : bord sombre puis pas en pointillé.
+    [["rgba(70,48,24,0.4)", 2, false], ["rgba(196,166,108,0.95)", 0, true]].forEach(function (passe) {
+      details.places.forEach(function (p) {
+        if (!p.trace) return;
+        ctx.globalAlpha = p.fondu;
+        ctx.beginPath();
+        for (var q = 0; q < p.trace.length; q += 2) {
+          var sx = p.trace[q] * z + tx, sy = p.trace[q + 1] * z + ty;
+          if (q === 0) ctx.moveTo(sx, sy); else ctx.lineTo(sx, sy);
+        }
+        ctx.strokeStyle = passe[0];
+        ctx.lineWidth = p.largeur + passe[1] * p.largeur * 0.6;
+        ctx.setLineDash(passe[2] ? [p.largeur * 2.4, p.largeur * 1.2] : []);
+        ctx.stroke();
+      });
+    });
+    ctx.setLineDash([]);
+    details.places.slice().sort(function (a, b) { return a.y - b.y; }).forEach(function (p) {
+      ctx.globalAlpha = p.fondu;
+      dessinerPOI(ctx, p.type, p.x * z + tx, p.y * z + ty, p.taille, th);
+    });
+    ctx.restore();
+  }
+
+  function dessinerLignes(ctx, carte, vue, th, X0, Y0, X1, Y1, masque) {
+    var lignes = carte.lignes || [];
+    var voies = [];
+    ["riviere", "sentier", "route", "muraille", "frontiere"].forEach(function (type) {
       for (var i = 0; i < lignes.length; i++) {
         var l = lignes[i];
         if (l.type !== type || !l.pts || l.pts.length < 4) continue;
@@ -683,8 +1551,9 @@
         var lw = Math.max(l.taille || 0, st.min / vue.zoom);
         ctx.lineCap = "round";
         ctx.lineJoin = "round";
-        if (type === "riviere" && (l.meandre > 0 || l.delta)) { tracerRiviere(ctx, l, st, lw, vue); continue; }
+        if (type === "riviere") continue;     // creusées dans la terre (creuserEaux), comme la mer
         if (type === "muraille") { tracerMuraille(ctx, l, st, lw, vue, th); continue; }
+        if (type === "route" || type === "sentier") { voies.push({ l: l, st: st, lw: lw }); continue; }
         if (st.halo) {
           cheminLigne(ctx, l.pts, st.lisse);
           ctx.setLineDash([]);
@@ -700,6 +1569,12 @@
         ctx.setLineDash(st.tiret ? st.tiret.map(function (v) { return v * lw; }) : []);
         ctx.stroke();
         ctx.setLineDash([]);
+      }
+      // Sentiers et routes ensemble (leurs croisements se fondent), puis les ponts, avant
+      // les murailles et les frontières.
+      if (type === "route") {
+        tracerVoies(ctx, voies, vue);
+        dessinerPonts(ctx, carte, vue, th, masque);
       }
     });
   }
@@ -1256,6 +2131,7 @@
     ctx.fillRect(0, 0, pw, ph);
 
     var z = vue.zoom * dpr;
+    ZPX = z;
     var tx = pw / 2 - vue.cx * z, ty = ph / 2 - vue.cy * z;
     var X0 = vue.cx - vue.largeur / 2 / vue.zoom, X1 = vue.cx + vue.largeur / 2 / vue.zoom;
     var Y0 = vue.cy - vue.hauteur / 2 / vue.zoom, Y1 = vue.cy + vue.hauteur / 2 / vue.zoom;
@@ -1280,7 +2156,9 @@
     lc.beginPath();
     lc.rect(0, 0, carte.largeur, carte.hauteur);
     lc.clip();
+    // 1) Les aplats de tous les traits, et les décors semés au passage (pas encore posés).
     var traits = carte.traits || [];
+    var semis = [];
     for (var i = 0; i < traits.length; i++) {
       var t = traits[i];
       if (!t.bb) t.bb = boiteTrait(t.pts, t.taille);
@@ -1288,10 +2166,45 @@
       var mat = MAT[t.mat];
       if (!mat) continue;
       tracerTrait(lc, t, mat);
-      if (!opts.rapide && mat.type === "terre" && mat.decor) decorer(lc, t, mat, vue.zoom, X0, Y0, X1, Y1);
+      if (!opts.rapide && mat.type === "terre" && mat.decor) semer(t, mat, vue.zoom, X0, Y0, X1, Y1, semis);
     }
+    // La terre telle qu'elle est AVANT d'être creusée : l'eau douce ne doit exister que
+    // dans son contour (sinon une rivière tracée jusqu'à la mer y déborde en pointe).
+    var terreAvant = null;
+    if (th.eauDouce) {
+      terreAvant = couche((opts.cle || "principal") + "-avant", pw, ph);
+      var ta = terreAvant.getContext("2d");
+      ta.setTransform(1, 0, 0, 1, 0, 0);
+      ta.clearRect(0, 0, pw, ph);
+      ta.drawImage(cvT, 0, 0);
+    }
+    // Lacs et rivières creusent la terre (encore dans le cadre de la carte).
+    creuserEaux(lc, carte, vue, X0, Y0, X1, Y1);
     lc.restore();
+
+    // Le masque des matériaux (ce qu'il y a sous chaque point : terrain, eau, route).
+    // Il sert aux décors, aux ponts et aux détails ; jamais pendant un déplacement.
+    var niv = niveau(carte, vue);
+    var masque = opts.rapide ? null : construireMasque(carte, vue, pw, ph, tx, ty, z, X0, Y0, X1, Y1);
+    // Les petits lieux qui apparaissent en zoomant : choisis maintenant, pour que les
+    // décors s'en écartent ; dessinés plus loin, au-dessus des routes.
+    var details = (masque && niv >= NIVEAU_DETAILS) ? preparerDetails(carte, vue, th, masque, tx, ty, z, pw, ph, dpr) : null;
+
+    // 2) Transitions : les couleurs des terrains se fondent les unes dans les autres
+    //    (flou appliqué à la couleur seulement, la côte reste nette).
+    if (!opts.rapide) fondreTransitions(lc, cvT, carte, z, dpr, pw, ph, opts.cle || "principal");
+
     if (!opts.rapide) {
+      // 3) Les décors, posés en une fois : seulement là où leur terrain est resté visible,
+      //    sans se chevaucher, du fond vers l'avant.
+      lc.save();
+      lc.setTransform(z, 0, 0, z, tx, ty);
+      lc.beginPath();
+      lc.rect(0, 0, carte.largeur, carte.hauteur);
+      lc.clip();
+      poserDecors(lc, semis, masque, details);
+      lc.restore();
+      // 4) Le grain du papier.
       lc.setTransform(1, 0, 0, 1, 0, 0);
       lc.globalCompositeOperation = "source-atop";
       lc.fillStyle = motifGrain(lc);
@@ -1299,8 +2212,33 @@
       lc.globalCompositeOperation = "source-over";
     }
 
-    // Assemblage : halo d'eau peu profonde, trait de côte, puis la terre.
+    // L'eau douce (thèmes à mer de papier) : peinte à part, gardée seulement là où il y
+    // avait de la terre avant le creusement, puis posée sous la terre.
+    if (terreAvant) {
+      var cvE = couche((opts.cle || "principal") + "-eaux", pw, ph), ec = cvE.getContext("2d");
+      ec.setTransform(1, 0, 0, 1, 0, 0);
+      ec.globalCompositeOperation = "source-over";
+      ec.clearRect(0, 0, pw, ph);
+      ec.setTransform(z, 0, 0, z, tx, ty);
+      eauxDouces(ec, carte, vue, th, X0, Y0, X1, Y1);
+      ec.setTransform(1, 0, 0, 1, 0, 0);
+      ec.globalCompositeOperation = "destination-in";
+      ec.drawImage(terreAvant, 0, 0);
+      ec.globalCompositeOperation = "source-over";
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.drawImage(cvE, 0, 0);
+      ctx.restore();
+    }
+
+    // Assemblage : halo d'eau peu profonde, trait de côte, puis la terre. Le tout reste
+    // dans le rectangle de la carte : une terre qui touche le bord (carte d'une ville)
+    // ne doit pas faire déborder son halo bleu sur la table.
     ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(tx, ty, carte.largeur * z, carte.hauteur * z);
+    ctx.clip();
     if (!opts.rapide) {
       var decale = pw + 64;
       var glow = th.glowPx
@@ -1318,11 +2256,13 @@
       }
     }
     ctx.drawImage(cvT, 0, 0);
+    ctx.restore();
 
     // Lignes, grille, teinte du thème.
     ctx.setTransform(z, 0, 0, z, tx, ty);
     if (opts.grille) dessinerGrille(ctx, carte, vue, th);
-    dessinerLignes(ctx, carte, vue, th, X0, Y0, X1, Y1);
+    dessinerLignes(ctx, carte, vue, th, X0, Y0, X1, Y1, masque);
+    dessinerDetails(ctx, details, th, carte);
     if (th.papier && !opts.rapide) {
       // Bords du parchemin plus sombres, comme une feuille vieillie.
       var rayon = Math.hypot(carte.largeur, carte.hauteur) / 2;
@@ -1377,15 +2317,17 @@
     var mat = MAT[t.mat];
     if (!mat) return;
     var dpr = vue.dpr || 1, z = vue.zoom * dpr;
+    ZPX = z;
     ctx.save();
     ctx.setTransform(z, 0, 0, z, vue.largeur * dpr / 2 - vue.cx * z, vue.hauteur * dpr / 2 - vue.cy * z);
     if (mat.type === "terre") {
       ctx.globalAlpha = 0.92;
       tracerTrait(ctx, t, mat);
       if (mat.decor) {
-        var m = t.taille;
-        decorer(ctx, t, mat, vue.zoom, vue.cx - vue.largeur / 2 / vue.zoom - m, vue.cy - vue.hauteur / 2 / vue.zoom - m,
-          vue.cx + vue.largeur / 2 / vue.zoom + m, vue.cy + vue.hauteur / 2 / vue.zoom + m);
+        var m = t.taille, semis = [];
+        semer(t, mat, vue.zoom, vue.cx - vue.largeur / 2 / vue.zoom - m, vue.cy - vue.hauteur / 2 / vue.zoom - m,
+          vue.cx + vue.largeur / 2 / vue.zoom + m, vue.cy + vue.hauteur / 2 / vue.zoom + m, semis);
+        poserDecors(ctx, semis, null);
       }
     } else {
       ctx.globalAlpha = 0.55;
@@ -1408,7 +2350,7 @@
     niveau: niveau, zoomAjuste: zoomAjuste,
     boiteTrait: boiteTrait, nouveauTrait: nouveauTrait,
     boiteEtiquette: boiteEtiquette, visibleLieu: visibleLieu, tailleIcone: tailleIcone,
-    styleLigne: styleLigne, pointsAffiches: pointsAffiches,
+    styleLigne: styleLigne, pointsAffiches: pointsAffiches, dansPolygone: dansPolygone,
     icone: icone, iconeAuto: iconeAuto,
     dessiner: dessiner, carteEntiere: carteEntiere, vignette: vignette, apercuTrait: apercuTrait
   };

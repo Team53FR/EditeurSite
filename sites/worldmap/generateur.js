@@ -152,6 +152,23 @@
       });
     }
 
+    // Quelques lacs, dans les basses terres, à bonne distance les uns des autres.
+    carte.lacs = carte.lacs || [];
+    var basses = [], lacsPos = [];
+    for (var s2 = 0; s2 < total; s2++) if (ALT[s2] > 0.12 && ALT[s2] < 0.4) basses.push(s2);
+    var nbLacs = Math.max(2, Math.min(5, Math.round(M / 1500)));
+    for (var tl = 0; tl < 80 && lacsPos.length < nbLacs && basses.length; tl++) {
+      var cl = basses[Math.floor(Moteur.alea(g + 41, tl) * basses.length)];
+      if (!lacsPos.every(function (o) { return Math.hypot(PX[o] - PX[cl], PY[o] - PY[cl]) > cell * 14; })) continue;
+      lacsPos.push(cl);
+      var rl = cell * (1.5 + Moteur.alea(g + 42, tl) * 1.6), contour = [];
+      for (var kl = 0; kl < 14; kl++) {
+        var al = kl / 14 * Math.PI * 2, rr = rl * (0.72 + 0.5 * Moteur.alea(g + 43, tl * 20 + kl));
+        contour.push(PX[cl] + Math.cos(al) * rr * 1.2, PY[cl] + Math.sin(al) * rr * 0.85);
+      }
+      carte.lacs.push({ id: "w" + (tl + 1) + Math.floor(Moteur.alea(g, tl + 9) * 1e6).toString(36), pts: contour });
+    }
+
     // Des navires en pleine mer, à l'écart des côtes et des îlots.
     carte.lieux = carte.lieux || [];
     var mers = [], navires = [];
