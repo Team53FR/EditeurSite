@@ -2051,6 +2051,83 @@ de ronde clair, deux rangées de créneaux) et les tours sont rondes, à toit co
 carrées pour les gardes de porte ; dans les autres styles, les tours de profil de toujours, plus
 grosses aux portes, et une arche entre elles.
 
+**Style Plan : ce qui complète la vue du dessus.**
+- **Carrefours sans chevauchement** : `maisonsDesRues` propose d'abord toutes les maisons de toutes les
+  rues, quelle que soit la vue (leur place ne dépend pas de ce qu'on regarde), puis écarte celles qui
+  mordraient sur une voie — la leur dans un virage, une autre à un carrefour —, sur une place ou sur
+  une maison déjà posée (grille de voisinage).
+- **Place** (tampon `place`, ronde ou carrée selon la variante) : disque de terre battue, pavage en
+  pointillé, fontaine au centre. Peinte avant tout le reste (`FONDS`) ; les décors semés dont le dessin
+  la recouvre sont retirés, et les rues bordées de maisons la contournent.
+- **Ponton** (tracé `ponton`, `tracerPonton`) : planches, rives de bois, pieux de chaque côté, ombre sur
+  l'eau ; on le trace de la berge vers le large.
+- **Reliefs vus du dessus** (`PEINTRES_DESSUS`) : montagnes et cimes en facettes éclairées du nord-ouest
+  (calotte blanche pour les cimes), collines à courbes de niveau, dunes à rides, roches sombres.
+- **Lieux vus du dessus** (`iconeDessus`, `ICONES_DESSUS`) : village, ville et capitale enceintes de
+  murs et de tours, fort, tour, port avec son ponton et son bateau, temple en croix, ruines, cabane,
+  ferme, auberge, moulin, phare, puits, menhirs, donjon, grotte, mine, navire, campement. Les autres
+  types gardent leur dessin de profil.
+
+**Gizmo : déplacer, tourner, redimensionner tout élément.** Autour de la sélection (un objet ou un
+groupe) : un cadre pointillé, quatre poignées d'angle pour agrandir ou réduire (autour du centre), une
+poignée ronde au-dessus pour tourner (Maj : par 15°) ; glisser l'objet — ou l'intérieur du cadre —
+le déplace, y compris un tracé entier. Le cadre suit l'objet (orienté pour un décor, un lieu ou un
+nom, aligné aux axes pour un tracé, un lac ou un groupe). Au début du geste on garde une copie de
+chaque objet (`debuterGizmo`) et chaque mouvement repart de cette copie (`appliquerGizmo` : échelle,
+rotation autour du pivot, translation) : rien ne dérive, et l'annulation est exacte, en un seul pas
+d'historique. Données : `a` (degrés) sur les décors posés et les lieux — le dessin est tourné autour
+de son centre, le nom d'un lieu reste droit ; `taille`/`maison` des tracés suivent l'échelle ; un nom
+attaché à un tracé ne fait que changer de taille. Panneau : curseur « Rotation » pour les décors et
+les lieux ; l'échelle d'un lieu va jusqu'à ×6.
+
+**Figer les décors automatiques.** Outil Décors → « Figer les décors de la vue » : `Moteur.figerDecors`
+rejoue la génération des décors du terrain pour la vue et les rend en tampons ordinaires, que l'on
+règle un par un avec le gizmo. La zone est retirée de la génération automatique par une zone
+rectangulaire de `carte.finesses` (`rect`, `dens: 0`), pour qu'ils ne s'affichent pas en double ; le
+tout est un seul pas d'historique, refusé au-delà de 6 000 décors (on zoome davantage). Pour une carte
+entièrement à la main : masquer le calque « Décors du terrain ».
+
+**Décors automatiques : aucun ne bouge ni ne disparaît en zoomant (refonte).** Avant, l'existence d'un
+décor était lue dans une image du terrain calculée à l'échelle de l'écran, et les décors trop petits
+étaient regroupés ou supprimés : des arbres apparaissaient, disparaissaient ou changeaient de place
+en zoomant. Désormais :
+- **Le terrain est interrogé en unités du monde** (`sonde`, `contexteZone`) : lacs et rivières
+  creusent, le trait le plus récent qui couvre le point donne le terrain, les zones « Affiner / Gomme à
+  décors » règlent finesse et densité (`zoneEn`), la distance aux voies se mesure sur la largeur de
+  la carte (`distVoie`), l'écart à la lisière du biome se fait par quatre sondes à une distance
+  proportionnelle à la taille du décor. Aucune étape ne dépend du zoom.
+- **Chaque décor est décidé une fois** et gardé par tuile de 24 × 24 cases (`CACHE_DECORS`,
+  `calculerTuile`). `synchroniserDecors` compare à chaque rendu les objets qui comptent (traits, lacs,
+  rivières, voies, zones) à ce qu'ils étaient et n'invalide que les tuiles touchées : peindre,
+  annuler ou déplacer un lac ne recalcule que ce qu'il faut.
+- **Plus de regroupement** : la vue choisit seulement les décors qu'elle montre. Un décor de moins
+  d'un pixel est invisible (pas supprimé : il grandit avec le zoom). Le même seuil vaut pour les
+  maisons, les décors posés et les rues de maisons.
+- Le plan des villes, les champs et les fissures de lave interrogent eux aussi le terrain du monde.
+Vérifié : sur une zone de 36 × 22 km (3 terrains, une route, un lac), les 41 mêmes décors, aux mêmes
+places et de la même taille, de ×0,5 à ×30.
+
+**Positions absolues des décors automatiques.** Un décor automatique est défini par des coordonnées du
+monde seules : grilles emboîtées ancrées en (0, 0), hachage de la case, terrain interrogé en unités du
+monde. Ni le zoom, ni la taille de la fenêtre, ni la définition de l'export n'y entrent. Reste
+l'échelle de référence des décors, qui dépendait de la taille de la carte : elle est maintenant
+**figée dans la carte** (`carte.zbFixe`, posée à l'ouverture ou à la création, `Moteur.fixerEchelleDecors`).
+Agrandir ou rétrécir la carte ne déplace donc plus aucun décor ; seul le réglage « Échelle des décors »
+la recalcule — et redistribue alors tous les décors, ce que l'éditeur annonce. Vérifié : 79 décors
+identiques (0 différence) après quatre changements de taille de la carte ; sans l'échelle figée, les
+79 étaient redistribués.
+Ce qui peut encore changer la place d'un décor, volontairement : repeindre le terrain autour
+(le terrain voisin change), peindre ou effacer une zone « Affiner / Gomme à décors », régler la
+finesse d'un coup de pinceau. Le thème, lui, ne change que la taille et l'aspect, jamais la place.
+
+**Style Plan : tout est vu du dessus.** Décors (`PEINTRES_DESSUS`) : arbres, conifères, palmiers, acacias,
+arbres morts (branches rayonnantes), montagnes et cimes en facettes, collines à courbes de niveau,
+dunes, rochers et roches sombres, cratère de volcan (anneaux, lave au centre), blocs de glace,
+marais (eau trouble et touffes de roseaux), parcelles de champ posées à la main, herbes. Lieux
+(`ICONES_DESSUS`) : les 28 types, y compris pilotis, vestiges, portail, cimetière, bataille, oasis,
+arbre ancien et épave. Les maisons, bâtisses et églises sont des toits orientés, la place est à plat.
+Seuls les repères (point, croix, étoile, drapeau) et les images importées gardent leur dessin propre.
+
 Les cartes d'avant s'ouvrent telles quelles : seuls leurs décors changent (ils viennent maintenant
 du terrain) et leurs petits lieux automatiques ont disparu.
 

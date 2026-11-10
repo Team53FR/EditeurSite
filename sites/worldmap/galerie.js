@@ -162,6 +162,7 @@
         carte.lieux = Array.isArray(carte.lieux) ? carte.lieux : [];
         carte.lacs = Array.isArray(carte.lacs) ? carte.lacs : [];
         carte.tampons = Array.isArray(carte.tampons) ? carte.tampons : [];
+        if (!(carte.zbFixe > 0)) Moteur.fixerEchelleDecors(carte);
         carte.id = Stockage.nouvelId();
         carte.nom = String(carte.nom || "Carte importée").slice(0, 80);
         carte.majLe = Date.now();
@@ -233,6 +234,7 @@
       majLe: Date.now(),
       version: 1
     };
+    Moteur.fixerEchelleDecors(carte);       // les décors automatiques gardent leur place, quelle que soit la taille ensuite
     if (actif($("nDepart"), "data-depart") === "aleatoire") {
       Generateur.monde(carte, Math.floor(Math.random() * 1e9));
     }

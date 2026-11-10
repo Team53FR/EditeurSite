@@ -602,27 +602,183 @@
       });
     };
   }
-  function rocherDessus(g, v) {
+  function rocherDessus(g, v, sombre) {
     var R = function (i) { return alea(2200 + v, i); };
     [[-12, 4, 17], [14, -4, 13], [4, 16, 10]].slice(0, 2 + v % 2).forEach(function (b, k) {
       var pts = [];
       for (var j = 0; j < 7; j++) { var a = j / 7 * TAU, r = b[2] * (0.75 + R(k * 9 + j) * 0.4); pts.push([b[0] + Math.cos(a) * r, b[1] + Math.sin(a) * r]); }
       var trace = function (dx, dy) { g.beginPath(); pts.forEach(function (q, j) { if (j) g.lineTo(q[0] + dx, q[1] + dy); else g.moveTo(q[0] + dx, q[1] + dy); }); g.closePath(); };
       trace(4, 5); g.fillStyle = "rgba(16,30,28,0.28)"; g.fill();
-      trace(0, 0); g.fillStyle = "#b9b6a6"; g.fill(); g.strokeStyle = "#1c2622"; g.lineWidth = 2.2; g.stroke();
+      trace(0, 0); g.fillStyle = sombre ? "#5a5552" : "#b9b6a6"; g.fill(); g.strokeStyle = "#1c2622"; g.lineWidth = 2.2; g.stroke();
     });
   }
+  // Un massif vu du dessus : un polygone irrégulier, découpé en facettes qui partent du sommet
+  // et sont éclairées du nord-ouest (claires d'un côté, sombres de l'autre) — l'ombrage d'un
+  // relief sur un plan. Les cimes ont une calotte blanche.
+  function montagneDessus(neige) {
+    return function (g, v) {
+      var R = function (i) { return alea(2300 + v + (neige ? 40 : 0), i); };
+      var n = 9, pts = [], i;
+      for (i = 0; i < n; i++) { var a = i / n * TAU + R(i) * 0.5, r = 30 + R(10 + i) * 14; pts.push([Math.cos(a) * r, Math.sin(a) * r * 0.92]); }
+      var c = [(R(30) - 0.5) * 8, (R(31) - 0.5) * 8];
+      var trace = function (dx, dy, k) { g.beginPath(); pts.forEach(function (q, j) { var X = c[0] + (q[0] - c[0]) * (k || 1) + dx, Y = c[1] + (q[1] - c[1]) * (k || 1) + dy; if (j) g.lineTo(X, Y); else g.moveTo(X, Y); }); g.closePath(); };
+      trace(6, 8); g.fillStyle = "rgba(16,30,28,0.3)"; g.fill();
+      trace(0, 0); g.fillStyle = "#8d8a7c"; g.fill();
+      var facettes = function (k, clair, sombre) {
+        for (var j = 0; j < n; j++) {
+          var p0 = pts[j], p1 = pts[(j + 1) % n], mx = (p0[0] + p1[0]) / 2 - c[0], my = (p0[1] + p1[1]) / 2 - c[1];
+          var lum = (-mx - my) / ((Math.hypot(mx, my) || 1) * 1.414);
+          g.fillStyle = lum > 0 ? clair + (0.1 + 0.38 * lum) + ")" : sombre + (0.12 - 0.34 * lum) + ")";
+          g.beginPath();
+          g.moveTo(c[0], c[1]);
+          g.lineTo(c[0] + (p0[0] - c[0]) * k, c[1] + (p0[1] - c[1]) * k);
+          g.lineTo(c[0] + (p1[0] - c[0]) * k, c[1] + (p1[1] - c[1]) * k);
+          g.closePath(); g.fill();
+        }
+      };
+      facettes(1, "rgba(255,252,236,", "rgba(26,22,16,");
+      g.strokeStyle = "rgba(40,34,26,0.45)"; g.lineWidth = 1;
+      g.beginPath(); pts.forEach(function (q) { g.moveTo(c[0], c[1]); g.lineTo(q[0], q[1]); }); g.stroke();
+      if (neige) {
+        g.save(); trace(0, 0, 0.55); g.fillStyle = "rgba(248,251,252,0.94)"; g.fill(); g.clip();
+        for (var j = 0; j < n; j++) {
+          var p0 = pts[j], p1 = pts[(j + 1) % n], mx = (p0[0] + p1[0]) / 2 - c[0], my = (p0[1] + p1[1]) / 2 - c[1];
+          var lum = (-mx - my) / ((Math.hypot(mx, my) || 1) * 1.414);
+          if (lum < 0) { g.fillStyle = "rgba(96,128,160," + (0.14 - 0.3 * lum) + ")"; g.beginPath(); g.moveTo(c[0], c[1]); g.lineTo(p0[0], p0[1]); g.lineTo(p1[0], p1[1]); g.closePath(); g.fill(); }
+        }
+        g.restore();
+      }
+      trace(0, 0); g.strokeStyle = "#1c2622"; g.lineWidth = 2.2; g.stroke();
+    };
+  }
+  function collineDessus(g, v) {
+    var R = function (i) { return alea(2400 + v, i); }, rx = 36 + R(1) * 8, ry = 28 + R(2) * 7, a = (R(3) - 0.5) * 0.5;
+    g.save(); g.translate(5, 7); g.rotate(a); g.fillStyle = "rgba(16,30,28,0.22)"; g.beginPath(); g.ellipse(0, 0, rx, ry, 0, 0, TAU); g.fill(); g.restore();
+    g.save(); g.rotate(a);
+    var gr = g.createRadialGradient(-rx * 0.3, -ry * 0.35, 2, 0, 0, rx);
+    gr.addColorStop(0, "#c3dd9f"); gr.addColorStop(1, "#86b070");
+    g.fillStyle = gr; g.beginPath(); g.ellipse(0, 0, rx, ry, 0, 0, TAU); g.fill();
+    g.strokeStyle = "rgba(50,82,44,0.4)"; g.lineWidth = 1.2;
+    [0.7, 0.4].forEach(function (f) { g.beginPath(); g.ellipse(-rx * 0.1 * (1 - f), -ry * 0.12 * (1 - f), rx * f, ry * f, 0, 0, TAU); g.stroke(); });
+    g.strokeStyle = "rgba(28,48,36,0.55)"; g.lineWidth = 1.6; g.beginPath(); g.ellipse(0, 0, rx, ry, 0, 0, TAU); g.stroke();
+    g.restore();
+  }
+  function duneDessus(g, v) {
+    var R = function (i) { return alea(2500 + v, i); }, rx = 38 + R(1) * 8, ry = 24 + R(2) * 6, a = (R(3) - 0.5) * 0.8;
+    g.save(); g.rotate(a);
+    g.fillStyle = "rgba(120,92,40,0.2)"; g.beginPath(); g.ellipse(4, 5, rx, ry, 0, 0, TAU); g.fill();
+    var gr = g.createLinearGradient(-rx, -ry, rx, ry); gr.addColorStop(0, "#f0e2b0"); gr.addColorStop(1, "#cdb676");
+    g.fillStyle = gr; g.beginPath(); g.ellipse(0, 0, rx, ry, 0, 0, TAU); g.fill();
+    g.strokeStyle = "rgba(150,112,48,0.5)"; g.lineWidth = 1.3;
+    for (var i = -2; i <= 2; i++) { g.beginPath(); g.moveTo(-rx * 0.8, i * ry * 0.32); g.quadraticCurveTo(0, i * ry * 0.32 - ry * 0.28, rx * 0.8, i * ry * 0.32); g.stroke(); }
+    g.restore();
+  }
+  // Une place : un disque (ou un carré) de terre battue, son pavage en pointillé et, au
+  // milieu, une fontaine ou un monument. Posée sous les maisons et les arbres.
+  function peintPlace(g, v) {
+    var carre = v % 2 === 1, R = 46;
+    var forme = function (k) { g.beginPath(); if (carre) { var q = R * k * 0.9; g.rect(-q, -q, 2 * q, 2 * q); } else g.arc(0, 0, R * k, 0, TAU); };
+    forme(1); g.fillStyle = "#d9cfae"; g.fill(); g.strokeStyle = "rgba(70,58,36,0.6)"; g.lineWidth = 2.4; g.stroke();
+    forme(0.84); g.strokeStyle = "rgba(100,86,56,0.45)"; g.lineWidth = 5; g.setLineDash([2.5, 4]); g.stroke(); g.setLineDash([]);
+    g.fillStyle = "rgba(16,30,28,0.28)"; g.beginPath(); g.arc(3, 4, 12, 0, TAU); g.fill();
+    g.fillStyle = "#bdb8a8"; g.strokeStyle = "#1c2622"; g.lineWidth = 2; g.beginPath(); g.arc(0, 0, 12, 0, TAU); g.fill(); g.stroke();
+    g.fillStyle = "#6aa6b2"; g.beginPath(); g.arc(0, 0, 8, 0, TAU); g.fill(); g.stroke();
+    g.fillStyle = "#c9c4b4"; g.beginPath(); g.arc(0, 0, 2.6, 0, TAU); g.fill();
+  }
+
+  function reduit(f, k) { return function (g, v) { g.save(); g.scale(k, k); f(g, v); g.restore(); }; }
+
+  // Le reste des décors, vus du dessus.
+  function mortDessus(g, v) {
+    var R = function (i) { return alea(2600 + v, i); };
+    var branche = function (x, y, a, L, w, n) {
+      var ex = x + Math.cos(a) * L, ey = y + Math.sin(a) * L;
+      g.lineWidth = w; g.beginPath(); g.moveTo(x, y); g.lineTo(ex, ey); g.stroke();
+      if (n > 0) { branche(ex, ey, a - 0.5 - R(n * 5 + 1) * 0.4, L * 0.66, w * 0.7, n - 1); branche(ex, ey, a + 0.45 + R(n * 5 + 2) * 0.4, L * 0.62, w * 0.7, n - 1); }
+    };
+    var tout = function () { for (var k = 0; k < 6; k++) branche(0, 0, k / 6 * TAU + R(k) * 0.8, 17 + R(10 + k) * 7, 3.6, 3); };
+    g.lineCap = "round";
+    g.save(); g.translate(5, 6); g.strokeStyle = "rgba(16,30,28,0.28)"; tout(); g.restore();
+    g.strokeStyle = "#4a4036"; tout();
+    g.fillStyle = "#3a3028"; g.strokeStyle = "#1c2622"; g.lineWidth = 1.8; g.beginPath(); g.arc(0, 0, 4.4, 0, TAU); g.fill(); g.stroke();
+  }
+  function maraisDessus(g, v) {
+    var R = function (i) { return alea(2700 + v, i); }, pts = [], i;
+    for (i = 0; i < 10; i++) { var a = i / 10 * TAU, r = 30 + R(i) * 10; pts.push([Math.cos(a) * r, Math.sin(a) * r * 0.78]); }
+    var blob = function () { g.beginPath(); pts.forEach(function (q, j) { if (j) g.lineTo(q[0], q[1]); else g.moveTo(q[0], q[1]); }); g.closePath(); };
+    var gr = g.createRadialGradient(-6, -4, 3, 0, 0, 40); gr.addColorStop(0, "#74aaa2"); gr.addColorStop(1, "#4f7f7e");
+    blob(); g.fillStyle = gr; g.fill(); g.strokeStyle = "rgba(28,48,44,0.6)"; g.lineWidth = 1.6; g.stroke();
+    for (i = 0; i < 5; i++) {
+      var cx = (R(20 + i) - 0.5) * 40, cy = (R(30 + i) - 0.5) * 26;
+      for (var j = 0; j < 7; j++) { var b = j / 7 * TAU + R(40 + i * 7 + j); g.strokeStyle = j % 2 ? "#3d5c35" : "#6d8c4f"; g.lineWidth = 2; g.lineCap = "round"; g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + Math.cos(b) * (5 + R(50 + j) * 4), cy + Math.sin(b) * (5 + R(60 + j) * 4)); g.stroke(); }
+      g.fillStyle = "#5b3f26"; g.beginPath(); g.arc(cx, cy, 1.6, 0, TAU); g.fill();
+    }
+  }
+  function glaconDessus(g, v) {
+    var R = function (i) { return alea(2800 + v, i); }, n = 8, pts = [], i;
+    for (i = 0; i < n; i++) { var a = i / n * TAU + R(i) * 0.4, r = 22 + R(10 + i) * 14; pts.push([Math.cos(a) * r, Math.sin(a) * r * 0.9]); }
+    var trace = function (dx, dy) { g.beginPath(); pts.forEach(function (q, j) { if (j) g.lineTo(q[0] + dx, q[1] + dy); else g.moveTo(q[0] + dx, q[1] + dy); }); g.closePath(); };
+    trace(5, 6); g.fillStyle = "rgba(20,60,90,0.28)"; g.fill();
+    trace(0, 0); g.fillStyle = "#e6f0f4"; g.fill();
+    for (i = 0; i < n; i++) {
+      var p0 = pts[i], p1 = pts[(i + 1) % n], mx = (p0[0] + p1[0]) / 2, my = (p0[1] + p1[1]) / 2, lum = (-mx - my) / ((Math.hypot(mx, my) || 1) * 1.414);
+      g.fillStyle = lum > 0 ? "rgba(255,255,255," + (0.2 + 0.4 * lum) + ")" : "rgba(80,130,170," + (0.1 - 0.3 * lum) + ")";
+      g.beginPath(); g.moveTo(0, 0); g.lineTo(p0[0], p0[1]); g.lineTo(p1[0], p1[1]); g.closePath(); g.fill();
+    }
+    trace(0, 0); g.strokeStyle = "#5f87a0"; g.lineWidth = 1.8; g.stroke();
+  }
+  function cratereDessus(g, v) {
+    g.fillStyle = "rgba(16,30,28,0.3)"; g.beginPath(); g.arc(6, 8, 42, 0, TAU); g.fill();
+    var gr = g.createRadialGradient(-12, -14, 4, 0, 0, 44); gr.addColorStop(0, "#9a8574"); gr.addColorStop(1, "#40342e");
+    g.fillStyle = gr; g.strokeStyle = "#1c2622"; g.lineWidth = 2.4; g.beginPath(); g.arc(0, 0, 42, 0, TAU); g.fill(); g.stroke();
+    g.strokeStyle = "rgba(30,22,16,0.4)"; g.lineWidth = 1.2; g.beginPath();
+    for (var i = 0; i < 12; i++) { var a = i / 12 * TAU + v; g.moveTo(Math.cos(a) * 17, Math.sin(a) * 17); g.lineTo(Math.cos(a) * 41, Math.sin(a) * 41); }
+    g.stroke();
+    g.fillStyle = "#2c2420"; g.beginPath(); g.arc(0, 0, 17, 0, TAU); g.fill();
+    var lave = g.createRadialGradient(0, 0, 1, 0, 0, 13); lave.addColorStop(0, "#ffe08a"); lave.addColorStop(0.5, "#ff8a1c"); lave.addColorStop(1, "#c23c10");
+    g.fillStyle = lave; g.beginPath(); g.arc(0, 0, 13, 0, TAU); g.fill();
+  }
+  function champDessus(g, v) {
+    var R = function (i) { return alea(2900 + v, i); }, a = (R(1) - 0.5) * 0.7, teintes = ["#94776a", "#9c7c6c", "#886f64", "#a08572"];
+    g.save(); g.rotate(a);
+    g.fillStyle = "rgba(16,30,28,0.22)"; g.fillRect(-38, -24, 80, 54);
+    g.fillStyle = teintes[v % teintes.length]; g.fillRect(-40, -28, 80, 56);
+    g.strokeStyle = "rgba(60,40,32,0.5)"; g.lineWidth = 1.4; g.beginPath();
+    for (var i = 1; i < 12; i++) { g.moveTo(-40, -28 + i * 4.7); g.lineTo(40, -28 + i * 4.7); }
+    g.stroke();
+    g.strokeStyle = "#1c2622"; g.lineWidth = 2; g.strokeRect(-40, -28, 80, 56);
+    g.restore();
+  }
+  function herbeDessus(seche) {
+    return function (g, v) {
+      var R = function (i) { return alea(3000 + v, i); };
+      g.lineCap = "round";
+      for (var i = 0; i < 9; i++) {
+        var a = i / 9 * TAU + R(i) * 0.5, L = 12 + R(10 + i) * 10;
+        g.strokeStyle = seche ? (i % 2 ? "#a08848" : "#c4aa5c") : (i % 2 ? "#4c762e" : "#84aa4c"); g.lineWidth = 3;
+        g.beginPath(); g.moveTo(0, 0); g.quadraticCurveTo(Math.cos(a + 0.4) * L * 0.6, Math.sin(a + 0.4) * L * 0.6, Math.cos(a) * L, Math.sin(a) * L); g.stroke();
+      }
+    };
+  }
+
   var PEINTRES_DESSUS = {
+    mort: mortDessus, marais: maraisDessus, glacon: glaconDessus, cratere: cratereDessus, champ: champDessus,
+    herbe: herbeDessus(false), seche: herbeDessus(true),
+    // Vus d'en haut, ils occupent toute la boîte du dessin de profil : on les réduit pour qu'ils
+    // gardent la même emprise sur la carte.
+    montagne: reduit(montagneDessus(false), 0.62), cime: reduit(montagneDessus(true), 0.62),
+    colline: reduit(collineDessus, 0.58), dune: reduit(duneDessus, 0.66),
+    basalte: function (g, v) { rocherDessus(g, v, true); }, aiguilles: function (g, v) { rocherDessus(g, v + 1, true); },
     arbre: arbreDessus("arbre"), tropical: arbreDessus("tropical"), conifere: arbreDessus("conifere"),
-    automne: arbreDessus("automne"), palmier: arbreDessus("palmier"), acacia: arbreDessus("acacia"), rocher: rocherDessus
+    automne: arbreDessus("automne"), palmier: arbreDessus("palmier"), acacia: arbreDessus("acacia"), rocher: function (g, v) { rocherDessus(g, v, false); }
   };
 
   // Une maison vue du dessus : un toit rectangulaire (long côté `w`, tourné de `a`), ses
   // deux pans séparés par le faîte, les rangs de bardeaux, et son ombre. Dessinée en
   // vectoriel (et non collée) : chaque maison a sa propre orientation.
   var TOITS_DESSUS = ["#b98a68", "#a97c5e", "#c29472", "#b08064", "#9c7458", "#6f8496", "#bd8e6c", "#7b8ea0"];
-  function maisonDessus(lc, x, y, w, h, a, v) {
-    var u = Math.max(w, h) / 60;
+  function maisonDessus(lc, x, y, w, h, a, v, fin, couleur) {
+    var u = Math.max(Math.max(w, h) / 60, fin || 0);
     lc.save();
     lc.translate(x, y);
     lc.save();
@@ -631,7 +787,7 @@
     lc.restore();
     lc.rotate(a);
     lc.lineJoin = "round";
-    lc.fillStyle = TOITS_DESSUS[v % TOITS_DESSUS.length];
+    lc.fillStyle = couleur || TOITS_DESSUS[v % TOITS_DESSUS.length];
     lc.fillRect(-w / 2, -h / 2, w, h);
     lc.fillStyle = "rgba(20,14,8,0.16)"; lc.fillRect(-w / 2, 0, w, h / 2);       // le pan à l'ombre
     lc.strokeStyle = "rgba(40,26,16,0.45)"; lc.lineWidth = u * 0.9;
@@ -681,10 +837,11 @@
     champ: peintChamp, glacon: peintGlacon, cratere: peintCratere, aiguilles: peintAiguilles,
     maison: function (g, v) { peintMaisonVille(g, v, "maison"); },
     batisse: function (g, v) { peintMaisonVille(g, v, "batisse"); },
-    clocher: function (g, v) { peintMaisonVille(g, v, "clocher"); }
+    clocher: function (g, v) { peintMaisonVille(g, v, "clocher"); },
+    place: peintPlace
   };
   var VARIANTES = { arbre: 6, conifere: 4, automne: 6, tropical: 6, palmier: 4, acacia: 4, mort: 4, montagne: 6, cime: 6,
-    colline: 4, dune: 4, marais: 3, herbe: 3, seche: 3, rocher: 6, basalte: 6, champ: 6, glacon: 4, cratere: 2, aiguilles: 6, maison: 12, batisse: 6, clocher: 4 };
+    colline: 4, dune: 4, marais: 3, herbe: 3, seche: 3, rocher: 6, basalte: 6, champ: 6, glacon: 4, cratere: 2, aiguilles: 6, maison: 12, batisse: 6, clocher: 4, place: 2 };
 
   // Colle un décor peint : (x, y) est le point où il touche le sol, s la taille de sa boîte.
   function colle(ctx, type, v, x, y, s) {
@@ -750,7 +907,7 @@
     { id: "mort", nom: "Arbre mort" }, { id: "montagne", nom: "Montagne", max: 230 }, { id: "cime", nom: "Pic enneigé", max: 230 },
     { id: "cratere", nom: "Volcan", max: 230 }, { id: "aiguilles", nom: "Aiguilles noires", max: 170 }, { id: "colline", nom: "Colline", max: 170 }, { id: "dune", nom: "Dune", max: 170 },
     { id: "rocher", nom: "Rochers" }, { id: "basalte", nom: "Roche sombre" }, { id: "glacon", nom: "Glace" },
-    { id: "champ", nom: "Champ" }, { id: "maison", nom: "Maison" }, { id: "batisse", nom: "Bâtisse" }, { id: "clocher", nom: "Église" }, { id: "marais", nom: "Roseaux" }, { id: "herbe", nom: "Herbes" }, { id: "seche", nom: "Herbes sèches" }
+    { id: "champ", nom: "Champ" }, { id: "maison", nom: "Maison" }, { id: "batisse", nom: "Bâtisse" }, { id: "clocher", nom: "Église" }, { id: "place", nom: "Place" }, { id: "marais", nom: "Roseaux" }, { id: "herbe", nom: "Herbes" }, { id: "seche", nom: "Herbes sèches" }
   ];
 
   var BATIMENTS = { maison: 1, batisse: 1.5, clocher: 1.8 };      // tampons orientables en vue du dessus
@@ -769,7 +926,8 @@
     falaise:   { nom: "Falaise",        px: 1.6 },
     muraille:  { nom: "Muraille",       px: 5 },
     frontiere: { nom: "Frontière",      px: 2.4 },
-    maritime:  { nom: "Route maritime", px: 1.6 }
+    maritime:  { nom: "Route maritime", px: 1.6 },
+    ponton:    { nom: "Ponton",         px: 4 }
   };
   // Les voies : elles se rejoignent, portent des ponts, et les décors s'en écartent.
   var VOIES = { route: true, pavee: true, sentier: true, maisons: true };
@@ -1008,10 +1166,16 @@
   // `carte.finesse` (0, 1 ou 2 ; 1 par défaut) règle l'échelle générale des décors : à 1, un
   // arbre fait une quinzaine de pixels à la vue d'ensemble — une carte fouillée, qui supporte
   // d'être regardée de près.
-  function zoomBase(carte) {
+  //
+  // Cette échelle est FIGÉE dans la carte (`carte.zbFixe`) dès qu'elle est ouverte ou créée :
+  // agrandir ou rétrécir la carte ne la change pas, donc ne déplace aucun décor automatique.
+  // Seul le réglage « Échelle des décors » la recalcule (`fixerEchelleDecors`), à la demande.
+  function zoomBaseCalcule(carte) {
     var fin = typeof carte.finesse === "number" ? carte.finesse : 1;
     return 1400 / Math.max(carte.largeur, carte.hauteur) * Math.pow(2, fin);
   }
+  function zoomBase(carte) { return carte.zbFixe > 0 ? carte.zbFixe : zoomBaseCalcule(carte); }
+  function fixerEchelleDecors(carte) { carte.zbFixe = zoomBaseCalcule(carte); return carte.zbFixe; }
   var FINESSE_MAX = 4;
 
   // Le niveau de cases d'un terrain : fixé par la carte et par la finesse du trait (`fin` :
@@ -1025,20 +1189,249 @@
   // feraient moins de quelques pixels (une forêt fine vue de très loin), on en dessine un
   // sur quatre, deux fois plus grand, aux mêmes endroits — la forêt reste une forêt.
   // `tampons` : les décors posés à la main, dont les autres s'écartent.
+  // ----- Ce qu'il y a sous un point du monde (sans écran, sans zoom) -----
+  //
+  // Pour qu'un décor automatique ne bouge ni ne disparaisse en zoomant, sa présence ne peut
+  // dépendre que de la carte : jamais d'une image calculée à l'échelle de l'écran. On interroge
+  // donc les objets eux-mêmes, en unités du monde : les lacs et les rivières creusent, le trait
+  // le plus récent qui couvre le point donne le terrain, les zones « Affiner / Gomme à décors »
+  // ajustent la finesse et la densité. Les listes d'objets sont d'abord réduites à la zone qui
+  // nous intéresse (`contexteZone`), si bien qu'une interrogation ne parcourt que quelques objets.
+  var indexTraits = typeof WeakMap !== "undefined" ? new WeakMap() : null;
+
+  function indexTrait(t) {
+    var p = t.pts, cle = p.length + "|" + t.taille + "|" + p[0] + "|" + p[p.length - 1];
+    var c = indexTraits && indexTraits.get(t);
+    if (c && c.cle === cle) return c;
+    var cell = Math.max(t.taille, 1e-9), r = t.taille / 2, grille = {}, i;
+    var ajoute = function (gx, gy, v) { var k = gx + "," + gy; (grille[k] || (grille[k] = [])).push(v); };
+    if (t.nuage || p.length <= 2) {
+      for (i = 0; i < p.length; i += 2) ajoute(Math.floor(p[i] / cell), Math.floor(p[i + 1] / cell), i);
+    } else {
+      for (i = 0; i + 3 < p.length; i += 2) {
+        var gx0 = Math.floor((Math.min(p[i], p[i + 2]) - r) / cell), gx1 = Math.floor((Math.max(p[i], p[i + 2]) + r) / cell);
+        var gy0 = Math.floor((Math.min(p[i + 1], p[i + 3]) - r) / cell), gy1 = Math.floor((Math.max(p[i + 1], p[i + 3]) + r) / cell);
+        for (var gx = gx0; gx <= gx1; gx++) for (var gy = gy0; gy <= gy1; gy++) ajoute(gx, gy, i);
+      }
+    }
+    c = { cle: cle, cell: cell, grille: grille };
+    if (indexTraits) indexTraits.set(t, c);
+    return c;
+  }
+
+  function couvre(t, x, y) {
+    var ix = indexTrait(t), r = t.taille / 2, p = t.pts, dabs = t.nuage || p.length <= 2;
+    var gx = Math.floor(x / ix.cell), gy = Math.floor(y / ix.cell);
+    for (var ax = gx - 1; ax <= gx + 1; ax++) {
+      for (var ay = gy - 1; ay <= gy + 1; ay++) {
+        var l = ix.grille[ax + "," + ay];
+        if (!l) continue;
+        for (var q = 0; q < l.length; q++) {
+          var i = l[q];
+          if (dabs) { if (Math.hypot(p[i] - x, p[i + 1] - y) <= r * 0.92) return true; }
+          else if (distSeg(x, y, p[i], p[i + 1], p[i + 2], p[i + 3]) <= r) return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  // Les objets qui touchent le rectangle (x0, y0, x1, y1), réduits à ce qui compte pour les décors.
+  function contexteZone(carte, x0, y0, x1, y1) {
+    var ctx = { traits: [], lacs: [], rivieres: [], voies: [], zones: [] };
+    (carte.traits || []).forEach(function (t) {
+      if (!t.bb) t.bb = boiteTrait(t.pts, t.taille);
+      if (chevauche(t.bb, x0, y0, x1, y1)) ctx.traits.push(t);
+    });
+    (carte.lacs || []).forEach(function (l) {
+      if (!l.pts || l.pts.length < 6) return;
+      var bb = boiteTrait(l.pts, 0);
+      if (chevauche(bb, x0, y0, x1, y1)) ctx.lacs.push({ l: l, bb: bb });
+    });
+    (carte.lignes || []).forEach(function (l) {
+      if (!l.pts || l.pts.length < 4 || (l.type !== "riviere" && !VOIES[l.type])) return;
+      var d = pointsAffiches(l), m = (l.taille || 0) * 1.5, bb = boiteTrait(d, 0);
+      if (!chevauche([bb[0] - m, bb[1] - m, bb[2] + m, bb[3] + m], x0, y0, x1, y1)) return;
+      (l.type === "riviere" ? ctx.rivieres : ctx.voies).push({ l: l, d: d, bb: bb, m: m });
+    });
+    (carte.finesses || []).forEach(function (f) { if (f.bb && chevauche(f.bb, x0, y0, x1, y1)) ctx.zones.push(f); });
+    return ctx;
+  }
+
+  var SANS_TERRAIN = { eau: true, t: null, m: null };
+  // Le terrain en (x, y) : { eau: true } (mer, gomme, lac, rivière, hors carte) ou { eau: false, t, m }.
+  function sonde(ctx, carte, x, y) {
+    if (x < 0 || y < 0 || x > carte.largeur || y > carte.hauteur) return SANS_TERRAIN;
+    var i, q;
+    for (i = 0; i < ctx.lacs.length; i++) {
+      var lb = ctx.lacs[i].bb;
+      if (x >= lb[0] && x <= lb[2] && y >= lb[1] && y <= lb[3] && dansPolygone(x, y, ctx.lacs[i].l.pts)) return SANS_TERRAIN;
+    }
+    for (i = 0; i < ctx.rivieres.length; i++) {
+      var rv = ctx.rivieres[i], rb = rv.bb, demi = (rv.l.taille || 0) * (rv.l.delta ? 0.65 : 0.5);
+      if (x < rb[0] - demi || x > rb[2] + demi || y < rb[1] - demi || y > rb[3] + demi) continue;
+      for (q = 0; q + 3 < rv.d.length; q += 2) if (distSeg(x, y, rv.d[q], rv.d[q + 1], rv.d[q + 2], rv.d[q + 3]) <= demi) return SANS_TERRAIN;
+    }
+    for (i = ctx.traits.length - 1; i >= 0; i--) {
+      var t = ctx.traits[i], b = t.bb;
+      if (x < b[0] || x > b[2] || y < b[1] || y > b[3] || !couvre(t, x, y)) continue;
+      var m = MAT[t.mat];
+      return !m || m.type === "eau" ? SANS_TERRAIN : { eau: false, t: t, m: m };
+    }
+    return SANS_TERRAIN;
+  }
+
+  // Distance d'un point à la voie la plus proche, moins la demi-largeur de cette voie (négatif :
+  // sur la voie). La largeur est celle de la carte (`taille`), pas celle dessinée à l'écran.
+  function distVoie(ctx, x, y) {
+    var best = Infinity;
+    for (var i = 0; i < ctx.voies.length; i++) {
+      var v = ctx.voies[i], b = v.bb, m = v.m + best;
+      if (best < Infinity && (x < b[0] - m || x > b[2] + m || y < b[1] - m || y > b[3] + m)) continue;
+      var demi = (v.l.taille || 0) * 0.6;
+      for (var q = 0; q + 3 < v.d.length; q += 2) {
+        var d = distSeg(x, y, v.d[q], v.d[q + 1], v.d[q + 2], v.d[q + 3]) - demi;
+        if (d < best) best = d;
+      }
+    }
+    return best;
+  }
+
+  // La zone « Affiner / Gomme à décors » qui couvre ce point (la plus récente), ou null.
+  function zoneEn(ctx, x, y) {
+    var res = null;
+    for (var i = 0; i < ctx.zones.length; i++) {
+      var f = ctx.zones[i];
+      if (f.rect) { if (x >= f.rect[0] && x <= f.rect[2] && y >= f.rect[1] && y <= f.rect[3]) res = f; continue; }
+      var p = f.pts, r = f.taille / 2, ok = false, q;
+      if (p.length <= 2) ok = Math.hypot(p[0] - x, p[1] - y) <= r;
+      else for (q = 0; q + 3 < p.length && !ok; q += 2) ok = distSeg(x, y, p[q], p[q + 1], p[q + 2], p[q + 3]) <= r;
+      if (ok) res = f;
+    }
+    return res;
+  }
+
+  // Réglages d'un point : finesse, densité, taille des décors (la zone prime sur le trait).
+  function reglagesEn(q, zone) {
+    var t = q.t;
+    return {
+      fin: Math.min(FINESSE_MAX, zone && zone.fin != null ? zone.fin : (t.fin || 0)),
+      dens: zone && zone.dens != null ? zone.dens : (t.sansDecor ? 0 : (t.dens == null ? 2 : t.dens)),
+      ech: t.ech == null ? 1 : t.ech
+    };
+  }
+
+  // ----- Les décors du terrain, décidés une fois pour toutes -----
+  //
+  // Chaque case des grilles emboîtées (pointCase) porte un emplacement. On décide, pour chacun, en
+  // coordonnées du monde, s'il porte un décor : le terrain dessous, sa densité, son écart à la
+  // lisière du biome, aux voies. Rien de cela ne dépend du zoom : même décor, même place, même
+  // taille en km, à toutes les échelles. Le résultat est gardé par tuile ; quand un objet change
+  // (un coup de pinceau, un lac déplacé…), seules les tuiles qu'il touche sont recalculées.
+  var TUILE = 24;                                    // côté d'une tuile, en cases
+  var CACHE_DECORS = { sig: "", tuiles: new Map(), objets: new Map(), total: 0 };
+
+  function invaliderDecors(bb) {
+    CACHE_DECORS.tuiles.forEach(function (tu, cle) {
+      if (chevauche(tu.bbm, bb[0], bb[1], bb[2], bb[3])) { CACHE_DECORS.total -= tu.entrees.length + 1; CACHE_DECORS.tuiles.delete(cle); }
+    });
+  }
+
+  // Compare les objets qui influencent les décors à ce qu'ils étaient au rendu précédent.
+  function synchroniserDecors(carte) {
+    var C = CACHE_DECORS, sig = [carte.id, carte.largeur, carte.hauteur, zoomBase(carte)].join("|");
+    if (C.sig !== sig || C.total > 900000) { C.sig = sig; C.tuiles.clear(); C.objets.clear(); C.total = 0; }
+    var vus = {};
+    var voir = function (id, signature, bb) {
+      vus[id] = true;
+      var o = C.objets.get(id);
+      if (!o) { C.objets.set(id, { sig: signature, bb: bb }); invaliderDecors(bb); }
+      else if (o.sig !== signature) { invaliderDecors(o.bb); invaliderDecors(bb); o.sig = signature; o.bb = bb; }
+    };
+    var somme = function (p, ini) { var n = ini; for (var i = 0; i < p.length; i++) n += p[i] * (1 + (i % 7) * 0.137); return n; };
+    (carte.traits || []).forEach(function (t, i) {
+      if (!t.bb) t.bb = boiteTrait(t.pts, t.taille);
+      var p = t.pts, mid = p.length >> 2 << 1;
+      var m = MAT[t.mat];
+      voir("t" + (t.id || i), p.length * 1.1 + t.taille * 7.3 + p[0] + p[p.length - 1] * 3.1 + p[mid] * 1.7 + (t.dens == null ? 9 : t.dens) * 17 + (t.ech == null ? 9 : t.ech) * 29 +
+        (t.fin || 0) * 31 + (m ? m.code : 0) * 37 + (t.sansDecor ? 1000 : 0) + (t.rug || 0) * 13, t.bb);
+    });
+    (carte.lacs || []).forEach(function (l, i) {
+      if (l.pts && l.pts.length >= 6) voir("w" + (l.id || i), somme(l.pts, 0), boiteTrait(l.pts, 0));
+    });
+    (carte.lignes || []).forEach(function (l, i) {
+      if (!l.pts || l.pts.length < 4 || (l.type !== "riviere" && !VOIES[l.type])) return;
+      var m = (l.taille || 0) * 2;
+      voir("l" + (l.id || i), somme(l.pts, (l.taille || 0) * 11 + (l.meandre || 0) * 5 + (l.delta ? 3 : 0) + (l.lisse === false ? 7 : 0) + (l.type === "riviere" ? 1 : 2)),
+        (function (bb) { return [bb[0] - m, bb[1] - m, bb[2] + m, bb[3] + m]; })(boiteTrait(l.pts, 0)));
+    });
+    (carte.finesses || []).forEach(function (f, i) {
+      voir("f" + (f.id || i), f.rect ? somme(f.rect, 5 + (f.dens == null ? 9 : f.dens)) : somme(f.pts, f.taille * 3 + (f.fin == null ? 9 : f.fin) + (f.dens == null ? 9 : f.dens) * 7), f.bb || [0, 0, 0, 0]);
+    });
+    C.objets.forEach(function (o, id) { if (!vus[id]) { invaliderDecors(o.bb); C.objets.delete(id); } });
+  }
+
+  function calculerTuile(carte, k, ti, tj, zb) {
+    var D = CASE0 / Math.pow(2, k), x0 = ti * TUILE * D, y0 = tj * TUILE * D, x1 = x0 + TUILE * D, y1 = y0 + TUILE * D, pad = 10 * D;
+    var tu = { entrees: [], bbm: [x0 - pad, y0 - pad, x1 + pad, y1 + pad] };
+    var ctx = contexteZone(carte, tu.bbm[0], tu.bbm[1], tu.bbm[2], tu.bbm[3]);
+    if (!ctx.traits.length) return tu;
+    var L = carte.largeur, H = carte.hauteur;
+    for (var cj = tj * TUILE; cj < (tj + 1) * TUILE; cj++) {
+      for (var ci = ti * TUILE; ci < (ti + 1) * TUILE; ci++) {
+        var pt = pointCase(k, ci, cj);
+        if (pt.x > L || pt.y > H) continue;
+        var q = sonde(ctx, carte, pt.x, pt.y);
+        if (q.eau) continue;
+        var dd = DECORS[q.m.decor];
+        if (!dd || dd.rues) continue;                                 // les villes ont leur propre plan
+        var rg = reglagesEn(q, zoneEn(ctx, pt.x, pt.y));
+        if (niveauDecor(zb, dd.C, rg.fin) !== k) continue;            // ce terrain est à un autre niveau
+        if (pt.r >= dd.p * DENSITES[rg.dens]) continue;
+        var ch = dd.choix[0], cumul = 0, n;
+        for (n = 0; n < dd.choix.length; n++) { cumul += dd.choix[n][1]; if (pt.r2 < cumul) { ch = dd.choix[n]; break; } }
+        // Sa taille dans le monde : proportionnelle à la case, donc fixe.
+        var s = ch[2] / dd.C * D * 0.72 * ECHELLES[rg.ech] * (0.82 + 0.36 * pt.r3);
+        var grand = ch[2] >= 40;
+        if (distVoie(ctx, pt.x, pt.y) < (grand ? 0.45 : 0.22) * s) continue;       // pas sur une voie
+        // Bien à l'intérieur de son terrain : tout autour, le même terrain.
+        var e = dd.marge * s, ok = true, sondes = [[-e, 0], [e, 0], [0, -e], [0, e * 0.5]];
+        for (n = 0; n < 4 && ok; n++) {
+          var qq = sonde(ctx, carte, pt.x + sondes[n][0], pt.y + sondes[n][1]);
+          if (qq.eau || qq.m !== q.m) ok = false;
+          else if (grand && distVoie(ctx, pt.x + sondes[n][0], pt.y + sondes[n][1]) < 0) ok = false;
+        }
+        if (!ok) continue;
+        tu.entrees.push({ x: pt.x, y: pt.y, s: s, sprite: ch[0], r: pt.r3 });
+      }
+    }
+    return tu;
+  }
+
+  // Rassemble dans `liste` les décors à dessiner pour cette vue : { x, y, s, sprite, r }.
+  // Tous les décors de la carte existent en permanence : la vue ne fait que choisir ceux qu'elle
+  // montre. Aucun n'est regroupé, déplacé ou supprimé selon le zoom — un décor trop petit pour
+  // se lire (moins d'un pixel) est simplement invisible, et grandit avec le zoom.
+  // `tampons` : les décors posés à la main, dont les autres s'écartent.
+  // (`masque` ne sert plus qu'à vérifier qu'on dessine pour de vrai, pas pendant un geste.)
   function semerDecors(carte, vue, masque, X0, Y0, X1, Y1, tampons, liste) {
     liste.rues = [];
     if (!masque) return;
-    var zoom = vue.zoom, data = masque.data, mw = masque.mw, mh = masque.mh, zb = zoomBase(carte);
+    var zoom = vue.zoom, zb = zoomBase(carte), i;
     if (memoCases.size > 400000) memoCases.clear();
-    // Quels niveaux de cases faut-il parcourir ? Ceux des traits visibles.
-    var niveaux = {}, traits = carte.traits || [], i;
-    for (i = 0; i < traits.length; i++) {
-      var t = traits[i], mat = MAT[t.mat], d = mat && DECORS[mat.decor];
-      if (!d || t.sansDecor || t.dens === 0 || !t.bb || !chevauche(t.bb, X0, Y0, X1, Y1)) continue;
-      niveaux[niveauDecor(zb, d.C, t.fin || 0)] = true;
-      if (masque.finesses) for (var zf = 0; zf < masque.finesses.length; zf++) niveaux[niveauDecor(zb, d.C, masque.finesses[zf])] = true;
-    }
-    var dataFin = masque.fin;
+    synchroniserDecors(carte);
+    // Quels niveaux de cases ? Ceux des terrains visibles, à chacune des finesses présentes.
+    var Cs = {}, fins = { 0: true }, ville = false;
+    (carte.traits || []).forEach(function (t) {
+      var mat = MAT[t.mat], d = mat && DECORS[mat.decor];
+      if (!d || t.sansDecor || t.dens === 0 || !t.bb || !chevauche(t.bb, X0, Y0, X1, Y1)) return;
+      if (d.rues) ville = true;
+      Cs[d.C] = true;
+      fins[Math.min(FINESSE_MAX, t.fin || 0)] = true;
+    });
+    (carte.finesses || []).forEach(function (f) { if (f.fin != null && f.bb && chevauche(f.bb, X0, Y0, X1, Y1)) fins[Math.min(FINESSE_MAX, f.fin)] = true; });
+    var niveaux = {};
+    Object.keys(Cs).forEach(function (c) { Object.keys(fins).forEach(function (f) { niveaux[niveauDecor(zb, parseFloat(c), parseInt(f, 10))] = true; }); });
     // Une petite grille des tampons, pour s'en écarter sans tout comparer.
     var gt = null, gc = 0;
     if (tampons && tampons.length) {
@@ -1049,67 +1442,36 @@
         for (var a = a0; a <= a1; a++) for (var b = b0; b <= b1; b++) { var kk = a + "," + b; (gt[kk] || (gt[kk] = [])).push(tp); }
       });
     }
-    var L = carte.largeur, H = carte.hauteur;
+    var L = carte.largeur, H = carte.hauteur, C = CACHE_DECORS;
     Object.keys(niveaux).forEach(function (cle) {
-      var k = parseInt(cle, 10), Dk = CASE0 / Math.pow(2, k);
-      // Trop petits pour être lus : on remonte de `n` niveaux (un décor sur 4ⁿ, 2ⁿ fois plus grand).
-      var n = Dk * zoom < 4.2 ? Math.ceil(Math.log(4.2 / (Dk * zoom)) / Math.LN2) : 0;
-      var kv = Math.max(0, k - n), D = CASE0 / Math.pow(2, kv), grossi = Math.pow(2, k - kv);
-      var m = 140 / zoom + D * 3;
-      var i0 = Math.max(0, Math.floor((X0 - m) / D)), i1 = Math.min(Math.floor(L / D), Math.floor((X1 + m) / D));
-      var j0 = Math.max(0, Math.floor((Y0 - m) / D)), j1 = Math.min(Math.floor(H / D), Math.floor((Y1 + m) / D));
-      if ((i1 - i0 + 1) * (j1 - j0 + 1) > 450000) return;
-      semerVille(carte, masque, zb, zoom, k, kv, grossi, X0, Y0, X1, Y1, liste);
-      for (var cj = j0; cj <= j1; cj++) {
-        for (var ci = i0; ci <= i1; ci++) {
-          var pt = pointCase(kv, ci, cj);
-          var px = pixelMasque(masque, pt.x, pt.y);
-          if (px < 0 || data[px + 3] < 128) continue;                 // hors masque, ou de l'eau
-          if (data[px + 1] > 128) continue;                           // une route
-          var mt = MATERIAUX[Math.round(data[px] / 10) - 1];
-          var dd = mt && DECORS[mt.decor];
-          if (!dd || dd.rues) continue;                               // les villes ont leur propre plan
-          var code = Math.round(data[px + 2] / 20) - 1;               // densité × 3 + échelle
-          if (code < 0) continue;
-          // La finesse : celle d'une zone « Affiner » si le point y est, sinon celle du trait.
-          var zf = dataFin && dataFin[px + 3] > 200 ? Math.round(dataFin[px] / 40) : 0, zd = dataFin && dataFin[px + 3] > 200 ? Math.round(dataFin[px + 1] / 60) : 0;
-          var finPt = zf ? zf - 1 : Math.round(data[px + 1] / 24);
-          if (niveauDecor(zb, dd.C, finPt) !== k) continue;           // ce terrain a un autre niveau
-          // La densité : celle d'une zone « Éclaircir » si le point y est, sinon celle du trait.
-          var ech = ECHELLES[code % 3], dens = DENSITES[zd ? zd - 1 : Math.floor(code / 3)];
-          if (pt.r >= dd.p * dens) continue;
-          // Quel décor, parmi ceux du terrain ?
-          var ch = dd.choix[0], cumul = 0;
-          for (var q = 0; q < dd.choix.length; q++) { cumul += dd.choix[q][1]; if (pt.r2 < cumul) { ch = dd.choix[q]; break; } }
-          // Sa taille dans le monde : proportionnelle à la case, donc fixe.
-          var s = ch[2] / dd.C * Dk * 0.72 * grossi * ech * ECH_THEME * (0.82 + 0.36 * pt.r3);
-          var taillePx = s * zoom;
-          if (taillePx < 3) continue;
-          // Bien à l'intérieur de son terrain : les quatre voisins disent la même chose.
-          var e = Math.max(1, Math.round(dd.marge * Math.min(taillePx, 120) * masque.z / zoom / masque.ech));
-          var sx = (px / 4) % mw, sy = Math.floor(px / 4 / mw), ok = true;
-          for (var w = 0; w < 4 && ok; w++) {
-            var nx = sx + (w === 0 ? -e : w === 1 ? e : 0), ny = sy + (w === 2 ? -e : w === 3 ? Math.round(e * 0.5) : 0);
-            if (nx < 0 || ny < 0 || nx >= mw || ny >= mh) continue;
-            var np = (ny * mw + nx) * 4;
-            // Un grand décor (pic, colline) ne déborde pas sur une voie ; un arbre, lui, la borde.
-            if (data[np] !== data[px] || data[np + 3] < 128 || (w !== 2 && ch[2] >= 40 && data[np + 1] > 128)) ok = false;
-          }
-          if (!ok) continue;
-          if (gt) {
-            var voisins = gt[Math.floor(pt.x / gc) + "," + Math.floor(pt.y / gc)];
-            if (voisins) {
-              for (var u = 0; u < voisins.length && ok; u++) {
-                var tp = voisins[u];
-                if (Math.hypot(tp.x - pt.x, (tp.y - tp.s * 0.12 - pt.y) * 1.3) < tp.s * 0.36 + s * 0.2) ok = false;
+      var k = parseInt(cle, 10), D = CASE0 / Math.pow(2, k), T = TUILE * D, m = 10 * D;
+      var ti0 = Math.max(0, Math.floor((X0 - m) / T)), ti1 = Math.min(Math.floor(L / T), Math.floor((X1 + m) / T));
+      var tj0 = Math.max(0, Math.floor((Y0 - m) / T)), tj1 = Math.min(Math.floor(H / T), Math.floor((Y1 + m) / T));
+      if ((ti1 - ti0 + 1) * (tj1 - tj0 + 1) > 4000) return;
+      for (var tj = tj0; tj <= tj1; tj++) {
+        for (var ti = ti0; ti <= ti1; ti++) {
+          var cleT = k + "|" + ti + "|" + tj, tu = C.tuiles.get(cleT);
+          if (!tu) { tu = calculerTuile(carte, k, ti, tj, zb); C.tuiles.set(cleT, tu); C.total += tu.entrees.length + 1; }
+          for (var q = 0; q < tu.entrees.length; q++) {
+            var en = tu.entrees[q], s = en.s * ECH_THEME;
+            if (s * zoom < 0.7) continue;                                   // plus petit qu'un pixel : invisible
+            if (en.x < X0 - s || en.x > X1 + s || en.y < Y0 - s * 0.2 || en.y > Y1 + s) continue;
+            if (SANS_DECOR && SANS_DECOR[en.sprite]) continue;
+            if (gt) {
+              var voisins = gt[Math.floor(en.x / gc) + "," + Math.floor(en.y / gc)], libre = true;
+              if (voisins) {
+                for (var u = 0; u < voisins.length && libre; u++) {
+                  var tp = voisins[u];
+                  if (Math.hypot(tp.x - en.x, (tp.y - tp.s * 0.12 - en.y) * 1.3) < tp.s * 0.36 + s * 0.2) libre = false;
+                }
+                if (!libre) continue;
               }
-              if (!ok) continue;
             }
+            liste.push({ x: en.x, y: en.y, s: s, sprite: en.sprite, r: en.r });
           }
-          if (SANS_DECOR && SANS_DECOR[ch[0]]) continue;
-          liste.push({ x: pt.x, y: pt.y, s: s, sprite: ch[0], r: pt.r3 });
         }
       }
+      if (ville) semerVille(carte, zb, zoom, k, X0, Y0, X1, Y1, liste);
     });
   }
 
@@ -1125,26 +1487,24 @@
   // Les maisons vont dans `liste` (triées et peintes avec les autres décors) ; les rues dans
   // `liste.rues`, peintes dans la terre avant les décors. Une route tracée par l'auteur
   // reste prioritaire : les maisons s'en écartent.
-  function semerVille(carte, masque, zb, zoom, k, kv, grossi, X0, Y0, X1, Y1, liste) {
-    var data = masque.data, dataFin = masque.fin;
+  function semerVille(carte, zb, zoom, k, X0, Y0, X1, Y1, liste) {
     // Un îlot fait huit cases de côté : quatre maisons le long de chaque rue.
-    var kb = kv - 3;
+    var kb = k - 3;
     if (kb < 0) return;
-    var Dk = CASE0 / Math.pow(2, k) * grossi, B = CASE0 / Math.pow(2, kb), m = B;
+    var Dk = CASE0 / Math.pow(2, k), B = CASE0 / Math.pow(2, kb), m = B;
+    var ctx = contexteZone(carte, X0 - 3 * B, Y0 - 3 * B, X1 + 3 * B, Y1 + 3 * B);
+    if (!ctx.traits.length) return;
     var i0 = Math.max(0, Math.floor((X0 - m) / B)), i1 = Math.min(Math.floor(carte.largeur / B), Math.floor((X1 + m) / B));
     var j0 = Math.max(0, Math.floor((Y0 - m) / B)), j1 = Math.min(Math.floor(carte.hauteur / B), Math.floor((Y1 + m) / B));
     // Ce point est-il en ville (à ce niveau de finesse) ? Renvoie sa fiche, ou null.
     var enVille = function (x, y) {
-      var px = pixelMasque(masque, x, y);
-      if (px < 0 || data[px + 3] < 128) return null;
-      var mt = MATERIAUX[Math.round(data[px] / 10) - 1], dd = mt && DECORS[mt.decor];
+      var q = sonde(ctx, carte, x, y);
+      if (q.eau) return null;
+      var dd = DECORS[q.m.decor];
       if (!dd || !dd.rues) return null;
-      var code = Math.round(data[px + 2] / 20) - 1;
-      if (code < 0) return null;
-      var surZone = dataFin && dataFin[px + 3] > 200;
-      var zf = surZone ? Math.round(dataFin[px] / 40) : 0, zd = surZone ? Math.round(dataFin[px + 1] / 60) : 0;
-      if (niveauDecor(zb, dd.C, zf ? zf - 1 : Math.round(data[px + 1] / 24)) !== k) return null;
-      return { dd: dd, route: data[px + 1] > 128, ech: ECHELLES[code % 3], dens: DENSITES[zd ? zd - 1 : Math.floor(code / 3)], mat: data[px] };
+      var rg = reglagesEn(q, zoneEn(ctx, x, y));
+      if (niveauDecor(zb, dd.C, rg.fin) !== k) return null;
+      return { dd: dd, route: distVoie(ctx, x, y) < Dk * 0.4, ech: ECHELLES[rg.ech], dens: DENSITES[rg.dens], mat: q.m.id };
     };
     for (var cj = j0; cj <= j1; cj++) {
       for (var ci = i0; ci <= i1; ci++) {
@@ -1170,7 +1530,7 @@
             if (!v || v.route || v.mat !== ici.mat || alea(g + 90 + q * 7 + r, h) >= v.dens) continue;
             // (La maison n'occupe que la moitié de la largeur de sa vignette.)
             var s = Dk * 2.9 * v.ech * ECH_THEME * (0.9 + 0.2 * hr);
-            if (s * zoom < 3) continue;
+            if (s * zoom < 0.7) continue;
             if (DESSUS) {
               // Pignon sur rue, le plus souvent ; parfois le long de la rue.
               var long = Dk * 1.5 * v.ech * (0.85 + 0.5 * hr), travers = alea(g + 150 + q * 7 + r, h) < 0.7;
@@ -1193,7 +1553,7 @@
               break;
             }
             if (DESSUS && coeur[n][0] === "champ") break;
-            if (sc * zoom >= 3 && !ici.route && tirage / cumul < ici.dens + 0.01) liste.push({ x: cx, y: cy + sc * 0.25, s: sc, sprite: coeur[n][0], r: alea(g + 201, h) });
+            if (sc * zoom >= 0.7 && !ici.route && tirage / cumul < ici.dens + 0.01) liste.push({ x: cx, y: cy + sc * 0.25, s: sc, sprite: coeur[n][0], r: alea(g + 201, h) });
             break;
           }
         }
@@ -1226,31 +1586,50 @@
   // pignon sur rue le plus souvent. Déplacer un point de la rue déplace ses maisons.
   // `l.maison` : taille d'une maison (monde) ; `l.cote` : "deux", "gauche" ou "droite" ;
   // `l.espace` : écart entre maisons (1 = serrées).
+  function distSeg(px, py, ax, ay, bx, by) {
+    var dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy, t = l2 ? Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / l2)) : 0;
+    return Math.hypot(px - ax - dx * t, py - ay - dy * t);
+  }
+
+  // Toutes les maisons des rues sont d'abord PROPOSÉES (tout le long de chaque rue, quelle que
+  // soit la vue : leur place ne dépend pas de ce qu'on regarde), puis triées : une maison qui
+  // mordrait sur une voie (la sienne dans un virage, ou une autre à un carrefour), sur une
+  // place ou sur une maison déjà posée est écartée. Les carrefours restent ainsi dégagés.
   function maisonsDesRues(carte, vue, masque, X0, Y0, X1, Y1) {
-    var out = [];
+    var th = THEMES[carte.theme] || THEMES.atlas, voies = [], rues = [], i;
     (carte.lignes || []).forEach(function (l) {
-      if (l.type !== "maisons" || !l.pts || l.pts.length < 4) return;
-      var d = pointsAffiches(l), m = d.length / 2, W = l.maison || (l.taille || 1) * 6;
-      if (W * vue.zoom < 2.5) return;
-      var bb = boiteTrait(d, W * 6);
-      if (!chevauche(bb, X0, Y0, X1, Y1)) return;
-      var lw = Math.max(l.taille || 0, 2 / vue.zoom), h = hashTexte(String(l.id || ""));
+      if (!VOIES[l.type] || !l.pts || l.pts.length < 4) return;
+      var d = pointsAffiches(l), st = styleLigne(l, th), lw = Math.max(l.taille || 0, st.min / vue.zoom);
+      var vo = { l: l, d: d, lw: lw, bb: boiteTrait(d, 0) };
+      voies.push(vo);
+      if (l.type === "maisons") rues.push(vo);
+    });
+    if (!rues.length) return [];
+    var places = (carte.tampons || []).filter(function (t) { return t.type === "place"; });
+    var ctxH = contexteZone(carte, X0 - 1e9, Y0 - 1e9, X1 + 1e9, Y1 + 1e9);
+    var cand = [], Wmax = 0;
+    rues.forEach(function (vo) {
+      var l = vo.l, d = vo.d, m = d.length / 2, W = l.maison || (l.taille || 1) * 6;
+      if (W * vue.zoom < 0.7) return;
+      Wmax = Math.max(Wmax, W);
+      // Hors vue (avec une grande marge) : inutile de calculer cette rue.
+      var mg = W * 8 + 200 / vue.zoom;
+      if (!chevauche(boiteTrait(d, 0), X0 - mg, Y0 - mg, X1 + mg, Y1 + mg)) return;
+      var lw = vo.lw, h = hashTexte(String(l.id || ""));
       var cotes = l.cote === "gauche" ? [-1] : l.cote === "droite" ? [1] : [-1, 1];
       var pas = W * 1.45 * (l.espace || 1), prochain = pas * 0.55, parcouru = 0, rang = 0;
-      for (var i = 0; i + 1 < m; i++) {
-        var dx = d[2 * i + 2] - d[2 * i], dy = d[2 * i + 3] - d[2 * i + 1], L = Math.hypot(dx, dy);
+      for (var k = 0; k + 1 < m; k++) {
+        var dx = d[2 * k + 2] - d[2 * k], dy = d[2 * k + 3] - d[2 * k + 1], L = Math.hypot(dx, dy);
         if (!L) continue;
         while (prochain <= parcouru + L) {
-          var f = (prochain - parcouru) / L, x = d[2 * i] + dx * f, y = d[2 * i + 1] + dy * f;
+          var f = (prochain - parcouru) / L, x = d[2 * k] + dx * f, y = d[2 * k + 1] + dy * f;
           cotes.forEach(function (cote) {
             var hr = alea(h, rang * 4 + cote + 1), travers = alea(h + 1, rang * 4 + cote + 1) < 0.7;
             if (alea(h + 2, rang * 4 + cote + 1) < 0.08) return;                 // une dent creuse, de temps en temps
-            var long = W * (1 + 0.38 * hr), large = W * 0.74;
-            var recul = lw / 2 + (travers ? long : large) / 2 + W * 0.22;
-            var px = x - dy / L * cote * recul, py = y + dx / L * cote * recul;
-            if (px < X0 - W * 2 || px > X1 + W * 2 || py < Y0 - W * 2 || py > Y1 + W * 2) return;
-            if (masque && materiauEn(masque, px, py) === null) return;           // pas dans l'eau
-            out.push({ x: px, y: py, w: long, h: large, a: Math.atan2(dy, dx) + (travers ? Math.PI / 2 : 0) + (hr - 0.5) * 0.14, v: Math.floor(hr * 40) });
+            var long = W * (1 + 0.38 * hr), large = W * 0.74, ext = (travers ? long : large) / 2;
+            var recul = lw / 2 + ext + W * 0.22;
+            cand.push({ x: x - dy / L * cote * recul, y: y + dx / L * cote * recul, w: long, h: large, ext: ext, vo: vo,
+              a: Math.atan2(dy, dx) + (travers ? Math.PI / 2 : 0) + (hr - 0.5) * 0.14, v: Math.floor(hr * 40) });
           });
           prochain += pas * (0.9 + 0.25 * alea(h + 3, rang));
           rang++;
@@ -1258,15 +1637,53 @@
         parcouru += L;
       }
     });
+    // Le tri : voies, places, puis maisons déjà posées (grille).
+    var gardees = [], grille = {}, cell = Math.max(Wmax * 2.4, 1e-9);
+    cand.forEach(function (c) {
+      var r = Math.hypot(c.w, c.h) / 2 * 0.8, q;
+      for (i = 0; i < voies.length; i++) {
+        var vo = voies[i], bb = vo.bb, marge = Math.max(c.w, c.h) + vo.lw;
+        if (c.x < bb[0] - marge || c.x > bb[2] + marge || c.y < bb[1] - marge || c.y > bb[3] + marge) continue;
+        var besoin = vo.lw / 2 + (vo === c.vo ? c.ext : Math.max(c.w, c.h) * 0.45), d2 = vo.d;
+        for (q = 0; q + 3 < d2.length; q += 2) if (distSeg(c.x, c.y, d2[q], d2[q + 1], d2[q + 2], d2[q + 3]) < besoin * 0.98) return;
+      }
+      for (i = 0; i < places.length; i++) if (Math.hypot(c.x - places[i].x, c.y - (places[i].y - places[i].s * 0.3)) < places[i].s * 0.47 + r * 0.5) return;
+      var gx = Math.floor(c.x / cell), gy = Math.floor(c.y / cell);
+      for (var ax = gx - 1; ax <= gx + 1; ax++) for (var ay = gy - 1; ay <= gy + 1; ay++) {
+        var vs = grille[ax + "," + ay];
+        if (vs) for (q = 0; q < vs.length; q++) if (Math.hypot(vs[q].x - c.x, vs[q].y - c.y) < (vs[q].r + r) * 0.9) return;
+      }
+      c.r = r;
+      (grille[gx + "," + gy] || (grille[gx + "," + gy] = [])).push(c);
+      gardees.push(c);
+    });
+    // Dans la vue, hors de l'eau.
+    var out = [];
+    gardees.forEach(function (c) {
+      var W2 = c.w * 2;
+      if (c.x < X0 - W2 || c.x > X1 + W2 || c.y < Y0 - W2 || c.y > Y1 + W2) return;
+      if (sonde(ctxH, carte, c.x, c.y).eau) return;
+      out.push({ x: c.x, y: c.y, w: c.w, h: c.h, a: c.a, v: c.v });
+    });
     return out;
   }
 
   // Peint les décors (semés et tampons), du fond vers l'avant.
+  var FONDS = { place: true };         // décors posés AU SOL : peints avant tout le reste
   function peindreDecors(lc, liste) {
-    liste.sort(function (a, b) { return a.y - b.y; });
+    liste.sort(function (a, b) { return (FONDS[b.sprite] ? 1 : 0) - (FONDS[a.sprite] ? 1 : 0) || a.y - b.y; });
     for (var i = 0; i < liste.length; i++) {
       var o = liste[i];
       if (o.maison) { maisonDessus(lc, o.x, o.y, o.maison.w, o.maison.h, o.maison.a, o.maison.v); continue; }
+      if (o.rot) {
+        // Un décor tourné : on le colle autour de son centre (le dessin est centré à 0,31 s au-dessus de son pied).
+        lc.save();
+        lc.translate(o.x, o.y - o.s * 0.31);
+        lc.rotate(o.rot);
+        colle(lc, o.sprite, o.v != null ? o.v % VARIANTES[o.sprite] : variante(o.sprite, o.r), 0, o.s * 0.31, o.s);
+        lc.restore();
+        continue;
+      }
       colle(lc, o.sprite, o.v != null ? o.v % VARIANTES[o.sprite] : variante(o.sprite, o.r), o.x, o.y, o.s);
     }
   }
@@ -1294,15 +1711,13 @@
     var visible = false, traits = carte.traits || [];
     for (var t = 0; t < traits.length && !visible; t++) if (traits[t].mat === "champs" && traits[t].bb && chevauche(traits[t].bb, X0, Y0, X1, Y1)) visible = true;
     if (!visible) return;
-    var zoom = vue.zoom, data = masque.data, code = MAT.champs.code * 10, u = 1 / zoom;
+    var zoom = vue.zoom, u = 1 / zoom;
     // Le découpage est fixé par la carte (parcelles d'une quinzaine de pixels à la vue
     // d'ensemble), pas par le zoom : zoomer agrandit les mêmes parcelles.
     var kFin = Math.floor(Math.log(CASE0 * zoomBase(carte) * 2 / 30) / Math.LN2), f = 1;
-    if (CASE0 / Math.pow(2, kFin) * zoom < 5) return;
-    var enChamp = function (x, y) {
-      var px = pixelMasque(masque, x, y);
-      return px >= 0 && data[px + 3] >= 128 && data[px] === code;
-    };
+    if (CASE0 / Math.pow(2, kFin) * zoom < 1.5) return;                  // des parcelles de moins d'un pixel et demi : à peine un grain
+    var DC = CASE0 / Math.pow(2, kFin), ctxC = contexteZone(carte, X0 - 3 * DC, Y0 - 3 * DC, X1 + 3 * DC, Y1 + 3 * DC);
+    var enChamp = function (x, y) { var q = sonde(ctxC, carte, x, y); return !q.eau && q.m.id === "champs"; };
     var polygone = function (c) {
       lc.beginPath();
       lc.moveTo(c[0][0], c[0][1]); lc.lineTo(c[1][0], c[1][1]); lc.lineTo(c[2][0], c[2][1]); lc.lineTo(c[3][0], c[3][1]);
@@ -1391,14 +1806,12 @@
     var volcan = MAT.volcan, visible = false, traits = carte.traits || [];
     for (var t = 0; t < traits.length && !visible; t++) if (traits[t].mat === "volcan" && traits[t].bb && chevauche(traits[t].bb, X0, Y0, X1, Y1)) visible = true;
     if (!visible) return;
-    var zoom = vue.zoom, data = masque.data, code = volcan.code * 10, u = 1 / zoom;
+    var zoom = vue.zoom, u = 1 / zoom;
     // Réseau fixé par la carte : mêmes fissures, de même largeur (en km), à tous les zooms.
     var zr = zoomBase(carte) * 2, niveauReel = Math.floor(Math.log(CASE0 * zr / 46) / Math.LN2), kFin = niveauReel, f = 1;
     u = 1 / zr;
-    var surLave = function (x, y) {
-      var px = pixelMasque(masque, x, y);
-      return px >= 0 && data[px + 3] >= 128 && data[px] === code;
-    };
+    var DL = CASE0 / Math.pow(2, Math.max(1, kFin - 5)), ctxL = contexteZone(carte, X0 - 2 * DL, Y0 - 2 * DL, X1 + 2 * DL, Y1 + 2 * DL);
+    var surLave = function (x, y) { var q = sonde(ctxL, carte, x, y); return !q.eau && q.m.id === "volcan"; };
     var segments = [];
     for (var k = Math.max(1, kFin - 5); k <= kFin; k++) {
       var D = CASE0 / Math.pow(2, k), m = D * 2;
@@ -1566,6 +1979,7 @@
     if (l.type === "pavee") return { c: l.couleur || "#bdb6a6", tiret: null, lisse: true, min: 2.6, halo: false };
     if (l.type === "sentier") return { c: l.couleur || th.voie || "#c2a56c", tiret: null, lisse: true, min: 2, halo: false };
     if (l.type === "falaise") return { c: l.couleur || "#4a3620", tiret: null, lisse: true, min: 1.2, halo: false };
+    if (l.type === "ponton") return { c: l.couleur || "#a98558", tiret: null, lisse: false, min: 3, halo: false };
     if (l.type === "maritime") return { c: l.couleur || th.texteMer, tiret: [3.2, 3.2], lisse: true, min: 1.3, halo: false };
     if (l.type === "muraille") return { c: l.couleur || "#c9c2b0", tiret: null, lisse: false, min: 3, halo: false };
     return { c: l.couleur || "#8a2b2b", tiret: [5, 2.2, 1.2, 2.2], lisse: !!l.lisse, min: 1.6, halo: true };
@@ -1758,6 +2172,34 @@
   // Muraille : ombre au sol, contour, pierre, créneaux en tirets sur le faîte, puis des
   // tours à toit conique aux deux bouts et tous les neuf largeurs. Les tours
   // grandissent avec le zoom ; trop petites, elles disparaissent.
+  // Un ponton : des planches en travers, deux rives de bois, des pieux enfoncés de chaque côté
+  // et son ombre sur l'eau. On le trace de la berge vers le large.
+  function tracerPonton(ctx, l, st, lw, vue) {
+    var p = l.pts, zoom = vue.zoom, px = lw * zoom;
+    ctx.setLineDash([]);
+    ctx.lineCap = "butt";
+    ctx.lineJoin = "round";
+    var chemin = function (q) { cheminLigne(ctx, q || p, false); };
+    ctx.save(); ctx.translate(lw * 0.22, lw * 0.3);
+    chemin(); ctx.strokeStyle = "rgba(8,30,44,0.35)"; ctx.lineWidth = lw * 1.1; ctx.stroke();
+    ctx.restore();
+    chemin(); ctx.strokeStyle = "#1c2622"; ctx.lineWidth = lw + 2 / zoom; ctx.stroke();
+    chemin(); ctx.strokeStyle = st.c; ctx.lineWidth = lw; ctx.stroke();
+    if (px >= 5) {
+      chemin(); ctx.strokeStyle = "rgba(58,36,14,0.55)"; ctx.lineWidth = lw * 0.96;
+      ctx.setLineDash([Math.max(0.5 / zoom, lw * 0.045), lw * 0.2]); ctx.stroke(); ctx.setLineDash([]);
+      chemin(); ctx.strokeStyle = "rgba(255,236,200,0.18)"; ctx.lineWidth = lw * 0.3; ctx.stroke();
+    }
+    if (px >= 7) {
+      ctx.lineCap = "round";
+      [-1, 1].forEach(function (c) {
+        chemin(decaler(p, c * lw * 0.52)); ctx.strokeStyle = "#2a1a0b"; ctx.lineWidth = lw * 0.22;
+        ctx.setLineDash([0.001, lw * 1.3]); ctx.stroke();
+      });
+      ctx.setLineDash([]);
+    }
+  }
+
   // ----- Murailles -----
   //
   // Une muraille s'ouvre d'elle-même là où une route ou un chemin la traverse : le mur est
@@ -2158,6 +2600,7 @@
         cf.strokeStyle = cf.fillStyle = "rgb(" + (f.fin == null ? 0 : (Math.min(FINESSE_MAX, f.fin) + 1) * 40) + "," + (f.dens == null ? 0 : (f.dens + 1) * 60) + ",0)";
         cf.lineWidth = f.taille;
         cf.beginPath();
+        if (f.rect) { cf.fillRect(f.rect[0], f.rect[1], f.rect[2] - f.rect[0], f.rect[3] - f.rect[1]); return; }
         if (f.pts.length <= 2) { cf.arc(f.pts[0], f.pts[1], f.taille / 2, 0, TAU); cf.fill(); }
         else { cf.moveTo(f.pts[0], f.pts[1]); for (var q = 2; q < f.pts.length; q += 2) cf.lineTo(f.pts[q], f.pts[q + 1]); cf.stroke(); }
       });
@@ -2331,7 +2774,7 @@
   function dessinerLignes(ctx, carte, vue, th, X0, Y0, X1, Y1, masque) {
     var lignes = carte.lignes || [];
     var voies = [];
-    ["riviere", "falaise", "voies", "muraille", "frontiere", "maritime"].forEach(function (type) {
+    ["riviere", "falaise", "voies", "ponton", "muraille", "frontiere", "maritime"].forEach(function (type) {
       for (var i = 0; i < lignes.length; i++) {
         var l = lignes[i];
         if ((type === "voies" ? !VOIES[l.type] : l.type !== type) || !l.pts || l.pts.length < 4) continue;
@@ -2345,6 +2788,7 @@
         if (type === "riviere") continue;     // creusées dans la terre (creuserEaux), comme la mer
         if (type === "muraille") { tracerMuraille(ctx, l, st, lw, vue, th, carte); continue; }
         if (type === "falaise") { tracerFalaise(ctx, l, st, lw, vue); continue; }
+        if (type === "ponton") { tracerPonton(ctx, l, st, lw, vue); continue; }
         if (type === "voies") continue;       // peintes dans la terre, sous les arbres (voir dessiner)
         var pts = type === "maritime" ? pointsAffiches(l) : l.pts;
         var tracer = function () {
@@ -3133,6 +3577,180 @@
     ctx.restore();
   }
 
+  // ----- Lieux vus du dessus (style Plan) -----
+  var ICONES_DESSUS = { village: 1, ville: 1, capitale: 1, fort: 1, tour: 1, port: 1, temple: 1, ruine: 1, cabane: 1, ferme: 1,
+    auberge: 1, moulin: 1, phare: 1, puits: 1, menhirs: 1, donjon: 1, grotte: 1, mine: 1, navire: 1, campement: 1,
+    pilotis: 1, vestiges: 1, portail: 1, cimetiere: 1, bataille: 1, oasis: 1, ancien: 1, epave: 1 };
+
+  function iconeDessus(ctx, type, x, y, s, th, accent) {
+    var k = 100 / s, lw = Math.max(1.5, k * 1.2), pierre = "#cdc6b1", toitT = accent || "#a8613f", ombre = "rgba(16,30,28,0.3)";
+    var toit = function (px, py, w, h, a, v) { maisonDessus(ctx, px, py, w, h, a, v, k * 0.6, accent || null); };
+    var tour = function (px, py, r, carre) { tourDessus(ctx, px, py, r, !!carre, 0, pierre, toitT, 1 / k); };
+    var disque = function (cx, cy, r, fond) {
+      ctx.fillStyle = ombre; ctx.beginPath(); ctx.arc(cx + 4, cy + 5, r, 0, TAU); ctx.fill();
+      ctx.fillStyle = fond; ctx.strokeStyle = "#1c2622"; ctx.lineWidth = lw; ctx.beginPath(); ctx.arc(cx, cy, r, 0, TAU); ctx.fill(); ctx.stroke();
+    };
+    var enceinte = function (r, sol) {                       // une enceinte ronde : sol, mur de pierre
+      ctx.fillStyle = ombre; ctx.beginPath(); ctx.arc(4, 5, r + 3, 0, TAU); ctx.fill();
+      ctx.fillStyle = sol; ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ctx.fill();
+      ctx.strokeStyle = "#1c2622"; ctx.lineWidth = 6 + lw; ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ctx.stroke();
+      ctx.strokeStyle = pierre; ctx.lineWidth = 6; ctx.stroke();
+    };
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(s / 100, s / 100);
+    ctx.lineJoin = ctx.lineCap = "round";
+    var i;
+    switch (type) {
+      case "village":
+        [[-18, -8, 22, 14, 0.2], [10, -16, 18, 12, -0.3], [22, 8, 20, 13, 0.5], [-8, 16, 20, 13, -0.2], [-30, 12, 15, 11, 0.6]].forEach(function (m, q) { toit(m[0], m[1], m[2], m[3], m[4], q * 7 + 2); });
+        disque(-2, -2, 5, "#4b8166");
+        break;
+      case "ville":
+        enceinte(44, "#c9bd92");
+        for (i = 0; i < 9; i++) { var a = i * TAU / 9 + 0.3, r = 25 + (i % 2) * 6; toit(Math.cos(a) * r, Math.sin(a) * r, 17, 11, a + Math.PI / 2, i * 5 + 1); }
+        toit(0, 0, 26, 15, 0.3, 5);
+        [[0, -44], [44, 0], [0, 44], [-44, 0]].forEach(function (q) { tour(q[0], q[1], 6.5); });
+        break;
+      case "capitale":
+        enceinte(47, "#c9bd92");
+        for (i = 0; i < 12; i++) { var a2 = i * TAU / 12 + 0.2, r2 = 30 + (i % 2) * 6; toit(Math.cos(a2) * r2, Math.sin(a2) * r2, 15, 10, a2 + Math.PI / 2, i * 3 + 4); }
+        for (i = 0; i < 8; i++) tour(Math.cos(i * TAU / 8) * 47, Math.sin(i * TAU / 8) * 47, 6.5);
+        tour(0, 0, 14, true);
+        break;
+      case "fort":
+        ctx.fillStyle = ombre; ctx.fillRect(-35, -34, 76, 76);
+        ctx.fillStyle = "#c9bd92"; ctx.fillRect(-38, -38, 76, 76);
+        ctx.strokeStyle = "#1c2622"; ctx.lineWidth = 9 + lw; ctx.strokeRect(-38, -38, 76, 76);
+        ctx.strokeStyle = pierre; ctx.lineWidth = 9; ctx.strokeRect(-38, -38, 76, 76);
+        toit(0, 0, 32, 22, 0.1, 6);
+        [[-38, -38], [38, -38], [38, 38], [-38, 38]].forEach(function (q) { tour(q[0], q[1], 10); });
+        break;
+      case "tour": tour(0, 0, 26); break;
+      case "port":
+        [[-30, -8, 24, 15, 0.1], [-12, 12, 20, 13, -0.2], [-36, 14, 16, 11, 0.4]].forEach(function (m, q) { toit(m[0], m[1], m[2], m[3], m[4], q * 5 + 3); });
+        ctx.fillStyle = ombre; ctx.fillRect(2, 2, 46, 10);
+        ctx.fillStyle = "#a98558"; ctx.strokeStyle = "#1c2622"; ctx.lineWidth = lw; ctx.fillRect(-2, -3, 48, 10); ctx.strokeRect(-2, -3, 48, 10);
+        ctx.fillStyle = "#8f6a45"; ctx.beginPath(); ctx.ellipse(32, -18, 14, 5.5, 0.08, 0, TAU); ctx.fill(); ctx.stroke();
+        ctx.strokeStyle = "rgba(255,255,255,0.7)"; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(20, -11); ctx.quadraticCurveTo(10, -9, 4, -12); ctx.stroke();
+        break;
+      case "temple":
+        ctx.fillStyle = ombre; ctx.fillRect(-26, -9, 64, 26); ctx.fillRect(-8, -27, 26, 62);
+        ctx.fillStyle = "#d6cdb4"; ctx.strokeStyle = "#1c2622"; ctx.lineWidth = lw;
+        ctx.beginPath(); ctx.rect(-30, -12, 60, 24); ctx.rect(-12, -30, 24, 60); ctx.fill(); ctx.stroke();
+        ctx.fillRect(-11, -11, 22, 22);
+        ctx.strokeStyle = "rgba(70,60,44,0.5)"; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(-30, 0); ctx.lineTo(30, 0); ctx.moveTo(0, -30); ctx.lineTo(0, 30); ctx.stroke();
+        break;
+      case "ruine":
+        ctx.fillStyle = ombre; ctx.beginPath(); ctx.arc(4, 5, 4, 0, TAU); ctx.fill();
+        ctx.strokeStyle = "#1c2622"; ctx.lineWidth = 9 + lw; ctx.setLineDash([16, 8]); ctx.strokeRect(-32, -24, 64, 48);
+        ctx.strokeStyle = "#b9b3a2"; ctx.lineWidth = 9; ctx.strokeRect(-32, -24, 64, 48); ctx.setLineDash([]);
+        [[-8, 4, 5], [10, -6, 4], [18, 10, 3.4], [-20, 8, 3]].forEach(function (q) { disque(q[0], q[1], q[2], "#b9b3a2"); });
+        break;
+      case "cabane": toit(0, 0, 40, 26, 0.15, 2); break;
+      case "ferme":
+        ctx.fillStyle = "#9a7a64"; ctx.strokeStyle = "#1c2622"; ctx.lineWidth = lw;
+        ctx.save(); ctx.rotate(-0.12); ctx.fillRect(-42, -30, 50, 38); ctx.strokeRect(-42, -30, 50, 38);
+        ctx.strokeStyle = "rgba(40,24,16,0.45)"; ctx.lineWidth = 1.2; ctx.beginPath(); for (i = 1; i < 7; i++) { ctx.moveTo(-42, -30 + i * 5.4); ctx.lineTo(8, -30 + i * 5.4); } ctx.stroke(); ctx.restore();
+        toit(22, -6, 34, 22, 0.1, 8); toit(26, 22, 20, 14, -0.1, 3);
+        break;
+      case "auberge": toit(-4, -6, 46, 26, 0.08, 4); toit(14, 16, 24, 16, 0.08, 1); break;
+      case "moulin":
+        disque(0, 0, 11, pierre);
+        ctx.fillStyle = "#f0ead2"; ctx.strokeStyle = "#1c2622"; ctx.lineWidth = lw;
+        for (i = 0; i < 4; i++) { ctx.save(); ctx.rotate(0.55 + i * Math.PI / 2); ctx.beginPath(); ctx.rect(-3.4, -40, 6.8, 29); ctx.fill(); ctx.stroke(); ctx.restore(); }
+        disque(0, 0, 4, "#7a5a3a");
+        break;
+      case "phare":
+        ctx.fillStyle = "#6c6a62"; ctx.strokeStyle = "#1c2622"; ctx.lineWidth = lw; ctx.beginPath(); ctx.ellipse(0, 4, 34, 28, 0.3, 0, TAU); ctx.fill(); ctx.stroke();
+        var lueur = ctx.createRadialGradient(0, 0, 4, 0, 0, 30); lueur.addColorStop(0, "rgba(255,230,130,0.95)"); lueur.addColorStop(1, "rgba(255,210,90,0)");
+        ctx.fillStyle = lueur; ctx.beginPath(); ctx.arc(0, 0, 30, 0, TAU); ctx.fill();
+        tour(0, 0, 12);
+        break;
+      case "puits": disque(0, 0, 18, pierre); disque(0, 0, 10, "#6aa6b2"); break;
+      case "menhirs":
+        for (i = 0; i < 8; i++) { var am = i * TAU / 8; ctx.save(); ctx.translate(Math.cos(am) * 30, Math.sin(am) * 30); ctx.rotate(am);
+          ctx.fillStyle = ombre; ctx.beginPath(); ctx.ellipse(3, 3, 5.5, 8, 0, 0, TAU); ctx.fill();
+          ctx.fillStyle = "#b3b0a2"; ctx.strokeStyle = "#1c2622"; ctx.lineWidth = lw; ctx.beginPath(); ctx.ellipse(0, 0, 5.5, 8, 0, 0, TAU); ctx.fill(); ctx.stroke(); ctx.restore(); }
+        disque(0, 0, 6, "#9b9889");
+        break;
+      case "donjon": case "grotte": case "mine":
+        rocherDessus(ctx, type === "mine" ? 2 : 1, false);
+        ctx.fillStyle = "#141010"; ctx.beginPath(); ctx.ellipse(0, 8, 11, 7, 0, 0, TAU); ctx.fill();
+        if (type === "mine") { ctx.fillStyle = "#8a6238"; ctx.strokeStyle = "#1c2622"; ctx.lineWidth = lw; ctx.beginPath(); ctx.rect(-16, 2, 5, 12); ctx.rect(11, 2, 5, 12); ctx.rect(-16, -1, 32, 5); ctx.fill(); ctx.stroke(); }
+        break;
+      case "navire":
+        ctx.strokeStyle = "rgba(255,255,255,0.8)"; ctx.lineWidth = 2.4;
+        ctx.beginPath(); ctx.moveTo(-44, -4); ctx.quadraticCurveTo(-52, 0, -44, 4); ctx.moveTo(-36, -8); ctx.quadraticCurveTo(-48, 0, -36, 8); ctx.stroke();
+        ctx.fillStyle = ombre; ctx.beginPath(); ctx.moveTo(-32, 5); ctx.quadraticCurveTo(0, 22, 40, 4); ctx.quadraticCurveTo(0, -10, -32, 5); ctx.fill();
+        ctx.fillStyle = "#8f6a45"; ctx.strokeStyle = "#1c2622"; ctx.lineWidth = lw;
+        ctx.beginPath(); ctx.moveTo(-36, 0); ctx.quadraticCurveTo(-6, -17, 40, 0); ctx.quadraticCurveTo(-6, 17, -36, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = "#f0ead2"; ctx.beginPath(); ctx.ellipse(-8, 0, 3.4, 13, 0, 0, TAU); ctx.ellipse(12, 0, 3, 11, 0, 0, TAU); ctx.fill(); ctx.stroke();
+        break;
+      case "campement":
+        toit(-14, -6, 24, 17, 0.35, 0); toit(14, 6, 22, 16, -0.4, 0); toit(-4, 20, 18, 13, 0.1, 0);
+        break;
+      case "pilotis":
+        ctx.fillStyle = ombre; ctx.fillRect(-8, 4, 56, 12);
+        ctx.fillStyle = "#a98558"; ctx.strokeStyle = "#1c2622"; ctx.lineWidth = lw; ctx.fillRect(-12, 0, 56, 11); ctx.strokeRect(-12, 0, 56, 11);
+        ctx.fillStyle = "#2a1a0b"; [[-12, 0], [44, 0], [-12, 11], [44, 11]].forEach(function (q) { ctx.beginPath(); ctx.arc(q[0], q[1], 2.6, 0, TAU); ctx.fill(); });
+        toit(-6, -10, 42, 26, 0.04, 6);
+        break;
+      case "vestiges":
+        [[-22, -8, 10], [8, -16, 8], [20, 8, 11], [-8, 14, 9], [-28, 14, 6]].forEach(function (q) { disque(q[0], q[1], q[2], "#b9b3a2"); });
+        ctx.strokeStyle = "#1c2622"; ctx.lineWidth = 7 + lw; ctx.setLineDash([10, 9]); ctx.beginPath(); ctx.moveTo(-34, -22); ctx.lineTo(26, -26); ctx.stroke();
+        ctx.strokeStyle = "#cdc6b1"; ctx.lineWidth = 7; ctx.stroke(); ctx.setLineDash([]);
+        break;
+      case "portail":
+        ctx.fillStyle = ombre; ctx.beginPath(); ctx.arc(4, 5, 30, 0, TAU); ctx.fill();
+        var magie = ctx.createRadialGradient(0, 0, 2, 0, 0, 24); magie.addColorStop(0, "rgba(232,214,255,0.98)"); magie.addColorStop(0.6, accent || "rgba(140,90,220,0.9)"); magie.addColorStop(1, "rgba(60,30,120,0.95)");
+        ctx.fillStyle = magie; ctx.beginPath(); ctx.arc(0, 0, 24, 0, TAU); ctx.fill();
+        ctx.strokeStyle = "#1c2622"; ctx.lineWidth = 9 + lw; ctx.beginPath(); ctx.arc(0, 0, 28, 0, TAU); ctx.stroke();
+        ctx.strokeStyle = pierre; ctx.lineWidth = 9; ctx.stroke();
+        [[-28, 0], [28, 0]].forEach(function (q) { disque(q[0], q[1], 7, "#b9b3a2"); });
+        break;
+      case "cimetiere":
+        ctx.fillStyle = "rgba(196,206,176,0.85)"; ctx.strokeStyle = "#1c2622"; ctx.lineWidth = lw; ctx.fillRect(-42, -32, 84, 64); ctx.strokeRect(-42, -32, 84, 64);
+        for (var gi = 0; gi < 3; gi++) for (var gj = 0; gj < 3; gj++) {
+          var gx = -26 + gi * 26, gy = -18 + gj * 18;
+          ctx.fillStyle = ombre; ctx.fillRect(gx - 4 + 3, gy - 6 + 3, 8, 12);
+          ctx.fillStyle = "#b9b3a2"; ctx.strokeStyle = "#1c2622"; ctx.lineWidth = lw * 0.8; ctx.fillRect(gx - 4, gy - 6, 8, 12); ctx.strokeRect(gx - 4, gy - 6, 8, 12);
+        }
+        break;
+      case "bataille":
+        [[-1, 1], [1, 1]].forEach(function (d) {
+          ctx.save(); ctx.rotate(d[0] * 0.75);
+          ctx.fillStyle = ombre; ctx.fillRect(-2.5 + 3, -36 + 3, 6, 56);
+          ctx.fillStyle = "#dcdcd6"; ctx.strokeStyle = "#1c2622"; ctx.lineWidth = lw; ctx.fillRect(-3, -36, 6, 50); ctx.strokeRect(-3, -36, 6, 50);
+          ctx.fillStyle = accent || "#8e6a2a"; ctx.fillRect(-14, 12, 28, 6); ctx.strokeRect(-14, 12, 28, 6); ctx.fillRect(-3, 18, 6, 14); ctx.strokeRect(-3, 18, 6, 14);
+          ctx.restore();
+        });
+        [[-30, 22], [32, -18], [26, 26], [-34, -14]].forEach(function (q) { disque(q[0], q[1], 4, "#8e2b22"); });
+        break;
+      case "oasis":
+        ctx.fillStyle = "#ead9a0"; ctx.strokeStyle = "rgba(120,96,40,0.5)"; ctx.lineWidth = lw; ctx.beginPath(); ctx.ellipse(0, 0, 44, 33, 0, 0, TAU); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = "#5aa6c0"; ctx.strokeStyle = "#1c2622"; ctx.beginPath(); ctx.ellipse(0, 0, 28, 19, 0, 0, TAU); ctx.fill(); ctx.stroke();
+        [[-30, -16], [30, -14], [-24, 20], [26, 20]].forEach(function (q) {
+          for (var pi = 0; pi < 7; pi++) { var pa = pi / 7 * TAU; ctx.strokeStyle = pi % 2 ? "#2f7a34" : "#4f9f3f"; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(q[0], q[1]); ctx.lineTo(q[0] + Math.cos(pa) * 11, q[1] + Math.sin(pa) * 11); ctx.stroke(); }
+          disque(q[0], q[1], 2.6, "#5a3a1c");
+        });
+        break;
+      case "ancien":
+        ctx.save(); ctx.scale(1.3, 1.3); PEINTRES_DESSUS.arbre(ctx, 3); ctx.restore();
+        break;
+      case "epave":
+        ctx.strokeStyle = "rgba(255,255,255,0.85)"; ctx.lineWidth = 2.4; ctx.beginPath(); ctx.ellipse(0, 0, 44, 20, -0.15, 0.3, 5.9); ctx.stroke();
+        ctx.fillStyle = ombre; ctx.beginPath(); ctx.moveTo(-34, 4); ctx.quadraticCurveTo(-4, 22, 34, 4); ctx.lineTo(24, -6); ctx.quadraticCurveTo(-4, -12, -34, 4); ctx.fill();
+        ctx.fillStyle = "#7a5a3a"; ctx.strokeStyle = "#1c2622"; ctx.lineWidth = lw;
+        ctx.beginPath(); ctx.moveTo(-36, 0); ctx.quadraticCurveTo(-6, -16, 30, -6); ctx.lineTo(18, 6); ctx.lineTo(24, 12); ctx.quadraticCurveTo(-6, 16, -36, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.strokeStyle = "rgba(40,24,12,0.55)"; ctx.lineWidth = 1.4; ctx.beginPath();
+        for (i = 0; i < 5; i++) { ctx.moveTo(-26 + i * 10, -8 + i * 1.2); ctx.lineTo(-26 + i * 10, 8 - i * 0.6); }
+        ctx.stroke();
+        break;
+    }
+    ctx.restore();
+  }
+
   // Le pictogramme ou le dessin, selon le thème de la carte. Les repères (point, croix,
   // étoile, drapeau) restent des pictogrammes partout ; les types sans pictogramme
   // (moulin, grotte, campement…) sont dessinés dans tous les thèmes.
@@ -3142,7 +3760,8 @@
     return !!(th && th.lieuxIllustres) || !tp || !tp.px;
   }
   function iconeAuto(ctx, type, x, y, s, th, accent) {
-    if (estDessine(type, th)) iconeIllustree(ctx, type, x, y, s, th, accent);
+    if (th.dessus && ICONES_DESSUS[type]) iconeDessus(ctx, type, x, y, s, th, accent);
+    else if (estDessine(type, th)) iconeIllustree(ctx, type, x, y, s, th, accent);
     else icone(ctx, type, x, y, s, th, accent);
   }
 
@@ -3187,6 +3806,16 @@
   }
 
   function dessinerIconeLieu(ctx, carte, l, sx, sy, s, th) {
+    if (l.a) {
+      // Un lieu tourné : tout est dessiné autour de son centre (le nom, lui, reste droit).
+      ctx.save();
+      ctx.translate(sx, sy);
+      ctx.rotate(l.a * Math.PI / 180);
+      dessinerIconeLieu0(ctx, carte, l, 0, 0, s, th);
+      ctx.restore();
+    } else dessinerIconeLieu0(ctx, carte, l, sx, sy, s, th);
+  }
+  function dessinerIconeLieu0(ctx, carte, l, sx, sy, s, th) {
     if (l.type === "image") {
       var im = imageDe(carte, l.image);
       if (im) {
@@ -3635,13 +4264,15 @@
         if (!PEINTRES[tp.type]) return;
         // Le centre du décor ne bouge pas : c'est autour de lui que la taille est plafonnée.
         var s = tailleTampon(tp, vue.zoom), y = tp.y - tp.s * 0.3 + s * 0.3;
-        if (tp.x + s < X0 || tp.x - s > X1 || y + s < Y0 || y - s > Y1 || s * vue.zoom < 2.5) return;
-        visibles.push({ x: tp.x, y: y, s: s });
+        if (tp.x + s < X0 || tp.x - s > X1 || y + s < Y0 || y - s > Y1 || s * vue.zoom < 0.7) return;
+        // Les décors du terrain s'écartent des tampons. La place, dessinée à plat et centrée, est
+        // traitée à part : on retire ensuite tout décor dont le dessin la recouvre.
+        if (tp.type !== "place") visibles.push({ x: tp.x, y: y, s: s });
         if (DESSUS && BATIMENTS[tp.type]) {
           // Vu du dessus, une maison posée à la main est un toit, orientable (`a`, en degrés).
           var kb = BATIMENTS[tp.type];
           decors.push({ x: tp.x, y: tp.y - tp.s * 0.3, maison: { w: s * 0.62 * kb, h: s * 0.4 * kb, a: (tp.a || 0) * Math.PI / 180, v: tp.v || 0 } });
-        } else decors.push({ x: tp.x, y: y, s: s, sprite: tp.type, v: tp.v || 0 });
+        } else decors.push({ x: tp.x, y: y, s: s, sprite: tp.type, v: tp.v || 0, rot: tp.a ? tp.a * Math.PI / 180 : 0 });
       });
       // Les maisons des rues : les arbres leur laissent la place.
       maisonsDesRues(carte, vue, masque, X0, Y0, X1, Y1).forEach(function (mz) {
@@ -3649,7 +4280,18 @@
         if (DESSUS) decors.push({ x: mz.x, y: mz.y, maison: mz });
         else decors.push({ x: mz.x, y: mz.y + mz.w * 0.55, s: mz.w * 2.5, sprite: "maison", v: mz.v });
       });
+      var nAvant = decors.length;
       if (!sansDecors) semerDecors(carte, vue, masque, X0, Y0, X1, Y1, visibles, decors);
+      // Rien ne pousse sur une place : on retire les décors semés (arbres, collines, maisons…)
+      // dont le dessin mord sur elle.
+      (carte.tampons || []).forEach(function (tp) {
+        if (tp.type !== "place") return;
+        var pcx = tp.x, pcy = tp.y - tp.s * 0.3, R = tp.s * 0.5;
+        for (var q = decors.length - 1; q >= nAvant; q--) {
+          var o = decors[q], cx = o.x, cy = o.maison ? o.y : o.y - (o.s || 0) * 0.31, rayon = o.maison ? Math.max(o.maison.w, o.maison.h) * 0.5 : (o.s || 0) * 0.32;
+          if (Math.hypot(cx - pcx, cy - pcy) < R + rayon) decors.splice(q, 1);
+        }
+      });
       lc.save();
       lc.setTransform(z, 0, 0, z, tx, ty);
       lc.beginPath();
@@ -3836,7 +4478,36 @@
     ZPX = avant;
   }
 
+  // Les décors automatiques d'une vue, rendus en objets ordinaires (des tampons) : chacun peut
+  // ensuite être déplacé, tourné, redimensionné ou supprimé. `tampons` : les décors déjà posés,
+  // dont les nouveaux s'écartent comme à l'écran. Rend aussi le rectangle couvert, à retirer des
+  // décors automatiques (sans quoi ils s'afficheraient en double).
+  function figerDecors(carte, vue, tampons) {
+    var th = THEMES[carte.theme] || THEMES.atlas;
+    COULEURS = th.couleurs || null; ENCRE_DECORS = !!th.encreDecors; ECH_THEME = th.echDecors || 1;
+    DESSUS = !!th.dessus; SANS_DECOR = th.sansDecor || null; CULTURES_THEME = th.cultures || null;
+    var pw = Math.max(1, Math.round(vue.largeur)), ph = Math.max(1, Math.round(vue.hauteur)), z = vue.zoom;
+    ZPX = z;
+    var tx = pw / 2 - vue.cx * z, ty = ph / 2 - vue.cy * z;
+    var X0 = vue.cx - vue.largeur / 2 / z, X1 = vue.cx + vue.largeur / 2 / z, Y0 = vue.cy - vue.hauteur / 2 / z, Y1 = vue.cy + vue.hauteur / 2 / z;
+    var masque = construireMasque(carte, { zoom: z, largeur: vue.largeur, hauteur: vue.hauteur, cx: vue.cx, cy: vue.cy }, pw, ph, tx, ty, z, X0, Y0, X1, Y1);
+    var liste = [];
+    var evite = (tampons || []).filter(function (t) { return t.type !== "place"; }).map(function (t) { return { x: t.x, y: t.y, s: t.s }; });
+    semerDecors(carte, vue, masque, X0, Y0, X1, Y1, evite, liste);
+    X0 = Math.max(0, X0); Y0 = Math.max(0, Y0); X1 = Math.min(carte.largeur, X1); Y1 = Math.min(carte.hauteur, Y1);
+    var out = [];
+    liste.forEach(function (o) {
+      if (o.x < X0 || o.x > X1 || o.y < Y0 || o.y > Y1) return;
+      if (o.maison) {
+        var sm = o.maison.w / 0.62;
+        out.push({ type: "maison", v: o.maison.v, x: o.x, y: o.y + sm * 0.3, s: sm, a: Math.round(o.maison.a * 180 / Math.PI * 10) / 10 });
+      } else out.push({ type: o.sprite, v: o.v != null ? o.v : variante(o.sprite, o.r), x: o.x, y: o.y, s: o.s });
+    });
+    return { objets: out, rect: [X0, Y0, X1, Y1] };
+  }
+
   window.Moteur = {
+    figerDecors: figerDecors, fixerEchelleDecors: fixerEchelleDecors,
     THEMES: THEMES, MATERIAUX: MATERIAUX, MAT: MAT, GROUPES_MATERIAUX: GROUPES_MATERIAUX,
     DECORS: DECORS, TAMPONS: TAMPONS, VOIES: VOIES,
     TYPES_LIGNES: TYPES_LIGNES, TYPES_LIEUX: TYPES_LIEUX, CATEGORIES_LIEUX: CATEGORIES_LIEUX, STYLES_ETIQ: STYLES_ETIQ,
