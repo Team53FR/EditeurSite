@@ -1738,7 +1738,7 @@ fichier `.worldmap.json` (réimportable depuis la galerie).
 |---|---|
 | `index.html` / `galerie.js` | Galerie « Mes cartes » (tuiles à vignette), création (taille, style, mer vide ou monde aléatoire), import/export, duplication |
 | `editeur.html` / `editeur.js` | Éditeur : vue, outils, historique, panneaux, enregistrement, export |
-| `moteur.js` | Rendu (`Moteur.dessiner`), matériaux, décors, thèmes, types de lieux. Fonction pure : même rendu pour l'écran, les vignettes et les exports |
+| `moteur.js` | Rendu (`Moteur.dessiner`), matériaux, décors, tampons, thèmes, types de lieux, ornements. Fonction pure : même rendu pour l'écran, les vignettes et les exports |
 | `generateur.js` | Monde aléatoire (bruit fractal), produit de vrais traits de pinceau |
 | `stockage.js` | IndexedDB |
 
@@ -1758,8 +1758,8 @@ réglable lieu par lieu.
 **Terre et eau.** Les matériaux « terre » colorent ; « Eau » (et la gomme) **creuse** la terre déjà
 peinte, sur une couche à part. De là le trait de côte et le halo d'eau peu profonde, obtenus avec
 des ombres portées de la silhouette de la couche. Les décors (arbres, montagnes, collines, dunes…)
-sont semés le long du trait avec un hasard dérivé de (graine du trait, rang) : ils ne bougent pas
-quand on zoome, et ne sont pas dessinés quand ils feraient moins de 3 px.
+ne sont plus attachés aux coups de pinceau : ils naissent du terrain, à l'échelle de ce que l'on
+regarde (voir « Décors qui s'adaptent au zoom »).
 
 **Thèmes** (`Moteur.THEMES`) : Atlas, Parchemin et Illustré. Illustré va vers le rendu des cartes de
 fantasy peintes : la « mer » est le papier (taches accrochées au monde, bords sombres), le bleu ne
@@ -1799,24 +1799,37 @@ tracés comme des polygones irréguliers (rayon de 78 à 112 %, graine du trait)
 gagnent des anses et des caps au lieu d'une suite de cercles. Le monde aléatoire pose aussi
 quelques îlots et des navires en pleine mer (loin du cadre, des côtes et les uns des autres).
 
-**Décors peints.** Arbres, conifères, pics, collines, dunes, marais et herbes sont peints **une seule
+**Décors peints.** Arbres, conifères, palmiers, acacias, arbres morts ou d'automne, pics, collines,
+dunes, rochers, parcelles de champs, blocs de glace, roseaux et herbes sont peints **une seule
 fois** dans de petits canvas (`peintArbre`, `peintMontagne`…) : dégradés, ombre au sol, touches de
-lumière, pas de contour de dessin animé. On les colle ensuite par centaines (`colle`), avec quatre
-définitions (64 à 512 px) choisies d'après le zoom (`ZPX`). Plus beau, et plus rapide que de retracer
-chaque arbre. Seul le volcan reste en vectoriel.
+lumière, pas de contour de dessin animé. On les colle ensuite par milliers (`colle`), avec cinq
+définitions (64 à 1 024 px) choisies d'après le zoom (`ZPX`). Seules les terres volcaniques restent
+en vectoriel.
 
-**Pose des décors (`semer` puis `poserDecors`).** Les décors de tous les traits sont d'abord semés,
-puis posés ensemble, avec trois règles : un décor ne pousse que là où son terrain est resté visible
-(le masque le dit : pas sous un terrain peint après lui, ni dans l'eau, un lac, une rivière, ni sur
-une route) ; il ne chevauche pas ses voisins (les plus grands d'abord, `espace` par type) ; on peint
-du fond vers l'avant, tous terrains confondus. Les montagnes sont des arêtes à deux ou trois sommets,
-neige suivant le relief. **Transitions** : `fondreTransitions` recopie la couche de terre floutée par-
-dessus elle-même en « source-atop » — les couleurs se mélangent aux frontières, la côte reste nette.
+**Décors qui s'adaptent au zoom (`semerDecors`).** Un décor n'appartient plus à un coup de pinceau
+(sa taille suivait celle du pinceau : une forêt peinte sur le continent devenait trois arbres géants
+et flous une fois qu'on zoomait, et une plaine restait vide). Il naît du **terrain**, là où l'on
+regarde. Le monde est découpé en cases de plus en plus fines (`pointCase` : chaque niveau coupe les
+cases du précédent en quatre) et chaque case porte **un** emplacement. Quand une case est coupée,
+l'emplacement qu'elle contenait reste où il était — la sous-case où il tombe en hérite — et les
+trois autres en reçoivent un nouveau. D'où trois propriétés : les décors ont une taille en **pixels
+écran** (un arbre fait une trentaine de pixels de ×1 à ×3 000) ; en zoomant, ceux qui sont visibles
+ne bougent pas et de nouveaux **poussent** entre eux, d'abord minuscules — rien n'apparaît ni ne
+disparaît d'un coup ; et le nombre de décors dépend de la taille de l'écran, pas de celle du monde.
+Rien n'est enregistré : tout vient d'un hachage de la case. Le terrain sous chaque emplacement est lu
+dans le masque ; un décor ne pousse que si ses quatre voisins disent le même terrain (il se tient à
+l'intérieur de son biome, loin de l'eau et des routes). La table `DECORS` donne, par terrain, l'écart
+(`C`), la part d'emplacements occupés (`p`) et le ou les décors (une savane mêle acacias et herbes
+sèches). **Transitions** : `fondreTransitions` recopie la couche de terre floutée par-dessus
+elle-même en « source-atop » — les couleurs se mélangent aux frontières, la côte reste nette.
+**Texture du sol** (`textureSol`) : des marbrures accrochées au monde, à deux échelles fondues l'une
+dans l'autre, pour qu'un aplat ait du grain à toutes les distances.
 
-**Masque des matériaux.** Canal rouge : le terrain (code par matériau) ; transparent : l'eau — mer,
-gomme, mais aussi lacs et rivières, creusés un peu plus larges que le dessin ; canal vert : les routes
-et leurs abords, AJOUTÉES en « lighter » sans rien effacer (sous une route, l'eau reste de l'eau).
-Résolution : moitié de l'écran, une lecture de pixels par image.
+**Masque des matériaux.** Canal rouge : le terrain (rang du matériau × 10) ; canal bleu : les
+réglages de décor du trait (densité × 3 + taille) ; transparent : l'eau — mer, gomme, mais aussi lacs
+et rivières, creusés un peu plus larges que le dessin ; canal vert : les routes et leurs abords,
+AJOUTÉES en « lighter » sans rien effacer (sous une route, l'eau reste de l'eau). Résolution : moitié
+de l'écran, une lecture de pixels par image.
 
 **Routes et ponts.** « Route » (terre battue : bas-côtés sombres, chaussée, milieu usé, ornières) et
 « Sentier » (pointillé) ondulent légèrement d'elles-mêmes (`forceMeandres`). Un **pont** est la route
@@ -1825,17 +1838,14 @@ elle-même au-dessus de l'eau : `dessinerPonts` suit la route, repère au masque
 ne donne qu'un pont), les prolonge un peu sur les rives, et trace le tablier le long de ce tronçon —
 courbe comprise (`pontLe` : garde-corps, planches en pointillé perpendiculaire, poteaux).
 
-**Cohérence (voies, lacs, détails).** Le masque des matériaux déborde de l'écran d'un cinquième de
+**Cohérence (voies, lacs).** Le masque des matériaux déborde de l'écran d'un cinquième de
 chaque côté, et `materiauEn` distingue « eau » (null) de « inconnu » (undefined, hors masque) : la
 confusion faisait naître des ponts au bord de l'écran. Les voies sont tracées ensemble, couche par
 couche (`tracerVoies` : bas-côtés, chaussées, milieux, ornières), si bien qu'un embranchement se fond
 dans la route qu'il rejoint ; dans l'éditeur, un point posé près d'une voie (ou d'une rivière pour
 une rivière) s'y **accroche** (`accrocher`, anneau doré sous le curseur). Les **lacs** sont peints
 dans la couche de terre en « source-atop » : ils n'existent que sur la terre (jamais sur la mer ni
-le trait de côte) et passent sous les arbres de la rive. Les **détails du zoom** (`preparerDetails`)
-sont choisis avant les décors, qui s'en écartent (`genePourDetails`) ; leur taille suit celle de leur
-case (38 à 110 px), et chacun est relié par un chemin à la voie la plus proche, sinon au lieu voisin,
-seulement si le chemin reste à terre — il n'y a plus de réseau de chemins tiré au hasard.
+le trait de côte) et passent sous les arbres de la rive.
 
 **Eaux douces.** Lacs et rivières **creusent la terre** comme la mer (`creuserEaux`) : la côte, le halo
 et la falaise les bordent d'eux-mêmes, et là où une rivière ou un lac touche la mer il n'y a plus de
@@ -1843,26 +1853,16 @@ frontière. Pour les thèmes dont la mer est du papier (Illustré, Parchemin), `
 SOUS la terre (visible seulement dans le creux) ; le thème Atlas n'en a pas besoin. Une seule forme
 de rivière (`traceRiviereEau`) sert au creusement, à l'eau douce et au masque.
 
-**Petits lieux stables.** `terrainEn(carte, x, y)` répond sans écran ni masque (index en grille de
-chaque trait, `indexTrait`), si bien qu'un petit lieu ne dépend que de sa case (octave, colonne,
-rangée) : il apparaît en fondu quand son octave devient assez grande, puis ne bouge plus. Son chemin
-mène à la voie la plus proche, sinon au petit lieu le plus proche d'une octave aussi grossière ou plus
-— jamais plus fine : en zoomant, les nouveaux lieux s'accrochent aux anciens et aucun chemin ne
-change de destination. Deux cases de marge autour de l'écran : le chemin d'un lieu hors champ reste
-visible.
+**Rien n'est ajouté tout seul.** Les biomes ne posent plus ni chemins, ni cabanes, ni grottes : le
+système de « détails qui apparaissent en zoomant » (`preparerDetails`, `poiCase`, `cheminDe`) a été
+retiré, avec `terrainEn` qui ne servait qu'à lui. Un terrain ne produit que ses décors naturels
+(arbres, pics, dunes…). Tout le reste se pose à la main : les anciens petits lieux sont devenus des
+**types de lieux** ordinaires (cabane, campement, ferme, menhirs, grotte, vestiges, oasis, pilotis)
+et les chemins se tracent avec l'outil Tracés (sentier).
 
 **Lacs** : contours fermés (`carte.lacs`), dessinés à main levée avec l'outil Lacs (K), puis déplaçables,
 remodelables (sommets, double-clic pour en ajouter) et redimensionnables. Rive de sable, eau en
 dégradé, ombre intérieure, rides.
-
-**Détails qui apparaissent en zoomant** (`dessinerDetails`) : chemins, cabanes, campements, fermes,
-menhirs, grottes, ruines, oasis, cabanes sur pilotis. Rien n'est enregistré : tout vient d'une graine
-(identifiant de la carte) dans une grille d'« octaves » (chaque octave est deux fois plus fine, et
-n'apparaît, en fondu, que si ses cases font au moins 96 px). Le matériau sous chaque point vient du
-**masque des matériaux** (`construireMasque`) : tous les traits repeints en petit, chacun d'une
-couleur-code, puis une seule lecture de pixels par image. Les chemins relient les bords actifs de
-chaque case à son centre ; les bords étant partagés entre cases voisines, les chemins sont continus.
-Seulement à partir du niveau ×2,8 et jamais pendant un déplacement.
 
 **Interface** : thème « atelier du cartographe » en CSS pur (bois à fibres, parchemin au bruit SVG
 intégré, filets d'or, sceaux de cire, boutons de laiton), icônes d'outils en SVG.
@@ -1898,9 +1898,53 @@ problèmes de très petites polices des canvas.
 **Ajouté au portail** (`DEFAULT_SITES`, id `worldmap`). Comme Recto-verso, il ne lit pas la session
 et ne touche pas Supabase ; l'entrée du tableau de bord reste soumise à `acces` comme les autres.
 
-**Pistes** : minicarte, courbes de niveau, texte courbe suivant un tracé, calques, biomes qui se
-fondent, mode « région » détaillé à partir d'un détail de la grande carte, synchronisation avec
-un compte (Supabase) pour retrouver ses cartes d'un appareil à l'autre.
+**Atelier complet.** Ce que l'éditeur sait faire de plus :
+
+- **Terrains** (B) — 21 matériaux rangés par famille (plaines, forêts, reliefs, terres arides, eaux
+  et froid), chacun avec un aperçu de son décor. Réglages du pinceau, enregistrés dans le trait :
+  `dens` (décors : aucun, rares, normal, dense), `ech` (petits, normaux, grands) et `rug` (bord lisse
+  → découpé : le contour devient une suite de polygones irréguliers, `formeRugueuse`, mise en cache
+  par trait — de quoi dessiner des côtes à anses et à caps ; la gomme l'a aussi).
+- **Décors** (D) — les mêmes dessins, posés **un par un** (`carte.tampons` : `{ type, v, x, y, s }`) :
+  clic pour en poser un, glisser pour en semer. Un tampon appartient au monde (il grandit quand on
+  s'approche) jusqu'à une taille d'écran plafonnée (`Moteur.tailleTampon`), et les décors du terrain
+  lui laissent la place.
+- **Tracés** (L) — en plus des rivières, routes, sentiers, murailles et frontières : **route pavée**
+  (joints de pavés, ponts), **falaise** (hachures du côté droit du tracé, « Inverser le sens »),
+  **route maritime** (pointillé), et **territoire** (une frontière refermée, `ferme`, au fond
+  coloré, `fond`). Glisser trace à main levée ; la sinuosité des voies se règle.
+- **Noms** (T) — styles Relief et Lieu-dit, **courbure** (`courbe` : les lettres sont posées une à
+  une le long d'un arc), espacement des lettres, opacité, taille au curseur.
+- **Lieux** (P) — 32 types en cinq catégories (cités, ouvrages, mystères, nature, repères), plus
+  **votre propre image** (réduite à 256 px, gardée dans `carte.images` en data-URL — une adresse
+  distante est refusée). Par lieu : sous-titre, taille, couleur (toits et bannière, ou repère),
+  miroir, nom affiché ou non, position (auto, bas, haut, gauche, droite), style, taille et couleur
+  du nom, niveau d'apparition (« Dès ce zoom »), notes privées, carte détaillée. À l'écran : fondu à
+  l'apparition, lieux du sud devant ceux du nord, et **noms qui ne se recouvrent pas** — le plus
+  important d'abord, les autres cherchent une place libre autour de leur icône, sinon attendent
+  que l'on zoome.
+- **Ornements** (`carte.ornements`, réglés dans « Carte… ») : rose des vents, échelle graphique,
+  cartouche de titre — à la mesure de la carte, donc présents dans l'image exportée.
+- **Autour** : minicarte (M) cliquable, index des lieux avec recherche (un clic y mène), clic droit
+  sur tout objet (dupliquer, supprimer…), Ctrl+D, historique par lots (une traînée de décors
+  s'annule d'un coup), raccourcis actifs même quand un curseur a le focus.
+- **Export** : la carte entière ou la vue actuelle ; symboles « comme à l'écran » (l'image est
+  dessinée comme sur un écran de 2 048 px puis agrandie : plus nette, pas plus chargée) ou « fins ».
+
+**Style Enluminé** (`THEMES.enlumine`) — le rendu « carte peinte » : la mer est le parchemin et le
+bleu ne tient qu'en une large bande le long des rivages (`glowMin`, trois passes) ; la terre est un
+plateau (falaise épaisse tracée par pas, `falaisePx`, et ombre des rivages : la silhouette de l'eau
+projetée sur la terre, `ombreCote`) ; les terrains ont des couleurs plus denses (`couleurs`, lues par
+`tracerTrait`) ; les décors sont un peu plus grands (`echDecors`) et **cernés d'encre** — le sprite
+est assombri puis sa silhouette, décalée dans huit directions, est glissée dessous (`encreDecors`,
+mis en cache à part) ; le cadre gagne volutes et fleurons (`orneRiche`).
+
+Les cartes d'avant s'ouvrent telles quelles : seuls leurs décors changent (ils viennent maintenant
+du terrain) et leurs petits lieux automatiques ont disparu.
+
+**Pistes** : courbes de niveau, calques, texte suivant un tracé quelconque, mode « région » détaillé
+à partir d'un détail de la grande carte, synchronisation avec un compte (Supabase) pour retrouver
+ses cartes d'un appareil à l'autre.
 
 ## Favicon
 
