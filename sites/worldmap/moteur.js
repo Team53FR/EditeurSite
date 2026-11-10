@@ -3018,6 +3018,17 @@
   //             grille, cle (canvas de travail) }
   function dessiner(cv, carte, vue, options) {
     var opts = options || {};
+    // Calques masqués (`opts.cacher` : { decors, tampons, lignes, lacs, etiquettes, lieux,
+    // ornements }) : on dessine une copie de la carte où ces collections sont vides — tout
+    // le reste du rendu (masque, ponts, creusement) suit de lui-même.
+    var cache = opts.cacher, sansDecors = false;
+    if (cache) {
+      var copie = Object.assign({}, carte);
+      ["tampons", "lignes", "lacs", "etiquettes", "lieux"].forEach(function (k) { if (cache[k]) copie[k] = []; });
+      if (cache.ornements) copie.ornements = null;
+      sansDecors = !!cache.decors;
+      carte = copie;
+    }
     var th = THEMES[carte.theme] || THEMES.atlas;
     COULEURS = th.couleurs || null; ENCRE_DECORS = !!th.encreDecors; ECH_THEME = th.echDecors || 1;
     var dpr = vue.dpr || 1;
@@ -3104,7 +3115,7 @@
         visibles.push({ x: tp.x, y: y, s: s });
         decors.push({ x: tp.x, y: y, s: s, sprite: tp.type, v: tp.v || 0 });
       });
-      semerDecors(carte, vue, masque, X0, Y0, X1, Y1, visibles, decors);
+      if (!sansDecors) semerDecors(carte, vue, masque, X0, Y0, X1, Y1, visibles, decors);
       lc.save();
       lc.setTransform(z, 0, 0, z, tx, ty);
       lc.beginPath();

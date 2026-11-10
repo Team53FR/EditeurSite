@@ -448,6 +448,21 @@ fieldset.champ-groupe legend { padding: 0 8px; color: var(--cire); font-size: 16
 }
 .rangee-fin { margin-top: 16px; padding-top: 10px; border-top: 1px dotted rgba(80, 52, 20, 0.45); }
 
+/* Calques : un œil et un cadenas par famille d'objets. */
+.calques { display: flex; flex-direction: column; }
+.ligne-calque { display: flex; align-items: center; gap: 4px; padding: 2px 0; border-bottom: 1px dotted rgba(80, 52, 20, 0.35); font-size: 16px; }
+.ligne-calque.cache .nom-calque { color: var(--encre-douce); text-decoration: line-through; }
+.nom-calque { margin-left: 4px; }
+.btn-calque {
+  appearance: none; width: 30px; height: 26px; flex: none; display: grid; place-items: center;
+  background: rgba(255, 249, 226, 0.55); border: 1px solid #9c7f4d; border-radius: 3px; cursor: pointer; color: var(--encre); padding: 0;
+}
+.btn-calque svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.800; stroke-linecap: round; stroke-linejoin: round; }
+.btn-calque:hover { border-color: var(--or-fonce); background: rgba(255, 249, 226, 0.95); }
+.btn-calque.inactif { color: rgba(107, 82, 51, 0.55); }
+.btn-calque.verrou { background: var(--cire); color: #fdf1cf; border-color: var(--cire); }
+.btn-calque.vide { visibility: hidden; }
+
 /* Blocs repliables (index des lieux, infos de la carte). */
 details.repli > summary { list-style: none; cursor: pointer; }
 details.repli > summary::-webkit-details-marker { display: none; }

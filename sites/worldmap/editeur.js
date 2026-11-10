@@ -37,6 +37,7 @@
     taillePxEtiq: 30,
     typeLieu: "ville",
     selection: null,         // { coll, obj }
+    multi: [],               // sélection multiple : [{ coll, obj }] (deux objets au moins)
     grille: false,
     ligneEnCours: null,      // { type, pts, taille }
     curseur: null,           // { x, y } en px scène
@@ -135,7 +136,7 @@
       cx: E.vue.cx, cy: E.vue.cy, zoom: E.vue.zoom,
       largeur: Math.round(W * (1 + 2 * MARGE_CACHE)), hauteur: Math.round(H * (1 + 2 * MARGE_CACHE)), dpr: DPR
     };
-    Moteur.dessiner(cache.cv, E.carte, v, { grille: E.grille });
+    Moteur.dessiner(cache.cv, E.carte, v, { grille: E.grille, cacher: calquesCaches() });
     cache.vue = v;
   }
 
@@ -294,8 +295,31 @@
   }
 
   function selectionSurcouche(ctx) {
-    var sel = E.selection;
+    if (geste && geste.type === "cadre") {
+      var gx = Math.min(geste.x0, geste.x1), gy = Math.min(geste.y0, geste.y1);
+      ctx.fillStyle = "rgba(255,211,107,0.14)"; ctx.strokeStyle = "#ffd36b"; ctx.lineWidth = 1.5;
+      ctx.setLineDash([5, 4]);
+      ctx.fillRect(gx, gy, Math.abs(geste.x1 - geste.x0), Math.abs(geste.y1 - geste.y0));
+      ctx.strokeRect(gx, gy, Math.abs(geste.x1 - geste.x0), Math.abs(geste.y1 - geste.y0));
+      ctx.setLineDash([]);
+    }
+    if (E.multi.length) E.multi.forEach(function (m) { marqueSelection(ctx, m, true); });
+    else marqueSelection(ctx, E.selection, false);
+  }
+
+  // Le repère d'un objet sélectionné. `groupe` : dans une sélection multiple, un tracé ou un
+  // lac est simplement surligné (ses points ne se déplacent qu'un par un, seul).
+  function marqueSelection(ctx, sel, groupe) {
     if (!sel) return;
+    if (groupe && (sel.coll === "lignes" || sel.coll === "lacs")) {
+      var pg = sel.coll === "lignes" ? Moteur.pointsAffiches(sel.obj) : sel.obj.pts;
+      ctx.strokeStyle = "rgba(255,211,107,0.9)"; ctx.lineWidth = 3; ctx.setLineDash([6, 4]);
+      ctx.beginPath();
+      for (var g = 0; g < pg.length; g += 2) { var sg = versEcran(pg[g], pg[g + 1]); if (g === 0) ctx.moveTo(sg[0], sg[1]); else ctx.lineTo(sg[0], sg[1]); }
+      if (sel.coll === "lacs") ctx.closePath();
+      ctx.stroke(); ctx.setLineDash([]);
+      return;
+    }
     ctx.strokeStyle = "#ffd36b";
     ctx.fillStyle = "#fff";
     ctx.lineWidth = 2;
@@ -369,6 +393,8 @@
 
   function apresHistorique() {
     if (E.selection && collection(E.selection.coll).indexOf(E.selection.obj) < 0) E.selection = null;
+    E.multi = E.multi.filter(function (m) { return collection(m.coll).indexOf(m.obj) >= 0; });
+    if (E.multi.length < 2) E.multi = [];
     majBoutonsHisto();
     panneauSelection();
     infosCarte();
@@ -465,6 +491,7 @@
   // ----- Sélection et recherche d'objets -----
   function selectionner(coll, obj) {
     cloreEdition();
+    E.multi = [];
     E.selection = obj ? { coll: coll, obj: obj } : null;
     panneauSelection();
     majIndex();
@@ -478,16 +505,157 @@
     return { d: Math.hypot(px - x, py - y), x: x, y: y, t: t };
   }
 
+  // ----- Sélection multiple -----
+  function selectionListe() { return E.multi.length ? E.multi : (E.selection ? [E.selection] : []); }
+  function selectionnerListe(liste) {
+    cloreEdition();
+    if (liste.length === 1) { selectionner(liste[0].coll, liste[0].obj); return; }
+    E.selection = null;
+    E.multi = liste.length >= 2 ? liste : [];
+    panneauSelection();
+    majIndex();
+    surcouche();
+  }
+  function dansSelection(obj) { return E.multi.some(function (m) { return m.obj === obj; }); }
+
+  // Le point d'ancrage d'un objet (monde), pour savoir s'il est dans le cadre.
+  function ancres(coll, o) {
+    if (o.pts) return o.pts;
+    if (coll === "tampons") return [o.x, o.y - o.s * 0.3];
+    return [o.x, o.y];
+  }
+  var COLLS = ["lieux", "etiquettes", "tampons", "lignes", "lacs"];
+
+  // Tout ce qui tombe entièrement dans le rectangle (monde), sur les calques modifiables.
+  function objetsDans(x0, y0, x1, y1) {
+    var out = [], niv = niveauActuel();
+    COLLS.forEach(function (coll) {
+      if (!calqueLibre(coll)) return;
+      E.carte[coll].forEach(function (o) {
+        if (coll === "lieux" && !Moteur.visibleLieu(o, niv)) return;
+        var a = ancres(coll, o);
+        for (var i = 0; i < a.length; i += 2) if (a[i] < x0 || a[i] > x1 || a[i + 1] < y0 || a[i + 1] > y1) return;
+        out.push({ coll: coll, obj: o });
+      });
+    });
+    return out;
+  }
+
+  function deplacerDe(o, base, dx, dy) {
+    if (o.pts) { for (var i = 0; i < base.length; i += 2) { o.pts[i] = base[i] + dx; o.pts[i + 1] = base[i + 1] + dy; } }
+    else { o.x = base[0] + dx; o.y = base[1] + dy; }
+  }
+
+  function supprimerSelection() {
+    var liste = selectionListe();
+    if (!liste.length) return;
+    if (liste.length === 1) { supprimerObjet(liste[0].coll, liste[0].obj); return; }
+    // Triées par rang : « Annuler » remet chaque objet à sa place d'origine.
+    var actions = liste.map(function (m) { return { t: "suppr", coll: m.coll, obj: m.obj, idx: collection(m.coll).indexOf(m.obj) }; })
+      .sort(function (a, b) { return a.idx - b.idx; });
+    E.multi = [];
+    executer({ t: "lot", actions: actions });
+  }
+
+  function dupliquerSelection() {
+    var liste = selectionListe();
+    if (!liste.length) return;
+    if (liste.length === 1) { dupliquer(liste[0].coll, liste[0].obj); return; }
+    var d = 26 / E.vue.zoom, copies = [], compte = {};
+    var actions = liste.map(function (m) {
+      var c = cloner(m.obj);
+      c.id = nouvelId(m.coll.charAt(0));
+      delete c.carteId;
+      if (c.pts) for (var i = 0; i < c.pts.length; i += 2) { c.pts[i] += d; c.pts[i + 1] += d; }
+      else { c.x += d; c.y += d; }
+      compte[m.coll] = (compte[m.coll] || 0) + 1;
+      copies.push({ coll: m.coll, obj: c });
+      return { t: "ajout", coll: m.coll, obj: c, idx: collection(m.coll).length + compte[m.coll] - 1 };
+    });
+    executer({ t: "lot", actions: actions });
+    selectionnerListe(copies);
+  }
+
+  // Agrandit ou réduit tous les objets de la sélection (lieux, décors, noms), sur place.
+  function echelleSelection(f) {
+    var avant = E.multi.map(function (m) { return JSON.stringify(m.obj); });
+    E.multi.forEach(function (m) {
+      var o = m.obj;
+      if (m.coll === "lieux") o.ech = borne((o.ech || 1) * f, 0.4, 3);
+      else if (m.coll === "tampons") { var pied = o.y - o.s * 0.3; o.s *= f; o.y = pied + o.s * 0.3; }
+      else if (m.coll === "etiquettes") o.taille *= f;
+    });
+    var actions = [];
+    E.multi.forEach(function (m, i) {
+      var ap = JSON.stringify(m.obj);
+      if (ap !== avant[i]) actions.push({ t: "modif", coll: m.coll, id: m.obj.id, avant: JSON.parse(avant[i]), apres: JSON.parse(ap) });
+    });
+    if (actions.length) { enregistrer({ t: "lot", actions: actions }); marquer(); rendre(); }
+  }
+
+  // ----- Calques -----
+  //
+  // Chaque famille d'objets peut être masquée (elle n'est plus dessinée, ni à l'écran ni
+  // dans l'export) ou verrouillée (on ne peut plus la sélectionner : elle ne bouge plus par
+  // erreur). L'état est enregistré avec la carte (`carte.calques`).
+  var CALQUES = [
+    ["decors", "Décors du terrain"], ["tampons", "Décors posés"], ["lignes", "Tracés"], ["lacs", "Lacs"],
+    ["etiquettes", "Noms"], ["lieux", "Lieux"], ["ornements", "Ornements"]
+  ];
+  function etatCalque(cle) { var c = E.carte.calques; return (c && c[cle]) || {}; }
+  function calqueLibre(coll) { var e = etatCalque(coll); return !e.cache && !e.verrou; }
+  function calquesCaches() {
+    var out = null;
+    CALQUES.forEach(function (c) { if (etatCalque(c[0]).cache) { out = out || {}; out[c[0]] = true; } });
+    return out;
+  }
+  function basculerCalque(cle, champ) {
+    var c = E.carte.calques = E.carte.calques || {};
+    c[cle] = c[cle] || {};
+    if (c[cle][champ]) delete c[cle][champ]; else c[cle][champ] = true;
+    if (!c[cle].cache && !c[cle].verrou) delete c[cle];
+    // Ce qui devient intouchable sort de la sélection.
+    if (E.selection && !calqueLibre(E.selection.coll)) selectionner(null, null);
+    if (E.multi.length) selectionnerListe(E.multi.filter(function (m) { return calqueLibre(m.coll); }));
+    majCalques();
+    marquer();
+    rendre();
+  }
+  function majCalques() {
+    var zone = $("listeCalques");
+    if (!zone) return;
+    zone.innerHTML = "";
+    CALQUES.forEach(function (c) {
+      var e = etatCalque(c[0]);
+      var oeil = el("button", { type: "button", classe: "btn-calque" + (e.cache ? " inactif" : ""), title: e.cache ? "Afficher" : "Masquer", "aria-pressed": String(!e.cache), "aria-label": (e.cache ? "Afficher " : "Masquer ") + c[1] });
+      oeil.innerHTML = e.cache
+        ? '<svg viewBox="0 0 24 24"><path d="M3 3l18 18"/><path d="M10.600 6.200A9.500 9.500 0 0 1 12 6c5 0 8.500 4 9.500 6-.400.800-1.200 2-2.400 3.200M6.300 7.700C4.300 9 3 10.900 2.500 12c1 2 4.500 6 9.500 6 1.300 0 2.500-.300 3.600-.700"/></svg>'
+        : '<svg viewBox="0 0 24 24"><path d="M2.500 12C3.500 10 7 6 12 6s8.500 4 9.500 6c-1 2-4.500 6-9.500 6s-8.500-4-9.500-6z"/><circle cx="12" cy="12" r="2.800"/></svg>';
+      oeil.addEventListener("click", function () { basculerCalque(c[0], "cache"); });
+      var ligne = el("div", { classe: "ligne-calque" + (e.cache ? " cache" : "") }, [oeil]);
+      if (c[0] !== "decors" && c[0] !== "ornements") {
+        var cadenas = el("button", { type: "button", classe: "btn-calque" + (e.verrou ? " verrou" : " inactif"), title: e.verrou ? "Déverrouiller" : "Verrouiller (ne plus pouvoir sélectionner)", "aria-pressed": String(!!e.verrou), "aria-label": (e.verrou ? "Déverrouiller " : "Verrouiller ") + c[1] });
+        cadenas.innerHTML = e.verrou
+          ? '<svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="1.500"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>'
+          : '<svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="1.500"/><path d="M8 11V8a4 4 0 0 1 7.500-2"/></svg>';
+        cadenas.addEventListener("click", function () { basculerCalque(c[0], "verrou"); });
+        ligne.appendChild(cadenas);
+      } else ligne.appendChild(el("span", { classe: "btn-calque vide" }));
+      ligne.appendChild(el("span", { classe: "nom-calque", texte: c[1] }));
+      zone.appendChild(ligne);
+    });
+  }
+
   function trouver(px, py) {
     var z = E.vue.zoom, niv = niveauActuel(), w = versMonde(px, py), i;
-    var lieux = E.carte.lieux;
+    var lieux = calqueLibre("lieux") ? E.carte.lieux : [];
     for (i = lieux.length - 1; i >= 0; i--) {
       var l = lieux[i];
       if (!Moteur.visibleLieu(l, niv)) continue;
       var s = versEcran(l.x, l.y);
       if (Math.hypot(s[0] - px, s[1] - py) <= Moteur.tailleIcone(l, themeActuel()) / 2 + 6) return { coll: "lieux", obj: l };
     }
-    var et = E.carte.etiquettes;
+    var et = calqueLibre("etiquettes") ? E.carte.etiquettes : [];
     for (i = et.length - 1; i >= 0; i--) {
       var e = et[i];
       var tpx = e.taille * z;
@@ -498,7 +666,7 @@
       var lx = dx * Math.cos(a) - dy * Math.sin(a), ly = dx * Math.sin(a) + dy * Math.cos(a);
       if (Math.abs(lx) <= b.w / 2 + 4 / z && Math.abs(ly - (b.dy || 0)) <= b.h / 2 + 2 / z) return { coll: "etiquettes", obj: e };
     }
-    var li = E.carte.lignes;
+    var li = calqueLibre("lignes") ? E.carte.lignes : [];
     for (i = li.length - 1; i >= 0; i--) {
       var ln = li[i];
       var seuil = Math.max(7, ln.taille * z / 2 + 4) / z;
@@ -508,7 +676,7 @@
       }
     }
     // Les décors posés à la main : du premier plan vers le fond.
-    var tp = E.carte.tampons, meilleur = null;
+    var tp = calqueLibre("tampons") ? E.carte.tampons : [], meilleur = null;
     for (i = 0; i < tp.length; i++) {
       // (x, yc) : le centre du décor, fixe ; `ts` : sa taille à ce zoom (plafonnée à l'écran).
       var t = tp[i], ts = Moteur.tailleTampon(t, z), yc = t.y - t.s * 0.3;
@@ -517,7 +685,7 @@
     }
     if (meilleur) return { coll: "tampons", obj: meilleur };
     // Les lacs en dernier : au-dessous des tracés (une route sur un lac se clique avant lui).
-    var lacs = E.carte.lacs;
+    var lacs = calqueLibre("lacs") ? E.carte.lacs : [];
     for (i = lacs.length - 1; i >= 0; i--) {
       if (lacs[i].pts && lacs[i].pts.length >= 6 && Moteur.dansPolygone(w[0], w[1], lacs[i].pts)) return { coll: "lacs", obj: lacs[i] };
     }
@@ -649,7 +817,7 @@
         geste = { type: "clic", x: p.x, y: p.y };
         break;
       case "selection":
-        debutSelection(p, w);
+        debutSelection(p, w, ev.shiftKey);
         break;
     }
   }
@@ -669,7 +837,25 @@
     return out;
   }
 
-  function debutSelection(p, w) {
+  function debutSelection(p, w, maj) {
+    var touche = trouver(p.x, p.y);
+    if (maj) {
+      // Maj + clic : ajouter ou retirer un objet ; Maj + glisser dans le vide : un cadre.
+      if (touche) {
+        var liste = selectionListe().slice(), rang = -1;
+        liste.forEach(function (m, q) { if (m.obj === touche.obj) rang = q; });
+        if (rang >= 0) liste.splice(rang, 1); else liste.push(touche);
+        selectionnerListe(liste);
+        geste = { type: "rien" };
+      } else geste = { type: "cadre", x0: p.x, y0: p.y, x1: p.x, y1: p.y, base: selectionListe().slice() };
+      return;
+    }
+    if (touche && dansSelection(touche.obj)) {
+      // Glisser l'un des objets sélectionnés les déplace tous.
+      geste = { type: "deplaceMulti", x0: w[0], y0: w[1], bouge: false,
+        bases: E.multi.map(function (m) { return { avant: JSON.stringify(m.obj), base: m.obj.pts ? m.obj.pts.slice() : [m.obj.x, m.obj.y] }; }) };
+      return;
+    }
     var sel = E.selection;
     if (sel && (sel.coll === "lignes" || sel.coll === "lacs")) {
       var i = sommetProche(sel.obj, p.x, p.y);
@@ -797,6 +983,15 @@
           surcouche();
         }
         break;
+      case "cadre":
+        geste.x1 = p.x; geste.y1 = p.y;
+        surcouche();
+        break;
+      case "deplaceMulti":
+        E.multi.forEach(function (m, q) { deplacerDe(m.obj, geste.bases[q].base, w[0] - geste.x0, w[1] - geste.y0); });
+        geste.bouge = true;
+        rendre();
+        break;
       case "deplaceLac":
         var ddx = w[0] - geste.x0, ddy = w[1] - geste.y0;
         for (var q = 0; q < geste.base.length; q += 2) {
@@ -863,6 +1058,23 @@
           ajouter("lacs", lac);
           selectionner("lacs", lac);
           choisirOutil("selection");
+        }
+        break;
+      case "cadre":
+        var c0 = versMonde(Math.min(g.x0, g.x1), Math.min(g.y0, g.y1)), c1 = versMonde(Math.max(g.x0, g.x1), Math.max(g.y0, g.y1));
+        var pris = objetsDans(c0[0], c0[1], c1[0], c1[1]);
+        g.base.forEach(function (m) { if (!pris.some(function (x) { return x.obj === m.obj; })) pris.push(m); });
+        selectionnerListe(pris);
+        break;
+      case "deplaceMulti":
+        if (g.bouge) {
+          var modifs = [];
+          E.multi.forEach(function (m, q) {
+            if (m.obj.bb && m.obj.taille != null) m.obj.bb = Moteur.boiteTrait(m.obj.pts, m.obj.taille);
+            modifs.push({ t: "modif", coll: m.coll, id: m.obj.id, avant: JSON.parse(g.bases[q].avant), apres: cloner(m.obj) });
+          });
+          enregistrer({ t: "lot", actions: modifs });
+          marquer();
         }
         break;
       case "deplaceLac":
@@ -1398,7 +1610,7 @@
 
     if (E.outil === "lac") zone.appendChild(el("p", { classe: "aide", texte: "Dessinez le contour du lac à main levée, en maintenant le bouton : il se referme tout seul au relâchement. On peut ensuite le déplacer, le remodeler, l'agrandir. Les rivières et les routes qui le traversent s'y raccordent." }));
     if (E.outil === "main") zone.appendChild(el("p", { classe: "aide", texte: "Faites glisser pour déplacer la carte. La molette zoome, Espace + glisser déplace avec n'importe quel outil." }));
-    if (E.outil === "selection") zone.appendChild(el("p", { classe: "aide", texte: "Cliquez un lieu, un nom, un décor ou un tracé pour le régler, le déplacer ou le supprimer. Double-clic pour renommer ; sur un tracé, double-clic ajoute un point. Clic droit : dupliquer, supprimer. Ctrl+D duplique." }));
+    if (E.outil === "selection") zone.appendChild(el("p", { classe: "aide", texte: "Cliquez un lieu, un nom, un décor ou un tracé pour le régler, le déplacer ou le supprimer. Double-clic pour renommer ; sur un tracé, double-clic ajoute un point. Clic droit : dupliquer, supprimer. Plusieurs objets : Maj + clic, ou Maj + glisser pour tracer un cadre ; Ctrl+A prend tout." }));
   }
 
   // ----- Panneau : sélection -----
@@ -1406,6 +1618,26 @@
     var bloc = $("blocSelection"), zone = $("optionsSelection");
     var sel = E.selection;
     zone.innerHTML = "";
+    if (E.multi.length) {
+      bloc.hidden = false;
+      $("titreSelection").textContent = "Sélection (" + E.multi.length + ")";
+      var compte = {};
+      E.multi.forEach(function (m) { compte[m.coll] = (compte[m.coll] || 0) + 1; });
+      var noms = { lieux: ["lieu", "lieux"], etiquettes: ["nom", "noms"], lignes: ["tracé", "tracés"], lacs: ["lac", "lacs"], tampons: ["décor", "décors"] };
+      zone.appendChild(el("p", { classe: "aide", texte: Object.keys(compte).map(function (k) { return compte[k] + " " + noms[k][compte[k] > 1 ? 1 : 0]; }).join(", ") + "." }));
+      if (compte.lieux || compte.tampons || compte.etiquettes) {
+        zone.appendChild(el("div", { classe: "rangee" }, [
+          el("button", { type: "button", classe: "btn", texte: "Plus petits", onclick: function () { echelleSelection(1 / 1.15); } }),
+          el("button", { type: "button", classe: "btn", texte: "Plus grands", onclick: function () { echelleSelection(1.15); } })
+        ]));
+      }
+      zone.appendChild(el("p", { classe: "aide", texte: "Glissez l'un des objets pour les déplacer tous. Maj + clic ajoute ou retire un objet, Maj + glisser trace un cadre, Ctrl+A prend tout." }));
+      zone.appendChild(el("div", { classe: "rangee rangee-fin" }, [
+        el("button", { type: "button", classe: "btn", texte: "Dupliquer", onclick: dupliquerSelection }),
+        el("button", { type: "button", classe: "btn danger", texte: "Supprimer", onclick: supprimerSelection })
+      ]));
+      return;
+    }
     bloc.hidden = !sel;
     if (!sel) return;
     var o = sel.obj;
@@ -1796,7 +2028,7 @@
     Moteur.preparerImages(c).then(function () {
       try {
         var cv = document.createElement("canvas");
-        Moteur.dessiner(cv, c, vue, { cle: "export", grille: $("exGrille").checked });
+        Moteur.dessiner(cv, c, vue, { cle: "export", grille: $("exGrille").checked, cacher: calquesCaches() });
         cv.toBlob(function (blob) {
           if (!blob) { $("exMessage").textContent = "Le navigateur n'a pas pu produire cette image : essayez une taille plus petite."; return; }
           telecharger(blob, nomFichier() + (vueSeule ? "-detail" : "") + ".png");
@@ -1899,19 +2131,25 @@
 
     if (mod && (k === "z" || k === "Z")) { ev.preventDefault(); if (ev.shiftKey) refaire(); else annuler(); return; }
     if (mod && (k === "y" || k === "Y")) { ev.preventDefault(); refaire(); return; }
-    if (mod && (k === "d" || k === "D")) { ev.preventDefault(); if (E.selection) dupliquer(E.selection.coll, E.selection.obj); return; }
+    if (mod && (k === "d" || k === "D")) { ev.preventDefault(); dupliquerSelection(); return; }
+    if (mod && (k === "a" || k === "A")) {
+      ev.preventDefault();
+      choisirOutil("selection");
+      selectionnerListe(objetsDans(-Infinity, -Infinity, Infinity, Infinity));
+      return;
+    }
     if (mod) return;
 
     if (k === " ") { E.espace = true; scene.classList.add("main"); ev.preventDefault(); return; }
     if (k === "Escape") {
       if (!$("menuContexte").hidden) fermerMenu();
       else if (E.ligneEnCours) { E.ligneEnCours = null; surcouche(); }
-      else if (E.selection) selectionner(null, null);
+      else if (E.selection || E.multi.length) selectionner(null, null);
       else if (E.outil !== "selection") choisirOutil("selection");   // Échap : quitter l'outil
       return;
     }
     if (k === "Enter" && E.ligneEnCours) { terminerLigne(); return; }
-    if ((k === "Delete" || k === "Backspace") && E.selection) { ev.preventDefault(); supprimerObjet(E.selection.coll, E.selection.obj); return; }
+    if ((k === "Delete" || k === "Backspace") && (E.selection || E.multi.length)) { ev.preventDefault(); supprimerSelection(); return; }
     if (k === "Backspace" && E.ligneEnCours) { E.ligneEnCours.pts.length -= 2; if (!E.ligneEnCours.pts.length) E.ligneEnCours = null; surcouche(); return; }
 
     var outils = { v: "selection", h: "main", b: "pinceau", e: "gomme", d: "tampon", l: "ligne", k: "lac", t: "etiquette", p: "lieu" };
@@ -1974,6 +2212,7 @@
     panneauSelection();
     infosCarte();
     majIndex();
+    majCalques();
     majBoutonsHisto();
     infosVue();
     etat("Enregistré");

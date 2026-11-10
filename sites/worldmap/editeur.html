@@ -68,6 +68,10 @@
     <aside class="panneau" id="panneau" aria-label="Réglages">
       <section class="bloc"><h2 id="titreOutil">Outil</h2><div id="optionsOutil"></div></section>
       <section class="bloc" id="blocSelection" hidden><h2 id="titreSelection">Sélection</h2><div id="optionsSelection"></div></section>
+      <details class="bloc repli" id="blocCalques">
+        <summary><h2>Calques</h2></summary>
+        <div class="calques" id="listeCalques"></div>
+      </details>
       <details class="bloc repli" id="blocIndex">
         <summary><h2>Lieux <small id="compteLieux"></small></h2></summary>
         <input type="search" class="filtre" id="filtreLieux" placeholder="Chercher un lieu…" aria-label="Chercher un lieu" autocomplete="off">
@@ -83,7 +87,8 @@
           <li><kbd>K</kbd> lacs</li><li><kbd>T</kbd> noms</li>
           <li><kbd>P</kbd> lieux</li><li><kbd>M</kbd> minicarte</li>
           <li><kbd>[</kbd> <kbd>]</kbd> taille</li><li><kbd>Espace</kbd> déplacer</li>
-          <li><kbd>Ctrl</kbd> <kbd>D</kbd> dupliquer</li><li><kbd>Suppr</kbd> effacer</li>
+          <li><kbd>Ctrl</kbd> <kbd>D</kbd> dupliquer</li><li><kbd>Maj</kbd> plusieurs</li>
+          <li><kbd>Ctrl</kbd> <kbd>A</kbd> tout</li><li><kbd>Suppr</kbd> effacer</li>
           <li><kbd>G</kbd> grille</li><li><kbd>Échap</kbd> quitter l'outil</li>
         </ul>
       </details>

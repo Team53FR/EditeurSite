@@ -1985,6 +1985,18 @@ cheminées et rangs de tuiles ; murs à assises de pierre (`assises`) ; porte à
 capitale gagne un second rang de tours et des bannières, la ville devient une ville close (enceinte,
 église, trois rangs de toits), le village un hameau de cinq maisons.
 
+**Sélection multiple** (`E.multi`). Maj + clic ajoute ou retire un objet, Maj + glisser dans le vide
+trace un cadre (`objetsDans` : ce qui y tombe entièrement), Ctrl+A prend tout. Glisser l'un des objets
+les déplace tous ; « Plus petits / Plus grands », Dupliquer (Ctrl+D) et Supprimer s'appliquent au
+groupe. Chaque opération est un seul pas d'historique (un « lot » ; les suppressions y sont triées par
+rang pour que « Annuler » remette chaque objet à sa place).
+
+**Calques** (`carte.calques`, bloc « Calques » du panneau). Sept familles — décors du terrain, décors
+posés, tracés, lacs, noms, lieux, ornements — chacune avec un œil (masquer) et, pour les objets, un
+cadenas (verrouiller : plus sélectionnable, donc plus déplaçable par erreur). Un calque masqué n'est
+dessiné ni à l'écran ni dans l'export : `Moteur.dessiner` reçoit `cacher` et travaille sur une copie
+de la carte aux collections vidées, si bien que masque, ponts et creusement suivent d'eux-mêmes.
+
 Les cartes d'avant s'ouvrent telles quelles : seuls leurs décors changent (ils viennent maintenant
 du terrain) et leurs petits lieux automatiques ont disparu.
 
