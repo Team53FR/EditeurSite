@@ -1152,15 +1152,6 @@
     return v;
   }
 
-  // Ce que le masque dit d'un point : l'indice du pixel, ou -1 hors du masque.
-  function pixelMasque(masque, wx, wy) {
-    var sx = Math.floor((wx * masque.z + masque.tx) / masque.ech), sy = Math.floor((wy * masque.z + masque.ty) / masque.ech);
-    if (sx < 0 || sy < 0 || sx >= masque.mw || sy >= masque.mh) return -1;
-    return (sy * masque.mw + sx) * 4;
-  }
-
-  // Rassemble dans `liste` les décors à dessiner pour cette vue : { x, y, s, sprite, v } en
-  // unités du monde. `tampons` : les décors posés à la main, dont les autres s'écartent.
   // Le zoom de référence d'une carte : celui où elle tient dans 1 400 px. C'est à cette
   // échelle que les décors ont leur taille « normale » ; il ne dépend ni de l'écran ni de la vue.
   // `carte.finesse` (0, 1 ou 2 ; 1 par défaut) règle l'échelle générale des décors : à 1, un
@@ -1260,7 +1251,7 @@
 
   var SANS_TERRAIN = { eau: true, t: null, m: null };
   // Le terrain en (x, y) : { eau: true } (mer, gomme, lac, rivière, hors carte) ou { eau: false, t, m }.
-  function sonde(ctx, carte, x, y) {
+  function sonde(ctx, carte, x, y, demiMin) {
     if (x < 0 || y < 0 || x > carte.largeur || y > carte.hauteur) return SANS_TERRAIN;
     var i, q;
     for (i = 0; i < ctx.lacs.length; i++) {
@@ -1268,7 +1259,7 @@
       if (x >= lb[0] && x <= lb[2] && y >= lb[1] && y <= lb[3] && dansPolygone(x, y, ctx.lacs[i].l.pts)) return SANS_TERRAIN;
     }
     for (i = 0; i < ctx.rivieres.length; i++) {
-      var rv = ctx.rivieres[i], rb = rv.bb, demi = (rv.l.taille || 0) * (rv.l.delta ? 0.65 : 0.5);
+      var rv = ctx.rivieres[i], rb = rv.bb, demi = Math.max((rv.l.taille || 0) * (rv.l.delta ? 0.65 : 0.5), demiMin || 0);
       if (x < rb[0] - demi || x > rb[2] + demi || y < rb[1] - demi || y > rb[3] + demi) continue;
       for (q = 0; q + 3 < rv.d.length; q += 2) if (distSeg(x, y, rv.d[q], rv.d[q + 1], rv.d[q + 2], rv.d[q + 3]) <= demi) return SANS_TERRAIN;
     }
@@ -1971,6 +1962,36 @@
     ctx.restore();
   }
 
+  // Un halo : l'ombre floue de la silhouette de la terre. Un flou est une basse fréquence : on le
+  // calcule sur une image réduite (jusqu'à 16 fois moins de pixels pour un flou de 90 px, et un flou
+  // de 90 px est ce qui coûtait le plus cher du rendu), puis on l'étire. Le résultat ne se distingue
+  // pas de l'original. `memo` garde, pour ce rendu, les silhouettes déjà réduites.
+  function halo(ctx, cvT, couleur, rayons, pw, ph) {
+    var groupes = {}, memo = {};
+    rayons.forEach(function (r) { var F = Math.max(1, Math.min(4, Math.round(r / 12))); (groupes[F] || (groupes[F] = [])).push(r); });
+    Object.keys(groupes).forEach(function (cle) {
+      var F = parseInt(cle, 10), liste = groupes[F];
+      if (F === 1) { liste.forEach(function (r) { ombre(ctx, cvT, couleur, r, 0, 0, pw + 64); }); return; }
+      var w = Math.max(1, Math.ceil(pw / F)), h = Math.max(1, Math.ceil(ph / F)), src = memo[F];
+      if (!src) {
+        src = memo[F] = couche("halo-src" + F, w, h);
+        var sc = src.getContext("2d");
+        sc.setTransform(1, 0, 0, 1, 0, 0); sc.globalCompositeOperation = "source-over"; sc.clearRect(0, 0, w, h);
+        sc.imageSmoothingEnabled = true; sc.imageSmoothingQuality = "medium";
+        sc.drawImage(cvT, 0, 0, w, h);
+      }
+      // Les halos de même couleur et de même finesse s'additionnent sur la même petite image,
+      // qu'on n'étire qu'une fois.
+      var bas = couche("halo-bas" + F, w, h), bc = bas.getContext("2d");
+      bc.setTransform(1, 0, 0, 1, 0, 0); bc.clearRect(0, 0, w, h);
+      liste.forEach(function (r) { ombre(bc, src, couleur, r / F, 0, 0, w + 64); });
+      ctx.save();
+      ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "low";       // un halo est flou : un filtre simple suffit
+      ctx.drawImage(bas, 0, 0, pw, ph);
+      ctx.restore();
+    });
+  }
+
   // ----- Lignes : rivières, routes, frontières -----
   function styleLigne(l, th) {
     if (l.type === "riviere") return { c: l.couleur || th.riviere, tiret: null, lisse: l.lisse !== false, min: 1.4, halo: false };
@@ -2515,114 +2536,6 @@
     return dedans;
   }
 
-  // ----- Ce qu'il y a sous un point : le masque des matériaux -----
-  //
-  // Pour poser un pont sur la mer, ou un campement dans la forêt, il faut savoir quel
-  // matériau recouvre un point. Les traits sont tous repeints, en petit (un tiers de la
-  // définition), chacun d'une couleur-code ; l'eau creuse comme à l'écran. Une lecture de
-  // pixels, une fois par image : bien moins cher que de tester chaque trait un à un.
-  //
-  // Le masque déborde de l'écran d'un cinquième de chaque côté : ce qui se trouve juste
-  // au-delà du bord (le bout d'une route, la base d'une montagne) doit être connu, sans
-  // quoi « hors du masque » se confondait avec « dans l'eau » — et des ponts naissaient
-  // au bord de l'écran.
-  function construireMasque(carte, vue, pw, ph, tx, ty, z, X0, Y0, X1, Y1) {
-    var ech = 2, marge = Math.round(Math.max(pw, ph) * 0.2);
-    var mw = Math.max(1, Math.ceil((pw + 2 * marge) / ech)), mh = Math.max(1, Math.ceil((ph + 2 * marge) / ech));
-    var mx = marge / z;                  // la même marge, en unités du monde
-    X0 -= mx; Y0 -= mx; X1 += mx; Y1 += mx;
-    tx += marge; ty += marge;
-    var cv = couche("masque", mw, mh);
-    var c = cv.getContext("2d", { willReadFrequently: true });
-    c.setTransform(1, 0, 0, 1, 0, 0);
-    c.globalCompositeOperation = "source-over";
-    c.clearRect(0, 0, mw, mh);
-    c.setTransform(z / ech, 0, 0, z / ech, tx / ech, ty / ech);
-    c.save();
-    c.beginPath();
-    c.rect(0, 0, carte.largeur, carte.hauteur);
-    c.clip();
-    var traits = carte.traits || [];
-    for (var i = 0; i < traits.length; i++) {
-      var t = traits[i], mat = MAT[t.mat];
-      if (!mat || !t.bb || !chevauche(t.bb, X0, Y0, X1, Y1)) continue;
-      // Rouge : le terrain ; bleu : les réglages de décor du trait (densité × 3 + échelle + 1).
-      var densT = t.sansDecor ? 0 : (t.dens == null ? 2 : t.dens), echT = t.ech == null ? 1 : t.ech;
-      // Vert (jusqu'à 96 ; au-delà de 128 c'est une route) : la finesse des décors du trait.
-      tracerTrait(c, t, mat, "rgb(" + (mat.code * 10) + "," + (Math.min(FINESSE_MAX, t.fin || 0) * 24) + "," + ((densT * 3 + echT + 1) * 20) + ")");
-    }
-
-    var u = ech / z;                     // un pixel du masque, en unités du monde
-    // Lacs et rivières : c'est de l'eau, on creuse — un peu plus large que le dessin,
-    // pour qu'aucun arbre ne pousse les racines dans l'eau.
-    c.globalCompositeOperation = "destination-out";
-    c.fillStyle = c.strokeStyle = "#000";
-    c.lineCap = c.lineJoin = "round";
-    (carte.lacs || []).forEach(function (lac) {
-      if (!lac.pts || lac.pts.length < 6 || !cheminFerme(c, lac.pts)) return;
-      c.fill();
-      c.lineWidth = 3 * u;
-      c.stroke();
-    });
-    (carte.lignes || []).forEach(function (l) {
-      if (l.type !== "riviere" || !l.pts || l.pts.length < 4) return;
-      traceRiviereEau(c, l, vue, 3 * u, 2.5 * u);
-    });
-    // Routes et sentiers : un drapeau dans le canal vert, AJOUTÉ (« lighter ») sans rien
-    // effacer — sous une route, l'eau reste de l'eau (d'où les ponts) et la terre reste
-    // la terre ; les décors, eux, s'en écartent.
-    c.globalCompositeOperation = "lighter";
-    c.strokeStyle = "rgb(0,255,0)";
-    (carte.lignes || []).forEach(function (l) {
-      if (!VOIES[l.type] || !l.pts || l.pts.length < 4) return;
-      var d = pointsAffiches(l), lw = Math.max(l.taille || 0, (l.type === "sentier" || l.type === "maisons" ? 1.3 : 2.4) / vue.zoom);
-      c.lineWidth = lw + 3 * u;
-      c.beginPath();
-      c.moveTo(d[0], d[1]);
-      for (var q = 2; q < d.length; q += 2) c.lineTo(d[q], d[q + 1]);
-      c.stroke();
-    });
-    c.globalCompositeOperation = "source-over";
-    c.restore();
-    var masque = { data: c.getImageData(0, 0, mw, mh).data, mw: mw, mh: mh, ech: ech, tx: tx, ty: ty, z: z, fin: null };
-    // Les zones « Affiner » : des coups de pinceau qui ne changent pas le terrain, seulement
-    // la finesse de ses décors. Elles ont leur propre petit masque (rouge = finesse + 1),
-    // lu seulement quand la vue en contient.
-    var zones = (carte.finesses || []).filter(function (f) { return f.bb && chevauche(f.bb, X0, Y0, X1, Y1); });
-    if (zones.length) {
-      var cf = couche("masque-fin", mw, mh).getContext("2d", { willReadFrequently: true });
-      cf.setTransform(1, 0, 0, 1, 0, 0);
-      cf.clearRect(0, 0, mw, mh);
-      cf.setTransform(z / ech, 0, 0, z / ech, tx / ech, ty / ech);
-      cf.lineCap = cf.lineJoin = "round";
-      zones.forEach(function (f) {
-        // Rouge : finesse + 1 (0 = inchangée) ; vert : densité + 1 (0 = inchangée).
-        cf.strokeStyle = cf.fillStyle = "rgb(" + (f.fin == null ? 0 : (Math.min(FINESSE_MAX, f.fin) + 1) * 40) + "," + (f.dens == null ? 0 : (f.dens + 1) * 60) + ",0)";
-        cf.lineWidth = f.taille;
-        cf.beginPath();
-        if (f.rect) { cf.fillRect(f.rect[0], f.rect[1], f.rect[2] - f.rect[0], f.rect[3] - f.rect[1]); return; }
-        if (f.pts.length <= 2) { cf.arc(f.pts[0], f.pts[1], f.taille / 2, 0, TAU); cf.fill(); }
-        else { cf.moveTo(f.pts[0], f.pts[1]); for (var q = 2; q < f.pts.length; q += 2) cf.lineTo(f.pts[q], f.pts[q + 1]); cf.stroke(); }
-      });
-      masque.fin = cf.getImageData(0, 0, mw, mh).data;
-      masque.finesses = zones.filter(function (f) { return f.fin != null; }).map(function (f) { return Math.min(FINESSE_MAX, f.fin); });
-    }
-    return masque;
-  }
-
-  // L'identifiant du matériau sous un point du monde ; null : de l'eau (mer, lac, rivière) ;
-  // undefined : on ne sait pas (pas de masque, ou point hors du masque). Les deux derniers
-  // ne se confondent JAMAIS : « inconnu » n'est pas « de l'eau ».
-  function materiauEn(masque, wx, wy) {
-    if (!masque) return undefined;
-    var sx = Math.floor((wx * masque.z + masque.tx) / masque.ech), sy = Math.floor((wy * masque.z + masque.ty) / masque.ech);
-    if (sx < 0 || sy < 0 || sx >= masque.mw || sy >= masque.mh) return undefined;
-    var i = (sy * masque.mw + sx) * 4;
-    if (masque.data[i + 3] < 128) return null;
-    var m = MATERIAUX[Math.round(masque.data[i] / 10) - 1];
-    return m ? m.id : null;
-  }
-
   // ----- Ponts -----
   //
   // Un pont n'est pas un objet posé à côté de la route : c'est la route elle-même, le temps
@@ -2703,6 +2616,8 @@
     (carte.lignes || []).forEach(function (r) {
       if (!VOIES[r.type] || !r.pts || r.pts.length < 4) return;
       var d = pointsAffiches(r), m = d.length / 2;
+      var bbR = boiteTrait(d, 0), mR = 8 / vue.zoom + (r.taille || 0) * 6;
+      var ctxP = contexteZone(carte, bbR[0] - mR, bbR[1] - mR, bbR[2] + mR, bbR[3] + mR);
       var lw = Math.max(r.taille || 0, (r.type === "sentier" || r.type === "maisons" ? 1.3 : 2.4) / vue.zoom);
       // Un peu plus large que la route ET que ses bas-côtés : la route y entre sans déborder.
       var W = Math.max(lw * (r.type === "sentier" ? 2 : 1.7), lw + 4.5 / vue.zoom);
@@ -2719,7 +2634,7 @@
         while (seg < m - 1 && cum[seg] < sc) seg++;
         var a = cum[seg - 1], b = cum[seg], f = b > a ? (sc - a) / (b - a) : 0;
         var x = d[2 * seg - 2] + (d[2 * seg] - d[2 * seg - 2]) * f, y = d[2 * seg - 1] + (d[2 * seg + 1] - d[2 * seg - 1]) * f;
-        var eau = x >= 0 && y >= 0 && x <= L && y <= H && materiauEn(masque, x, y) === null;
+        var eau = x >= 0 && y >= 0 && x <= L && y <= H && sonde(ctxP, carte, x, y, 1.2 / vue.zoom).eau;
         if (eau && debut < 0) debut = sc;
         if (!eau && debut >= 0) { troncons.push([debut, sc]); debut = -1; }
       }
@@ -4236,12 +4151,16 @@
     // La terre telle qu'elle est AVANT d'être creusée : l'eau douce ne doit exister que
     // dans son contour (sinon une rivière tracée jusqu'à la mer y déborde en pointe).
     var terreAvant = null;
+    // L'eau douce n'est visible que dans le creux de la terre, et ses bords sont cachés sous elle :
+    // sur un grand écran (ou un écran à haute densité), on la calcule à demi-résolution.
+    var FE = pw * ph > 1500000 ? 2 : 1, we = Math.max(1, Math.ceil(pw / FE)), he = Math.max(1, Math.ceil(ph / FE));
     if (th.eauDouce) {
-      terreAvant = couche((opts.cle || "principal") + "-avant", pw, ph);
+      terreAvant = couche((opts.cle || "principal") + "-avant", we, he);
       var ta = terreAvant.getContext("2d");
       ta.setTransform(1, 0, 0, 1, 0, 0);
-      ta.clearRect(0, 0, pw, ph);
-      ta.drawImage(cvT, 0, 0);
+      ta.clearRect(0, 0, we, he);
+      ta.imageSmoothingEnabled = true;
+      ta.drawImage(cvT, 0, 0, we, he);
     }
     // Lacs et rivières creusent la terre (encore dans le cadre de la carte).
     creuserEaux(lc, carte, vue, X0, Y0, X1, Y1);
@@ -4249,7 +4168,8 @@
 
     // Le masque des matériaux (ce qu'il y a sous chaque point : terrain, eau, route).
     // Il sert aux décors et aux ponts ; jamais pendant un déplacement.
-    var masque = opts.rapide ? null : construireMasque(carte, vue, pw, ph, tx, ty, z, X0, Y0, X1, Y1);
+    // (Plus d'image du terrain à l'échelle de l'écran : décors et ponts interrogent le monde.)
+    var masque = opts.rapide ? null : true;
 
     // 2) Transitions : les couleurs des terrains se fondent les unes dans les autres
     //    (flou appliqué à la couleur seulement, la côte reste nette).
@@ -4335,11 +4255,11 @@
     // L'eau douce (thèmes à mer de papier) : peinte à part, gardée seulement là où il y
     // avait de la terre avant le creusement, puis posée sous la terre.
     if (terreAvant) {
-      var cvE = couche((opts.cle || "principal") + "-eaux", pw, ph), ec = cvE.getContext("2d");
+      var cvE = couche((opts.cle || "principal") + "-eaux", we, he), ec = cvE.getContext("2d");
       ec.setTransform(1, 0, 0, 1, 0, 0);
       ec.globalCompositeOperation = "source-over";
-      ec.clearRect(0, 0, pw, ph);
-      ec.setTransform(z, 0, 0, z, tx, ty);
+      ec.clearRect(0, 0, we, he);
+      ec.setTransform(z / FE, 0, 0, z / FE, tx / FE, ty / FE);
       eauxDouces(ec, carte, vue, th, X0, Y0, X1, Y1);
       ec.setTransform(1, 0, 0, 1, 0, 0);
       ec.globalCompositeOperation = "destination-in";
@@ -4347,7 +4267,8 @@
       ec.globalCompositeOperation = "source-over";
       ctx.save();
       ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.drawImage(cvE, 0, 0);
+      ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "low";
+      ctx.drawImage(cvE, 0, 0, pw, ph);
       ctx.restore();
     }
 
@@ -4364,25 +4285,28 @@
       var glow = th.glowPx
         ? Math.min(th.glowPx * dpr, Math.max((th.glowMin || 14) * dpr, z * 40))
         : Math.max(5 * dpr, Math.min(30 * dpr, z * 18));
-      ombre(ctx, cvT, th.glow, glow, 0, 0, decale);
-      if (th.glowDouble) ombre(ctx, cvT, th.glow, glow * 0.45, 0, 0, decale);
-      if (th.glowTriple) { ombre(ctx, cvT, th.glow, glow, 0, 0, decale); ombre(ctx, cvT, th.glow, glow * 0.16, 0, 0, decale); }
+      var rayonsHalo = [glow];
+      if (th.glowDouble) rayonsHalo.push(glow * 0.45);
+      if (th.glowTriple) rayonsHalo.push(glow, glow * 0.16);
+      halo(ctx, cvT, th.glow, rayonsHalo, pw, ph);
       if (th.vagues) ondesCotieres(ctx, cvT, th, dpr, pw, ph);
       // La falaise : la silhouette de la terre, décalée vers le bas, donne du relief.
       if (th.falaise) {
         var hf = Math.max(2 * dpr, Math.min((th.falaisePx || 7) * dpr, z * (th.falaisePx ? 6 : 3)));
         // Une falaise épaisse est tracée en plusieurs pas : décalée d'un seul coup, elle
         // laisserait un jour entre la terre et son socle dans les anses étroites.
-        for (var pasF = Math.max(1, Math.ceil(hf / (3 * dpr))), qf = 1; qf <= pasF; qf++) ombre(ctx, cvT, th.falaise, 0, 0, hf * qf / pasF, decale);
+        for (var pasF = Math.max(1, Math.ceil(hf / (5 * dpr))), qf = 1; qf <= pasF; qf++) ombre(ctx, cvT, th.falaise, 0, 0, hf * qf / pasF, decale);
       }
       // La grève : un liseré de sable tout autour de la terre.
       if (th.rive) {
         var rg = Math.min(th.rive.px * dpr, Math.max(1.5 * dpr, z * 6));
-        for (var kg = 0; kg < 12; kg++) ombre(ctx, cvT, th.rive.c, 0, Math.cos(kg * TAU / 12) * rg, Math.sin(kg * TAU / 12) * rg, decale);
+        for (var kg = 0; kg < 8; kg++) ombre(ctx, cvT, th.rive.c, 0, Math.cos(kg * TAU / 8) * rg, Math.sin(kg * TAU / 8) * rg, decale);
       }
-      var r = Math.max(1, 1.1 * dpr);
-      for (var k = 0; k < 8; k++) {
-        var a = k * Math.PI / 4;
+      // Le contour : un trait d'un pixel et demi. Quatre décalages en diagonale suffisent (chaque
+      // décalage est une passe sur toute l'image, et il y en avait huit).
+      var r = Math.max(1, 1.1 * dpr) * 1.1;
+      for (var k = 0; k < 4; k++) {
+        var a = Math.PI / 4 + k * Math.PI / 2;
         ombre(ctx, cvT, th.encre, 0, Math.cos(a) * r, Math.sin(a) * r, decale);
       }
     }
@@ -4490,7 +4414,7 @@
     ZPX = z;
     var tx = pw / 2 - vue.cx * z, ty = ph / 2 - vue.cy * z;
     var X0 = vue.cx - vue.largeur / 2 / z, X1 = vue.cx + vue.largeur / 2 / z, Y0 = vue.cy - vue.hauteur / 2 / z, Y1 = vue.cy + vue.hauteur / 2 / z;
-    var masque = construireMasque(carte, { zoom: z, largeur: vue.largeur, hauteur: vue.hauteur, cx: vue.cx, cy: vue.cy }, pw, ph, tx, ty, z, X0, Y0, X1, Y1);
+    var masque = true;
     var liste = [];
     var evite = (tampons || []).filter(function (t) { return t.type !== "place"; }).map(function (t) { return { x: t.x, y: t.y, s: t.s }; });
     semerDecors(carte, vue, masque, X0, Y0, X1, Y1, evite, liste);

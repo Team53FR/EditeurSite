@@ -2128,6 +2128,27 @@ marais (eau trouble et touffes de roseaux), parcelles de champ posées à la mai
 arbre ancien et épave. Les maisons, bâtisses et églises sont des toits orientés, la place est à plat.
 Seuls les repères (point, croix, étoile, drapeau) et les images importées gardent leur dessin propre.
 
+**Vitesse : zoom et déplacement quasi instantanés.** Trois changements.
+- **Brouillon puis image nette** (éditeur) : pendant un geste, l'image déjà calculée est étirée
+  (instantané) ; 30 ms après le dernier geste, un *brouillon* à demi-résolution la remplace
+  (50 à 140 ms) ; l'image nette arrive 320 ms après (`rendre`, `demanderImage`, `rendreComplet(brouillon)`,
+  deux canvas de travail `cv` / `cvB` et deux jeux de couches). Après une modification (pinceau,
+  curseur…), même séquence avec 250 ms.
+- **Halos des côtes en basse résolution** (`halo`) : un flou de 90 px sur toute l'image était de loin
+  le poste le plus coûteux (703 ms sur 839 à ×4). Un flou est une basse fréquence : calculé sur une
+  image 4 fois plus petite (16 fois moins de pixels) et étiré, il ne se distingue pas de l'original ;
+  les halos de même couleur s'additionnent sur la petite image, étirée une seule fois.
+- **Plus de masque des matériaux** : le terrain était repeint en petit à chaque rendu pour deux usages
+  (décors, ponts) qui interrogent maintenant le monde (`sonde`) ; il a disparu. Les eaux douces,
+  les contours (huit passes → quatre) et la falaise (moins de pas) coûtent moins cher.
+Mesuré (environnement de test sans carte graphique, vue de 1 430 × 870, monde de 6 000 km) : rendu net à
+×4 de 839 à 150 ms ; à haute densité de pixels (×2) il reste de l'ordre de la seconde, mais le brouillon
+s'affiche en ~140 ms.
+
+**Boussole et échelle graphique** : plus ajoutées par défaut à une nouvelle carte (`ornements`). Sur une
+carte existante : calque « Ornements » (œil) pour les masquer, ou « Carte… » → rose des vents « Aucune »
+et case « Échelle graphique » décochée.
+
 Les cartes d'avant s'ouvrent telles quelles : seuls leurs décors changent (ils viennent maintenant
 du terrain) et leurs petits lieux automatiques ont disparu.
 

@@ -108,39 +108,48 @@
   // image décalée et agrandie — instantané, et c'est la vraie carte, pas un brouillon
   // simplifié qui changerait d'aspect. Le rendu complet suit dès que le geste se calme.
   var MARGE_CACHE = 0.15;
-  var cache = { cv: document.createElement("canvas"), vue: null };
-  var rafId = 0, veutComplet = false, minuteurComplet = 0;
+  // Deux images de travail : un brouillon (résolution réduite, prêt en quelques dizaines de ms) et
+  // l'image nette. Après un geste ou une modification, le brouillon remplace aussitôt l'image
+  // étirée ; la nette arrive quand tout est calme.
+  var cache = { cv: document.createElement("canvas"), cvB: document.createElement("canvas"), actif: null, vue: null };
+  var rafId = 0, veutComplet = false, minuteurComplet = 0, minuteurBrouillon = 0;
 
   function rendre(pendantGeste) {
     if (!E.carte) return;
+    clearTimeout(minuteurComplet);
+    clearTimeout(minuteurBrouillon);
     if (pendantGeste && cache.vue) {
-      demanderImage(false);
-      clearTimeout(minuteurComplet);
-      minuteurComplet = setTimeout(function () { demanderImage(true); }, 140);
+      demanderImage(false);                                   // l'image déjà calculée, déplacée et étirée
+      minuteurBrouillon = setTimeout(function () { demanderImage("brouillon"); }, 30);
+      minuteurComplet = setTimeout(function () { demanderImage(true); }, 320);
     } else {
-      clearTimeout(minuteurComplet);
-      demanderImage(true);
+      demanderImage("brouillon");
+      minuteurComplet = setTimeout(function () { demanderImage(true); }, 250);
     }
   }
 
-  function demanderImage(complet) {
-    if (complet) veutComplet = true;
+  function demanderImage(mode) {
+    if (mode === true) veutComplet = true;
+    else if (mode === "brouillon" && veutComplet !== true) veutComplet = "brouillon";
     if (rafId) return;
     rafId = requestAnimationFrame(function () {
       rafId = 0;
-      if (veutComplet) { veutComplet = false; rendreComplet(); }
+      if (veutComplet) { var brouillon = veutComplet === "brouillon"; veutComplet = false; rendreComplet(brouillon); }
       afficherCache();
       surcouche();
       dessinerMini();
     });
   }
 
-  function rendreComplet() {
+  function rendreComplet(brouillon) {
     var v = {
       cx: E.vue.cx, cy: E.vue.cy, zoom: E.vue.zoom,
-      largeur: Math.round(W * (1 + 2 * MARGE_CACHE)), hauteur: Math.round(H * (1 + 2 * MARGE_CACHE)), dpr: DPR
+      largeur: Math.round(W * (1 + 2 * MARGE_CACHE)), hauteur: Math.round(H * (1 + 2 * MARGE_CACHE)),
+      dpr: brouillon ? Math.max(0.5, DPR * 0.5) : DPR
     };
-    Moteur.dessiner(cache.cv, E.carte, v, { grille: E.grille, cacher: calquesCaches() });
+    var cible = brouillon ? cache.cvB : cache.cv;
+    Moteur.dessiner(cible, E.carte, v, { grille: E.grille, cacher: calquesCaches(), cle: brouillon ? "brouillon" : undefined });
+    cache.actif = cible;
     cache.vue = v;
   }
 
@@ -159,7 +168,7 @@
     var dw = c.largeur * s * DPR, dh = c.hauteur * s * DPR;
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = "high";
-    ctx.drawImage(cache.cv, cx - dw / 2, cy - dh / 2, dw, dh);
+    ctx.drawImage(cache.actif || cache.cv, cx - dw / 2, cy - dh / 2, dw, dh);
   }
 
   function infosVue() {
