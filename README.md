@@ -2051,6 +2051,23 @@ de ronde clair, deux rangées de créneaux) et les tours sont rondes, à toit co
 carrées pour les gardes de porte ; dans les autres styles, les tours de profil de toujours, plus
 grosses aux portes, et une arche entre elles.
 
+**Style Plan : ce qui complète la vue du dessus.**
+- **Carrefours sans chevauchement** : `maisonsDesRues` propose d'abord toutes les maisons de toutes les
+  rues, quelle que soit la vue (leur place ne dépend pas de ce qu'on regarde), puis écarte celles qui
+  mordraient sur une voie — la leur dans un virage, une autre à un carrefour —, sur une place ou sur
+  une maison déjà posée (grille de voisinage).
+- **Place** (tampon `place`, ronde ou carrée selon la variante) : disque de terre battue, pavage en
+  pointillé, fontaine au centre. Peinte avant tout le reste (`FONDS`) ; les décors semés dont le dessin
+  la recouvre sont retirés, et les rues bordées de maisons la contournent.
+- **Ponton** (tracé `ponton`, `tracerPonton`) : planches, rives de bois, pieux de chaque côté, ombre sur
+  l'eau ; on le trace de la berge vers le large.
+- **Reliefs vus du dessus** (`PEINTRES_DESSUS`) : montagnes et cimes en facettes éclairées du nord-ouest
+  (calotte blanche pour les cimes), collines à courbes de niveau, dunes à rides, roches sombres.
+- **Lieux vus du dessus** (`iconeDessus`, `ICONES_DESSUS`) : village, ville et capitale enceintes de
+  murs et de tours, fort, tour, port avec son ponton et son bateau, temple en croix, ruines, cabane,
+  ferme, auberge, moulin, phare, puits, menhirs, donjon, grotte, mine, navire, campement. Les autres
+  types gardent leur dessin de profil.
+
 Les cartes d'avant s'ouvrent telles quelles : seuls leurs décors changent (ils viennent maintenant
 du terrain) et leurs petits lieux automatiques ont disparu.
 
