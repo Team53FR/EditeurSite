@@ -1931,6 +1931,14 @@ et ne touche pas Supabase ; l'entrée du tableau de bord reste soumise à `acces
 - **Export** : la carte entière ou la vue actuelle ; symboles « comme à l'écran » (l'image est
   dessinée comme sur un écran de 2 048 px puis agrandie : plus nette, pas plus chargée) ou « fins ».
 
+**Style Enluminé** (`THEMES.enlumine`) — le rendu « carte peinte » : la mer est le parchemin et le
+bleu ne tient qu'en une large bande le long des rivages (`glowMin`, trois passes) ; la terre est un
+plateau (falaise épaisse tracée par pas, `falaisePx`, et ombre des rivages : la silhouette de l'eau
+projetée sur la terre, `ombreCote`) ; les terrains ont des couleurs plus denses (`couleurs`, lues par
+`tracerTrait`) ; les décors sont un peu plus grands (`echDecors`) et **cernés d'encre** — le sprite
+est assombri puis sa silhouette, décalée dans huit directions, est glissée dessous (`encreDecors`,
+mis en cache à part) ; le cadre gagne volutes et fleurons (`orneRiche`).
+
 Les cartes d'avant s'ouvrent telles quelles : seuls leurs décors changent (ils viennent maintenant
 du terrain) et leurs petits lieux automatiques ont disparu.
 

@@ -55,6 +55,27 @@
     }
   };
 
+  // Le style des cartes enluminées, peintes comme une illustration : la terre est un plateau
+  // (falaise épaisse, ombre le long des côtes), ses couleurs sont plus denses, les décors
+  // sont cernés d'encre et un peu plus grands, la mer est le parchemin et le bleu ne tient
+  // qu'en une bande le long des rivages.
+  THEMES.enlumine = {
+    nom: "Enluminé", mer: "#e6cd92", mer2: "#dcbf7e",
+    glow: "rgba(30,118,222,0.96)", glowPx: 92, glowDouble: true, glowTriple: true,
+    encre: "#22160a", hors: "#1d1710", halo: "rgba(248,236,204,0.9)", teinte: "rgba(236,196,120,0.2)",
+    riviere: "#2f86d6", route: "#6b4a2b", texteMer: "#2a5a94", lacClair: "#58a8ea", lacFonce: "#1f6cc2", eauDouce: "#3186da",
+    grille: "rgba(58,42,26,0.25)", cadre: "#3a2a14",
+    falaise: "#3b2812", falaisePx: 13, ombreCote: "rgba(34,24,4,0.6)",
+    papier: true, orne: true, orneRiche: true, lieuxIllustres: true,
+    encreDecors: true, echDecors: 1.22,
+    glowMin: 44, vagues: [{ r: 8, a: 0.42 }], vagueCouleur: "rgb(12,58,140)",
+    couleurs: {
+      plaine: "#8ea343", foret: "#47752b", taiga: "#3c6a45", colline: "#98a04a", montagne: "#8f8878", cime: "#cdd3d6",
+      volcan: "#b58a4f", desert: "#d8b670", steppe: "#b8a658", marais: "#5c784c", cendres: "#a8804a", champs: "#a6ae4a",
+      savane: "#c1ab55", automne: "#9a7833", jungle: "#326b31", morte: "#7b6f56", rocaille: "#9b917b", plage: "#e5cf98", toundra: "#989e7a"
+    }
+  };
+
   // ----- Matériaux : ce qu'on peut peindre -----
   // « terre » colore ; « eau » creuse la terre déjà peinte (mers, lacs, gomme).
   // `groupe` range la palette de l'éditeur ; `decor` renvoie à la table DECORS.
@@ -94,12 +115,15 @@
   // rapide que de retracer chaque arbre à chaque image. Quatre définitions (64, 128, 256
   // et 512 px) suivent le zoom, pour que rien ne devienne flou en s'approchant.
   var SPRITES = {};
+  // Réglages du thème pendant le rendu en cours : couleurs des terrains, décors cernés d'encre,
+  // taille des décors.
+  var COULEURS = null, ENCRE_DECORS = false, ECH_THEME = 1, SANS_OMBRE = false;
   var ZPX = 1;   // pixels de l'appareil par unité du monde, pendant le rendu en cours
 
   function tailleSprite(px) { return px <= 64 ? 64 : px <= 128 ? 128 : px <= 256 ? 256 : px <= 512 ? 512 : 1024; }
 
   function spriteCanvas(type, v, S) {
-    var cle = type + "|" + v + "|" + S;
+    var cle = type + "|" + v + "|" + S + (ENCRE_DECORS ? "|e" : "");
     if (SPRITES[cle]) return SPRITES[cle];
     var c = document.createElement("canvas");
     c.width = c.height = S;
@@ -107,12 +131,36 @@
     g.translate(S / 2, S / 2);
     g.scale(S / 100, S / 100);          // une boîte de 100 × 100 centrée ; le sol est vers y = +31
     g.lineJoin = g.lineCap = "round";
+    if (!ENCRE_DECORS) { PEINTRES[type](g, v); SPRITES[cle] = c; return c; }
+    // Décor enluminé : couleurs assombries, puis cerné d'encre (sa silhouette, décalée dans
+    // huit directions, glissée dessous). Pas d'ombre au sol : le cerne en tient lieu.
+    SANS_OMBRE = true;
     PEINTRES[type](g, v);
-    SPRITES[cle] = c;
-    return c;
+    SANS_OMBRE = false;
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.globalCompositeOperation = "source-atop";
+    g.fillStyle = "rgba(46,34,0,0.16)";
+    g.fillRect(0, 0, S, S);
+    var sil = document.createElement("canvas");
+    sil.width = sil.height = S;
+    var sg = sil.getContext("2d");
+    sg.drawImage(c, 0, 0);
+    sg.globalCompositeOperation = "source-in";
+    sg.fillStyle = "#1c1206";
+    sg.fillRect(0, 0, S, S);
+    var fin = document.createElement("canvas");
+    fin.width = fin.height = S;
+    var fg = fin.getContext("2d"), e = Math.max(0.7, S * 0.011);
+    fg.globalAlpha = type === "herbe" || type === "seche" ? 0.25 : 0.7;
+    for (var k = 0; k < 8; k++) fg.drawImage(sil, Math.cos(k * Math.PI / 4) * e, Math.sin(k * Math.PI / 4) * e);
+    fg.globalAlpha = 1;
+    fg.drawImage(c, 0, 0);
+    SPRITES[cle] = fin;
+    return fin;
   }
 
   function ombreDecor(g, cx, cy, rx, ry, a) {
+    if (SANS_OMBRE) return;
     g.fillStyle = "rgba(14,26,10," + a + ")";
     g.beginPath(); g.ellipse(cx, cy, rx, ry, 0, 0, TAU); g.fill();
   }
@@ -741,7 +789,7 @@
     var p = t.pts;
     var terre = mat.type === "terre";
     lc.globalCompositeOperation = terre ? "source-over" : "destination-out";
-    lc.fillStyle = lc.strokeStyle = terre ? (couleur || mat.couleur) : "#000";
+    lc.fillStyle = lc.strokeStyle = terre ? (couleur || (COULEURS && COULEURS[mat.id]) || mat.couleur) : "#000";
     lc.lineWidth = t.taille;
     lc.lineCap = "round";
     lc.lineJoin = "round";
@@ -877,7 +925,7 @@
           // Quel décor, parmi ceux du terrain ?
           var ch = dd.choix[0], cumul = 0;
           for (var q = 0; q < dd.choix.length; q++) { cumul += dd.choix[q][1]; if (pt.r2 < cumul) { ch = dd.choix[q]; break; } }
-          var taillePx = ch[2] * ech * (0.82 + 0.36 * pt.r3) * (pt.k === k ? pousse : 1);
+          var taillePx = ch[2] * ech * ECH_THEME * (0.82 + 0.36 * pt.r3) * (pt.k === k ? pousse : 1);
           if (taillePx < 3.5) continue;
           var s = taillePx / zoom;
           // Bien à l'intérieur de son terrain : les quatre voisins disent la même chose.
@@ -2524,6 +2572,27 @@
     ctx.lineWidth = 0.8 * u;
     ctx.strokeRect(m * 1.5, m * 1.5, L - 3 * m, H - 3 * m);
     var coins = [[m, m, 1, 1], [L - m, m, -1, 1], [m, H - m, 1, -1], [L - m, H - m, -1, -1]];
+    if (th.orneRiche) {
+      // Des volutes dans les coins et un fleuron au milieu de chaque côté.
+      ctx.lineWidth = 1.1 * u;
+      coins.forEach(function (c) {
+        [[1, 0], [0, 1]].forEach(function (d) {
+          var bx = c[0] + c[2] * (30 + d[0] * 26) * u, by = c[1] + c[3] * (30 + d[1] * 26) * u;
+          ctx.beginPath();
+          ctx.moveTo(c[0] + c[2] * 26 * u * (d[0] ? 1 : 0.4), c[1] + c[3] * 26 * u * (d[1] ? 1 : 0.4));
+          ctx.bezierCurveTo(bx, by - c[3] * 14 * u * d[0], bx + c[2] * 12 * u, by + c[3] * 12 * u, bx - c[2] * 4 * u * d[0], by - c[3] * 4 * u * d[1]);
+          ctx.stroke();
+          ctx.beginPath(); ctx.arc(bx - c[2] * 4 * u * d[0], by - c[3] * 4 * u * d[1], 2 * u, 0, TAU); ctx.fill();
+        });
+      });
+      [[L / 2, m * 1.25, 1, 0], [L / 2, H - m * 1.25, 1, 0], [m * 1.25, H / 2, 0, 1], [L - m * 1.25, H / 2, 0, 1]].forEach(function (f) {
+        ctx.beginPath();
+        ctx.moveTo(f[0] - f[2] * 22 * u, f[1] - f[3] * 22 * u);
+        ctx.quadraticCurveTo(f[0] - f[3] * 9 * u, f[1] - f[2] * 9 * u, f[0] + f[2] * 22 * u, f[1] + f[3] * 22 * u);
+        ctx.quadraticCurveTo(f[0] + f[3] * 9 * u, f[1] + f[2] * 9 * u, f[0] - f[2] * 22 * u, f[1] - f[3] * 22 * u);
+        ctx.fill();
+      });
+    }
     coins.forEach(function (c) {
       ctx.lineWidth = 1.2 * u;
       ctx.beginPath();
@@ -2643,6 +2712,7 @@
   function dessiner(cv, carte, vue, options) {
     var opts = options || {};
     var th = THEMES[carte.theme] || THEMES.atlas;
+    COULEURS = th.couleurs || null; ENCRE_DECORS = !!th.encreDecors; ECH_THEME = th.echDecors || 1;
     var dpr = vue.dpr || 1;
     var pw = Math.max(1, Math.round(vue.largeur * dpr));
     var ph = Math.max(1, Math.round(vue.hauteur * dpr));
@@ -2735,6 +2805,22 @@
       lc.clip();
       peindreDecors(lc, decors);
       lc.restore();
+      // L'ombre des rivages (style Enluminé) : la silhouette de l'EAU projette une ombre
+      // sur la terre, qui s'assombrit vers la côte, les lacs et les rivières.
+      if (th.ombreCote) {
+        var cvM = couche((opts.cle || "principal") + "-mer", pw, ph), mc = cvM.getContext("2d");
+        mc.setTransform(1, 0, 0, 1, 0, 0);
+        mc.globalCompositeOperation = "source-over";
+        mc.fillStyle = "#000";
+        mc.fillRect(0, 0, pw, ph);
+        mc.globalCompositeOperation = "destination-out";
+        mc.drawImage(cvT, 0, 0);
+        mc.globalCompositeOperation = "source-over";
+        lc.setTransform(1, 0, 0, 1, 0, 0);
+        lc.globalCompositeOperation = "source-atop";
+        ombre(lc, cvM, th.ombreCote, Math.max(4 * dpr, Math.min(13 * dpr, z * 8)), 0, 0, pw + 64);
+        lc.globalCompositeOperation = "source-over";
+      }
       // 4) Le grain du papier.
       lc.setTransform(1, 0, 0, 1, 0, 0);
       lc.globalCompositeOperation = "source-atop";
@@ -2773,13 +2859,19 @@
     if (!opts.rapide) {
       var decale = pw + 64;
       var glow = th.glowPx
-        ? Math.min(th.glowPx * dpr, Math.max(14 * dpr, z * 40))
+        ? Math.min(th.glowPx * dpr, Math.max((th.glowMin || 14) * dpr, z * 40))
         : Math.max(5 * dpr, Math.min(30 * dpr, z * 18));
       ombre(ctx, cvT, th.glow, glow, 0, 0, decale);
       if (th.glowDouble) ombre(ctx, cvT, th.glow, glow * 0.45, 0, 0, decale);
+      if (th.glowTriple) { ombre(ctx, cvT, th.glow, glow, 0, 0, decale); ombre(ctx, cvT, th.glow, glow * 0.16, 0, 0, decale); }
       if (th.vagues) ondesCotieres(ctx, cvT, th, dpr, pw, ph);
       // La falaise : la silhouette de la terre, décalée vers le bas, donne du relief.
-      if (th.falaise) ombre(ctx, cvT, th.falaise, 0, 0, Math.max(2 * dpr, Math.min(7 * dpr, z * 3)), decale);
+      if (th.falaise) {
+        var hf = Math.max(2 * dpr, Math.min((th.falaisePx || 7) * dpr, z * (th.falaisePx ? 6 : 3)));
+        // Une falaise épaisse est tracée en plusieurs pas : décalée d'un seul coup, elle
+        // laisserait un jour entre la terre et son socle dans les anses étroites.
+        for (var pasF = Math.max(1, Math.ceil(hf / (3 * dpr))), qf = 1; qf <= pasF; qf++) ombre(ctx, cvT, th.falaise, 0, 0, hf * qf / pasF, decale);
+      }
       var r = Math.max(1, 1.1 * dpr);
       for (var k = 0; k < 8; k++) {
         var a = k * Math.PI / 4;
