@@ -2107,6 +2107,19 @@ en zoomant. Désormais :
 Vérifié : sur une zone de 36 × 22 km (3 terrains, une route, un lac), les 41 mêmes décors, aux mêmes
 places et de la même taille, de ×0,5 à ×30.
 
+**Positions absolues des décors automatiques.** Un décor automatique est défini par des coordonnées du
+monde seules : grilles emboîtées ancrées en (0, 0), hachage de la case, terrain interrogé en unités du
+monde. Ni le zoom, ni la taille de la fenêtre, ni la définition de l'export n'y entrent. Reste
+l'échelle de référence des décors, qui dépendait de la taille de la carte : elle est maintenant
+**figée dans la carte** (`carte.zbFixe`, posée à l'ouverture ou à la création, `Moteur.fixerEchelleDecors`).
+Agrandir ou rétrécir la carte ne déplace donc plus aucun décor ; seul le réglage « Échelle des décors »
+la recalcule — et redistribue alors tous les décors, ce que l'éditeur annonce. Vérifié : 79 décors
+identiques (0 différence) après quatre changements de taille de la carte ; sans l'échelle figée, les
+79 étaient redistribués.
+Ce qui peut encore changer la place d'un décor, volontairement : repeindre le terrain autour
+(le terrain voisin change), peindre ou effacer une zone « Affiner / Gomme à décors », régler la
+finesse d'un coup de pinceau. Le thème, lui, ne change que la taille et l'aspect, jamais la place.
+
 Les cartes d'avant s'ouvrent telles quelles : seuls leurs décors changent (ils viennent maintenant
 du terrain) et leurs petits lieux automatiques ont disparu.
 

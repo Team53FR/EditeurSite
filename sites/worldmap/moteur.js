@@ -1091,10 +1091,16 @@
   // `carte.finesse` (0, 1 ou 2 ; 1 par défaut) règle l'échelle générale des décors : à 1, un
   // arbre fait une quinzaine de pixels à la vue d'ensemble — une carte fouillée, qui supporte
   // d'être regardée de près.
-  function zoomBase(carte) {
+  //
+  // Cette échelle est FIGÉE dans la carte (`carte.zbFixe`) dès qu'elle est ouverte ou créée :
+  // agrandir ou rétrécir la carte ne la change pas, donc ne déplace aucun décor automatique.
+  // Seul le réglage « Échelle des décors » la recalcule (`fixerEchelleDecors`), à la demande.
+  function zoomBaseCalcule(carte) {
     var fin = typeof carte.finesse === "number" ? carte.finesse : 1;
     return 1400 / Math.max(carte.largeur, carte.hauteur) * Math.pow(2, fin);
   }
+  function zoomBase(carte) { return carte.zbFixe > 0 ? carte.zbFixe : zoomBaseCalcule(carte); }
+  function fixerEchelleDecors(carte) { carte.zbFixe = zoomBaseCalcule(carte); return carte.zbFixe; }
   var FINESSE_MAX = 4;
 
   // Le niveau de cases d'un terrain : fixé par la carte et par la finesse du trait (`fin` :
@@ -1258,7 +1264,7 @@
 
   // Compare les objets qui influencent les décors à ce qu'ils étaient au rendu précédent.
   function synchroniserDecors(carte) {
-    var C = CACHE_DECORS, sig = [carte.id, carte.largeur, carte.hauteur, carte.finesse == null ? 1 : carte.finesse].join("|");
+    var C = CACHE_DECORS, sig = [carte.id, carte.largeur, carte.hauteur, zoomBase(carte)].join("|");
     if (C.sig !== sig || C.total > 900000) { C.sig = sig; C.tuiles.clear(); C.objets.clear(); C.total = 0; }
     var vus = {};
     var voir = function (id, signature, bb) {
@@ -4368,7 +4374,7 @@
   }
 
   window.Moteur = {
-    figerDecors: figerDecors,
+    figerDecors: figerDecors, fixerEchelleDecors: fixerEchelleDecors,
     THEMES: THEMES, MATERIAUX: MATERIAUX, MAT: MAT, GROUPES_MATERIAUX: GROUPES_MATERIAUX,
     DECORS: DECORS, TAMPONS: TAMPONS, VOIES: VOIES,
     TYPES_LIGNES: TYPES_LIGNES, TYPES_LIEUX: TYPES_LIEUX, CATEGORIES_LIEUX: CATEGORIES_LIEUX, STYLES_ETIQ: STYLES_ETIQ,

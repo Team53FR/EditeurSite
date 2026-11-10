@@ -1430,6 +1430,7 @@
     };
     // De la terre partout : un seul trait, assez épais pour couvrir toute la carte. Elle
     // se couvre d'herbe à la bonne échelle, comme n'importe quel terrain.
+    Moteur.fixerEchelleDecors(enfant);
     var fond = Moteur.nouveauTrait("plaine", t[1] * 1.3, [0, t[1] / 2, t[0], t[1] / 2], false);
     enfant.traits.push(fond);
     enfant.vignette = Moteur.vignette(enfant);
@@ -2249,6 +2250,7 @@
       $("rgMessage").textContent = "La largeur et la hauteur doivent être comprises entre 0,05 et 40 000 km.";
       return;
     }
+    var avantFinesse = typeof E.carte.finesse === "number" ? E.carte.finesse : 1;
     E.carte.finesse = parseInt($("rgFinesse").value, 10) || 0;
     if ($("rgRose").value || $("rgEchelle").checked || $("rgTitre").checked) {
       E.carte.ornements = { rose: $("rgRose").value, echelle: $("rgEchelle").checked, titre: $("rgTitre").checked };
@@ -2257,6 +2259,8 @@
     E.carte.largeur = l;
     E.carte.hauteur = h;
     E.carte.theme = $("rgTheme").value;
+    // Seul ce réglage redistribue les décors automatiques ; la taille de la carte, non.
+    if (E.carte.finesse !== avantFinesse) { Moteur.fixerEchelleDecors(E.carte); etat("Échelle des décors changée : les décors automatiques ont été redistribués."); }
     $("nomCarte").value = E.carte.nom;
     dlgReg.close();
     marquer();
@@ -2470,6 +2474,9 @@
     carte.lieux = carte.lieux || [];
     carte.lacs = carte.lacs || [];
     carte.tampons = carte.tampons || [];
+    // L'échelle des décors automatiques est figée une fois pour toutes dans la carte : changer
+    // sa taille ne déplace plus aucun décor (voir Moteur.fixerEchelleDecors).
+    if (!(carte.zbFixe > 0)) Moteur.fixerEchelleDecors(carte);
     carte.finesses = carte.finesses || [];
     Moteur.surImage = function () { rendre(); };
     $("filtreLieux").addEventListener("input", majIndex);
