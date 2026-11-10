@@ -2120,6 +2120,14 @@ Ce qui peut encore changer la place d'un décor, volontairement : repeindre le t
 (le terrain voisin change), peindre ou effacer une zone « Affiner / Gomme à décors », régler la
 finesse d'un coup de pinceau. Le thème, lui, ne change que la taille et l'aspect, jamais la place.
 
+**Style Plan : tout est vu du dessus.** Décors (`PEINTRES_DESSUS`) : arbres, conifères, palmiers, acacias,
+arbres morts (branches rayonnantes), montagnes et cimes en facettes, collines à courbes de niveau,
+dunes, rochers et roches sombres, cratère de volcan (anneaux, lave au centre), blocs de glace,
+marais (eau trouble et touffes de roseaux), parcelles de champ posées à la main, herbes. Lieux
+(`ICONES_DESSUS`) : les 28 types, y compris pilotis, vestiges, portail, cimetière, bataille, oasis,
+arbre ancien et épave. Les maisons, bâtisses et églises sont des toits orientés, la place est à plat.
+Seuls les repères (point, croix, étoile, drapeau) et les images importées gardent leur dessin propre.
+
 Les cartes d'avant s'ouvrent telles quelles : seuls leurs décors changent (ils viennent maintenant
 du terrain) et leurs petits lieux automatiques ont disparu.
 

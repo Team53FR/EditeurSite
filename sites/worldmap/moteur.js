@@ -688,7 +688,82 @@
 
   function reduit(f, k) { return function (g, v) { g.save(); g.scale(k, k); f(g, v); g.restore(); }; }
 
+  // Le reste des décors, vus du dessus.
+  function mortDessus(g, v) {
+    var R = function (i) { return alea(2600 + v, i); };
+    var branche = function (x, y, a, L, w, n) {
+      var ex = x + Math.cos(a) * L, ey = y + Math.sin(a) * L;
+      g.lineWidth = w; g.beginPath(); g.moveTo(x, y); g.lineTo(ex, ey); g.stroke();
+      if (n > 0) { branche(ex, ey, a - 0.5 - R(n * 5 + 1) * 0.4, L * 0.66, w * 0.7, n - 1); branche(ex, ey, a + 0.45 + R(n * 5 + 2) * 0.4, L * 0.62, w * 0.7, n - 1); }
+    };
+    var tout = function () { for (var k = 0; k < 6; k++) branche(0, 0, k / 6 * TAU + R(k) * 0.8, 17 + R(10 + k) * 7, 3.6, 3); };
+    g.lineCap = "round";
+    g.save(); g.translate(5, 6); g.strokeStyle = "rgba(16,30,28,0.28)"; tout(); g.restore();
+    g.strokeStyle = "#4a4036"; tout();
+    g.fillStyle = "#3a3028"; g.strokeStyle = "#1c2622"; g.lineWidth = 1.8; g.beginPath(); g.arc(0, 0, 4.4, 0, TAU); g.fill(); g.stroke();
+  }
+  function maraisDessus(g, v) {
+    var R = function (i) { return alea(2700 + v, i); }, pts = [], i;
+    for (i = 0; i < 10; i++) { var a = i / 10 * TAU, r = 30 + R(i) * 10; pts.push([Math.cos(a) * r, Math.sin(a) * r * 0.78]); }
+    var blob = function () { g.beginPath(); pts.forEach(function (q, j) { if (j) g.lineTo(q[0], q[1]); else g.moveTo(q[0], q[1]); }); g.closePath(); };
+    var gr = g.createRadialGradient(-6, -4, 3, 0, 0, 40); gr.addColorStop(0, "#74aaa2"); gr.addColorStop(1, "#4f7f7e");
+    blob(); g.fillStyle = gr; g.fill(); g.strokeStyle = "rgba(28,48,44,0.6)"; g.lineWidth = 1.6; g.stroke();
+    for (i = 0; i < 5; i++) {
+      var cx = (R(20 + i) - 0.5) * 40, cy = (R(30 + i) - 0.5) * 26;
+      for (var j = 0; j < 7; j++) { var b = j / 7 * TAU + R(40 + i * 7 + j); g.strokeStyle = j % 2 ? "#3d5c35" : "#6d8c4f"; g.lineWidth = 2; g.lineCap = "round"; g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + Math.cos(b) * (5 + R(50 + j) * 4), cy + Math.sin(b) * (5 + R(60 + j) * 4)); g.stroke(); }
+      g.fillStyle = "#5b3f26"; g.beginPath(); g.arc(cx, cy, 1.6, 0, TAU); g.fill();
+    }
+  }
+  function glaconDessus(g, v) {
+    var R = function (i) { return alea(2800 + v, i); }, n = 8, pts = [], i;
+    for (i = 0; i < n; i++) { var a = i / n * TAU + R(i) * 0.4, r = 22 + R(10 + i) * 14; pts.push([Math.cos(a) * r, Math.sin(a) * r * 0.9]); }
+    var trace = function (dx, dy) { g.beginPath(); pts.forEach(function (q, j) { if (j) g.lineTo(q[0] + dx, q[1] + dy); else g.moveTo(q[0] + dx, q[1] + dy); }); g.closePath(); };
+    trace(5, 6); g.fillStyle = "rgba(20,60,90,0.28)"; g.fill();
+    trace(0, 0); g.fillStyle = "#e6f0f4"; g.fill();
+    for (i = 0; i < n; i++) {
+      var p0 = pts[i], p1 = pts[(i + 1) % n], mx = (p0[0] + p1[0]) / 2, my = (p0[1] + p1[1]) / 2, lum = (-mx - my) / ((Math.hypot(mx, my) || 1) * 1.414);
+      g.fillStyle = lum > 0 ? "rgba(255,255,255," + (0.2 + 0.4 * lum) + ")" : "rgba(80,130,170," + (0.1 - 0.3 * lum) + ")";
+      g.beginPath(); g.moveTo(0, 0); g.lineTo(p0[0], p0[1]); g.lineTo(p1[0], p1[1]); g.closePath(); g.fill();
+    }
+    trace(0, 0); g.strokeStyle = "#5f87a0"; g.lineWidth = 1.8; g.stroke();
+  }
+  function cratereDessus(g, v) {
+    g.fillStyle = "rgba(16,30,28,0.3)"; g.beginPath(); g.arc(6, 8, 42, 0, TAU); g.fill();
+    var gr = g.createRadialGradient(-12, -14, 4, 0, 0, 44); gr.addColorStop(0, "#9a8574"); gr.addColorStop(1, "#40342e");
+    g.fillStyle = gr; g.strokeStyle = "#1c2622"; g.lineWidth = 2.4; g.beginPath(); g.arc(0, 0, 42, 0, TAU); g.fill(); g.stroke();
+    g.strokeStyle = "rgba(30,22,16,0.4)"; g.lineWidth = 1.2; g.beginPath();
+    for (var i = 0; i < 12; i++) { var a = i / 12 * TAU + v; g.moveTo(Math.cos(a) * 17, Math.sin(a) * 17); g.lineTo(Math.cos(a) * 41, Math.sin(a) * 41); }
+    g.stroke();
+    g.fillStyle = "#2c2420"; g.beginPath(); g.arc(0, 0, 17, 0, TAU); g.fill();
+    var lave = g.createRadialGradient(0, 0, 1, 0, 0, 13); lave.addColorStop(0, "#ffe08a"); lave.addColorStop(0.5, "#ff8a1c"); lave.addColorStop(1, "#c23c10");
+    g.fillStyle = lave; g.beginPath(); g.arc(0, 0, 13, 0, TAU); g.fill();
+  }
+  function champDessus(g, v) {
+    var R = function (i) { return alea(2900 + v, i); }, a = (R(1) - 0.5) * 0.7, teintes = ["#94776a", "#9c7c6c", "#886f64", "#a08572"];
+    g.save(); g.rotate(a);
+    g.fillStyle = "rgba(16,30,28,0.22)"; g.fillRect(-38, -24, 80, 54);
+    g.fillStyle = teintes[v % teintes.length]; g.fillRect(-40, -28, 80, 56);
+    g.strokeStyle = "rgba(60,40,32,0.5)"; g.lineWidth = 1.4; g.beginPath();
+    for (var i = 1; i < 12; i++) { g.moveTo(-40, -28 + i * 4.7); g.lineTo(40, -28 + i * 4.7); }
+    g.stroke();
+    g.strokeStyle = "#1c2622"; g.lineWidth = 2; g.strokeRect(-40, -28, 80, 56);
+    g.restore();
+  }
+  function herbeDessus(seche) {
+    return function (g, v) {
+      var R = function (i) { return alea(3000 + v, i); };
+      g.lineCap = "round";
+      for (var i = 0; i < 9; i++) {
+        var a = i / 9 * TAU + R(i) * 0.5, L = 12 + R(10 + i) * 10;
+        g.strokeStyle = seche ? (i % 2 ? "#a08848" : "#c4aa5c") : (i % 2 ? "#4c762e" : "#84aa4c"); g.lineWidth = 3;
+        g.beginPath(); g.moveTo(0, 0); g.quadraticCurveTo(Math.cos(a + 0.4) * L * 0.6, Math.sin(a + 0.4) * L * 0.6, Math.cos(a) * L, Math.sin(a) * L); g.stroke();
+      }
+    };
+  }
+
   var PEINTRES_DESSUS = {
+    mort: mortDessus, marais: maraisDessus, glacon: glaconDessus, cratere: cratereDessus, champ: champDessus,
+    herbe: herbeDessus(false), seche: herbeDessus(true),
     // Vus d'en haut, ils occupent toute la boîte du dessin de profil : on les réduit pour qu'ils
     // gardent la même emprise sur la carte.
     montagne: reduit(montagneDessus(false), 0.62), cime: reduit(montagneDessus(true), 0.62),
@@ -3504,7 +3579,8 @@
 
   // ----- Lieux vus du dessus (style Plan) -----
   var ICONES_DESSUS = { village: 1, ville: 1, capitale: 1, fort: 1, tour: 1, port: 1, temple: 1, ruine: 1, cabane: 1, ferme: 1,
-    auberge: 1, moulin: 1, phare: 1, puits: 1, menhirs: 1, donjon: 1, grotte: 1, mine: 1, navire: 1, campement: 1 };
+    auberge: 1, moulin: 1, phare: 1, puits: 1, menhirs: 1, donjon: 1, grotte: 1, mine: 1, navire: 1, campement: 1,
+    pilotis: 1, vestiges: 1, portail: 1, cimetiere: 1, bataille: 1, oasis: 1, ancien: 1, epave: 1 };
 
   function iconeDessus(ctx, type, x, y, s, th, accent) {
     var k = 100 / s, lw = Math.max(1.5, k * 1.2), pierre = "#cdc6b1", toitT = accent || "#a8613f", ombre = "rgba(16,30,28,0.3)";
@@ -3613,6 +3689,63 @@
         break;
       case "campement":
         toit(-14, -6, 24, 17, 0.35, 0); toit(14, 6, 22, 16, -0.4, 0); toit(-4, 20, 18, 13, 0.1, 0);
+        break;
+      case "pilotis":
+        ctx.fillStyle = ombre; ctx.fillRect(-8, 4, 56, 12);
+        ctx.fillStyle = "#a98558"; ctx.strokeStyle = "#1c2622"; ctx.lineWidth = lw; ctx.fillRect(-12, 0, 56, 11); ctx.strokeRect(-12, 0, 56, 11);
+        ctx.fillStyle = "#2a1a0b"; [[-12, 0], [44, 0], [-12, 11], [44, 11]].forEach(function (q) { ctx.beginPath(); ctx.arc(q[0], q[1], 2.6, 0, TAU); ctx.fill(); });
+        toit(-6, -10, 42, 26, 0.04, 6);
+        break;
+      case "vestiges":
+        [[-22, -8, 10], [8, -16, 8], [20, 8, 11], [-8, 14, 9], [-28, 14, 6]].forEach(function (q) { disque(q[0], q[1], q[2], "#b9b3a2"); });
+        ctx.strokeStyle = "#1c2622"; ctx.lineWidth = 7 + lw; ctx.setLineDash([10, 9]); ctx.beginPath(); ctx.moveTo(-34, -22); ctx.lineTo(26, -26); ctx.stroke();
+        ctx.strokeStyle = "#cdc6b1"; ctx.lineWidth = 7; ctx.stroke(); ctx.setLineDash([]);
+        break;
+      case "portail":
+        ctx.fillStyle = ombre; ctx.beginPath(); ctx.arc(4, 5, 30, 0, TAU); ctx.fill();
+        var magie = ctx.createRadialGradient(0, 0, 2, 0, 0, 24); magie.addColorStop(0, "rgba(232,214,255,0.98)"); magie.addColorStop(0.6, accent || "rgba(140,90,220,0.9)"); magie.addColorStop(1, "rgba(60,30,120,0.95)");
+        ctx.fillStyle = magie; ctx.beginPath(); ctx.arc(0, 0, 24, 0, TAU); ctx.fill();
+        ctx.strokeStyle = "#1c2622"; ctx.lineWidth = 9 + lw; ctx.beginPath(); ctx.arc(0, 0, 28, 0, TAU); ctx.stroke();
+        ctx.strokeStyle = pierre; ctx.lineWidth = 9; ctx.stroke();
+        [[-28, 0], [28, 0]].forEach(function (q) { disque(q[0], q[1], 7, "#b9b3a2"); });
+        break;
+      case "cimetiere":
+        ctx.fillStyle = "rgba(196,206,176,0.85)"; ctx.strokeStyle = "#1c2622"; ctx.lineWidth = lw; ctx.fillRect(-42, -32, 84, 64); ctx.strokeRect(-42, -32, 84, 64);
+        for (var gi = 0; gi < 3; gi++) for (var gj = 0; gj < 3; gj++) {
+          var gx = -26 + gi * 26, gy = -18 + gj * 18;
+          ctx.fillStyle = ombre; ctx.fillRect(gx - 4 + 3, gy - 6 + 3, 8, 12);
+          ctx.fillStyle = "#b9b3a2"; ctx.strokeStyle = "#1c2622"; ctx.lineWidth = lw * 0.8; ctx.fillRect(gx - 4, gy - 6, 8, 12); ctx.strokeRect(gx - 4, gy - 6, 8, 12);
+        }
+        break;
+      case "bataille":
+        [[-1, 1], [1, 1]].forEach(function (d) {
+          ctx.save(); ctx.rotate(d[0] * 0.75);
+          ctx.fillStyle = ombre; ctx.fillRect(-2.5 + 3, -36 + 3, 6, 56);
+          ctx.fillStyle = "#dcdcd6"; ctx.strokeStyle = "#1c2622"; ctx.lineWidth = lw; ctx.fillRect(-3, -36, 6, 50); ctx.strokeRect(-3, -36, 6, 50);
+          ctx.fillStyle = accent || "#8e6a2a"; ctx.fillRect(-14, 12, 28, 6); ctx.strokeRect(-14, 12, 28, 6); ctx.fillRect(-3, 18, 6, 14); ctx.strokeRect(-3, 18, 6, 14);
+          ctx.restore();
+        });
+        [[-30, 22], [32, -18], [26, 26], [-34, -14]].forEach(function (q) { disque(q[0], q[1], 4, "#8e2b22"); });
+        break;
+      case "oasis":
+        ctx.fillStyle = "#ead9a0"; ctx.strokeStyle = "rgba(120,96,40,0.5)"; ctx.lineWidth = lw; ctx.beginPath(); ctx.ellipse(0, 0, 44, 33, 0, 0, TAU); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = "#5aa6c0"; ctx.strokeStyle = "#1c2622"; ctx.beginPath(); ctx.ellipse(0, 0, 28, 19, 0, 0, TAU); ctx.fill(); ctx.stroke();
+        [[-30, -16], [30, -14], [-24, 20], [26, 20]].forEach(function (q) {
+          for (var pi = 0; pi < 7; pi++) { var pa = pi / 7 * TAU; ctx.strokeStyle = pi % 2 ? "#2f7a34" : "#4f9f3f"; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(q[0], q[1]); ctx.lineTo(q[0] + Math.cos(pa) * 11, q[1] + Math.sin(pa) * 11); ctx.stroke(); }
+          disque(q[0], q[1], 2.6, "#5a3a1c");
+        });
+        break;
+      case "ancien":
+        ctx.save(); ctx.scale(1.3, 1.3); PEINTRES_DESSUS.arbre(ctx, 3); ctx.restore();
+        break;
+      case "epave":
+        ctx.strokeStyle = "rgba(255,255,255,0.85)"; ctx.lineWidth = 2.4; ctx.beginPath(); ctx.ellipse(0, 0, 44, 20, -0.15, 0.3, 5.9); ctx.stroke();
+        ctx.fillStyle = ombre; ctx.beginPath(); ctx.moveTo(-34, 4); ctx.quadraticCurveTo(-4, 22, 34, 4); ctx.lineTo(24, -6); ctx.quadraticCurveTo(-4, -12, -34, 4); ctx.fill();
+        ctx.fillStyle = "#7a5a3a"; ctx.strokeStyle = "#1c2622"; ctx.lineWidth = lw;
+        ctx.beginPath(); ctx.moveTo(-36, 0); ctx.quadraticCurveTo(-6, -16, 30, -6); ctx.lineTo(18, 6); ctx.lineTo(24, 12); ctx.quadraticCurveTo(-6, 16, -36, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.strokeStyle = "rgba(40,24,12,0.55)"; ctx.lineWidth = 1.4; ctx.beginPath();
+        for (i = 0; i < 5; i++) { ctx.moveTo(-26 + i * 10, -8 + i * 1.2); ctx.lineTo(-26 + i * 10, 8 - i * 0.6); }
+        ctx.stroke();
         break;
     }
     ctx.restore();
