@@ -1745,9 +1745,7 @@ fichier `.worldmap.json` (réimportable depuis la galerie).
 **Le zoom « infini » tient au vectoriel.** Une carte n'est pas une image : ce sont des objets en
 unités du monde (des **km**) — traits de pinceau, tracés, noms, lieux — redessinés à chaque
 image. Le pinceau se règle en **pixels écran** : zoomer avant de peindre donne un trait plus fin
-dans le monde, d'où le détail à volonté. Le niveau de zoom est plafonné à ×3 000 (1 pixel ≈ un
-mètre sur une carte de 6 000 km) : au-delà, les nombres flottants 32 bits du canvas ne suffisent
-plus à placer les points sans tremblement.
+dans le monde, d'où le détail à volonté. Le niveau de zoom est plafonné à ×15.
 
 **« Niveau » = zoom relatif à la vue d'ensemble** (`Moteur.zoomAjuste`) : 1 = la carte entière,
 10 = dix fois plus près. Il ne dépend ni de la taille de l'écran ni de celle de la carte, si bien
@@ -1946,6 +1944,21 @@ reste en place quand on zoome, s'épaissit doucement et se ramifie en fondu. Le 
 un bouquet d'aiguilles d'obsidienne (`peintAiguilles`, aussi en tampon) mêlé de roches sombres.
 **Montagnes** : plus massives (96 px) et à facettes claires et sombres. **Forêts** : trois essences
 mêlées. Le monde aléatoire sème aussi des plaques de **champs** dans les basses plaines.
+
+**Voies sous les arbres.** Routes et sentiers ne sont plus tracés par-dessus la carte : ils sont
+peints DANS la couche de terre (`tracerVoies` en « source-atop », jamais sur l'eau), après les champs
+et la lave et avant les décors. Les arbres qui les bordent passent donc devant, et le couloir dégagé
+dans le masque est réduit au pied de la voie (seuls les grands décors s'en écartent davantage).
+Texture refaite : talus en ombre douce, bord net, chaussée, milieu usé, cailloux sur les bords,
+ornières. **Ponts** (`pontLe`) : ombre sur l'eau, parapets de pierre, tablier de la couleur de la voie,
+dalles en travers, piles rondes ; en bois à planches pour un sentier.
+
+**Champs** (`dessinerChamps`) : un damier de parcelles — quadrillage déformé, une culture et des
+sillons par case, des haies entre elles — au lieu de parcelles isolées. Hiérarchique comme les
+décors : une parcelle qui se divise transmet sa couleur à ses filles, qui prennent peu à peu la leur ;
+les nouveaux coins et les nouvelles haies apparaissent en fondu. **Montagnes** : deux tailles mêlées,
+écart et marge réduits — une crête étroite porte sa rangée de sommets dès la vue d'ensemble.
+**Zoom** plafonné à ×15 (`NIVEAU_MAX`).
 
 Les cartes d'avant s'ouvrent telles quelles : seuls leurs décors changent (ils viennent maintenant
 du terrain) et leurs petits lieux automatiques ont disparu.

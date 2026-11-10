@@ -11,7 +11,7 @@
   var $ = function (id) { return document.getElementById(id); };
   var scene = $("scene"), cvCarte = $("cvCarte"), cvSur = $("cvSurcouche"), saisie = $("saisie");
 
-  var NIVEAU_MIN = 0.25, NIVEAU_MAX = 3000;
+  var NIVEAU_MIN = 0.25, NIVEAU_MAX = 15;
 
   var E = {
     carte: null,
@@ -1185,7 +1185,7 @@
     c.fillStyle = m.couleur; c.fillRect(0, 0, 34, 34);
     var d = Moteur.DECORS[m.decor];
     if (d) {
-      var ch = d.choix[0], grand = ch[2] > 22;
+      var ch = d.apercu ? [d.apercu, 1, 40] : d.choix[0], grand = ch[2] > 22;
       if (grand) Moteur.apercuDecor(c, ch[0], 1, 17, 17, 30);
       else { Moteur.apercuDecor(c, ch[0], 0, 10, 12, 17); Moteur.apercuDecor(c, ch[0], 1, 24, 15, 17); Moteur.apercuDecor(c, ch[0], 2, 15, 25, 17); }
     }
@@ -1374,7 +1374,7 @@
 
       zone.appendChild(sousTitre("Visibilité"));
       var niv = typeof o.niv === "number" ? o.niv : tp.niv;
-      zone.appendChild(champCurseur("Visible à partir du zoom", 0, 100, 0.1, Math.min(niv, 100), function (v) { return v === 0 ? "toujours" : "×" + nb(v, 1); },
+      zone.appendChild(champCurseur("Visible à partir du zoom", 0, 15, 0.1, Math.min(niv, 15), function (v) { return v === 0 ? "toujours" : "×" + nb(v, 1); },
         function (v) { editer(function (x) { x.niv = v; }); }));
       zone.appendChild(el("div", { classe: "rangee" }, [
         el("button", { type: "button", classe: "btn", texte: "Dès ce zoom (×" + nb(niveauActuel(), 1) + ")", onclick: function () { editer(function (x) { x.niv = Math.round(niveauActuel() * 0.9 * 10) / 10; }); panneauSelection(); } }),
@@ -1882,7 +1882,7 @@
       lp.addEventListener("click", function (ev) { ev.preventDefault(); allerVers(lp.href); });
     }
     tailleScene();
-    if (carte.vue && carte.vue.zoom > 0) { E.vue.cx = carte.vue.cx; E.vue.cy = carte.vue.cy; E.vue.zoom = carte.vue.zoom; }
+    if (carte.vue && carte.vue.zoom > 0) { E.vue.cx = carte.vue.cx; E.vue.cy = carte.vue.cy; E.vue.zoom = borne(carte.vue.zoom, zoomMin(), zoomMax()); }
     else ajusterVue();
     panneauOutil();
     panneauSelection();
