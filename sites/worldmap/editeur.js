@@ -21,6 +21,7 @@
     taillePx: 40,
     densite: 2,              // pinceau : décors du terrain (0 aucun, 1 clairsemé, 2 normal, 3 dense)
     echDecor: 1,             // pinceau : taille des décors (0 petits, 1 normaux, 2 grands)
+    eclaircir: 0,            // gomme à décors : 0 retire tout, 1 n'en laisse que quelques-uns
     finesse: "auto",         // pinceau : finesse des décors (0 à 4, ou « auto » : d'après le zoom)
     rugosite: 0,             // pinceau et gomme : bord découpé (0 = bord lisse)
     tampon: "arbre",         // outil Décors : le décor posé à la main
@@ -621,6 +622,7 @@
           dernier: w
         };
         if (E.outil === "pinceau" && E.materiau === "@affiner") { geste.affiner = true; geste.trait.mat = "@affiner"; geste.trait.fin = finesseActuelle(); surcouche(); break; }
+        if (E.outil === "pinceau" && E.materiau === "@eclaircir") { geste.affiner = true; geste.trait.mat = "@eclaircir"; geste.trait.dens = E.eclaircir; surcouche(); break; }
         if (E.rugosite > 0) geste.trait.rug = E.rugosite;
         if (E.outil === "pinceau") {
           if (E.densite !== 2) geste.trait.dens = E.densite;
@@ -841,7 +843,11 @@
     switch (g.type) {
       case "trait":
         g.trait.bb = Moteur.boiteTrait(g.trait.pts, g.trait.taille);
-        if (g.affiner) ajouter("finesses", { id: g.trait.id, taille: g.trait.taille, pts: g.trait.pts, fin: g.trait.fin, bb: g.trait.bb });
+        if (g.affiner) {
+          var zone = { id: g.trait.id, taille: g.trait.taille, pts: g.trait.pts, bb: g.trait.bb };
+          if (g.trait.mat === "@eclaircir") zone.dens = g.trait.dens; else zone.fin = g.trait.fin;
+          ajouter("finesses", zone);
+        }
         else ajouter("traits", g.trait);
         break;
       case "tampons":
@@ -1258,8 +1264,12 @@
         [el("span", { classe: "plus-image", style: "width:34px;height:34px;font-size:19px", texte: "⁂" }), el("span", { texte: "Affiner les décors" })]);
       bA.addEventListener("click", function () { E.materiau = "@affiner"; panneauOutil(); });
       palA.appendChild(bA);
+      var bE = el("button", { type: "button", classe: "mat" + (E.materiau === "@eclaircir" ? " actif" : ""), title: "Retire les arbres, pics ou rochers d'une zone sans repeindre le terrain" },
+        [el("span", { classe: "plus-image", style: "width:34px;height:34px;font-size:19px", texte: "∅" }), el("span", { texte: "Gomme à décors" })]);
+      bE.addEventListener("click", function () { E.materiau = "@eclaircir"; panneauOutil(); });
+      palA.appendChild(bE);
       if (E.carte.finesses.length) {
-        var bR = el("button", { type: "button", classe: "mat", title: "Retire toutes les zones affinées : les décors reprennent la finesse de leur terrain" }, [el("span", { texte: "Retirer les zones affinées (" + E.carte.finesses.length + ")" })]);
+        var bR = el("button", { type: "button", classe: "mat", title: "Retire toutes les zones affinées ou éclaircies : les décors reprennent les réglages de leur terrain" }, [el("span", { texte: "Retirer ces zones (" + E.carte.finesses.length + ")" })]);
         bR.addEventListener("click", function () {
           executer({ t: "lot", actions: E.carte.finesses.map(function (o, i) { return { t: "suppr", coll: "finesses", obj: o, idx: i }; }).reverse() });
           panneauOutil();
@@ -1273,13 +1283,19 @@
       zone.appendChild(champCurseur("Taille", 3, 240, 1, E.taillePx, function (v) { return Math.round(v) + " px"; },
         function (v) { E.taillePx = v; majLibelleTaille(); surcouche(); }));
       zone.appendChild(el("p", { classe: "aide", id: "libTaillePinceau" }));
-      if (!(E.outil === "pinceau" && E.materiau === "@affiner")) zone.appendChild(champCurseur("Bord", 0, 1, 0.05, E.rugosite, function (v) { return v === 0 ? "lisse" : v < 0.5 ? "irrégulier" : "découpé"; },
+      if (!(E.outil === "pinceau" && E.materiau.charAt(0) === "@")) zone.appendChild(champCurseur("Bord", 0, 1, 0.05, E.rugosite, function (v) { return v === 0 ? "lisse" : v < 0.5 ? "irrégulier" : "découpé"; },
         function (v) { E.rugosite = v; }));
       if (E.outil === "pinceau" && E.materiau === "@affiner") {
         zone.appendChild(champSegments("Finesse (échelle des décors)", [["auto", "Auto"], [0, "×1"], [1, "×2"], [2, "×4"], [3, "×8"], [4, "×16"]], E.finesse, function (v) { E.finesse = v; majLibelleFinesse(); }));
         zone.appendChild(el("p", { classe: "aide", id: "libFinesse" }));
         zone.appendChild(el("p", { classe: "aide", texte: "Passez sur une région déjà peinte : ses arbres, ses pics et ses collines prennent cette finesse, le terrain ne change pas. En Auto, zoomez d'abord sur la région : les décors seront à la bonne taille pour ce zoom." }));
         majLibelleFinesse();
+        majLibelleTaille();
+        return;
+      }
+      if (E.outil === "pinceau" && E.materiau === "@eclaircir") {
+        zone.appendChild(champSegments("Ce qu'il reste", [[0, "Rien"], [1, "Quelques décors"]], E.eclaircir, function (v) { E.eclaircir = v; }));
+        zone.appendChild(el("p", { classe: "aide", texte: "Passez sur une région : ses arbres, ses pics ou ses rochers disparaissent (ou se raréfient), le terrain ne change pas. Pour ouvrir une clairière, dégager un col, faire de la place à une ville." }));
         majLibelleTaille();
         return;
       }

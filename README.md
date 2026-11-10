@@ -1978,6 +1978,13 @@ continent. Les zones sont dans `carte.finesses` (`{ taille, pts, fin }`) et ont 
 masque (`masque.fin`), lu seulement quand la vue en contient ; là où il y en a une, sa finesse
 remplace celle du trait. « Retirer les zones affinées » les enlève toutes (annulable).
 
+**Gomme à décors** (Terrains → Détail) : une zone de `carte.finesses` peut porter `dens` au lieu de
+`fin` (0 : plus aucun décor ; 1 : quelques-uns) — canal vert du masque des zones. Pour ouvrir une
+clairière ou dégager un col sans repeindre le terrain. **Bâtiments** : maisons à colombages, fenêtres,
+cheminées et rangs de tuiles ; murs à assises de pierre (`assises`) ; porte à herse (`porte`) ; la
+capitale gagne un second rang de tours et des bannières, la ville devient une ville close (enceinte,
+église, trois rangs de toits), le village un hameau de cinq maisons.
+
 Les cartes d'avant s'ouvrent telles quelles : seuls leurs décors changent (ils viennent maintenant
 du terrain) et leurs petits lieux automatiques ont disparu.
 

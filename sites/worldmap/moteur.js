@@ -636,15 +636,15 @@
   // `px` : taille du pictogramme ; `pxIll` : taille du dessin (style Illustré, et types
   // qui n'ont pas de pictogramme) ; `cat` : rangement dans la palette de l'éditeur.
   var TYPES_LIEUX = {
-    capitale:  { nom: "Capitale",   px: 22, pxIll: 84, police: 17, niv: 0,   maj: true, cat: "Cités" },
-    ville:     { nom: "Ville",      px: 15, pxIll: 62, police: 14, niv: 0.6, cat: "Cités" },
-    village:   { nom: "Village",    px: 10, pxIll: 42, police: 12, niv: 2.5, cat: "Cités" },
+    capitale:  { nom: "Capitale",   px: 22, pxIll: 100, police: 17, niv: 0,   maj: true, cat: "Cités" },
+    ville:     { nom: "Ville",      px: 15, pxIll: 82, police: 14, niv: 0.6, cat: "Cités" },
+    village:   { nom: "Village",    px: 10, pxIll: 56, police: 12, niv: 2.5, cat: "Cités" },
     port:      { nom: "Port",       px: 14, pxIll: 66, police: 13, niv: 1.2, cat: "Cités" },
     ferme:     { nom: "Ferme",      pxIll: 44, police: 12, niv: 4, cat: "Cités" },
     cabane:    { nom: "Cabane",     pxIll: 38, police: 12, niv: 5, cat: "Cités" },
     campement: { nom: "Campement",  pxIll: 40, police: 12, niv: 5, cat: "Cités" },
     pilotis:   { nom: "Pilotis",    pxIll: 40, police: 12, niv: 5, cat: "Cités" },
-    fort:      { nom: "Forteresse", px: 15, pxIll: 58, police: 13, niv: 1.5, cat: "Ouvrages" },
+    fort:      { nom: "Forteresse", px: 15, pxIll: 70, police: 13, niv: 1.5, cat: "Ouvrages" },
     tour:      { nom: "Tour",       px: 12, pxIll: 46, police: 12, niv: 4, cat: "Ouvrages" },
     temple:    { nom: "Temple",     px: 14, pxIll: 52, police: 12, niv: 3, cat: "Ouvrages" },
     mine:      { nom: "Mine",       px: 12, pxIll: 46, police: 12, niv: 4, cat: "Ouvrages" },
@@ -927,9 +927,11 @@
           var code = Math.round(data[px + 2] / 20) - 1;               // densité × 3 + échelle
           if (code < 0) continue;
           // La finesse : celle d'une zone « Affiner » si le point y est, sinon celle du trait.
-          var finPt = dataFin && dataFin[px + 3] > 200 ? Math.round(dataFin[px] / 40) - 1 : Math.round(data[px + 1] / 24);
+          var zf = dataFin && dataFin[px + 3] > 200 ? Math.round(dataFin[px] / 40) : 0, zd = dataFin && dataFin[px + 3] > 200 ? Math.round(dataFin[px + 1] / 60) : 0;
+          var finPt = zf ? zf - 1 : Math.round(data[px + 1] / 24);
           if (niveauDecor(zb, dd.C, finPt) !== k) continue;           // ce terrain a un autre niveau
-          var ech = ECHELLES[code % 3], dens = DENSITES[Math.floor(code / 3)];
+          // La densité : celle d'une zone « Éclaircir » si le point y est, sinon celle du trait.
+          var ech = ECHELLES[code % 3], dens = DENSITES[zd ? zd - 1 : Math.floor(code / 3)];
           if (pt.r >= dd.p * dens) continue;
           // Quel décor, parmi ceux du terrain ?
           var ch = dd.choix[0], cumul = 0;
@@ -1694,14 +1696,15 @@
       cf.setTransform(z / ech, 0, 0, z / ech, tx / ech, ty / ech);
       cf.lineCap = cf.lineJoin = "round";
       zones.forEach(function (f) {
-        cf.strokeStyle = cf.fillStyle = "rgb(" + ((Math.min(FINESSE_MAX, f.fin || 0) + 1) * 40) + ",0,0)";
+        // Rouge : finesse + 1 (0 = inchangée) ; vert : densité + 1 (0 = inchangée).
+        cf.strokeStyle = cf.fillStyle = "rgb(" + (f.fin == null ? 0 : (Math.min(FINESSE_MAX, f.fin) + 1) * 40) + "," + (f.dens == null ? 0 : (f.dens + 1) * 60) + ",0)";
         cf.lineWidth = f.taille;
         cf.beginPath();
         if (f.pts.length <= 2) { cf.arc(f.pts[0], f.pts[1], f.taille / 2, 0, TAU); cf.fill(); }
         else { cf.moveTo(f.pts[0], f.pts[1]); for (var q = 2; q < f.pts.length; q += 2) cf.lineTo(f.pts[q], f.pts[q + 1]); cf.stroke(); }
       });
       masque.fin = cf.getImageData(0, 0, mw, mh).data;
-      masque.finesses = zones.map(function (f) { return Math.min(FINESSE_MAX, f.fin || 0); });
+      masque.finesses = zones.filter(function (f) { return f.fin != null; }).map(function (f) { return Math.min(FINESSE_MAX, f.fin); });
     }
     return masque;
   }
@@ -2153,35 +2156,86 @@
     c.fill();
   }
 
+  // Une maison : murs clairs à colombages, toit de tuiles à deux pans (l'un dans l'ombre),
+  // fenêtres, porte, et une cheminée une fois sur deux. (x, y) : le milieu de sa base.
   function maison(c, x, y, w, h) {
+    var lw = c.lineWidth;
     c.fillStyle = MURMAISON;
     c.beginPath(); c.rect(x - w / 2, y - h, w, h); c.fill(); c.stroke();
     c.fillStyle = OMBRE;
     c.fillRect(x, y - h, w / 2, h);
+    // Colombages, fenêtres et porte.
+    c.save();
+    c.strokeStyle = "rgba(92,62,30,0.75)"; c.lineWidth = lw * 0.6;
+    c.beginPath();
+    c.moveTo(x - w / 2, y - h * 0.52); c.lineTo(x + w / 2, y - h * 0.52);
+    c.moveTo(x - w * 0.22, y - h); c.lineTo(x - w * 0.22, y - h * 0.52);
+    c.moveTo(x + w * 0.24, y - h); c.lineTo(x + w * 0.24, y);
+    c.stroke();
+    c.restore();
+    c.fillStyle = "#3a2a1c";
+    c.fillRect(x - w * 0.4, y - h * 0.9, w * 0.13, h * 0.26);
+    c.fillRect(x + w * 0.3, y - h * 0.9, w * 0.13, h * 0.26);
+    c.fillStyle = BOIS;
+    c.fillRect(x - w * 0.1, y - h * 0.46, w * 0.2, h * 0.46);
+    // La cheminée, derrière le toit.
+    if (Math.round(x * 7 + y * 3) % 2 === 0) {
+      c.fillStyle = PIERRE;
+      c.beginPath(); c.rect(x + w * 0.2, y - h - w * 0.5, w * 0.13, w * 0.3); c.fill(); c.stroke();
+    }
     c.fillStyle = TOIT;
     c.beginPath();
-    c.moveTo(x - w / 2 - 2, y - h); c.lineTo(x, y - h - w * 0.5); c.lineTo(x + w / 2 + 2, y - h);
+    c.moveTo(x - w / 2 - 2.5, y - h); c.lineTo(x, y - h - w * 0.52); c.lineTo(x + w / 2 + 2.5, y - h);
     c.closePath(); c.fill(); c.stroke();
-    c.fillStyle = OMBRE;
-    c.beginPath(); c.moveTo(x, y - h - w * 0.5); c.lineTo(x + w / 2 + 2, y - h); c.lineTo(x, y - h); c.closePath(); c.fill();
-    c.fillStyle = BOIS;
-    c.fillRect(x - w * 0.09, y - h * 0.45, w * 0.18, h * 0.45);
+    c.fillStyle = "rgba(40,20,8,0.28)";
+    c.beginPath(); c.moveTo(x, y - h - w * 0.52); c.lineTo(x + w / 2 + 2.5, y - h); c.lineTo(x, y - h); c.closePath(); c.fill();
+    // Les rangs de tuiles.
+    c.save();
+    c.strokeStyle = "rgba(60,24,10,0.4)"; c.lineWidth = lw * 0.5;
+    c.beginPath();
+    for (var r = 1; r <= 2; r++) {
+      var f = r / 3;
+      c.moveTo(x - (w / 2 + 2.5) * f, y - h - w * 0.52 * (1 - f)); c.lineTo(x + (w / 2 + 2.5) * f, y - h - w * 0.52 * (1 - f));
+    }
+    c.stroke();
+    c.restore();
+  }
+
+  // Les assises d'un mur de pierre, entre (x0, y0) et (x1, y1) : joints horizontaux et
+  // verticaux décalés d'un rang à l'autre.
+  function assises(c, x0, y0, x1, y1, pas) {
+    c.save();
+    c.strokeStyle = "rgba(70,58,40,0.34)"; c.lineWidth = c.lineWidth * 0.5;
+    c.beginPath();
+    var rang = 0;
+    for (var y = y0 + pas; y < y1 - 0.5; y += pas, rang++) { c.moveTo(x0, y); c.lineTo(x1, y); }
+    rang = 0;
+    for (var yy = y0; yy < y1 - 0.5; yy += pas, rang++) {
+      for (var x = x0 + pas * (rang % 2 ? 0.6 : 1.3); x < x1 - 0.5; x += pas * 1.5) { c.moveTo(x, yy); c.lineTo(x, Math.min(y1, yy + pas)); }
+    }
+    c.stroke();
+    c.restore();
   }
 
   // Tour de pierre à toit conique : (x, y) est le milieu de sa base.
   function tourPierre(c, x, y, w, h, hToit) {
     c.fillStyle = PIERRE;
     c.beginPath(); c.rect(x - w / 2, y - h, w, h); c.fill(); c.stroke();
+    if (w >= 12) assises(c, x - w / 2, y - h, x + w / 2, y, Math.max(4, w * 0.22));
     c.fillStyle = OMBRE;
     c.fillRect(x, y - h, w / 2, h);
-    c.fillStyle = "#3a2a1a";
-    c.fillRect(x - w * 0.07, y - h * 0.68, w * 0.14, h * 0.2);
+    c.fillStyle = "#2a1c10";
+    c.fillRect(x - w * 0.07, y - h * 0.72, w * 0.14, h * 0.2);
+    if (h > 30) c.fillRect(x - w * 0.07, y - h * 0.4, w * 0.14, h * 0.14);
+    // L'encorbellement sous le toit.
+    c.fillStyle = PIERRE;
+    c.beginPath(); c.rect(x - w / 2 - 1.5, y - h - 1, w + 3, 3.4); c.fill(); c.stroke();
     c.fillStyle = TOIT;
     c.beginPath();
-    c.moveTo(x - w / 2 - 2, y - h); c.lineTo(x, y - h - hToit); c.lineTo(x + w / 2 + 2, y - h);
+    c.moveTo(x - w / 2 - 2.5, y - h - 1); c.lineTo(x, y - h - hToit); c.lineTo(x + w / 2 + 2.5, y - h - 1);
     c.closePath(); c.fill(); c.stroke();
-    c.fillStyle = OMBRE;
-    c.beginPath(); c.moveTo(x, y - h - hToit); c.lineTo(x + w / 2 + 2, y - h); c.lineTo(x, y - h); c.closePath(); c.fill();
+    c.fillStyle = "rgba(40,20,8,0.28)";
+    c.beginPath(); c.moveTo(x, y - h - hToit); c.lineTo(x + w / 2 + 2.5, y - h - 1); c.lineTo(x, y - h - 1); c.closePath(); c.fill();
   }
 
   // Rempart à créneaux entre x0 et x1, de hauteur h au-dessus de la ligne de sol yBase.
@@ -2192,6 +2246,7 @@
     for (var i = 0; i < n; i += 2) {
       c.beginPath(); c.rect(x0 + i * pas, yBase - h - 3.2, pas, 3.2); c.fill(); c.stroke();
     }
+    assises(c, x0, yBase - h, x1, yBase, Math.max(4, h * 0.26));
     c.fillStyle = OMBRE;
     c.fillRect(x0, yBase - h * 0.35, x1 - x0, h * 0.35);
   }
@@ -2202,17 +2257,38 @@
     c.beginPath(); c.moveTo(x, y - 15); c.lineTo(x + 10, y - 11.5); c.lineTo(x, y - 8); c.closePath(); c.fill(); c.stroke();
   }
 
+  // La porte d'une enceinte : une arche sombre et sa herse.
+  function porte(c, x, y, w, h) {
+    c.fillStyle = "#231710";
+    c.beginPath(); c.moveTo(x - w / 2, y); c.lineTo(x - w / 2, y - h + w / 2); c.arc(x, y - h + w / 2, w / 2, Math.PI, 0); c.lineTo(x + w / 2, y); c.closePath(); c.fill(); c.stroke();
+    c.save();
+    c.strokeStyle = "rgba(190,170,130,0.5)"; c.lineWidth = c.lineWidth * 0.5;
+    c.beginPath();
+    for (var q = -1; q <= 1; q++) { c.moveTo(x + q * w * 0.25, y); c.lineTo(x + q * w * 0.25, y - h * 0.72); }
+    c.moveTo(x - w / 2, y - h * 0.4); c.lineTo(x + w / 2, y - h * 0.4);
+    c.stroke();
+    c.restore();
+  }
+
+  // Un château : le donjon et ses tours derrière, la courtine à créneaux devant, la porte à
+  // herse, deux tours d'angle. La capitale y ajoute un second rang de tours, les toits de
+  // la ville haute et des bannières.
   function chateau(c, grand) {
-    ombreSol(c, 0, 34, 47, 8);
-    tourPierre(c, 0, 20, grand ? 30 : 24, grand ? 52 : 38, grand ? 20 : 16);
-    tourPierre(c, -20, 22, 13, 38, 13);
-    tourPierre(c, 20, 22, 13, 38, 13);
-    rempart(c, -38, 38, 33, 21, 11);
-    c.fillStyle = "#2a1c10";
-    c.beginPath(); c.moveTo(-7, 33); c.lineTo(-7, 24); c.arc(0, 24, 7, Math.PI, 0); c.lineTo(7, 33); c.closePath(); c.fill(); c.stroke();
-    tourPierre(c, -40, 35, 16, 44, 14);
-    tourPierre(c, 40, 35, 16, 44, 14);
-    if (grand) drapeau(c, 0, -32 - 20 + 4);
+    ombreSol(c, 0, 35, 49, 8);
+    if (grand) {
+      tourPierre(c, -30, 12, 11, 30, 12);
+      tourPierre(c, 30, 12, 11, 30, 12);
+      dessinerMaisons(c, [[-13, 14, 13, 9], [13, 14, 13, 9]]);
+    }
+    tourPierre(c, 0, 20, grand ? 28 : 24, grand ? 54 : 40, grand ? 21 : 16);
+    tourPierre(c, -19, 22, 13, grand ? 42 : 36, 13);
+    tourPierre(c, 19, 22, 13, grand ? 42 : 36, 13);
+    rempart(c, -38, 38, 34, 21, 11);
+    porte(c, 0, 34, 15, 17);
+    tourPierre(c, -40, 36, 16, 44, 14);
+    tourPierre(c, 40, 36, 16, 44, 14);
+    if (grand) { drapeau(c, 0, -34 - 21 + 4); drapeau(c, -40, -8 - 14 + 4); drapeau(c, 40, -8 - 14 + 4); }
+    else drapeau(c, 0, -20 - 16 + 4);
   }
 
   function dessinerMaisons(c, liste) {
@@ -2234,13 +2310,26 @@
       case "capitale": chateau(c, true); break;
       case "fort": chateau(c, false); break;
       case "ville":
-        ombreSol(c, 0, 31, 47, 9);
-        tourPierre(c, 0, 8, 17, 34, 15);
-        dessinerMaisons(c, [[-34, 14, 22, 15], [-6, 12, 18, 12], [32, 14, 22, 16], [-22, 28, 24, 16], [8, 30, 26, 18], [36, 31, 18, 12]]);
+        // Une ville close : l'église et son clocher, trois rangs de toits, l'enceinte et
+        // sa porte au premier plan.
+        ombreSol(c, 0, 35, 49, 8);
+        tourPierre(c, -40, 20, 10, 24, 10);
+        tourPierre(c, 40, 20, 10, 24, 10);
+        dessinerMaisons(c, [[-24, 2, 15, 10], [-6, 0, 15, 10], [26, 3, 16, 11]]);
+        tourPierre(c, 9, 6, 11, 34, 20);
+        c.beginPath(); c.moveTo(9, -48); c.lineTo(9, -55); c.moveTo(6, -52); c.lineTo(12, -52); c.stroke();
+        dessinerMaisons(c, [[-32, 15, 17, 11], [-13, 14, 17, 12], [5, 16, 16, 11], [24, 15, 18, 12], [-22, 26, 18, 12], [-2, 27, 19, 13], [19, 26, 18, 12]]);
+        rempart(c, -44, 44, 36, 11, 15);
+        porte(c, 0, 36, 10, 10);
+        tourPierre(c, -45, 37, 11, 24, 10);
+        tourPierre(c, 45, 37, 11, 24, 10);
         break;
       case "village":
-        ombreSol(c, 0, 29, 36, 7);
-        dessinerMaisons(c, [[16, 12, 22, 15], [-20, 15, 24, 16], [-2, 31, 28, 19]]);
+        // Un hameau : cinq maisons autour de la place, un arbre.
+        ombreSol(c, 0, 31, 42, 7);
+        dessinerMaisons(c, [[-4, 8, 17, 11], [20, 12, 20, 13], [-26, 14, 20, 13], [10, 30, 24, 16], [-18, 32, 22, 14]]);
+        c.fillStyle = "#5a4026"; c.fillRect(34, 22, 3, 10);
+        [[35.5, 18, 8, "#5f9c3b"], [31, 22, 6, "#4a8636"], [40, 22, 6, "#3f7a32"]].forEach(function (f) { c.fillStyle = f[3]; c.beginPath(); c.arc(f[0], f[1], f[2], 0, TAU); c.fill(); c.stroke(); });
         break;
       case "tour":
         ombreSol(c, 0, 35, 20, 6);
