@@ -892,7 +892,9 @@
       var t = traits[i], mat = MAT[t.mat], d = mat && DECORS[mat.decor];
       if (!d || t.sansDecor || t.dens === 0 || !t.bb || !chevauche(t.bb, X0, Y0, X1, Y1)) continue;
       niveaux[niveauDecor(zb, d.C, t.fin || 0)] = true;
+      if (masque.finesses) for (var zf = 0; zf < masque.finesses.length; zf++) niveaux[niveauDecor(zb, d.C, masque.finesses[zf])] = true;
     }
+    var dataFin = masque.fin;
     // Une petite grille des tampons, pour s'en écarter sans tout comparer.
     var gt = null, gc = 0;
     if (tampons && tampons.length) {
@@ -924,7 +926,9 @@
           if (!dd) continue;
           var code = Math.round(data[px + 2] / 20) - 1;               // densité × 3 + échelle
           if (code < 0) continue;
-          if (niveauDecor(zb, dd.C, Math.round(data[px + 1] / 24)) !== k) continue;   // ce terrain a un autre niveau
+          // La finesse : celle d'une zone « Affiner » si le point y est, sinon celle du trait.
+          var finPt = dataFin && dataFin[px + 3] > 200 ? Math.round(dataFin[px] / 40) - 1 : Math.round(data[px + 1] / 24);
+          if (niveauDecor(zb, dd.C, finPt) !== k) continue;           // ce terrain a un autre niveau
           var ech = ECHELLES[code % 3], dens = DENSITES[Math.floor(code / 3)];
           if (pt.r >= dd.p * dens) continue;
           // Quel décor, parmi ceux du terrain ?
@@ -1678,7 +1682,28 @@
     });
     c.globalCompositeOperation = "source-over";
     c.restore();
-    return { data: c.getImageData(0, 0, mw, mh).data, mw: mw, mh: mh, ech: ech, tx: tx, ty: ty, z: z };
+    var masque = { data: c.getImageData(0, 0, mw, mh).data, mw: mw, mh: mh, ech: ech, tx: tx, ty: ty, z: z, fin: null };
+    // Les zones « Affiner » : des coups de pinceau qui ne changent pas le terrain, seulement
+    // la finesse de ses décors. Elles ont leur propre petit masque (rouge = finesse + 1),
+    // lu seulement quand la vue en contient.
+    var zones = (carte.finesses || []).filter(function (f) { return f.bb && chevauche(f.bb, X0, Y0, X1, Y1); });
+    if (zones.length) {
+      var cf = couche("masque-fin", mw, mh).getContext("2d", { willReadFrequently: true });
+      cf.setTransform(1, 0, 0, 1, 0, 0);
+      cf.clearRect(0, 0, mw, mh);
+      cf.setTransform(z / ech, 0, 0, z / ech, tx / ech, ty / ech);
+      cf.lineCap = cf.lineJoin = "round";
+      zones.forEach(function (f) {
+        cf.strokeStyle = cf.fillStyle = "rgb(" + ((Math.min(FINESSE_MAX, f.fin || 0) + 1) * 40) + ",0,0)";
+        cf.lineWidth = f.taille;
+        cf.beginPath();
+        if (f.pts.length <= 2) { cf.arc(f.pts[0], f.pts[1], f.taille / 2, 0, TAU); cf.fill(); }
+        else { cf.moveTo(f.pts[0], f.pts[1]); for (var q = 2; q < f.pts.length; q += 2) cf.lineTo(f.pts[q], f.pts[q + 1]); cf.stroke(); }
+      });
+      masque.fin = cf.getImageData(0, 0, mw, mh).data;
+      masque.finesses = zones.map(function (f) { return Math.min(FINESSE_MAX, f.fin || 0); });
+    }
+    return masque;
   }
 
   // L'identifiant du matériau sous un point du monde ; null : de l'eau (mer, lac, rivière) ;

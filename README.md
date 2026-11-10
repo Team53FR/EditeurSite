@@ -1972,6 +1972,12 @@ lisibilité et la vitesse : des décors qui feraient moins de quelques pixels so
 quatre, deux fois plus grands, aux mêmes endroits. Champs et fissures de lave sont fixés de même ; les
 tampons n'ont plus de taille plafonnée à l'écran.
 
+**Affiner les décors** (outil Terrains, groupe « Détail ») : un pinceau qui ne change pas le terrain,
+seulement la finesse de ses décors — pour détailler après coup une région peinte à l'échelle du
+continent. Les zones sont dans `carte.finesses` (`{ taille, pts, fin }`) et ont leur propre petit
+masque (`masque.fin`), lu seulement quand la vue en contient ; là où il y en a une, sa finesse
+remplace celle du trait. « Retirer les zones affinées » les enlève toutes (annulable).
+
 Les cartes d'avant s'ouvrent telles quelles : seuls leurs décors changent (ils viennent maintenant
 du terrain) et leurs petits lieux automatiques ont disparu.
 

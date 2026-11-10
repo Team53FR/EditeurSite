@@ -191,9 +191,20 @@
     ctx.clearRect(0, 0, pw, ph);
     if (!E.carte) return;
 
-    if (geste && geste.type === "trait") Moteur.apercuTrait(ctx, geste.trait, vueComplete());
+    if (geste && geste.type === "trait" && !geste.affiner) Moteur.apercuTrait(ctx, geste.trait, vueComplete());
 
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    if (geste && geste.affiner) {
+      // La zone à affiner : un voile clair, le terrain reste visible dessous.
+      var pa = geste.trait.pts;
+      ctx.lineCap = ctx.lineJoin = "round";
+      ctx.strokeStyle = ctx.fillStyle = "rgba(255,244,200,0.4)";
+      ctx.lineWidth = geste.trait.taille * E.vue.zoom;
+      ctx.beginPath();
+      var s0 = versEcran(pa[0], pa[1]);
+      if (pa.length <= 2) { ctx.arc(s0[0], s0[1], geste.trait.taille * E.vue.zoom / 2, 0, Math.PI * 2); ctx.fill(); }
+      else { ctx.moveTo(s0[0], s0[1]); for (var ia = 2; ia < pa.length; ia += 2) { var sa2 = versEcran(pa[ia], pa[ia + 1]); ctx.lineTo(sa2[0], sa2[1]); } ctx.stroke(); }
+    }
     if (geste && geste.type === "tampons") {
       geste.poses.forEach(function (t) {
         var s0 = versEcran(t.x, t.y - t.s * 0.3), px = t.s * E.vue.zoom;
@@ -568,7 +579,10 @@
   // changent plus — ils sont fixés dans le monde.
   function finesseActuelle() {
     if (E.finesse !== "auto") return E.finesse;
-    return borne(Math.round(Math.log(Math.max(niveauActuel(), 0.01)) / Math.LN2), 0, Moteur.FINESSE_MAX);
+    // L'échelle générale de la carte compte déjà pour un ou deux crans : on vise des décors
+    // de taille normale À L'ÉCRAN au zoom où l'on peint.
+    var generale = typeof E.carte.finesse === "number" ? E.carte.finesse : 1;
+    return borne(Math.round(Math.log(Math.max(niveauActuel(), 0.01)) / Math.LN2) - generale, 0, Moteur.FINESSE_MAX);
   }
 
   // Un décor posé à la main : sa taille est celle de l'écran au moment du clic, puis il
@@ -606,6 +620,7 @@
           trait: Moteur.nouveauTrait(E.outil === "gomme" ? "eau" : E.materiau, tailleMondePinceau(), [w[0], w[1]], false),
           dernier: w
         };
+        if (E.outil === "pinceau" && E.materiau === "@affiner") { geste.affiner = true; geste.trait.mat = "@affiner"; geste.trait.fin = finesseActuelle(); surcouche(); break; }
         if (E.rugosite > 0) geste.trait.rug = E.rugosite;
         if (E.outil === "pinceau") {
           if (E.densite !== 2) geste.trait.dens = E.densite;
@@ -826,7 +841,8 @@
     switch (g.type) {
       case "trait":
         g.trait.bb = Moteur.boiteTrait(g.trait.pts, g.trait.taille);
-        ajouter("traits", g.trait);
+        if (g.affiner) ajouter("finesses", { id: g.trait.id, taille: g.trait.taille, pts: g.trait.pts, fin: g.trait.fin, bb: g.trait.bb });
+        else ajouter("traits", g.trait);
         break;
       case "tampons":
         ajouterLot("tampons", g.poses);
@@ -1233,13 +1249,40 @@
         zone.appendChild(pal);
       });
     }
+    if (E.outil === "pinceau") {
+      // « Affiner » : repasser sur un terrain déjà peint pour en changer la finesse des
+      // décors, sans toucher au terrain lui-même.
+      zone.appendChild(sousTitre("Détail"));
+      var palA = el("div", { classe: "palette" });
+      var bA = el("button", { type: "button", classe: "mat" + (E.materiau === "@affiner" ? " actif" : ""), title: "Change la taille des décors d'une zone sans repeindre le terrain" },
+        [el("span", { classe: "plus-image", style: "width:34px;height:34px;font-size:19px", texte: "⁂" }), el("span", { texte: "Affiner les décors" })]);
+      bA.addEventListener("click", function () { E.materiau = "@affiner"; panneauOutil(); });
+      palA.appendChild(bA);
+      if (E.carte.finesses.length) {
+        var bR = el("button", { type: "button", classe: "mat", title: "Retire toutes les zones affinées : les décors reprennent la finesse de leur terrain" }, [el("span", { texte: "Retirer les zones affinées (" + E.carte.finesses.length + ")" })]);
+        bR.addEventListener("click", function () {
+          executer({ t: "lot", actions: E.carte.finesses.map(function (o, i) { return { t: "suppr", coll: "finesses", obj: o, idx: i }; }).reverse() });
+          panneauOutil();
+        });
+        palA.appendChild(bR);
+      }
+      zone.appendChild(palA);
+    }
     if (E.outil === "pinceau" || E.outil === "gomme") {
       zone.appendChild(sousTitre("Pinceau"));
       zone.appendChild(champCurseur("Taille", 3, 240, 1, E.taillePx, function (v) { return Math.round(v) + " px"; },
         function (v) { E.taillePx = v; majLibelleTaille(); surcouche(); }));
       zone.appendChild(el("p", { classe: "aide", id: "libTaillePinceau" }));
-      zone.appendChild(champCurseur("Bord", 0, 1, 0.05, E.rugosite, function (v) { return v === 0 ? "lisse" : v < 0.5 ? "irrégulier" : "découpé"; },
+      if (!(E.outil === "pinceau" && E.materiau === "@affiner")) zone.appendChild(champCurseur("Bord", 0, 1, 0.05, E.rugosite, function (v) { return v === 0 ? "lisse" : v < 0.5 ? "irrégulier" : "découpé"; },
         function (v) { E.rugosite = v; }));
+      if (E.outil === "pinceau" && E.materiau === "@affiner") {
+        zone.appendChild(champSegments("Finesse (échelle des décors)", [["auto", "Auto"], [0, "×1"], [1, "×2"], [2, "×4"], [3, "×8"], [4, "×16"]], E.finesse, function (v) { E.finesse = v; majLibelleFinesse(); }));
+        zone.appendChild(el("p", { classe: "aide", id: "libFinesse" }));
+        zone.appendChild(el("p", { classe: "aide", texte: "Passez sur une région déjà peinte : ses arbres, ses pics et ses collines prennent cette finesse, le terrain ne change pas. En Auto, zoomez d'abord sur la région : les décors seront à la bonne taille pour ce zoom." }));
+        majLibelleFinesse();
+        majLibelleTaille();
+        return;
+      }
       if (E.outil === "pinceau" && Moteur.MAT[E.materiau].decor) {
         zone.appendChild(champSegments("Décors du terrain", [[0, "Aucun"], [1, "Rares"], [2, "Normal"], [3, "Dense"]], E.densite, function (v) { E.densite = v; }));
         zone.appendChild(champSegments("Taille des décors", [[0, "Petits"], [1, "Normaux"], [2, "Grands"]], E.echDecor, function (v) { E.echDecor = v; }));
@@ -1893,6 +1936,7 @@
     carte.lieux = carte.lieux || [];
     carte.lacs = carte.lacs || [];
     carte.tampons = carte.tampons || [];
+    carte.finesses = carte.finesses || [];
     Moteur.surImage = function () { rendre(); };
     $("filtreLieux").addEventListener("input", majIndex);
     carte.theme = Moteur.THEMES[carte.theme] ? carte.theme : "atlas";
