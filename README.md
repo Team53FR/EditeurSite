@@ -2040,6 +2040,17 @@ la main : les tampons Maison, Bâtisse et Église, avec une orientation (`a`, en
 terrain s'écartent des unes comme des autres. Dans les autres styles, ces maisons sont dessinées de
 profil.
 
+**Murailles et portes automatiques.** `portesMuraille` cherche où chaque voie (route, route pavée,
+sentier, rue bordée de maisons) coupe la muraille (intersection de segments, sur les tracés
+affichés, méandres compris). À chaque franchissement le mur s'interrompt (`sousChemin` entre les
+portes) et une porte prend la place : une tour de garde de chaque côté de l'ouverture, large de
+2,4 largeurs de voie. Une seule porte par franchissement ; les tours d'angle et d'intervalle (écart
+`ecartTours`, en largeurs de mur) ne sont jamais posées dans une porte. `portes: false` les
+supprime. Dans le style Plan, le mur est une bande de pierre vue du dessus (ombre, cerne, chemin
+de ronde clair, deux rangées de créneaux) et les tours sont rondes, à toit conique (`tourDessus`) —
+carrées pour les gardes de porte ; dans les autres styles, les tours de profil de toujours, plus
+grosses aux portes, et une arche entre elles.
+
 Les cartes d'avant s'ouvrent telles quelles : seuls leurs décors changent (ils viennent maintenant
 du terrain) et leurs petits lieux automatiques ont disparu.
 

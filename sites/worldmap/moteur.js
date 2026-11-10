@@ -1758,61 +1758,191 @@
   // Muraille : ombre au sol, contour, pierre, créneaux en tirets sur le faîte, puis des
   // tours à toit conique aux deux bouts et tous les neuf largeurs. Les tours
   // grandissent avec le zoom ; trop petites, elles disparaissent.
-  function tracerMuraille(ctx, l, st, lw, vue, th) {
-    var p = l.pts, n = p.length;
-    var px = lw * vue.zoom;
+  // ----- Murailles -----
+  //
+  // Une muraille s'ouvre d'elle-même là où une route ou un chemin la traverse : le mur est
+  // interrompu et une porte — deux tours de garde de part et d'autre de la voie — prend sa
+  // place. Les tours d'angle et d'intervalle ne sont posées qu'ailleurs. `l.portes = false`
+  // supprime les portes ; `l.ecartTours` (en largeurs de mur) règle l'écart des tours.
+  // Vue du dessus (thème `dessus`), le mur est une bande de pierre à créneaux et ses tours
+  // sont rondes, à toit conique vu d'en haut ; sinon, les tours de profil de toujours.
+  function cumulChemin(p) {
+    var m = p.length / 2, cum = [0];
+    for (var i = 1; i < m; i++) cum[i] = cum[i - 1] + Math.hypot(p[2 * i] - p[2 * i - 2], p[2 * i + 1] - p[2 * i - 1]);
+    return { d: p, cum: cum, m: m, total: cum[m - 1] };
+  }
+
+  // Les portes d'une muraille : [{ s (abscisse sur le mur), G (largeur de l'ouverture) }].
+  function portesMuraille(carte, l, lw, vue, th) {
+    if (!carte || l.portes === false || !l.pts || l.pts.length < 4) return [];
+    var ch = cumulChemin(l.pts), out = [], p = l.pts;
+    (carte.lignes || []).forEach(function (v) {
+      if (!VOIES[v.type] || !v.pts || v.pts.length < 4) return;
+      var d = pointsAffiches(v), vw = Math.max(v.taille || 0, styleLigne(v, th).min / vue.zoom);
+      for (var i = 0; i + 1 < ch.m; i++) {
+        var ax = p[2 * i], ay = p[2 * i + 1], bx = p[2 * i + 2], by = p[2 * i + 3], L = ch.cum[i + 1] - ch.cum[i];
+        if (!L) continue;
+        var x0 = Math.min(ax, bx) - vw, x1 = Math.max(ax, bx) + vw, y0 = Math.min(ay, by) - vw, y1 = Math.max(ay, by) + vw;
+        var r1x = bx - ax, r1y = by - ay;
+        for (var j = 0; j + 3 < d.length; j += 2) {
+          var cx = d[j], cy = d[j + 1], ex = d[j + 2], ey = d[j + 3];
+          if (Math.max(cx, ex) < x0 || Math.min(cx, ex) > x1 || Math.max(cy, ey) < y0 || Math.min(cy, ey) > y1) continue;
+          var r2x = ex - cx, r2y = ey - cy, den = r1x * r2y - r1y * r2x;
+          if (Math.abs(den) < 1e-12) continue;
+          var t = ((cx - ax) * r2y - (cy - ay) * r2x) / den, u = ((cx - ax) * r1y - (cy - ay) * r1x) / den;
+          if (t < 0 || t > 1 || u < 0 || u > 1) continue;
+          out.push({ s: ch.cum[i] + t * L, vw: vw });
+        }
+      }
+    });
+    out.sort(function (a, b) { return a.s - b.s; });
+    var res = [];
+    out.forEach(function (g) {
+      g.G = Math.max(lw * 2.8, g.vw * 2.4 + lw * 1.2);
+      var der = res[res.length - 1];
+      if (der && g.s - der.s < (g.G + der.G) / 2 + lw) return;           // une seule porte par franchissement
+      res.push(g);
+    });
+    return res;
+  }
+
+  // Une tour vue du dessus : ombre, cerne, pierre, couronne de créneaux, toit à pans.
+  // `carre` : tour de garde d'une porte (carrée, tournée de `ang`) ; sinon tour ronde.
+  function tourDessus(ctx, x, y, r, carre, ang, pierre, toit, zoom) {
+    var forme = function (k) {
+      ctx.beginPath();
+      if (carre) {
+        var c = Math.cos(ang), sn = Math.sin(ang), q = r * k;
+        [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(function (m, n) {
+          var X = x + c * m[0] * q - sn * m[1] * q, Y = y + sn * m[0] * q + c * m[1] * q;
+          if (n) ctx.lineTo(X, Y); else ctx.moveTo(X, Y);
+        });
+        ctx.closePath();
+      }
+      else ctx.arc(x, y, r * k, 0, TAU);
+    };
+    ctx.save();
     ctx.setLineDash([]);
+    ctx.lineJoin = "round";
+    ctx.translate(r * 0.28, r * 0.36); forme(1.04); ctx.fillStyle = "rgba(16,30,28,0.34)"; ctx.fill(); ctx.translate(-r * 0.28, -r * 0.36);
+    forme(1); ctx.fillStyle = pierre; ctx.fill(); ctx.strokeStyle = "#1c2622"; ctx.lineWidth = Math.max(r * 0.2, 1.4 / zoom); ctx.stroke();
+    if (r * zoom >= 5) {
+      forme(0.8); ctx.strokeStyle = "rgba(40,34,26,0.65)"; ctx.lineWidth = r * 0.17; ctx.setLineDash([r * 0.3, r * 0.22]); ctx.stroke(); ctx.setLineDash([]);   // les créneaux
+    }
+    forme(0.6); ctx.fillStyle = toit; ctx.fill(); ctx.strokeStyle = "#1c2622"; ctx.lineWidth = Math.max(r * 0.13, 1 / zoom); ctx.stroke();
+    if (r * zoom >= 5) {
+      ctx.strokeStyle = "rgba(50,24,12,0.5)"; ctx.lineWidth = r * 0.08;     // les arêtes du toit
+      ctx.beginPath();
+      if (carre) { var cc = Math.cos(ang), ss = Math.sin(ang), q = r * 0.6; [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(function (k) { ctx.moveTo(x, y); ctx.lineTo(x + cc * k[0] * q - ss * k[1] * q, y + ss * k[0] * q + cc * k[1] * q); }); }
+      else for (var i = 0; i < 8; i++) { var a = i * TAU / 8 + 0.4; ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(a) * r * 0.6, y + Math.sin(a) * r * 0.6); }
+      ctx.stroke();
+      ctx.fillStyle = "rgba(255,246,226,0.16)";          // le versant éclairé
+      forme(0.6); ctx.save(); ctx.clip(); ctx.beginPath(); ctx.rect(x - r, y - r, r * 1.1, r * 2); ctx.fill(); ctx.restore();
+    }
+    ctx.restore();
+  }
+
+  function tracerMuraille(ctx, l, st, lw, vue, th, carte) {
+    var p = l.pts, n = p.length, px = lw * vue.zoom, dessus = !!th.dessus;
+    var ch = cumulChemin(p), portes = portesMuraille(carte, l, lw, vue, th), zoom = vue.zoom;
+    var pierre = l.couleur || (dessus ? "#cdc6b1" : st.c);
+    // Les tronçons de mur, entre les portes.
+    var troncons = [], debut = 0;
+    portes.forEach(function (g) {
+      if (g.s - g.G / 2 - debut > lw * 0.3) troncons.push([debut, g.s - g.G / 2]);
+      debut = g.s + g.G / 2;
+    });
+    if (ch.total - debut > lw * 0.3) troncons.push([debut, ch.total]);
+    var parties = troncons.map(function (t) { return sousChemin(p, ch.cum, t[0], t[1]); });
+    var trace = function (f) { parties.forEach(function (q) { cheminLigne(ctx, q, false); f(q); }); };
+    ctx.setLineDash([]);
+    ctx.lineCap = dessus ? "butt" : "round";
+    ctx.lineJoin = "round";
     ctx.save();
     ctx.translate(lw * 0.22, lw * 0.34);
-    cheminLigne(ctx, p, false);
-    ctx.strokeStyle = "rgba(40,28,10,0.3)";
+    ctx.strokeStyle = dessus ? "rgba(16,30,28,0.32)" : "rgba(40,28,10,0.3)";
     ctx.lineWidth = lw * 1.2;
-    ctx.stroke();
+    trace(function () { ctx.stroke(); });
     ctx.restore();
-    cheminLigne(ctx, p, false);
-    ctx.strokeStyle = th.encre;
-    ctx.lineWidth = lw + 2 / vue.zoom;
-    ctx.stroke();
-    cheminLigne(ctx, p, false);
-    ctx.strokeStyle = st.c;
+    ctx.strokeStyle = dessus ? "#1c2622" : th.encre;
+    ctx.lineWidth = lw + 2 / zoom;
+    trace(function () { ctx.stroke(); });
+    ctx.strokeStyle = pierre;
     ctx.lineWidth = lw;
-    ctx.stroke();
-    if (px >= 5) {
-      cheminLigne(ctx, p, false);
+    trace(function () { ctx.stroke(); });
+    if (dessus) {
+      // Vue du dessus : le chemin de ronde, plus clair, ses deux rangées de créneaux et les
+      // joints des pierres en travers.
+      if (px >= 4) {
+        ctx.strokeStyle = "rgba(255,252,240,0.26)"; ctx.lineWidth = lw * 0.42;
+        trace(function () { ctx.stroke(); });
+      }
+      if (px >= 6) {
+        ctx.lineCap = "butt";
+        [-1, 1].forEach(function (cote) {
+          ctx.strokeStyle = "rgba(48,42,34,0.5)"; ctx.lineWidth = lw * 0.2;
+          ctx.setLineDash([lw * 0.34, lw * 0.3]);
+          parties.forEach(function (q) { var o = decaler(q, cote * lw * 0.4); cheminLigne(ctx, o, false); ctx.stroke(); });
+        });
+        ctx.setLineDash([]);
+      }
+    } else if (px >= 5) {
       ctx.strokeStyle = "rgba(40,30,18,0.55)";
       ctx.lineWidth = lw * 0.16;
       ctx.setLineDash([lw * 0.5, lw * 0.5]);
-      ctx.stroke();
+      trace(function () { ctx.stroke(); });
       ctx.setLineDash([]);
     }
     if (px < 4) return;
 
-    var tours = [], pas = lw * 9, prochain = 0, parcouru = 0;
-    for (var i = 0; i + 3 < n; i += 2) {
-      var dx = p[i + 2] - p[i], dy = p[i + 3] - p[i + 1], L = Math.hypot(dx, dy);
-      if (!L) continue;
-      while (prochain <= parcouru + L) {
-        var f = (prochain - parcouru) / L;
-        tours.push(p[i] + dx * f, p[i + 1] + dy * f);
-        prochain += pas;
-      }
-      parcouru += L;
+    // Les tours : aux deux bouts, aux angles, puis à intervalles réguliers — jamais dans une porte.
+    var ecart = (l.ecartTours || 1) * lw * 9, abscisses = [0, ch.total], i, s;
+    for (s = ecart; s < ch.total - ecart * 0.45; s += ecart) abscisses.push(s);
+    for (i = 1; i + 1 < ch.m; i++) {
+      var ux = p[2 * i] - p[2 * i - 2], uy = p[2 * i + 1] - p[2 * i - 1], vx = p[2 * i + 2] - p[2 * i], vy = p[2 * i + 3] - p[2 * i + 1];
+      var cosA = (ux * vx + uy * vy) / ((Math.hypot(ux, uy) * Math.hypot(vx, vy)) || 1);
+      if (cosA < 0.92) abscisses.push(ch.cum[i]);          // un angle de plus de 23° : tour d'angle
     }
-    tours.push(p[n - 2], p[n - 1]);
-    var ordre = [];
-    for (var t = 0; t < tours.length; t += 2) ordre.push(t);
-    ordre.sort(function (a, b) { return tours[a + 1] - tours[b + 1]; });
-    var u = lw * 2.3 / 16;
-    ordre.forEach(function (t) {
+    var objets = [];
+    abscisses.forEach(function (a) {
+      for (var q = 0; q < portes.length; q++) if (Math.abs(a - portes[q].s) < portes[q].G / 2 + lw * 1.6) return;
+      for (var r = 0; r < objets.length; r++) if (Math.abs(objets[r].s - a) < lw * 2.2) return;     // pas deux tours collées
+      var pt = pointChemin(ch, a);
+      objets.push({ s: a, x: pt.x, y: pt.y, ang: Math.atan2(pt.uy, pt.ux), garde: false });
+    });
+    // Les portes : une tour de garde de chaque côté de l'ouverture.
+    portes.forEach(function (g) {
+      [-1, 1].forEach(function (cote) {
+        var pt = pointChemin(ch, g.s + cote * g.G / 2);
+        objets.push({ s: g.s + cote * g.G / 2, x: pt.x, y: pt.y, ang: Math.atan2(pt.uy, pt.ux), garde: true, porte: g, cote: cote });
+      });
+    });
+    objets.sort(function (a, b) { return a.y - b.y; });
+    var toit = l.couleurToit || (dessus ? "#a8613f" : null);
+    objets.forEach(function (o) {
+      if (dessus) { tourDessus(ctx, o.x, o.y, lw * (o.garde ? 1.12 : 0.95), o.garde, o.ang, pierre, toit, zoom); return; }
+      var u = lw * 2.3 / 16 * (o.garde ? 1.3 : 1);
       ctx.save();
-      ctx.translate(tours[t], tours[t + 1]);
+      ctx.translate(o.x, o.y);
       ctx.scale(u, u);
       ctx.lineJoin = "round";
       ctx.lineWidth = 1.2;
       ctx.strokeStyle = th.encre;
-      tourPierre(ctx, 0, 5, 16, 20, 11);
+      tourPierre(ctx, 0, 5, 16, o.garde ? 24 : 20, o.garde ? 12 : 11);
       ctx.restore();
     });
+    if (!dessus) {
+      // De profil, l'arche de la porte entre ses deux tours.
+      portes.forEach(function (g) {
+        var pt = pointChemin(ch, g.s), u = lw * 2.3 / 16;
+        ctx.save();
+        ctx.translate(pt.x, pt.y);
+        ctx.scale(u, u);
+        ctx.lineWidth = 1.2; ctx.strokeStyle = th.encre; ctx.lineJoin = "round";
+        porte(ctx, 0, 6, Math.min(14, g.G / u * 0.5), 15);
+        ctx.restore();
+      });
+    }
   }
 
   // ----- Routes et sentiers -----
@@ -2213,7 +2343,7 @@
         ctx.lineCap = "round";
         ctx.lineJoin = "round";
         if (type === "riviere") continue;     // creusées dans la terre (creuserEaux), comme la mer
-        if (type === "muraille") { tracerMuraille(ctx, l, st, lw, vue, th); continue; }
+        if (type === "muraille") { tracerMuraille(ctx, l, st, lw, vue, th, carte); continue; }
         if (type === "falaise") { tracerFalaise(ctx, l, st, lw, vue); continue; }
         if (type === "voies") continue;       // peintes dans la terre, sous les arbres (voir dessiner)
         var pts = type === "maritime" ? pointsAffiches(l) : l.pts;

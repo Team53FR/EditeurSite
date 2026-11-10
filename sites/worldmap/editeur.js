@@ -1615,6 +1615,7 @@
         zone.appendChild(champCase("S'élargit vers l'embouchure", E.delta, function (v) { E.delta = v; }));
       }
       var aides = {
+        muraille: "Une porte s'ouvre d'elle-même, avec ses deux tours de garde, là où une route ou un chemin traverse la muraille. Tracez les routes avant ou après : elle s'adapte. Pour fermer une enceinte, terminez sur le premier point.",
         falaise: "Les hachures descendent à droite du sens du tracé : dessinez dans l'autre sens pour retourner la pente (ou « Inverser » une fois le tracé sélectionné).",
         pavee: "Une route de pierre : elle rejoint les autres voies et reçoit un pont au-dessus de l'eau.",
         maritime: "Un pointillé pour les routes des navires."
@@ -1814,6 +1815,13 @@
         var defaut = { route: 0.16, pavee: 0.06, sentier: 0.26 }[o.type];
         zone.appendChild(champCurseur("Sinuosité", 0, 1, 0.02, typeof o.meandre === "number" ? o.meandre : defaut, function (v) { return v === 0 ? "droite" : Math.round(v * 100) + " %"; },
           function (v) { editer(function (x) { x.meandre = v; }); }));
+      }
+      if (o.type === "muraille") {
+        zone.appendChild(champCase("Une porte là où une route ou un chemin la traverse", o.portes !== false, function (v) { editer(function (x) { if (v) delete x.portes; else x.portes = false; }); }));
+        zone.appendChild(champCurseur("Écart des tours", 0.5, 2.5, 0.05, o.ecartTours || 1, function (v) { return "×" + nb(v, 2); },
+          function (v) { editer(function (x) { if (Math.abs(v - 1) < 0.03) delete x.ecartTours; else x.ecartTours = v; }); }));
+        zone.appendChild(champCouleur("Couleur des toits", o.couleurToit || "#a8613f", function (v) { editer(function (x) { x.couleurToit = v; }); },
+          o.couleurToit ? function () { editer(function (x) { delete x.couleurToit; }); panneauSelection(); } : null));
       }
       if (o.type === "falaise") {
         zone.appendChild(champCurseur("Longueur des hachures", 0.4, 3, 0.1, o.hachures || 1, function (v) { return "×" + nb(v, 1); },
