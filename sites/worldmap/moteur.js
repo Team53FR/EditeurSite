@@ -72,7 +72,8 @@
     couleurs: {
       plaine: "#8ea343", foret: "#47752b", taiga: "#3c6a45", colline: "#98a04a", montagne: "#8f8878", cime: "#cdd3d6",
       volcan: "#b58a4f", desert: "#d8b670", steppe: "#b8a658", marais: "#5c784c", cendres: "#a8804a", champs: "#a6ae4a",
-      savane: "#c1ab55", automne: "#9a7833", jungle: "#326b31", morte: "#7b6f56", rocaille: "#9b917b", plage: "#e5cf98", toundra: "#989e7a"
+      savane: "#c1ab55", automne: "#9a7833", jungle: "#326b31", morte: "#7b6f56", rocaille: "#9b917b", plage: "#e5cf98", toundra: "#989e7a",
+      ville: "#bfa878", faubourg: "#a9a866"
     }
   };
 
@@ -101,11 +102,13 @@
     { id: "morte",    nom: "Forêt morte",     couleur: "#857a62", decor: "morte",    type: "terre", groupe: "Forêts" },
     { id: "rocaille", nom: "Rocaille",        couleur: "#a89f8c", decor: "rocaille", type: "terre", groupe: "Reliefs" },
     { id: "plage",    nom: "Sable",           couleur: "#ecdcab", decor: null,       type: "terre", groupe: "Terres arides" },
-    { id: "toundra",  nom: "Toundra",         couleur: "#a9ad8c", decor: "toundra",  type: "terre", groupe: "Eaux et froid" }
+    { id: "toundra",  nom: "Toundra",         couleur: "#a9ad8c", decor: "toundra",  type: "terre", groupe: "Eaux et froid" },
+    { id: "ville",    nom: "Ville (quartiers)", couleur: "#c4b08a", decor: "ville",  type: "terre", groupe: "Bâti" },
+    { id: "faubourg", nom: "Faubourg",        couleur: "#b3b077", decor: "faubourg", type: "terre", groupe: "Bâti" }
   ];
   var MAT = {};
   MATERIAUX.forEach(function (m, i) { MAT[m.id] = m; m.code = i + 1; });
-  var GROUPES_MATERIAUX = ["Plaines", "Forêts", "Reliefs", "Terres arides", "Eaux et froid"];
+  var GROUPES_MATERIAUX = ["Plaines", "Forêts", "Reliefs", "Terres arides", "Eaux et froid", "Bâti"];
 
   // ----- Décors : peints une fois, semés ensuite -----
   //
@@ -261,6 +264,21 @@
       g.quadraticCurveTo(x1 + (R(80 + i) - 0.5) * 6, (y1 + base) / 2, x1 + (R(90 + i) - 0.3) * 14, base - 2);
     }
     g.stroke();
+    // Les facettes : de chaque sommet descendent des pans de roche, tour à tour clairs et
+    // sombres — le massif a du volume, pas seulement deux versants.
+    sommets.forEach(function (s0, q) {
+      var nf = 5;
+      for (var f = 0; f < nf; f++) {
+        var a0 = -1 + 2 * f / nf, a1 = -1 + 2 * (f + 1) / nf, hm = s0.h * (0.35 + R(110 + q * 9 + f) * 0.3);
+        g.fillStyle = f % 2 ? "rgba(26,20,12,0.2)" : "rgba(255,250,236,0.16)";
+        g.beginPath();
+        g.moveTo(s0.x, base - s0.h);
+        g.lineTo(s0.x + a0 * s0.w * 0.95, base);
+        g.lineTo(s0.x + (a0 + a1) / 2 * s0.w * 0.7, base - hm);
+        g.lineTo(s0.x + a1 * s0.w * 0.95, base);
+        g.closePath(); g.fill();
+      }
+    });
     var limite = neige ? 0.42 : 0.7;                             // au-dessus de cette fraction, il neige
     sommets.forEach(function (s, k) {
       if (!neige && k > 0 && s.h < 44) return;                  // les petits sommets restent nus
@@ -495,6 +513,56 @@
     forme(); g.strokeStyle = "rgba(30,22,16,0.5)"; g.lineWidth = 1; g.stroke();
   }
 
+  // Un bouquet d'aiguilles d'obsidienne : des flèches noires, penchées, d'inégale hauteur,
+  // une arête claire sur le flanc au soleil et, parfois, la lueur de la lave à leur pied.
+  function peintAiguilles(g, v) {
+    var R = function (i) { return alea(1900 + v, i); };
+    ombreDecor(g, 6, 30, 40, 7, 0.34);
+    var n = 5 + (v % 3), liste = [];
+    for (var i = 0; i < n; i++) {
+      var centre = 1 - Math.abs(i - (n - 1) / 2) / (n / 2);
+      liste.push({ x: -34 + 68 * i / (n - 1) + (R(i) - 0.5) * 8, h: 24 + centre * 46 * (0.6 + R(10 + i) * 0.5), w: 9 + R(20 + i) * 7, p: (R(30 + i) - 0.5) * 14 });
+    }
+    if (v % 2 === 0) {
+      var lave = g.createRadialGradient(0, 28, 1, 0, 28, 30);
+      lave.addColorStop(0, "rgba(255,170,40,0.9)"); lave.addColorStop(1, "rgba(255,90,10,0)");
+      g.fillStyle = lave; g.beginPath(); g.ellipse(0, 28, 34, 9, 0, 0, TAU); g.fill();
+    }
+    liste.sort(function (a, b) { return a.h - b.h; }).reverse().forEach(function (a) {
+      var gr = g.createLinearGradient(a.x - a.w, 0, a.x + a.w, 0);
+      gr.addColorStop(0, "#4a4442"); gr.addColorStop(0.45, "#221d1c"); gr.addColorStop(1, "#0c0a0a");
+      g.fillStyle = gr;
+      g.beginPath();
+      g.moveTo(a.x - a.w, 31); g.lineTo(a.x - a.w * 0.5 + a.p * 0.4, 31 - a.h * 0.55); g.lineTo(a.x + a.p, 31 - a.h);
+      g.lineTo(a.x + a.w * 0.45 + a.p * 0.5, 31 - a.h * 0.5); g.lineTo(a.x + a.w, 31);
+      g.closePath(); g.fill();
+      g.strokeStyle = "rgba(150,140,138,0.55)"; g.lineWidth = 1.1;
+      g.beginPath(); g.moveTo(a.x - a.w * 0.7, 29); g.lineTo(a.x - a.w * 0.4 + a.p * 0.4, 31 - a.h * 0.55); g.lineTo(a.x + a.p, 31 - a.h); g.stroke();
+    });
+  }
+
+  // Les maisons d'un quartier, à semer par centaines : toits de tuiles de teintes variées
+  // (rouge, brun, ardoise), une grande bâtisse à deux corps, un clocher.
+  var TOITS_VILLE = ["#a8452f", "#b5552f", "#8f3b2a", "#9a5a36", "#6f6a72", "#b0603a"];
+  function peintMaisonVille(g, v, genre) {
+    g.lineWidth = 2.2; g.strokeStyle = "#2a1c0e"; g.lineJoin = "round";
+    var avant = TOIT;
+    TOIT = TOITS_VILLE[v % TOITS_VILLE.length];
+    ombreDecor(g, 4, 31, 30, 6, 0.3);
+    if (genre === "clocher") {
+      maison(g, -12, 31, 34, 22);
+      tourPierre(g, 14, 31, 18, 50, 24);
+      g.beginPath(); g.moveTo(14, -43); g.lineTo(14, -52); g.moveTo(10, -48); g.lineTo(18, -48); g.stroke();
+    } else if (genre === "batisse") {
+      maison(g, -14, 28, 34, 26);
+      maison(g, 14, 31, 40, 30);
+    } else {
+      var w = 44 + (v % 3) * 6, h = 26 + (v % 2) * 6;
+      maison(g, 0, 31, w, h);
+    }
+    TOIT = avant;
+  }
+
   var PEINTRES = {
     arbre: peintArbre, conifere: peintConifere,
     automne: function (g, v) { peintArbre(g, v, "automne"); },
@@ -506,10 +574,13 @@
     seche: function (g, v) { peintHerbe(g, v, true); },
     rocher: function (g, v) { peintRocher(g, v, false); },
     basalte: function (g, v) { peintRocher(g, v, true); },
-    champ: peintChamp, glacon: peintGlacon, cratere: peintCratere
+    champ: peintChamp, glacon: peintGlacon, cratere: peintCratere, aiguilles: peintAiguilles,
+    maison: function (g, v) { peintMaisonVille(g, v, "maison"); },
+    batisse: function (g, v) { peintMaisonVille(g, v, "batisse"); },
+    clocher: function (g, v) { peintMaisonVille(g, v, "clocher"); }
   };
   var VARIANTES = { arbre: 6, conifere: 4, automne: 6, tropical: 6, palmier: 4, acacia: 4, mort: 4, montagne: 6, cime: 6,
-    colline: 4, dune: 4, marais: 3, herbe: 3, seche: 3, rocher: 6, basalte: 6, champ: 6, glacon: 4, cratere: 2 };
+    colline: 4, dune: 4, marais: 3, herbe: 3, seche: 3, rocher: 6, basalte: 6, champ: 6, glacon: 4, cratere: 2, aiguilles: 6, maison: 12, batisse: 6, clocher: 4 };
 
   // Colle un décor peint : (x, y) est le point où il touche le sol, s la taille de sa boîte.
   function colle(ctx, type, v, x, y, s) {
@@ -519,67 +590,6 @@
   function variante(type, r) {
     var n = VARIANTES[type];
     return Math.min(n - 1, Math.floor(r * n));
-  }
-
-  // Terres volcaniques : aiguilles d'obsidienne, fissures de lave, cailloux sombres.
-  function volcan(ctx, x, y, s, r) {
-    ctx.lineJoin = "round";
-    ctx.lineCap = "round";
-    if (r < 0.4) {
-      var w = s * 0.34, h = s * (0.75 + r * 0.6);
-      ctx.fillStyle = "#1f1a19";
-      ctx.strokeStyle = "#0b0909";
-      ctx.lineWidth = s * 0.04;
-      ctx.beginPath();
-      ctx.moveTo(x - w, y + h * 0.35);
-      ctx.lineTo(x - w * 0.55, y - h * 0.18);
-      ctx.lineTo(x - w * 0.32, y - h * 0.1);
-      ctx.lineTo(x, y - h * 0.52);
-      ctx.lineTo(x + w * 0.22, y - h * 0.08);
-      ctx.lineTo(x + w * 0.58, y - h * 0.26);
-      ctx.lineTo(x + w, y + h * 0.35);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-      ctx.strokeStyle = "rgba(140,128,128,0.55)";
-      ctx.lineWidth = s * 0.03;
-      ctx.beginPath();
-      ctx.moveTo(x - w * 0.9, y + h * 0.3); ctx.lineTo(x - w * 0.52, y - h * 0.14); ctx.lineTo(x, y - h * 0.48);
-      ctx.stroke();
-      ctx.strokeStyle = "#ff9a2a";
-      ctx.lineWidth = s * 0.06;
-      ctx.beginPath();
-      ctx.moveTo(x - w * 0.05, y + h * 0.33); ctx.lineTo(x + w * 0.08, y + h * 0.05); ctx.lineTo(x - w * 0.02, y - h * 0.2);
-      ctx.stroke();
-    } else if (r < 0.75) {
-      var chemin = function () {
-        ctx.beginPath();
-        ctx.moveTo(x - s * 0.5, y);
-        ctx.lineTo(x - s * 0.22, y - s * 0.12);
-        ctx.lineTo(x, y + s * 0.06);
-        ctx.lineTo(x + s * 0.26, y - s * 0.1);
-        ctx.lineTo(x + s * 0.5, y + s * 0.05);
-      };
-      ctx.strokeStyle = "#c23c10";
-      ctx.lineWidth = s * 0.1;
-      chemin(); ctx.stroke();
-      ctx.strokeStyle = "#ff8a1c";
-      ctx.lineWidth = s * 0.06;
-      chemin(); ctx.stroke();
-      ctx.strokeStyle = "#ffd86a";
-      ctx.lineWidth = s * 0.026;
-      chemin(); ctx.stroke();
-    } else {
-      ctx.fillStyle = "#2a2220";
-      ctx.strokeStyle = "#0b0909";
-      ctx.lineWidth = s * 0.03;
-      ctx.beginPath();
-      ctx.moveTo(x - s * 0.3, y + s * 0.12); ctx.lineTo(x - s * 0.18, y - s * 0.1); ctx.lineTo(x - s * 0.02, y + s * 0.12);
-      ctx.moveTo(x + s * 0.02, y + s * 0.14); ctx.lineTo(x + s * 0.14, y - s * 0.04); ctx.lineTo(x + s * 0.3, y + s * 0.14);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-    }
   }
 
   // ----- Table des décors -----
@@ -593,21 +603,28 @@
   var DECORS = {
     herbe:    { C: 16,   p: 0.2,  marge: 0.1,  choix: [["herbe", 1, 17]] },
     seche:    { C: 17,   p: 0.2,  marge: 0.1,  choix: [["seche", 1, 17]] },
-    champs:   { C: 15,   p: 1,    marge: 0.3,  choix: [["champ", 1, 46]] },
+    // Les parcelles sont dessinées à part (voir « Champs ») ; ici, les arbres isolés entre elles.
+    champs:   { C: 17,   p: 0.05, marge: 0.1,  choix: [["arbre", 1, 24]], apercu: "champ" },
     savane:   { C: 17,   p: 0.8,  marge: 0.15, choix: [["acacia", 0.3, 36], ["seche", 0.7, 15]] },
-    foret:    { C: 8.5, p: 1,    marge: 0.12, choix: [["arbre", 0.9, 28], ["conifere", 0.1, 28]] },
+    foret:    { C: 8.5, p: 1,    marge: 0.12, choix: [["arbre", 0.68, 28], ["tropical", 0.2, 31], ["conifere", 0.12, 28]] },
     automne:  { C: 8.5, p: 1,    marge: 0.12, choix: [["automne", 1, 28]] },
     taiga:    { C: 8.5, p: 1,    marge: 0.12, choix: [["conifere", 1, 28]] },
     jungle:   { C: 8.5,   p: 1,    marge: 0.12, choix: [["tropical", 0.72, 29], ["palmier", 0.28, 33]] },
     morte:    { C: 12,   p: 0.8,  marge: 0.12, choix: [["mort", 1, 27]] },
-    colline:  { C: 19,   p: 0.85, marge: 0.25, choix: [["colline", 1, 46]] },
-    montagne: { C: 22,   p: 0.9,  marge: 0.28, choix: [["montagne", 1, 64]] },
-    cime:     { C: 22,   p: 0.9,  marge: 0.28, choix: [["cime", 1, 64]] },
-    volcan:   { C: 21,   p: 0.7,  marge: 0.2,  choix: [["@volcan", 1, 30]] },
+    colline:  { C: 19,   p: 0.85, marge: 0.12, choix: [["colline", 1, 62]] },
+    // Une chaîne : de grands massifs et, serrés entre eux, des pics plus petits. La marge
+    // est faible pour qu'une crête étroite, vue de loin, porte déjà sa rangée de sommets.
+    montagne: { C: 24,   p: 0.94, marge: 0.05, choix: [["montagne", 0.4, 170], ["montagne", 0.6, 104]] },
+    cime:     { C: 24,   p: 0.94, marge: 0.05, choix: [["cime", 0.4, 170], ["cime", 0.6, 104]] },
+    volcan:   { C: 21,   p: 0.62, marge: 0.2,  choix: [["aiguilles", 0.5, 84], ["basalte", 0.5, 24]] },
     rocaille: { C: 13,   p: 0.8,  marge: 0.15, choix: [["rocher", 1, 24]] },
     dune:     { C: 20,   p: 0.7,  marge: 0.25, choix: [["dune", 1, 44]] },
     cendres:  { C: 19,   p: 0.5,  marge: 0.15, choix: [["basalte", 0.6, 20], ["mort", 0.4, 24]] },
     toundra:  { C: 15,   p: 0.5,  marge: 0.1,  choix: [["rocher", 0.35, 15], ["seche", 0.65, 14]] },
+    // Une ville qui s'étale : des maisons serrées, quelques grandes bâtisses et clochers.
+    // Tracer une route à travers ouvre une rue (les maisons s'en écartent d'elles-mêmes).
+    ville:    { C: 10,   p: 0.97, marge: 0.1,  choix: [["maison", 0.86, 27], ["batisse", 0.09, 36], ["clocher", 0.05, 46]] },
+    faubourg: { C: 14,   p: 0.5,  marge: 0.1,  choix: [["maison", 0.7, 26], ["arbre", 0.22, 24], ["champ", 0.08, 34]] },
     glace:    { C: 24,   p: 0.45, marge: 0.2,  choix: [["glacon", 1, 24]] },
     marais:   { C: 15,   p: 0.75, marge: 0.2,  choix: [["marais", 1, 30]] }
   };
@@ -622,15 +639,15 @@
     { id: "arbre", nom: "Feuillu" }, { id: "conifere", nom: "Sapin" }, { id: "automne", nom: "Arbre d'automne" },
     { id: "tropical", nom: "Arbre tropical" }, { id: "palmier", nom: "Palmier" }, { id: "acacia", nom: "Acacia" },
     { id: "mort", nom: "Arbre mort" }, { id: "montagne", nom: "Montagne", max: 230 }, { id: "cime", nom: "Pic enneigé", max: 230 },
-    { id: "cratere", nom: "Volcan", max: 230 }, { id: "colline", nom: "Colline", max: 170 }, { id: "dune", nom: "Dune", max: 170 },
+    { id: "cratere", nom: "Volcan", max: 230 }, { id: "aiguilles", nom: "Aiguilles noires", max: 170 }, { id: "colline", nom: "Colline", max: 170 }, { id: "dune", nom: "Dune", max: 170 },
     { id: "rocher", nom: "Rochers" }, { id: "basalte", nom: "Roche sombre" }, { id: "glacon", nom: "Glace" },
-    { id: "champ", nom: "Champ" }, { id: "marais", nom: "Roseaux" }, { id: "herbe", nom: "Herbes" }, { id: "seche", nom: "Herbes sèches" }
+    { id: "champ", nom: "Champ" }, { id: "maison", nom: "Maison" }, { id: "batisse", nom: "Bâtisse" }, { id: "clocher", nom: "Église" }, { id: "marais", nom: "Roseaux" }, { id: "herbe", nom: "Herbes" }, { id: "seche", nom: "Herbes sèches" }
   ];
 
   var MAX_TAMPON = {};
   TAMPONS.forEach(function (t) { MAX_TAMPON[t.id] = t.max || 120; });
   // La taille d'un tampon dans le monde, à ce zoom (px CSS par unité).
-  function tailleTampon(t, zoom) { return Math.min(t.s, MAX_TAMPON[t.type] / zoom); }
+  function tailleTampon(t) { return t.s; }
 
   // ----- Types d'objets -----
   var TYPES_LIGNES = {
@@ -651,15 +668,15 @@
   // `px` : taille du pictogramme ; `pxIll` : taille du dessin (style Illustré, et types
   // qui n'ont pas de pictogramme) ; `cat` : rangement dans la palette de l'éditeur.
   var TYPES_LIEUX = {
-    capitale:  { nom: "Capitale",   px: 22, pxIll: 84, police: 17, niv: 0,   maj: true, cat: "Cités" },
-    ville:     { nom: "Ville",      px: 15, pxIll: 62, police: 14, niv: 0.6, cat: "Cités" },
-    village:   { nom: "Village",    px: 10, pxIll: 42, police: 12, niv: 2.5, cat: "Cités" },
+    capitale:  { nom: "Capitale",   px: 22, pxIll: 100, police: 17, niv: 0,   maj: true, cat: "Cités" },
+    ville:     { nom: "Ville",      px: 15, pxIll: 82, police: 14, niv: 0.6, cat: "Cités" },
+    village:   { nom: "Village",    px: 10, pxIll: 56, police: 12, niv: 2.5, cat: "Cités" },
     port:      { nom: "Port",       px: 14, pxIll: 66, police: 13, niv: 1.2, cat: "Cités" },
     ferme:     { nom: "Ferme",      pxIll: 44, police: 12, niv: 4, cat: "Cités" },
     cabane:    { nom: "Cabane",     pxIll: 38, police: 12, niv: 5, cat: "Cités" },
     campement: { nom: "Campement",  pxIll: 40, police: 12, niv: 5, cat: "Cités" },
     pilotis:   { nom: "Pilotis",    pxIll: 40, police: 12, niv: 5, cat: "Cités" },
-    fort:      { nom: "Forteresse", px: 15, pxIll: 58, police: 13, niv: 1.5, cat: "Ouvrages" },
+    fort:      { nom: "Forteresse", px: 15, pxIll: 70, police: 13, niv: 1.5, cat: "Ouvrages" },
     tour:      { nom: "Tour",       px: 12, pxIll: 46, police: 12, niv: 4, cat: "Ouvrages" },
     temple:    { nom: "Temple",     px: 14, pxIll: 52, police: 12, niv: 3, cat: "Ouvrages" },
     mine:      { nom: "Mine",       px: 12, pxIll: 46, police: 12, niv: 4, cat: "Ouvrages" },
@@ -875,17 +892,41 @@
 
   // Rassemble dans `liste` les décors à dessiner pour cette vue : { x, y, s, sprite, v } en
   // unités du monde. `tampons` : les décors posés à la main, dont les autres s'écartent.
+  // Le zoom de référence d'une carte : celui où elle tient dans 1 400 px. C'est à cette
+  // échelle que les décors ont leur taille « normale » ; il ne dépend ni de l'écran ni de la vue.
+  // `carte.finesse` (0, 1 ou 2 ; 1 par défaut) règle l'échelle générale des décors : à 1, un
+  // arbre fait une quinzaine de pixels à la vue d'ensemble — une carte fouillée, qui supporte
+  // d'être regardée de près.
+  function zoomBase(carte) {
+    var fin = typeof carte.finesse === "number" ? carte.finesse : 1;
+    return 1400 / Math.max(carte.largeur, carte.hauteur) * Math.pow(2, fin);
+  }
+  var FINESSE_MAX = 4;
+
+  // Le niveau de cases d'un terrain : fixé par la carte et par la finesse du trait (`fin` :
+  // chaque cran divise par deux la taille des décors), JAMAIS par le zoom de la vue.
+  function niveauDecor(zb, C, fin) { return Math.max(0, Math.floor(Math.log(CASE0 * zb * Math.pow(2, fin) / C) / Math.LN2)); }
+
+  // Rassemble dans `liste` les décors à dessiner pour cette vue : { x, y, s, sprite } en
+  // unités du monde. Les décors sont FIXÉS DANS LE MONDE, comme sur une carte imprimée :
+  // même nombre, mêmes places, même taille (en km) à tous les zooms — zoomer les agrandit,
+  // rien n'apparaît ni ne disparaît. Seule exception, la lisibilité : quand des décors
+  // feraient moins de quelques pixels (une forêt fine vue de très loin), on en dessine un
+  // sur quatre, deux fois plus grand, aux mêmes endroits — la forêt reste une forêt.
+  // `tampons` : les décors posés à la main, dont les autres s'écartent.
   function semerDecors(carte, vue, masque, X0, Y0, X1, Y1, tampons, liste) {
     if (!masque) return;
-    var zoom = vue.zoom, data = masque.data, mw = masque.mw, mh = masque.mh;
+    var zoom = vue.zoom, data = masque.data, mw = masque.mw, mh = masque.mh, zb = zoomBase(carte);
     if (memoCases.size > 400000) memoCases.clear();
-    // Quels écarts (C × échelle) faut-il parcourir ? Ceux des traits visibles.
-    var ecarts = {}, traits = carte.traits || [], i;
+    // Quels niveaux de cases faut-il parcourir ? Ceux des traits visibles.
+    var niveaux = {}, traits = carte.traits || [], i;
     for (i = 0; i < traits.length; i++) {
       var t = traits[i], mat = MAT[t.mat], d = mat && DECORS[mat.decor];
       if (!d || t.sansDecor || t.dens === 0 || !t.bb || !chevauche(t.bb, X0, Y0, X1, Y1)) continue;
-      ecarts[d.C * ECHELLES[t.ech == null ? 1 : t.ech]] = true;
+      niveaux[niveauDecor(zb, d.C, t.fin || 0)] = true;
+      if (masque.finesses) for (var zf = 0; zf < masque.finesses.length; zf++) niveaux[niveauDecor(zb, d.C, masque.finesses[zf])] = true;
     }
+    var dataFin = masque.fin;
     // Une petite grille des tampons, pour s'en écarter sans tout comparer.
     var gt = null, gc = 0;
     if (tampons && tampons.length) {
@@ -897,20 +938,18 @@
       });
     }
     var L = carte.largeur, H = carte.hauteur;
-    Object.keys(ecarts).forEach(function (cleEcart) {
-      var Ce = parseFloat(cleEcart);
-      var niveauReel = Math.log(CASE0 * zoom / Ce) / Math.LN2;
-      var k = Math.max(0, Math.floor(niveauReel)), f = niveauReel - k;
-      var D = CASE0 / Math.pow(2, k), m = 80 / zoom;
+    Object.keys(niveaux).forEach(function (cle) {
+      var k = parseInt(cle, 10), Dk = CASE0 / Math.pow(2, k);
+      // Trop petits pour être lus : on remonte de `n` niveaux (un décor sur 4ⁿ, 2ⁿ fois plus grand).
+      var n = Dk * zoom < 4.2 ? Math.ceil(Math.log(4.2 / (Dk * zoom)) / Math.LN2) : 0;
+      var kv = Math.max(0, k - n), D = CASE0 / Math.pow(2, kv), grossi = Math.pow(2, k - kv);
+      var m = 140 / zoom + D * 3;
       var i0 = Math.max(0, Math.floor((X0 - m) / D)), i1 = Math.min(Math.floor(L / D), Math.floor((X1 + m) / D));
       var j0 = Math.max(0, Math.floor((Y0 - m) / D)), j1 = Math.min(Math.floor(H / D), Math.floor((Y1 + m) / D));
       if ((i1 - i0 + 1) * (j1 - j0 + 1) > 450000) return;
-      // Un nouveau venu grandit pendant que l'on zoome ; les anciens ont leur taille.
-      var pousse = Math.min(1, f / 0.6); pousse = pousse * pousse * (3 - 2 * pousse);
       for (var cj = j0; cj <= j1; cj++) {
         for (var ci = i0; ci <= i1; ci++) {
-          var pt = pointCase(k, ci, cj);
-          if (pt.k === k && pousse < 0.06) continue;                   // un nouveau venu, encore invisible
+          var pt = pointCase(kv, ci, cj);
           var px = pixelMasque(masque, pt.x, pt.y);
           if (px < 0 || data[px + 3] < 128) continue;                 // hors masque, ou de l'eau
           if (data[px + 1] > 128) continue;                           // une route
@@ -919,23 +958,29 @@
           if (!dd) continue;
           var code = Math.round(data[px + 2] / 20) - 1;               // densité × 3 + échelle
           if (code < 0) continue;
-          var ech = ECHELLES[code % 3], dens = DENSITES[Math.floor(code / 3)];
-          if (Math.abs(dd.C * ech - Ce) > 1e-6) continue;             // ce terrain a un autre écart             // ce terrain a un autre écart
+          // La finesse : celle d'une zone « Affiner » si le point y est, sinon celle du trait.
+          var zf = dataFin && dataFin[px + 3] > 200 ? Math.round(dataFin[px] / 40) : 0, zd = dataFin && dataFin[px + 3] > 200 ? Math.round(dataFin[px + 1] / 60) : 0;
+          var finPt = zf ? zf - 1 : Math.round(data[px + 1] / 24);
+          if (niveauDecor(zb, dd.C, finPt) !== k) continue;           // ce terrain a un autre niveau
+          // La densité : celle d'une zone « Éclaircir » si le point y est, sinon celle du trait.
+          var ech = ECHELLES[code % 3], dens = DENSITES[zd ? zd - 1 : Math.floor(code / 3)];
           if (pt.r >= dd.p * dens) continue;
           // Quel décor, parmi ceux du terrain ?
           var ch = dd.choix[0], cumul = 0;
           for (var q = 0; q < dd.choix.length; q++) { cumul += dd.choix[q][1]; if (pt.r2 < cumul) { ch = dd.choix[q]; break; } }
-          var taillePx = ch[2] * ech * ECH_THEME * (0.82 + 0.36 * pt.r3) * (pt.k === k ? pousse : 1);
-          if (taillePx < 3.5) continue;
-          var s = taillePx / zoom;
+          // Sa taille dans le monde : proportionnelle à la case, donc fixe.
+          var s = ch[2] / dd.C * Dk * 0.72 * grossi * ech * ECH_THEME * (0.82 + 0.36 * pt.r3);
+          var taillePx = s * zoom;
+          if (taillePx < 3) continue;
           // Bien à l'intérieur de son terrain : les quatre voisins disent la même chose.
-          var e = Math.max(1, Math.round(dd.marge * taillePx * masque.z / zoom / masque.ech));
+          var e = Math.max(1, Math.round(dd.marge * Math.min(taillePx, 120) * masque.z / zoom / masque.ech));
           var sx = (px / 4) % mw, sy = Math.floor(px / 4 / mw), ok = true;
           for (var w = 0; w < 4 && ok; w++) {
             var nx = sx + (w === 0 ? -e : w === 1 ? e : 0), ny = sy + (w === 2 ? -e : w === 3 ? Math.round(e * 0.5) : 0);
             if (nx < 0 || ny < 0 || nx >= mw || ny >= mh) continue;
             var np = (ny * mw + nx) * 4;
-            if (data[np] !== data[px] || data[np + 3] < 128 || (w !== 2 && data[np + 1] > 128)) ok = false;
+            // Un grand décor (pic, colline) ne déborde pas sur une voie ; un arbre, lui, la borde.
+            if (data[np] !== data[px] || data[np + 3] < 128 || (w !== 2 && ch[2] >= 40 && data[np + 1] > 128)) ok = false;
           }
           if (!ok) continue;
           if (gt) {
@@ -959,9 +1004,172 @@
     liste.sort(function (a, b) { return a.y - b.y; });
     for (var i = 0; i < liste.length; i++) {
       var o = liste[i];
-      if (o.sprite === "@volcan") volcan(lc, o.x, o.y - o.s * 0.2, o.s, o.r);
-      else colle(lc, o.sprite, o.v != null ? o.v % VARIANTES[o.sprite] : variante(o.sprite, o.r), o.x, o.y, o.s);
+      colle(lc, o.sprite, o.v != null ? o.v % VARIANTES[o.sprite] : variante(o.sprite, o.r), o.x, o.y, o.s);
     }
+  }
+
+  // ----- Champs -----
+  //
+  // Le terrain « Champs » est un damier de parcelles : un quadrillage déformé (chaque coin
+  // est déplacé par son hachage), où chaque case reçoit une culture — blé, prairie, labour —
+  // et ses sillons. Pour que rien ne saute en zoomant, tout est hiérarchique, comme les
+  // décors : une parcelle qui se divise transmet d'abord sa couleur à ses quatre filles, qui
+  // prennent peu à peu la leur ; les nouveaux coins sortent de leur alignement en douceur ;
+  // les sillons des filles apparaissent pendant que ceux de la mère s'effacent.
+  var CULTURES = [[214, 196, 92], [150, 178, 70], [196, 160, 86], [124, 160, 62], [226, 210, 122], [168, 136, 84], [176, 192, 84]];
+
+  function coinChamp(k, i, j, kFin, f) {
+    while (k > 0 && !(i & 1) && !(j & 1)) { k--; i >>= 1; j >>= 1; }
+    var D = CASE0 / Math.pow(2, k), amp = 0.21 * D * (k >= kFin ? f : 1), h = (i * 73856093) ^ (j * 19349663);
+    return [i * D + (alea(k * 31 + 5, h) - 0.5) * 2 * amp, j * D + (alea(k * 31 + 6, h) - 0.5) * 2 * amp];
+  }
+  function cultureDe(k, i, j) { return CULTURES[Math.floor(alea(k * 53 + 9, (i * 73856093) ^ (j * 19349663)) * CULTURES.length)]; }
+
+  function dessinerChamps(lc, carte, vue, masque, X0, Y0, X1, Y1, encre) {
+    if (!masque) return;
+    var visible = false, traits = carte.traits || [];
+    for (var t = 0; t < traits.length && !visible; t++) if (traits[t].mat === "champs" && traits[t].bb && chevauche(traits[t].bb, X0, Y0, X1, Y1)) visible = true;
+    if (!visible) return;
+    var zoom = vue.zoom, data = masque.data, code = MAT.champs.code * 10, u = 1 / zoom;
+    // Le découpage est fixé par la carte (parcelles d'une quinzaine de pixels à la vue
+    // d'ensemble), pas par le zoom : zoomer agrandit les mêmes parcelles.
+    var kFin = Math.floor(Math.log(CASE0 * zoomBase(carte) * 2 / 30) / Math.LN2), f = 1;
+    if (CASE0 / Math.pow(2, kFin) * zoom < 5) return;
+    var enChamp = function (x, y) {
+      var px = pixelMasque(masque, x, y);
+      return px >= 0 && data[px + 3] >= 128 && data[px] === code;
+    };
+    var polygone = function (c) {
+      lc.beginPath();
+      lc.moveTo(c[0][0], c[0][1]); lc.lineTo(c[1][0], c[1][1]); lc.lineTo(c[2][0], c[2][1]); lc.lineTo(c[3][0], c[3][1]);
+      lc.closePath();
+    };
+    // Les sillons d'une parcelle : des traits parallèles, dans un sens tiré au hasard.
+    var sillons = function (c, k, i, j, D, alpha) {
+      if (alpha < 0.04) return;
+      var h = (i * 73856093) ^ (j * 19349663), ang = Math.floor(alea(k * 17 + 3, h) * 4) * Math.PI / 4 + (alea(k * 17 + 4, h) - 0.5) * 0.3;
+      var cx = (c[0][0] + c[2][0]) / 2, cy = (c[0][1] + c[2][1]) / 2, pas = D / 7, dx = Math.cos(ang), dy = Math.sin(ang);
+      lc.save();
+      polygone(c); lc.clip();
+      lc.globalAlpha = alpha;
+      lc.strokeStyle = "rgba(70,56,14,0.5)";
+      lc.lineWidth = Math.max(0.7 * u, pas * 0.16);
+      lc.beginPath();
+      for (var q = -7; q <= 7; q++) {
+        var ox = cx - dy * q * pas, oy = cy + dx * q * pas;
+        lc.moveTo(ox - dx * D, oy - dy * D); lc.lineTo(ox + dx * D, oy + dy * D);
+      }
+      lc.stroke();
+      lc.restore();
+    };
+    var D = CASE0 / Math.pow(2, kFin), m = D;
+    var i0 = Math.max(0, Math.floor((X0 - m) / D)), i1 = Math.min(Math.floor(carte.largeur / D), Math.floor((X1 + m) / D));
+    var j0 = Math.max(0, Math.floor((Y0 - m) / D)), j1 = Math.min(Math.floor(carte.hauteur / D), Math.floor((Y1 + m) / D));
+    if ((i1 - i0 + 1) * (j1 - j0 + 1) > 60000) return;
+    lc.save();
+    lc.globalCompositeOperation = "source-atop";
+    lc.lineJoin = "round";
+    var cases = [], meres = {};
+    for (var cj = j0; cj <= j1; cj++) {
+      for (var ci = i0; ci <= i1; ci++) {
+        var c = [coinChamp(kFin, ci, cj, kFin, f), coinChamp(kFin, ci + 1, cj, kFin, f), coinChamp(kFin, ci + 1, cj + 1, kFin, f), coinChamp(kFin, ci, cj + 1, kFin, f)];
+        // Toute la parcelle doit être dans les champs : la lisière reste un simple fondu.
+        if (!enChamp(c[0][0], c[0][1]) || !enChamp(c[1][0], c[1][1]) || !enChamp(c[2][0], c[2][1]) || !enChamp(c[3][0], c[3][1])) continue;
+        var a = cultureDe(kFin - 1, ci >> 1, cj >> 1), b = cultureDe(kFin, ci, cj);
+        polygone(c);
+        lc.fillStyle = "rgb(" + Math.round(a[0] + (b[0] - a[0]) * f) + "," + Math.round(a[1] + (b[1] - a[1]) * f) + "," + Math.round(a[2] + (b[2] - a[2]) * f) + ")";
+        lc.globalAlpha = 0.86;
+        lc.fill();
+        cases.push([c, ci, cj]);
+        meres[(ci >> 1) + "," + (cj >> 1)] = [ci >> 1, cj >> 1];
+      }
+    }
+    // Sillons : ceux des mères s'effacent, ceux des filles apparaissent.
+    Object.keys(meres).forEach(function (cle) {
+      var mi = meres[cle][0], mj = meres[cle][1];
+      var c = [coinChamp(kFin, 2 * mi, 2 * mj, kFin, f), coinChamp(kFin, 2 * mi + 2, 2 * mj, kFin, f), coinChamp(kFin, 2 * mi + 2, 2 * mj + 2, kFin, f), coinChamp(kFin, 2 * mi, 2 * mj + 2, kFin, f)];
+      if (!enChamp(c[0][0], c[0][1]) || !enChamp(c[1][0], c[1][1]) || !enChamp(c[2][0], c[2][1]) || !enChamp(c[3][0], c[3][1])) return;
+      sillons(c, kFin - 1, mi, mj, D * 2, 1 - f);
+    });
+    cases.forEach(function (e) { sillons(e[0], kFin, e[1], e[2], D, f); });
+    // Les haies : le bord des parcelles. Celles qui séparent deux mères sont déjà là ; les
+    // nouvelles apparaissent avec la division.
+    cases.forEach(function (e) {
+      var c = e[0], ci = e[1], cj = e[2];
+      for (var q = 0; q < 4; q++) {
+        var ancienne = q === 0 ? !(cj & 1) : q === 1 ? !!(ci & 1) : q === 2 ? !!(cj & 1) : !(ci & 1);
+        lc.globalAlpha = ancienne ? 1 : f;
+        lc.strokeStyle = encre ? "rgba(40,48,10,0.62)" : "rgba(64,72,24,0.42)";
+        lc.lineWidth = (encre ? 1.5 : 1.2) * u;
+        lc.beginPath(); lc.moveTo(c[q][0], c[q][1]); lc.lineTo(c[(q + 1) % 4][0], c[(q + 1) % 4][1]); lc.stroke();
+      }
+    });
+    lc.restore();
+    lc.globalAlpha = 1;
+    lc.globalCompositeOperation = "source-over";
+  }
+
+  // ----- Fissures de lave -----
+  //
+  // Sur les terres volcaniques, un réseau de fissures rougeoyantes. Il s'appuie sur les mêmes
+  // cases emboîtées que les décors : chaque emplacement est relié à celui de la case qui le
+  // contient, au niveau au-dessus — d'où un réseau en ARBRE, de grosses coulées qui se
+  // ramifient en fissures de plus en plus fines. En zoomant, les coulées restent en place,
+  // s'épaississent doucement, et de nouvelles ramifications apparaissent en fondu.
+  function fissuresLave(lc, carte, vue, masque, X0, Y0, X1, Y1) {
+    if (!masque) return;
+    var volcan = MAT.volcan, visible = false, traits = carte.traits || [];
+    for (var t = 0; t < traits.length && !visible; t++) if (traits[t].mat === "volcan" && traits[t].bb && chevauche(traits[t].bb, X0, Y0, X1, Y1)) visible = true;
+    if (!visible) return;
+    var zoom = vue.zoom, data = masque.data, code = volcan.code * 10, u = 1 / zoom;
+    // Réseau fixé par la carte : mêmes fissures, de même largeur (en km), à tous les zooms.
+    var zr = zoomBase(carte) * 2, niveauReel = Math.floor(Math.log(CASE0 * zr / 46) / Math.LN2), kFin = niveauReel, f = 1;
+    u = 1 / zr;
+    var surLave = function (x, y) {
+      var px = pixelMasque(masque, x, y);
+      return px >= 0 && data[px + 3] >= 128 && data[px] === code;
+    };
+    var segments = [];
+    for (var k = Math.max(1, kFin - 5); k <= kFin; k++) {
+      var D = CASE0 / Math.pow(2, k), m = D * 2;
+      var i0 = Math.max(0, Math.floor((X0 - m) / D)), i1 = Math.min(Math.floor(carte.largeur / D), Math.floor((X1 + m) / D));
+      var j0 = Math.max(0, Math.floor((Y0 - m) / D)), j1 = Math.min(Math.floor(carte.hauteur / D), Math.floor((Y1 + m) / D));
+      if ((i1 - i0 + 1) * (j1 - j0 + 1) > 40000) continue;
+      var age = niveauReel - k;                       // 0 : tout juste née ; grandit avec le zoom
+      var largeur = Math.min(7, 1.3 * Math.pow(1.55, age)) * u, alpha = 1;
+      if (largeur * zoom < 0.45) continue;            // trop fine pour être vue à ce zoom
+      for (var cj = j0; cj <= j1; cj++) {
+        for (var ci = i0; ci <= i1; ci++) {
+          var p = pointCase(k, ci, cj);
+          if (p.k !== k || p.r2 > 0.7) continue;      // un emplacement hérité est déjà relié plus haut
+          var q = pointCase(k - 1, ci >> 1, cj >> 1);
+          if (!surLave(p.x, p.y) || !surLave(q.x, q.y)) continue;
+          // Deux coudes entre les deux bouts : une fissure, pas un trait à la règle.
+          var dx = q.x - p.x, dy = q.y - p.y, e = Math.hypot(dx, dy) * 0.22;
+          var ax = p.x + dx * 0.33 - dy / (e * 4.5 || 1) * e * (p.r - 0.5) * 2, ay = p.y + dy * 0.33 + dx / (e * 4.5 || 1) * e * (p.r - 0.5) * 2;
+          var bx = p.x + dx * 0.67 - dy / (e * 4.5 || 1) * e * (p.r3 - 0.5) * 2, by = p.y + dy * 0.67 + dx / (e * 4.5 || 1) * e * (p.r3 - 0.5) * 2;
+          if (!surLave(ax, ay) || !surLave(bx, by)) continue;
+          segments.push({ pts: [p.x, p.y, ax, ay, bx, by, q.x, q.y], w: largeur, a: alpha });
+        }
+      }
+    }
+    if (!segments.length) return;
+    lc.save();
+    lc.lineCap = lc.lineJoin = "round";
+    // Trois passes : la roche brûlée autour, la lave, puis son cœur incandescent.
+    [["rgba(58,26,8,0.6)", 2.6], ["#e2560f", 1.25], ["#ffc23a", 0.5]].forEach(function (passe) {
+      segments.forEach(function (sg) {
+        lc.globalAlpha = sg.a;
+        lc.strokeStyle = passe[0];
+        lc.lineWidth = sg.w * passe[1];
+        lc.beginPath();
+        lc.moveTo(sg.pts[0], sg.pts[1]);
+        for (var n = 2; n < 8; n += 2) lc.lineTo(sg.pts[n], sg.pts[n + 1]);
+        lc.stroke();
+      });
+    });
+    lc.restore();
+    lc.globalAlpha = 1;
   }
 
   // ----- Texture du sol -----
@@ -1083,9 +1291,9 @@
   // ----- Lignes : rivières, routes, frontières -----
   function styleLigne(l, th) {
     if (l.type === "riviere") return { c: l.couleur || th.riviere, tiret: null, lisse: l.lisse !== false, min: 1.4, halo: false };
-    if (l.type === "route") return { c: l.couleur || "#d9c48e", tiret: null, lisse: true, min: 2.4, halo: false };
+    if (l.type === "route") return { c: l.couleur || "#d6bd84", tiret: null, lisse: true, min: 3, halo: false };
     if (l.type === "pavee") return { c: l.couleur || "#bdb6a6", tiret: null, lisse: true, min: 2.6, halo: false };
-    if (l.type === "sentier") return { c: l.couleur || "#b79a62", tiret: null, lisse: true, min: 1.3, halo: false };
+    if (l.type === "sentier") return { c: l.couleur || "#c2a56c", tiret: null, lisse: true, min: 2, halo: false };
     if (l.type === "falaise") return { c: l.couleur || "#4a3620", tiret: null, lisse: true, min: 1.2, halo: false };
     if (l.type === "maritime") return { c: l.couleur || th.texteMer, tiret: [3.2, 3.2], lisse: true, min: 1.3, halo: false };
     if (l.type === "muraille") return { c: l.couleur || "#c9c2b0", tiret: null, lisse: false, min: 3, halo: false };
@@ -1144,7 +1352,8 @@
     if (!(total > 0)) return p;
 
     var onde = Math.max((l.taille || 1) * 14, total / 60);
-    var amp = onde * 0.3 * force;
+    var amp = onde * 0.26 * force;
+    var ph3 = alea(hashTexte(String(l.id || "")), 3) * TAU;
     var h = hashTexte(String(l.id || "")), ph1 = alea(h, 1) * TAU, ph2 = alea(h, 2) * TAU;
     var out = [];
     for (i = 0; i < m; i++) {
@@ -1153,7 +1362,10 @@
       var tl = Math.hypot(tx, ty) || 1;
       var env = Math.min(1, cum[i] / (onde * 0.8), (total - cum[i]) / (onde * 0.8));
       env = env * env * (3 - 2 * env);
-      var off = amp * env * (Math.sin(cum[i] / onde * TAU + ph1) * 0.75 + Math.sin(cum[i] / (onde * 0.57) * TAU + ph2) * 0.25);
+      // Des méandres inégaux : amples par endroits, presque droits ailleurs, comme un vrai
+      // cours d'eau — une onde lente module l'amplitude des deux autres.
+      var module = 0.45 + 0.85 * (0.5 + 0.5 * Math.sin(cum[i] / (onde * 4.3) * TAU + ph3));
+      var off = amp * env * module * (Math.sin(cum[i] / onde * TAU + ph1) * 0.75 + Math.sin(cum[i] / (onde * 0.57) * TAU + ph2) * 0.25);
       out.push(dense[2 * i] - ty / tl * off, dense[2 * i + 1] + tx / tl * off);
     }
     return out;
@@ -1193,18 +1405,38 @@
     var d = pointsAffiches(l), m = d.length / 2;
     if (m < 2) return;
     var lw = Math.max(l.taille || 0, 1.4 / vue.zoom);
-    var troncons = l.delta ? Math.min(28, Math.max(1, Math.floor(m / 6))) : 1;
     c.lineCap = c.lineJoin = "round";
     c.setLineDash([]);
-    for (var k = 0; k < troncons; k++) {
-      var a = Math.floor(k * (m - 1) / troncons), b = Math.floor((k + 1) * (m - 1) / troncons);
-      var t = (k + 0.5) / troncons;
-      c.lineWidth = Math.max(l.delta ? lw * (0.35 + 0.9 * t) : lw, min || 0) + (extra || 0);
-      c.beginPath();
-      c.moveTo(d[2 * a], d[2 * a + 1]);
-      for (var j = a + 1; j <= b; j++) c.lineTo(d[2 * j], d[2 * j + 1]);
-      c.stroke();
+    c.fillStyle = c.strokeStyle;
+    // Un filet continu, de la largeur minimale : la rivière n'est jamais interrompue.
+    c.lineWidth = Math.max(l.delta ? lw * 0.18 : lw, min || 0) + (extra || 0);
+    c.beginPath();
+    c.moveTo(d[0], d[1]);
+    for (var j = 1; j < m; j++) c.lineTo(d[2 * j], d[2 * j + 1]);
+    c.stroke();
+    if (!l.delta) return;
+    // Le corps de la rivière : un ruban dont la largeur croît de la source (un filet) à
+    // l'embouchure, sans paliers, et ondule un peu — des biefs larges, des passages resserrés.
+    var h = hashTexte(String(l.id || "")), p1 = alea(h, 7) * TAU, p2 = alea(h, 8) * TAU;
+    var cum = [0], i;
+    for (i = 1; i < m; i++) cum[i] = cum[i - 1] + Math.hypot(d[2 * i] - d[2 * i - 2], d[2 * i + 1] - d[2 * i - 1]);
+    var total = cum[m - 1] || 1, gauche = [], droite = [];
+    for (i = 0; i < m; i++) {
+      var t = cum[i] / total;
+      var w = lw * (0.18 + 1.07 * Math.pow(t, 0.75)) * (1 + 0.16 * Math.sin(cum[i] / (lw * 9) + p1) + 0.08 * Math.sin(cum[i] / (lw * 3.7) + p2));
+      w = Math.max(w, min || 0) + (extra || 0);
+      var a = Math.max(0, i - 1), b = Math.min(m - 1, i + 1);
+      var tx = d[2 * b] - d[2 * a], ty = d[2 * b + 1] - d[2 * a + 1], tl = Math.hypot(tx, ty) || 1;
+      gauche.push(d[2 * i] - ty / tl * w / 2, d[2 * i + 1] + tx / tl * w / 2);
+      droite.push(d[2 * i] + ty / tl * w / 2, d[2 * i + 1] - tx / tl * w / 2);
+      if (i === m - 1) { c.beginPath(); c.arc(d[2 * i], d[2 * i + 1], w / 2, 0, TAU); c.fill(); }   // l'embouchure, arrondie
     }
+    c.beginPath();
+    c.moveTo(gauche[0], gauche[1]);
+    for (i = 1; i < m; i++) c.lineTo(gauche[2 * i], gauche[2 * i + 1]);
+    for (i = m - 1; i >= 0; i--) c.lineTo(droite[2 * i], droite[2 * i + 1]);
+    c.closePath();
+    c.fill();
   }
 
   // Lacs et rivières CREUSENT la terre, exactement comme la mer : la côte, le halo d'eau
@@ -1331,56 +1563,75 @@
       ctx.moveTo(d[0], d[1]);
       for (var i = 2; i < d.length; i += 2) ctx.lineTo(d[i], d[i + 1]);
     };
+    var passe = function (filtre, couleur, largeur, tirets) {
+      voies.forEach(function (v) {
+        if (!filtre(v)) return;
+        var lw = largeur(v);
+        if (!(lw > 0)) return;
+        chemin(v.d);
+        ctx.strokeStyle = typeof couleur === "function" ? couleur(v) : couleur;
+        ctx.lineWidth = lw;
+        ctx.setLineDash(tirets ? tirets(v) : []);
+        ctx.stroke();
+      });
+      ctx.setLineDash([]);
+    };
+    var toutes = function () { return true; }, routes = function (v) { return !v.sentier; }, terre = function (v) { return !v.sentier && !v.pavee; };
     ctx.setLineDash([]);
     ctx.lineCap = ctx.lineJoin = "round";
-    // 1) Les bas-côtés.
-    voies.forEach(function (v) {
-      chemin(v.d);
-      ctx.strokeStyle = v.sentier ? "rgba(70,48,24,0.32)" : v.pavee ? "rgba(44,40,34,0.62)" : "rgba(60,40,18,0.5)";
-      ctx.lineWidth = v.lw + (v.sentier ? 1.6 : 2.4) * u;
-      ctx.stroke();
-    });
-    // 2) Les chaussées : les sentiers d'abord, les routes par-dessus.
-    voies.filter(function (v) { return v.sentier; }).concat(voies.filter(function (v) { return !v.sentier; })).forEach(function (v) {
-      chemin(v.d);
-      ctx.strokeStyle = v.st.c;
-      ctx.lineWidth = v.lw;
-      if (v.sentier) ctx.setLineDash([v.lw * 2.4, v.lw * 1.2]);
-      ctx.stroke();
-      ctx.setLineDash([]);
-    });
-    // 3) Le milieu des routes, plus clair, usé par les roues.
-    voies.forEach(function (v) {
-      if (v.sentier) return;
-      chemin(v.d);
-      ctx.strokeStyle = v.pavee ? "rgba(255,255,250,0.22)" : "rgba(255,246,214,0.32)";
-      ctx.lineWidth = v.lw * 0.5;
-      ctx.stroke();
-    });
-    // 3 bis) Les joints des pavés : un pointillé aussi large que la chaussée.
-    voies.forEach(function (v) {
-      if (!v.pavee || v.lw * vue.zoom < 4) return;
-      chemin(v.d);
-      ctx.lineCap = "butt";
-      ctx.strokeStyle = "rgba(60,54,46,0.42)";
-      ctx.lineWidth = v.lw * 0.86;
-      ctx.setLineDash([Math.max(0.5 * u, v.lw * 0.07), v.lw * 0.5]);
-      ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.lineCap = "round";
-    });
-    // 4) Les ornières : deux sillons de charrette (et non un marquage au sol, qui ferait
-    //    route moderne).
-    voies.forEach(function (v) {
-      if (v.sentier || v.pavee || v.lw * vue.zoom < 4.5) return;
-      [-0.24, 0.24].forEach(function (k) {
+    // 1) Le talus : une ombre large et douce, puis le bord net de la voie.
+    passe(toutes, "rgba(40,28,10,0.16)", function (v) { return v.lw + 5 * u; });
+    passe(toutes, function (v) { return v.pavee ? "rgba(46,42,36,0.8)" : "rgba(74,50,22,0.72)"; }, function (v) { return v.lw + (v.sentier ? 1.2 : 2) * u; });
+    // 2) La chaussée : les sentiers d'abord, les routes par-dessus (un sentier qui rejoint
+    //    une route s'y fond).
+    passe(function (v) { return v.sentier; }, function (v) { return v.st.c; }, function (v) { return v.lw; });
+    passe(routes, function (v) { return v.st.c; }, function (v) { return v.lw; });
+    // 3) Le milieu, usé et plus clair.
+    passe(toutes, function (v) { return v.pavee ? "rgba(255,255,250,0.2)" : "rgba(255,244,208,0.34)"; }, function (v) { return v.lw * (v.sentier ? 0.42 : 0.52); });
+    // 4) Les détails, quand la voie est assez large à l'écran pour qu'on les lise.
+    ctx.lineCap = "butt";
+    //    Pavés : des joints en travers.
+    passe(function (v) { return v.pavee && v.lw * vue.zoom >= 4; }, "rgba(60,54,46,0.42)", function (v) { return v.lw * 0.86; },
+      function (v) { return [Math.max(0.5 * u, v.lw * 0.07), v.lw * 0.5]; });
+    //    Terre battue : des cailloux semés sur les bords (pointillés très courts, décalés).
+    [-0.34, 0.34].forEach(function (k, rang) {
+      voies.forEach(function (v) {
+        if (v.pavee || v.lw * vue.zoom < 4) return;
         var o = decaler(v.d, v.lw * k);
         chemin(o);
-        ctx.strokeStyle = "rgba(110,80,42,0.3)";
+        ctx.strokeStyle = "rgba(96,68,34,0.5)";
+        ctx.lineWidth = Math.max(0.9 * u, v.lw * 0.1);
+        ctx.setLineDash([v.lw * 0.12, v.lw * (rang ? 0.83 : 0.61)]);
+        ctx.stroke();
+      });
+    });
+    ctx.setLineDash([]);
+    ctx.lineCap = "round";
+    //    Routes : deux ornières de charrette.
+    [-0.2, 0.2].forEach(function (k) {
+      voies.forEach(function (v) {
+        if (v.sentier || v.pavee || v.lw * vue.zoom < 5) return;
+        chemin(decaler(v.d, v.lw * k));
+        ctx.strokeStyle = "rgba(104,74,38,0.34)";
         ctx.lineWidth = v.lw * 0.09;
         ctx.stroke();
       });
     });
+    void terre;
+  }
+
+  // Les voies visibles, avec leur style et leur largeur : pour les peindre dans la terre.
+  function voiesVisibles(carte, vue, th, X0, Y0, X1, Y1) {
+    var out = [];
+    (carte.lignes || []).forEach(function (l) {
+      if (!VOIES[l.type] || !l.pts || l.pts.length < 4) return;
+      var bb = boiteTrait(l.pts, 0);
+      var marge = Math.max(bb[2] - bb[0], bb[3] - bb[1]) * 0.1 + (l.taille || 0) * 40;
+      if (!chevauche([bb[0] - marge, bb[1] - marge, bb[2] + marge, bb[3] + marge], X0, Y0, X1, Y1)) return;
+      var st = styleLigne(l, th);
+      out.push({ l: l, st: st, lw: Math.max(l.taille || 0, st.min / vue.zoom) });
+    });
+    return out;
   }
 
   // Une polyligne décalée latéralement de `e` (à droite du sens de parcours).
@@ -1453,7 +1704,8 @@
       if (!mat || !t.bb || !chevauche(t.bb, X0, Y0, X1, Y1)) continue;
       // Rouge : le terrain ; bleu : les réglages de décor du trait (densité × 3 + échelle + 1).
       var densT = t.sansDecor ? 0 : (t.dens == null ? 2 : t.dens), echT = t.ech == null ? 1 : t.ech;
-      tracerTrait(c, t, mat, "rgb(" + (mat.code * 10) + ",0," + ((densT * 3 + echT + 1) * 20) + ")");
+      // Vert (jusqu'à 96 ; au-delà de 128 c'est une route) : la finesse des décors du trait.
+      tracerTrait(c, t, mat, "rgb(" + (mat.code * 10) + "," + (Math.min(FINESSE_MAX, t.fin || 0) * 24) + "," + ((densT * 3 + echT + 1) * 20) + ")");
     }
 
     var u = ech / z;                     // un pixel du masque, en unités du monde
@@ -1480,7 +1732,7 @@
     (carte.lignes || []).forEach(function (l) {
       if (!VOIES[l.type] || !l.pts || l.pts.length < 4) return;
       var d = pointsAffiches(l), lw = Math.max(l.taille || 0, (l.type === "sentier" ? 1.3 : 2.4) / vue.zoom);
-      c.lineWidth = lw + 8 * u;
+      c.lineWidth = lw + 3 * u;
       c.beginPath();
       c.moveTo(d[0], d[1]);
       for (var q = 2; q < d.length; q += 2) c.lineTo(d[q], d[q + 1]);
@@ -1488,7 +1740,29 @@
     });
     c.globalCompositeOperation = "source-over";
     c.restore();
-    return { data: c.getImageData(0, 0, mw, mh).data, mw: mw, mh: mh, ech: ech, tx: tx, ty: ty, z: z };
+    var masque = { data: c.getImageData(0, 0, mw, mh).data, mw: mw, mh: mh, ech: ech, tx: tx, ty: ty, z: z, fin: null };
+    // Les zones « Affiner » : des coups de pinceau qui ne changent pas le terrain, seulement
+    // la finesse de ses décors. Elles ont leur propre petit masque (rouge = finesse + 1),
+    // lu seulement quand la vue en contient.
+    var zones = (carte.finesses || []).filter(function (f) { return f.bb && chevauche(f.bb, X0, Y0, X1, Y1); });
+    if (zones.length) {
+      var cf = couche("masque-fin", mw, mh).getContext("2d", { willReadFrequently: true });
+      cf.setTransform(1, 0, 0, 1, 0, 0);
+      cf.clearRect(0, 0, mw, mh);
+      cf.setTransform(z / ech, 0, 0, z / ech, tx / ech, ty / ech);
+      cf.lineCap = cf.lineJoin = "round";
+      zones.forEach(function (f) {
+        // Rouge : finesse + 1 (0 = inchangée) ; vert : densité + 1 (0 = inchangée).
+        cf.strokeStyle = cf.fillStyle = "rgb(" + (f.fin == null ? 0 : (Math.min(FINESSE_MAX, f.fin) + 1) * 40) + "," + (f.dens == null ? 0 : (f.dens + 1) * 60) + ",0)";
+        cf.lineWidth = f.taille;
+        cf.beginPath();
+        if (f.pts.length <= 2) { cf.arc(f.pts[0], f.pts[1], f.taille / 2, 0, TAU); cf.fill(); }
+        else { cf.moveTo(f.pts[0], f.pts[1]); for (var q = 2; q < f.pts.length; q += 2) cf.lineTo(f.pts[q], f.pts[q + 1]); cf.stroke(); }
+      });
+      masque.fin = cf.getImageData(0, 0, mw, mh).data;
+      masque.finesses = zones.filter(function (f) { return f.fin != null; }).map(function (f) { return Math.min(FINESSE_MAX, f.fin); });
+    }
+    return masque;
   }
 
   // L'identifiant du matériau sous un point du monde ; null : de l'eau (mer, lac, rivière) ;
@@ -1531,10 +1805,10 @@
     return out;
   }
 
-  // Le tablier, le long du chemin `p` : ombre sur l'eau, garde-corps (le bord sombre),
-  // planches (un pointillé aussi large que le tablier, donc perpendiculaire au tracé),
-  // poteaux aux deux bouts.
-  function pontLe(ctx, p, W, vue) {
+  // Le pont, le long du chemin `p` : son ombre sur l'eau, deux parapets de pierre, et
+  // entre eux le tablier — de la couleur de la voie, qui semble ainsi se poursuivre —,
+  // des planches (sentier) ou des dalles en travers, et une pile ronde à chaque coin.
+  function pontLe(ctx, p, W, vue, couleur, bois) {
     var u = 1 / vue.zoom, n = p.length / 2;
     if (n < 2) return;
     var chemin = function () {
@@ -1542,32 +1816,37 @@
       ctx.moveTo(p[0], p[1]);
       for (var i = 2; i < p.length; i += 2) ctx.lineTo(p[i], p[i + 1]);
     };
+    var px = W * vue.zoom;
     ctx.save();
     ctx.setLineDash([]);
     ctx.lineCap = "butt";
     ctx.lineJoin = "round";
     ctx.save();
-    ctx.translate(W * 0.16, W * 0.34);
-    chemin(); ctx.strokeStyle = "rgba(6,28,60,0.32)"; ctx.lineWidth = W; ctx.stroke();
+    ctx.translate(W * 0.14, W * 0.3);
+    chemin(); ctx.strokeStyle = "rgba(6,24,54,0.34)"; ctx.lineWidth = W * 1.06; ctx.stroke();
     ctx.restore();
-    chemin(); ctx.strokeStyle = "#3e2a16"; ctx.lineWidth = W; ctx.stroke();
-    chemin(); ctx.strokeStyle = "#9c7748"; ctx.lineWidth = W * 0.72; ctx.stroke();
-    if (W * vue.zoom >= 5) {
+    chemin(); ctx.strokeStyle = "#2c2014"; ctx.lineWidth = W; ctx.stroke();                         // le cerne
+    chemin(); ctx.strokeStyle = bois ? "#8a6238" : "#bdb5a2"; ctx.lineWidth = W - Math.min(W * 0.16, 1.6 * u); ctx.stroke();   // les parapets
+    chemin(); ctx.strokeStyle = bois ? "#5c3f20" : "#6f6858"; ctx.lineWidth = W * 0.68; ctx.stroke();  // leur ombre intérieure
+    chemin(); ctx.strokeStyle = bois ? "#b08a56" : couleur; ctx.lineWidth = W * 0.6; ctx.stroke();     // le tablier
+    if (!bois) { chemin(); ctx.strokeStyle = "rgba(255,246,214,0.28)"; ctx.lineWidth = W * 0.3; ctx.stroke(); }
+    if (px >= 6) {
       chemin();
-      ctx.strokeStyle = "rgba(62,40,18,0.55)";
-      ctx.lineWidth = W * 0.72;
-      ctx.setLineDash([Math.max(0.5 * u, W * 0.05), Math.max(1.5 * u, W * 0.2)]);
+      ctx.strokeStyle = bois ? "rgba(58,36,14,0.6)" : "rgba(70,60,44,0.32)";
+      ctx.lineWidth = W * 0.6;
+      ctx.setLineDash(bois ? [Math.max(0.5 * u, W * 0.05), W * 0.17] : [Math.max(0.5 * u, W * 0.05), W * 0.38]);
       ctx.stroke();
       ctx.setLineDash([]);
     }
-    if (W * vue.zoom >= 7) {
-      ctx.fillStyle = "#2a1a0b";
-      var q = W * 0.2;
+    if (px >= 8) {
+      var r = W * 0.15;
       [[0, 1], [n - 1, n - 2]].forEach(function (e) {
         var x = p[2 * e[0]], y = p[2 * e[0] + 1], dx = x - p[2 * e[1]], dy = y - p[2 * e[1] + 1], l = Math.hypot(dx, dy) || 1;
-        var nx = -dy / l * W / 2, ny = dx / l * W / 2;
-        ctx.fillRect(x + nx - q / 2, y + ny - q / 2, q, q);
-        ctx.fillRect(x - nx - q / 2, y - ny - q / 2, q, q);
+        var nx = -dy / l * W * 0.46, ny = dx / l * W * 0.46;
+        [[x + nx, y + ny], [x - nx, y - ny]].forEach(function (c) {
+          ctx.fillStyle = "#2c2014"; ctx.beginPath(); ctx.arc(c[0], c[1], r * 1.25, 0, TAU); ctx.fill();
+          ctx.fillStyle = bois ? "#9a7244" : "#d2cab6"; ctx.beginPath(); ctx.arc(c[0], c[1], r * 0.85, 0, TAU); ctx.fill();
+        });
       });
     }
     ctx.restore();
@@ -1581,7 +1860,8 @@
       var d = pointsAffiches(r), m = d.length / 2;
       var lw = Math.max(r.taille || 0, (r.type === "sentier" ? 1.3 : 2.4) / vue.zoom);
       // Un peu plus large que la route ET que ses bas-côtés : la route y entre sans déborder.
-      var W = Math.max(lw * (r.type === "sentier" ? 1.6 : 1.3), lw + 3.2 / vue.zoom);
+      var W = Math.max(lw * (r.type === "sentier" ? 2 : 1.7), lw + 4.5 / vue.zoom);
+      var couleurVoie = styleLigne(r, th).c;
       // Abscisses cumulées le long de la route.
       var cum = [0];
       for (var i = 1; i < m; i++) cum[i] = cum[i - 1] + Math.hypot(d[2 * i] - d[2 * i - 2], d[2 * i + 1] - d[2 * i - 1]);
@@ -1610,7 +1890,7 @@
       fusion.forEach(function (t) {
         var s0 = Math.max(0, t[0] - lw * 0.9), s1 = Math.min(total, t[1] + lw * 0.9);
         if (s1 - s0 < lw) return;
-        pontLe(ctx, sousChemin(d, cum, s0, s1), W, vue);
+        pontLe(ctx, sousChemin(d, cum, s0, s1), W, vue, couleurVoie, r.type === "sentier");
       });
     });
   }
@@ -1663,7 +1943,7 @@
         if (type === "riviere") continue;     // creusées dans la terre (creuserEaux), comme la mer
         if (type === "muraille") { tracerMuraille(ctx, l, st, lw, vue, th); continue; }
         if (type === "falaise") { tracerFalaise(ctx, l, st, lw, vue); continue; }
-        if (type === "voies") { voies.push({ l: l, st: st, lw: lw }); continue; }
+        if (type === "voies") continue;       // peintes dans la terre, sous les arbres (voir dessiner)
         var pts = type === "maritime" ? pointsAffiches(l) : l.pts;
         var tracer = function () {
           if (l.ferme && pts.length >= 6) {
@@ -1698,10 +1978,7 @@
       }
       // Sentiers et routes ensemble (leurs croisements se fondent), puis les ponts, avant
       // les murailles et les frontières.
-      if (type === "voies") {
-        tracerVoies(ctx, voies, vue);
-        dessinerPonts(ctx, carte, vue, th, masque);
-      }
+      if (type === "voies") dessinerPonts(ctx, carte, vue, th, masque);
     });
   }
 
@@ -1741,6 +2018,54 @@
     return { w: w, h: h, dy: 0 };
   }
 
+  // ----- Noms qui suivent un tracé -----
+  //
+  // Un nom peut être attaché à un tracé (`ligne` : son identifiant) : il s'écrit alors le
+  // long de la rivière ou de la route, lettre à lettre, centré à la fraction `pos` de sa
+  // longueur et décalé de `ecart` hauteurs de texte sur le côté. Le tracé suivi est celui
+  // qui est dessiné (méandres compris). Si le texte irait de droite à gauche, il est écrit
+  // dans l'autre sens : un nom ne se lit jamais la tête en bas.
+  function cheminEtiquette(carte, e) {
+    if (!e.ligne) return null;
+    var lignes = carte.lignes || [], l = null;
+    for (var i = 0; i < lignes.length; i++) if (lignes[i].id === e.ligne) { l = lignes[i]; break; }
+    if (!l || !l.pts || l.pts.length < 4) return null;
+    var d = pointsAffiches(l), m = d.length / 2, cum = [0];
+    for (i = 1; i < m; i++) cum[i] = cum[i - 1] + Math.hypot(d[2 * i] - d[2 * i - 2], d[2 * i + 1] - d[2 * i - 1]);
+    return cum[m - 1] > 0 ? { d: d, cum: cum, total: cum[m - 1], m: m } : null;
+  }
+  // Le point du chemin à l'abscisse s (prolongé en ligne droite au-delà des bouts), et sa
+  // direction.
+  function pointChemin(ch, s) {
+    var i = 1;
+    while (i < ch.m - 1 && ch.cum[i] < s) i++;
+    var a = ch.cum[i - 1], b = ch.cum[i], dx = ch.d[2 * i] - ch.d[2 * i - 2], dy = ch.d[2 * i + 1] - ch.d[2 * i - 1], L = b - a || 1;
+    var f = (s - a) / L;
+    return { x: ch.d[2 * i - 2] + dx * f, y: ch.d[2 * i - 1] + dy * f, ux: dx / L, uy: dy / L };
+  }
+  function ecartEtiquette(e) { return (typeof e.ecart === "number" ? e.ecart : -0.85) * e.taille; }
+  // Où est le nom, et sous quel angle (degrés) : ses propres x, y, angle, ou ceux que lui
+  // donne le tracé qu'il suit. Sert à la sélection dans l'éditeur.
+  function poseEtiquette(carte, e) {
+    var ch = cheminEtiquette(carte, e);
+    if (!ch) return { x: e.x, y: e.y, angle: e.angle || 0, suit: false };
+    var p = pointChemin(ch, (e.pos == null ? 0.5 : e.pos) * ch.total), sens = p.ux < 0 ? -1 : 1, ec = ecartEtiquette(e);
+    return { x: p.x - p.uy * sens * ec, y: p.y + p.ux * sens * ec, angle: Math.atan2(p.uy * sens, p.ux * sens) * 180 / Math.PI, suit: true };
+  }
+  // La fraction du tracé la plus proche d'un point : pour faire glisser le nom le long.
+  function positionSurLigne(carte, e, wx, wy) {
+    var ch = cheminEtiquette(carte, e);
+    if (!ch) return null;
+    var best = 0, dMin = Infinity;
+    for (var i = 1; i < ch.m; i++) {
+      var ax = ch.d[2 * i - 2], ay = ch.d[2 * i - 1], dx = ch.d[2 * i] - ax, dy = ch.d[2 * i + 1] - ay, l2 = dx * dx + dy * dy;
+      var t = l2 ? Math.max(0, Math.min(1, ((wx - ax) * dx + (wy - ay) * dy) / l2)) : 0;
+      var dd = Math.hypot(wx - ax - dx * t, wy - ay - dy * t);
+      if (dd < dMin) { dMin = dd; best = (ch.cum[i - 1] + (ch.cum[i] - ch.cum[i - 1]) * t) / ch.total; }
+    }
+    return best;
+  }
+
   function dessinerEtiquettes(ctx, carte, vue, th, tx, ty, z, pw, ph, dpr) {
     var liste = carte.etiquettes || [];
     if (!liste.length) return;
@@ -1755,15 +2080,18 @@
       if (!e.texte) continue;
       var px = e.taille * z;
       if (px < 6 * dpr || px > 1400 * dpr) continue;
-      var sx = e.x * z + tx, sy = e.y * z + ty;
+      var chemin = cheminEtiquette(carte, e), pose = chemin ? poseEtiquette(carte, e) : e;
+      var sx = pose.x * z + tx, sy = pose.y * z + ty;
       var largeur = largeurEtiquette(e) * px;
       var demi = largeur / 2 + px * 2;
       if (sx + demi < 0 || sx - demi > pw || sy + demi < 0 || sy - demi > ph) continue;
       var st = STYLES_ETIQ[e.style] || STYLES_ETIQ.libre;
       var texte = texteEtiquette(e, st), espace = px * espaceEtiquette(e, st);
       ctx.save();
-      ctx.translate(sx, sy);
-      if (e.angle) ctx.rotate(e.angle * Math.PI / 180);
+      if (!chemin) {
+        ctx.translate(sx, sy);
+        if (e.angle) ctx.rotate(e.angle * Math.PI / 180);
+      }
       ctx.globalAlpha = e.opacite == null ? 1 : e.opacite;
       ctx.font = policeEtiquette(st, px);
       ctx.lineWidth = Math.max(2, px * 0.18);
@@ -1773,12 +2101,26 @@
       // (tous les navigateurs n'ont pas `letterSpacing` sur un canvas).
       var lettres = Array.from(texte), avances = [], k;
       for (k = 0; k < lettres.length; k++) avances.push(ctx.measureText(lettres[k]).width);
-      var theta = e.courbe ? e.courbe / 100 * Math.PI : 0, R = theta ? largeur / Math.abs(theta) : 0, sens = theta > 0 ? 1 : -1;
+      var theta = e.courbe && !chemin ? e.courbe / 100 * Math.PI : 0, R = theta ? largeur / Math.abs(theta) : 0, sens = theta > 0 ? 1 : -1;
+      // Le long d'un tracé : l'abscisse du milieu (en unités du monde), le sens de lecture.
+      var s0 = 0, lecture = 1, ecartM = 0;
+      if (chemin) {
+        s0 = (e.pos == null ? 0.5 : e.pos) * chemin.total;
+        lecture = pointChemin(chemin, s0).ux < 0 ? -1 : 1;
+        ecartM = ecartEtiquette(e);
+      }
       for (var passe = 0; passe < 2; passe++) {
         var x = -largeur / 2;
         for (k = 0; k < lettres.length; k++) {
           var cx = x + avances[k] / 2;
-          if (theta) {
+          if (chemin) {
+            var pc = pointChemin(chemin, s0 + lecture * cx / z);
+            ctx.save();
+            ctx.translate((pc.x - pc.uy * lecture * ecartM) * z + tx, (pc.y + pc.ux * lecture * ecartM) * z + ty);
+            ctx.rotate(Math.atan2(pc.uy * lecture, pc.ux * lecture));
+            if (passe === 0) ctx.strokeText(lettres[k], 0, 0); else ctx.fillText(lettres[k], 0, 0);
+            ctx.restore();
+          } else if (theta) {
             var phi = cx / R;
             ctx.save();
             ctx.translate(R * Math.sin(phi), sens * (R - R * Math.cos(phi)));
@@ -1935,35 +2277,86 @@
     c.fill();
   }
 
+  // Une maison : murs clairs à colombages, toit de tuiles à deux pans (l'un dans l'ombre),
+  // fenêtres, porte, et une cheminée une fois sur deux. (x, y) : le milieu de sa base.
   function maison(c, x, y, w, h) {
+    var lw = c.lineWidth;
     c.fillStyle = MURMAISON;
     c.beginPath(); c.rect(x - w / 2, y - h, w, h); c.fill(); c.stroke();
     c.fillStyle = OMBRE;
     c.fillRect(x, y - h, w / 2, h);
+    // Colombages, fenêtres et porte.
+    c.save();
+    c.strokeStyle = "rgba(92,62,30,0.75)"; c.lineWidth = lw * 0.6;
+    c.beginPath();
+    c.moveTo(x - w / 2, y - h * 0.52); c.lineTo(x + w / 2, y - h * 0.52);
+    c.moveTo(x - w * 0.22, y - h); c.lineTo(x - w * 0.22, y - h * 0.52);
+    c.moveTo(x + w * 0.24, y - h); c.lineTo(x + w * 0.24, y);
+    c.stroke();
+    c.restore();
+    c.fillStyle = "#3a2a1c";
+    c.fillRect(x - w * 0.4, y - h * 0.9, w * 0.13, h * 0.26);
+    c.fillRect(x + w * 0.3, y - h * 0.9, w * 0.13, h * 0.26);
+    c.fillStyle = BOIS;
+    c.fillRect(x - w * 0.1, y - h * 0.46, w * 0.2, h * 0.46);
+    // La cheminée, derrière le toit.
+    if (Math.round(x * 7 + y * 3) % 2 === 0) {
+      c.fillStyle = PIERRE;
+      c.beginPath(); c.rect(x + w * 0.2, y - h - w * 0.5, w * 0.13, w * 0.3); c.fill(); c.stroke();
+    }
     c.fillStyle = TOIT;
     c.beginPath();
-    c.moveTo(x - w / 2 - 2, y - h); c.lineTo(x, y - h - w * 0.5); c.lineTo(x + w / 2 + 2, y - h);
+    c.moveTo(x - w / 2 - 2.5, y - h); c.lineTo(x, y - h - w * 0.52); c.lineTo(x + w / 2 + 2.5, y - h);
     c.closePath(); c.fill(); c.stroke();
-    c.fillStyle = OMBRE;
-    c.beginPath(); c.moveTo(x, y - h - w * 0.5); c.lineTo(x + w / 2 + 2, y - h); c.lineTo(x, y - h); c.closePath(); c.fill();
-    c.fillStyle = BOIS;
-    c.fillRect(x - w * 0.09, y - h * 0.45, w * 0.18, h * 0.45);
+    c.fillStyle = "rgba(40,20,8,0.28)";
+    c.beginPath(); c.moveTo(x, y - h - w * 0.52); c.lineTo(x + w / 2 + 2.5, y - h); c.lineTo(x, y - h); c.closePath(); c.fill();
+    // Les rangs de tuiles.
+    c.save();
+    c.strokeStyle = "rgba(60,24,10,0.4)"; c.lineWidth = lw * 0.5;
+    c.beginPath();
+    for (var r = 1; r <= 2; r++) {
+      var f = r / 3;
+      c.moveTo(x - (w / 2 + 2.5) * f, y - h - w * 0.52 * (1 - f)); c.lineTo(x + (w / 2 + 2.5) * f, y - h - w * 0.52 * (1 - f));
+    }
+    c.stroke();
+    c.restore();
+  }
+
+  // Les assises d'un mur de pierre, entre (x0, y0) et (x1, y1) : joints horizontaux et
+  // verticaux décalés d'un rang à l'autre.
+  function assises(c, x0, y0, x1, y1, pas) {
+    c.save();
+    c.strokeStyle = "rgba(70,58,40,0.34)"; c.lineWidth = c.lineWidth * 0.5;
+    c.beginPath();
+    var rang = 0;
+    for (var y = y0 + pas; y < y1 - 0.5; y += pas, rang++) { c.moveTo(x0, y); c.lineTo(x1, y); }
+    rang = 0;
+    for (var yy = y0; yy < y1 - 0.5; yy += pas, rang++) {
+      for (var x = x0 + pas * (rang % 2 ? 0.6 : 1.3); x < x1 - 0.5; x += pas * 1.5) { c.moveTo(x, yy); c.lineTo(x, Math.min(y1, yy + pas)); }
+    }
+    c.stroke();
+    c.restore();
   }
 
   // Tour de pierre à toit conique : (x, y) est le milieu de sa base.
   function tourPierre(c, x, y, w, h, hToit) {
     c.fillStyle = PIERRE;
     c.beginPath(); c.rect(x - w / 2, y - h, w, h); c.fill(); c.stroke();
+    if (w >= 12) assises(c, x - w / 2, y - h, x + w / 2, y, Math.max(4, w * 0.22));
     c.fillStyle = OMBRE;
     c.fillRect(x, y - h, w / 2, h);
-    c.fillStyle = "#3a2a1a";
-    c.fillRect(x - w * 0.07, y - h * 0.68, w * 0.14, h * 0.2);
+    c.fillStyle = "#2a1c10";
+    c.fillRect(x - w * 0.07, y - h * 0.72, w * 0.14, h * 0.2);
+    if (h > 30) c.fillRect(x - w * 0.07, y - h * 0.4, w * 0.14, h * 0.14);
+    // L'encorbellement sous le toit.
+    c.fillStyle = PIERRE;
+    c.beginPath(); c.rect(x - w / 2 - 1.5, y - h - 1, w + 3, 3.4); c.fill(); c.stroke();
     c.fillStyle = TOIT;
     c.beginPath();
-    c.moveTo(x - w / 2 - 2, y - h); c.lineTo(x, y - h - hToit); c.lineTo(x + w / 2 + 2, y - h);
+    c.moveTo(x - w / 2 - 2.5, y - h - 1); c.lineTo(x, y - h - hToit); c.lineTo(x + w / 2 + 2.5, y - h - 1);
     c.closePath(); c.fill(); c.stroke();
-    c.fillStyle = OMBRE;
-    c.beginPath(); c.moveTo(x, y - h - hToit); c.lineTo(x + w / 2 + 2, y - h); c.lineTo(x, y - h); c.closePath(); c.fill();
+    c.fillStyle = "rgba(40,20,8,0.28)";
+    c.beginPath(); c.moveTo(x, y - h - hToit); c.lineTo(x + w / 2 + 2.5, y - h - 1); c.lineTo(x, y - h - 1); c.closePath(); c.fill();
   }
 
   // Rempart à créneaux entre x0 et x1, de hauteur h au-dessus de la ligne de sol yBase.
@@ -1974,6 +2367,7 @@
     for (var i = 0; i < n; i += 2) {
       c.beginPath(); c.rect(x0 + i * pas, yBase - h - 3.2, pas, 3.2); c.fill(); c.stroke();
     }
+    assises(c, x0, yBase - h, x1, yBase, Math.max(4, h * 0.26));
     c.fillStyle = OMBRE;
     c.fillRect(x0, yBase - h * 0.35, x1 - x0, h * 0.35);
   }
@@ -1984,17 +2378,38 @@
     c.beginPath(); c.moveTo(x, y - 15); c.lineTo(x + 10, y - 11.5); c.lineTo(x, y - 8); c.closePath(); c.fill(); c.stroke();
   }
 
+  // La porte d'une enceinte : une arche sombre et sa herse.
+  function porte(c, x, y, w, h) {
+    c.fillStyle = "#231710";
+    c.beginPath(); c.moveTo(x - w / 2, y); c.lineTo(x - w / 2, y - h + w / 2); c.arc(x, y - h + w / 2, w / 2, Math.PI, 0); c.lineTo(x + w / 2, y); c.closePath(); c.fill(); c.stroke();
+    c.save();
+    c.strokeStyle = "rgba(190,170,130,0.5)"; c.lineWidth = c.lineWidth * 0.5;
+    c.beginPath();
+    for (var q = -1; q <= 1; q++) { c.moveTo(x + q * w * 0.25, y); c.lineTo(x + q * w * 0.25, y - h * 0.72); }
+    c.moveTo(x - w / 2, y - h * 0.4); c.lineTo(x + w / 2, y - h * 0.4);
+    c.stroke();
+    c.restore();
+  }
+
+  // Un château : le donjon et ses tours derrière, la courtine à créneaux devant, la porte à
+  // herse, deux tours d'angle. La capitale y ajoute un second rang de tours, les toits de
+  // la ville haute et des bannières.
   function chateau(c, grand) {
-    ombreSol(c, 0, 34, 47, 8);
-    tourPierre(c, 0, 20, grand ? 30 : 24, grand ? 52 : 38, grand ? 20 : 16);
-    tourPierre(c, -20, 22, 13, 38, 13);
-    tourPierre(c, 20, 22, 13, 38, 13);
-    rempart(c, -38, 38, 33, 21, 11);
-    c.fillStyle = "#2a1c10";
-    c.beginPath(); c.moveTo(-7, 33); c.lineTo(-7, 24); c.arc(0, 24, 7, Math.PI, 0); c.lineTo(7, 33); c.closePath(); c.fill(); c.stroke();
-    tourPierre(c, -40, 35, 16, 44, 14);
-    tourPierre(c, 40, 35, 16, 44, 14);
-    if (grand) drapeau(c, 0, -32 - 20 + 4);
+    ombreSol(c, 0, 35, 49, 8);
+    if (grand) {
+      tourPierre(c, -30, 12, 11, 30, 12);
+      tourPierre(c, 30, 12, 11, 30, 12);
+      dessinerMaisons(c, [[-13, 14, 13, 9], [13, 14, 13, 9]]);
+    }
+    tourPierre(c, 0, 20, grand ? 28 : 24, grand ? 54 : 40, grand ? 21 : 16);
+    tourPierre(c, -19, 22, 13, grand ? 42 : 36, 13);
+    tourPierre(c, 19, 22, 13, grand ? 42 : 36, 13);
+    rempart(c, -38, 38, 34, 21, 11);
+    porte(c, 0, 34, 15, 17);
+    tourPierre(c, -40, 36, 16, 44, 14);
+    tourPierre(c, 40, 36, 16, 44, 14);
+    if (grand) { drapeau(c, 0, -34 - 21 + 4); drapeau(c, -40, -8 - 14 + 4); drapeau(c, 40, -8 - 14 + 4); }
+    else drapeau(c, 0, -20 - 16 + 4);
   }
 
   function dessinerMaisons(c, liste) {
@@ -2016,13 +2431,26 @@
       case "capitale": chateau(c, true); break;
       case "fort": chateau(c, false); break;
       case "ville":
-        ombreSol(c, 0, 31, 47, 9);
-        tourPierre(c, 0, 8, 17, 34, 15);
-        dessinerMaisons(c, [[-34, 14, 22, 15], [-6, 12, 18, 12], [32, 14, 22, 16], [-22, 28, 24, 16], [8, 30, 26, 18], [36, 31, 18, 12]]);
+        // Une ville close : l'église et son clocher, trois rangs de toits, l'enceinte et
+        // sa porte au premier plan.
+        ombreSol(c, 0, 35, 49, 8);
+        tourPierre(c, -40, 20, 10, 24, 10);
+        tourPierre(c, 40, 20, 10, 24, 10);
+        dessinerMaisons(c, [[-24, 2, 15, 10], [-6, 0, 15, 10], [26, 3, 16, 11]]);
+        tourPierre(c, 9, 6, 11, 34, 20);
+        c.beginPath(); c.moveTo(9, -48); c.lineTo(9, -55); c.moveTo(6, -52); c.lineTo(12, -52); c.stroke();
+        dessinerMaisons(c, [[-32, 15, 17, 11], [-13, 14, 17, 12], [5, 16, 16, 11], [24, 15, 18, 12], [-22, 26, 18, 12], [-2, 27, 19, 13], [19, 26, 18, 12]]);
+        rempart(c, -44, 44, 36, 11, 15);
+        porte(c, 0, 36, 10, 10);
+        tourPierre(c, -45, 37, 11, 24, 10);
+        tourPierre(c, 45, 37, 11, 24, 10);
         break;
       case "village":
-        ombreSol(c, 0, 29, 36, 7);
-        dessinerMaisons(c, [[16, 12, 22, 15], [-20, 15, 24, 16], [-2, 31, 28, 19]]);
+        // Un hameau : cinq maisons autour de la place, un arbre.
+        ombreSol(c, 0, 31, 42, 7);
+        dessinerMaisons(c, [[-4, 8, 17, 11], [20, 12, 20, 13], [-26, 14, 20, 13], [10, 30, 24, 16], [-18, 32, 22, 14]]);
+        c.fillStyle = "#5a4026"; c.fillRect(34, 22, 3, 10);
+        [[35.5, 18, 8, "#5f9c3b"], [31, 22, 6, "#4a8636"], [40, 22, 6, "#3f7a32"]].forEach(function (f) { c.fillStyle = f[3]; c.beginPath(); c.arc(f[0], f[1], f[2], 0, TAU); c.fill(); c.stroke(); });
         break;
       case "tour":
         ombreSol(c, 0, 35, 20, 6);
@@ -2711,6 +3139,17 @@
   //             grille, cle (canvas de travail) }
   function dessiner(cv, carte, vue, options) {
     var opts = options || {};
+    // Calques masqués (`opts.cacher` : { decors, tampons, lignes, lacs, etiquettes, lieux,
+    // ornements }) : on dessine une copie de la carte où ces collections sont vides — tout
+    // le reste du rendu (masque, ponts, creusement) suit de lui-même.
+    var cache = opts.cacher, sansDecors = false;
+    if (cache) {
+      var copie = Object.assign({}, carte);
+      ["tampons", "lignes", "lacs", "etiquettes", "lieux"].forEach(function (k) { if (cache[k]) copie[k] = []; });
+      if (cache.ornements) copie.ornements = null;
+      sansDecors = !!cache.decors;
+      carte = copie;
+    }
     var th = THEMES[carte.theme] || THEMES.atlas;
     COULEURS = th.couleurs || null; ENCRE_DECORS = !!th.encreDecors; ECH_THEME = th.echDecors || 1;
     var dpr = vue.dpr || 1;
@@ -2797,12 +3236,20 @@
         visibles.push({ x: tp.x, y: y, s: s });
         decors.push({ x: tp.x, y: y, s: s, sprite: tp.type, v: tp.v || 0 });
       });
-      semerDecors(carte, vue, masque, X0, Y0, X1, Y1, visibles, decors);
+      if (!sansDecors) semerDecors(carte, vue, masque, X0, Y0, X1, Y1, visibles, decors);
       lc.save();
       lc.setTransform(z, 0, 0, z, tx, ty);
       lc.beginPath();
       lc.rect(0, 0, carte.largeur, carte.hauteur);
       lc.clip();
+      dessinerChamps(lc, carte, vue, masque, X0, Y0, X1, Y1, !!th.encreDecors);
+      fissuresLave(lc, carte, vue, masque, X0, Y0, X1, Y1);
+      // Routes et sentiers sont peints DANS la terre, avant les décors : les arbres qui les
+      // bordent passent devant, au lieu d'un ruban posé par-dessus la forêt. « source-atop » :
+      // jamais sur l'eau — là, c'est le pont qui prend le relais.
+      lc.globalCompositeOperation = "source-atop";
+      tracerVoies(lc, voiesVisibles(carte, vue, th, X0, Y0, X1, Y1), vue);
+      lc.globalCompositeOperation = "source-over";
       peindreDecors(lc, decors);
       lc.restore();
       // L'ombre des rivages (style Enluminé) : la silhouette de l'EAU projette une ombre
@@ -2966,8 +3413,7 @@
   function apercuDecor(ctx, sprite, v, x, y, s) {
     var avant = ZPX;
     ZPX = 2;
-    if (sprite === "@volcan") volcan(ctx, x, y, s * 0.9, 0.2);
-    else if (PEINTRES[sprite]) colle(ctx, sprite, v || 0, x, y + s * 0.31, s);
+    if (PEINTRES[sprite]) colle(ctx, sprite, v || 0, x, y + s * 0.31, s);
     ZPX = avant;
   }
 
@@ -2979,10 +3425,10 @@
     alea: alea, joli: joli,
     niveau: niveau, zoomAjuste: zoomAjuste,
     boiteTrait: boiteTrait, nouveauTrait: nouveauTrait,
-    boiteEtiquette: boiteEtiquette, visibleLieu: visibleLieu, tailleIcone: tailleIcone,
+    boiteEtiquette: boiteEtiquette, poseEtiquette: poseEtiquette, positionSurLigne: positionSurLigne, visibleLieu: visibleLieu, tailleIcone: tailleIcone,
     styleLigne: styleLigne, pointsAffiches: pointsAffiches, dansPolygone: dansPolygone,
     icone: icone, iconeAuto: iconeAuto, dessinerIconeLieu: dessinerIconeLieu,
-    apercuDecor: apercuDecor, tailleTampon: tailleTampon, preparerImages: preparerImages, surImage: null,
+    apercuDecor: apercuDecor, tailleTampon: tailleTampon, FINESSE_MAX: FINESSE_MAX, preparerImages: preparerImages, surImage: null,
     dessiner: dessiner, carteEntiere: carteEntiere, vignette: vignette, apercuTrait: apercuTrait
   };
 })();

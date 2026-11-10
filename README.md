@@ -1745,9 +1745,7 @@ fichier `.worldmap.json` (réimportable depuis la galerie).
 **Le zoom « infini » tient au vectoriel.** Une carte n'est pas une image : ce sont des objets en
 unités du monde (des **km**) — traits de pinceau, tracés, noms, lieux — redessinés à chaque
 image. Le pinceau se règle en **pixels écran** : zoomer avant de peindre donne un trait plus fin
-dans le monde, d'où le détail à volonté. Le niveau de zoom est plafonné à ×3 000 (1 pixel ≈ un
-mètre sur une carte de 6 000 km) : au-delà, les nombres flottants 32 bits du canvas ne suffisent
-plus à placer les points sans tremblement.
+dans le monde, d'où le détail à volonté. Le niveau de zoom est plafonné à ×15.
 
 **« Niveau » = zoom relatif à la vue d'ensemble** (`Moteur.zoomAjuste`) : 1 = la carte entière,
 10 = dix fois plus près. Il ne dépend ni de la taille de l'écran ni de celle de la carte, si bien
@@ -1938,6 +1936,84 @@ projetée sur la terre, `ombreCote`) ; les terrains ont des couleurs plus denses
 `tracerTrait`) ; les décors sont un peu plus grands (`echDecors`) et **cernés d'encre** — le sprite
 est assombri puis sa silhouette, décalée dans huit directions, est glissée dessous (`encreDecors`,
 mis en cache à part) ; le cadre gagne volutes et fleurons (`orneRiche`).
+
+**Terres volcaniques.** `fissuresLave` trace un réseau de fissures rougeoyantes sur le terrain
+« Volcan » : chaque emplacement des cases emboîtées est relié à celui de la case qui le contient au
+niveau au-dessus, d'où un réseau en arbre (grosses coulées, ramifications de plus en plus fines) qui
+reste en place quand on zoome, s'épaissit doucement et se ramifie en fondu. Le décor du terrain est
+un bouquet d'aiguilles d'obsidienne (`peintAiguilles`, aussi en tampon) mêlé de roches sombres.
+**Montagnes** : plus massives (96 px) et à facettes claires et sombres. **Forêts** : trois essences
+mêlées. Le monde aléatoire sème aussi des plaques de **champs** dans les basses plaines.
+
+**Voies sous les arbres.** Routes et sentiers ne sont plus tracés par-dessus la carte : ils sont
+peints DANS la couche de terre (`tracerVoies` en « source-atop », jamais sur l'eau), après les champs
+et la lave et avant les décors. Les arbres qui les bordent passent donc devant, et le couloir dégagé
+dans le masque est réduit au pied de la voie (seuls les grands décors s'en écartent davantage).
+Texture refaite : talus en ombre douce, bord net, chaussée, milieu usé, cailloux sur les bords,
+ornières. **Ponts** (`pontLe`) : ombre sur l'eau, parapets de pierre, tablier de la couleur de la voie,
+dalles en travers, piles rondes ; en bois à planches pour un sentier.
+
+**Champs** (`dessinerChamps`) : un damier de parcelles — quadrillage déformé, une culture et des
+sillons par case, des haies entre elles — au lieu de parcelles isolées. Hiérarchique comme les
+décors : une parcelle qui se divise transmet sa couleur à ses filles, qui prennent peu à peu la leur ;
+les nouveaux coins et les nouvelles haies apparaissent en fondu. **Montagnes** : deux tailles mêlées,
+écart et marge réduits — une crête étroite porte sa rangée de sommets dès la vue d'ensemble.
+**Zoom** plafonné à ×15 (`NIVEAU_MAX`).
+
+**Décors fixés dans le monde (remplace « qui poussent en zoomant »).** Comme sur une carte
+imprimée : même nombre de décors, aux mêmes places, de la même taille en km à tous les zooms — zoomer
+les agrandit, rien n'apparaît ni ne disparaît. Le niveau de cases d'un terrain (`niveauDecor`) ne
+dépend plus de la vue mais de la carte (`zoomBase` : la carte tenant dans 1 400 px), de son **échelle
+des décors** (`carte.finesse`, 0 à 2, réglée dans « Carte… », 1 par défaut) et de la **finesse du
+trait** (`fin`, 0 à 4, dans le canal vert du masque) : chaque cran divise la taille par deux. Au
+pinceau, « Auto » la tire du zoom au moment de peindre — peindre de près donne des décors fins — ou
+on la fixe (×1 à ×16). La taille d'un décor est proportionnelle à sa case. Seule entorse, pour la
+lisibilité et la vitesse : des décors qui feraient moins de quelques pixels sont dessinés un sur
+quatre, deux fois plus grands, aux mêmes endroits. Champs et fissures de lave sont fixés de même ; les
+tampons n'ont plus de taille plafonnée à l'écran.
+
+**Affiner les décors** (outil Terrains, groupe « Détail ») : un pinceau qui ne change pas le terrain,
+seulement la finesse de ses décors — pour détailler après coup une région peinte à l'échelle du
+continent. Les zones sont dans `carte.finesses` (`{ taille, pts, fin }`) et ont leur propre petit
+masque (`masque.fin`), lu seulement quand la vue en contient ; là où il y en a une, sa finesse
+remplace celle du trait. « Retirer les zones affinées » les enlève toutes (annulable).
+
+**Gomme à décors** (Terrains → Détail) : une zone de `carte.finesses` peut porter `dens` au lieu de
+`fin` (0 : plus aucun décor ; 1 : quelques-uns) — canal vert du masque des zones. Pour ouvrir une
+clairière ou dégager un col sans repeindre le terrain. **Bâtiments** : maisons à colombages, fenêtres,
+cheminées et rangs de tuiles ; murs à assises de pierre (`assises`) ; porte à herse (`porte`) ; la
+capitale gagne un second rang de tours et des bannières, la ville devient une ville close (enceinte,
+église, trois rangs de toits), le village un hameau de cinq maisons.
+
+**Sélection multiple** (`E.multi`). Maj + clic ajoute ou retire un objet, Maj + glisser dans le vide
+trace un cadre (`objetsDans` : ce qui y tombe entièrement), Ctrl+A prend tout. Glisser l'un des objets
+les déplace tous ; « Plus petits / Plus grands », Dupliquer (Ctrl+D) et Supprimer s'appliquent au
+groupe. Chaque opération est un seul pas d'historique (un « lot » ; les suppressions y sont triées par
+rang pour que « Annuler » remette chaque objet à sa place).
+
+**Calques** (`carte.calques`, bloc « Calques » du panneau). Sept familles — décors du terrain, décors
+posés, tracés, lacs, noms, lieux, ornements — chacune avec un œil (masquer) et, pour les objets, un
+cadenas (verrouiller : plus sélectionnable, donc plus déplaçable par erreur). Un calque masqué n'est
+dessiné ni à l'écran ni dans l'export : `Moteur.dessiner` reçoit `cacher` et travaille sur une copie
+de la carte aux collections vidées, si bien que masque, ponts et creusement suivent d'eux-mêmes.
+
+**Villes qui s'étalent.** Deux terrains « Bâti » : **Ville (quartiers)** — maisons serrées aux toits
+de teintes variées, grandes bâtisses, clochers (`peintMaisonVille`, qui réutilise `maison` et
+`tourPierre`) — et **Faubourg** (maisons éparses, arbres, parcelles). Ce sont des terrains comme les
+autres : finesse, densité, gomme à décors s'y appliquent, et une route tracée à travers ouvre une rue
+(les maisons s'en écartent). Maison, bâtisse et église existent aussi en tampons.
+
+**Rivières plus naturelles.** `traceRiviereEau` dessine un ruban continu (deux rives décalées du
+tracé) au lieu de tronçons à paliers : un filet à la source, une largeur qui croît sans à-coups
+jusqu'à l'embouchure arrondie, des biefs larges et des passages resserrés. `serpenter` module
+l'amplitude des méandres par une onde lente : amples par endroits, presque droits ailleurs.
+
+**Noms qui suivent un tracé.** Un nom peut porter `ligne` (identifiant d'un tracé), `pos` (fraction
+de sa longueur) et `ecart` (décalage latéral, en hauteurs de texte) : il s'écrit lettre à lettre le
+long du tracé dessiné, méandres compris, et jamais la tête en bas (`cheminEtiquette`, `pointChemin`).
+Outil Noms : case « Le long d'un tracé », puis clic sur une rivière ou une route ; un nom existant
+s'attache au tracé le plus proche ou s'en détache. Glisser le nom le fait coulisser
+(`positionSurLigne`) ; si le tracé change, le nom suit ; si le tracé disparaît, il redevient droit.
 
 Les cartes d'avant s'ouvrent telles quelles : seuls leurs décors changent (ils viennent maintenant
 du terrain) et leurs petits lieux automatiques ont disparu.

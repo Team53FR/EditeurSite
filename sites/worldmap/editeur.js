@@ -11,7 +11,7 @@
   var $ = function (id) { return document.getElementById(id); };
   var scene = $("scene"), cvCarte = $("cvCarte"), cvSur = $("cvSurcouche"), saisie = $("saisie");
 
-  var NIVEAU_MIN = 0.25, NIVEAU_MAX = 3000;
+  var NIVEAU_MIN = 0.25, NIVEAU_MAX = 15;
 
   var E = {
     carte: null,
@@ -21,6 +21,8 @@
     taillePx: 40,
     densite: 2,              // pinceau : décors du terrain (0 aucun, 1 clairsemé, 2 normal, 3 dense)
     echDecor: 1,             // pinceau : taille des décors (0 petits, 1 normaux, 2 grands)
+    eclaircir: 0,            // gomme à décors : 0 retire tout, 1 n'en laisse que quelques-uns
+    finesse: "auto",         // pinceau : finesse des décors (0 à 4, ou « auto » : d'après le zoom)
     rugosite: 0,             // pinceau et gomme : bord découpé (0 = bord lisse)
     tampon: "arbre",         // outil Décors : le décor posé à la main
     taillePxTampon: 36,
@@ -31,10 +33,12 @@
     meandre: 0.6,            // rivières : amplitude des méandres (0 = droit)
     delta: true,             // rivières : s'élargissent vers l'embouchure
     fermer: false,           // frontières : refermer en territoire coloré
+    suivre: false,           // noms : poser le nom le long d'un tracé
     styleEtiq: "pays",
     taillePxEtiq: 30,
     typeLieu: "ville",
     selection: null,         // { coll, obj }
+    multi: [],               // sélection multiple : [{ coll, obj }] (deux objets au moins)
     grille: false,
     ligneEnCours: null,      // { type, pts, taille }
     curseur: null,           // { x, y } en px scène
@@ -133,7 +137,7 @@
       cx: E.vue.cx, cy: E.vue.cy, zoom: E.vue.zoom,
       largeur: Math.round(W * (1 + 2 * MARGE_CACHE)), hauteur: Math.round(H * (1 + 2 * MARGE_CACHE)), dpr: DPR
     };
-    Moteur.dessiner(cache.cv, E.carte, v, { grille: E.grille });
+    Moteur.dessiner(cache.cv, E.carte, v, { grille: E.grille, cacher: calquesCaches() });
     cache.vue = v;
   }
 
@@ -161,6 +165,7 @@
     var px = pas * E.vue.zoom;
     $("echelle").innerHTML = '<div class="regle" style="width:' + px.toFixed(0) + 'px"></div>' + formatKm(pas);
     majLibelleTaille();
+    majLibelleFinesse();
   }
 
   function vueChangee() {
@@ -189,9 +194,20 @@
     ctx.clearRect(0, 0, pw, ph);
     if (!E.carte) return;
 
-    if (geste && geste.type === "trait") Moteur.apercuTrait(ctx, geste.trait, vueComplete());
+    if (geste && geste.type === "trait" && !geste.affiner) Moteur.apercuTrait(ctx, geste.trait, vueComplete());
 
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    if (geste && geste.affiner) {
+      // La zone à affiner : un voile clair, le terrain reste visible dessous.
+      var pa = geste.trait.pts;
+      ctx.lineCap = ctx.lineJoin = "round";
+      ctx.strokeStyle = ctx.fillStyle = "rgba(255,244,200,0.4)";
+      ctx.lineWidth = geste.trait.taille * E.vue.zoom;
+      ctx.beginPath();
+      var s0 = versEcran(pa[0], pa[1]);
+      if (pa.length <= 2) { ctx.arc(s0[0], s0[1], geste.trait.taille * E.vue.zoom / 2, 0, Math.PI * 2); ctx.fill(); }
+      else { ctx.moveTo(s0[0], s0[1]); for (var ia = 2; ia < pa.length; ia += 2) { var sa2 = versEcran(pa[ia], pa[ia + 1]); ctx.lineTo(sa2[0], sa2[1]); } ctx.stroke(); }
+    }
     if (geste && geste.type === "tampons") {
       geste.poses.forEach(function (t) {
         var s0 = versEcran(t.x, t.y - t.s * 0.3), px = t.s * E.vue.zoom;
@@ -280,8 +296,31 @@
   }
 
   function selectionSurcouche(ctx) {
-    var sel = E.selection;
+    if (geste && geste.type === "cadre") {
+      var gx = Math.min(geste.x0, geste.x1), gy = Math.min(geste.y0, geste.y1);
+      ctx.fillStyle = "rgba(255,211,107,0.14)"; ctx.strokeStyle = "#ffd36b"; ctx.lineWidth = 1.5;
+      ctx.setLineDash([5, 4]);
+      ctx.fillRect(gx, gy, Math.abs(geste.x1 - geste.x0), Math.abs(geste.y1 - geste.y0));
+      ctx.strokeRect(gx, gy, Math.abs(geste.x1 - geste.x0), Math.abs(geste.y1 - geste.y0));
+      ctx.setLineDash([]);
+    }
+    if (E.multi.length) E.multi.forEach(function (m) { marqueSelection(ctx, m, true); });
+    else marqueSelection(ctx, E.selection, false);
+  }
+
+  // Le repère d'un objet sélectionné. `groupe` : dans une sélection multiple, un tracé ou un
+  // lac est simplement surligné (ses points ne se déplacent qu'un par un, seul).
+  function marqueSelection(ctx, sel, groupe) {
     if (!sel) return;
+    if (groupe && (sel.coll === "lignes" || sel.coll === "lacs")) {
+      var pg = sel.coll === "lignes" ? Moteur.pointsAffiches(sel.obj) : sel.obj.pts;
+      ctx.strokeStyle = "rgba(255,211,107,0.9)"; ctx.lineWidth = 3; ctx.setLineDash([6, 4]);
+      ctx.beginPath();
+      for (var g = 0; g < pg.length; g += 2) { var sg = versEcran(pg[g], pg[g + 1]); if (g === 0) ctx.moveTo(sg[0], sg[1]); else ctx.lineTo(sg[0], sg[1]); }
+      if (sel.coll === "lacs") ctx.closePath();
+      ctx.stroke(); ctx.setLineDash([]);
+      return;
+    }
     ctx.strokeStyle = "#ffd36b";
     ctx.fillStyle = "#fff";
     ctx.lineWidth = 2;
@@ -295,13 +334,13 @@
       ctx.stroke();
       ctx.setLineDash([]);
     } else if (sel.coll === "etiquettes") {
-      var e = sel.obj, b = Moteur.boiteEtiquette(e), sc = versEcran(e.x, e.y);
+      var e = sel.obj, po = Moteur.poseEtiquette(E.carte, e), b = po.suit ? { w: Moteur.boiteEtiquette({ texte: e.texte, style: e.style, espace: e.espace, taille: e.taille }).w, h: e.taille * 1.1, dy: 0 } : Moteur.boiteEtiquette(e), sc = versEcran(po.x, po.y);
       var w = b.w * E.vue.zoom, h = b.h * E.vue.zoom;
       // Hors des tailles où le texte est dessiné (6 à 1 400 px), il n'y a rien à entourer.
       if (e.taille * E.vue.zoom < 6 || e.taille * E.vue.zoom > 1400) return;
       ctx.save();
       ctx.translate(sc[0], sc[1]);
-      if (e.angle) ctx.rotate(e.angle * Math.PI / 180);
+      if (po.angle) ctx.rotate(po.angle * Math.PI / 180);
       ctx.setLineDash([5, 3]);
       ctx.strokeRect(-w / 2 - 4, -h / 2 - 2 + (b.dy || 0) * E.vue.zoom, w + 8, h + 4);   // `dy` : la flèche d'un nom courbe
       ctx.restore();
@@ -355,6 +394,8 @@
 
   function apresHistorique() {
     if (E.selection && collection(E.selection.coll).indexOf(E.selection.obj) < 0) E.selection = null;
+    E.multi = E.multi.filter(function (m) { return collection(m.coll).indexOf(m.obj) >= 0; });
+    if (E.multi.length < 2) E.multi = [];
     majBoutonsHisto();
     panneauSelection();
     infosCarte();
@@ -451,6 +492,7 @@
   // ----- Sélection et recherche d'objets -----
   function selectionner(coll, obj) {
     cloreEdition();
+    E.multi = [];
     E.selection = obj ? { coll: coll, obj: obj } : null;
     panneauSelection();
     majIndex();
@@ -464,27 +506,170 @@
     return { d: Math.hypot(px - x, py - y), x: x, y: y, t: t };
   }
 
+  // ----- Sélection multiple -----
+  function selectionListe() { return E.multi.length ? E.multi : (E.selection ? [E.selection] : []); }
+  function selectionnerListe(liste) {
+    cloreEdition();
+    if (liste.length === 1) { selectionner(liste[0].coll, liste[0].obj); return; }
+    E.selection = null;
+    E.multi = liste.length >= 2 ? liste : [];
+    panneauSelection();
+    majIndex();
+    surcouche();
+  }
+  function dansSelection(obj) { return E.multi.some(function (m) { return m.obj === obj; }); }
+
+  // Le point d'ancrage d'un objet (monde), pour savoir s'il est dans le cadre.
+  function ancres(coll, o) {
+    if (o.pts) return o.pts;
+    if (coll === "tampons") return [o.x, o.y - o.s * 0.3];
+    return [o.x, o.y];
+  }
+  var COLLS = ["lieux", "etiquettes", "tampons", "lignes", "lacs"];
+
+  // Tout ce qui tombe entièrement dans le rectangle (monde), sur les calques modifiables.
+  function objetsDans(x0, y0, x1, y1) {
+    var out = [], niv = niveauActuel();
+    COLLS.forEach(function (coll) {
+      if (!calqueLibre(coll)) return;
+      E.carte[coll].forEach(function (o) {
+        if (coll === "lieux" && !Moteur.visibleLieu(o, niv)) return;
+        var a = ancres(coll, o);
+        for (var i = 0; i < a.length; i += 2) if (a[i] < x0 || a[i] > x1 || a[i + 1] < y0 || a[i + 1] > y1) return;
+        out.push({ coll: coll, obj: o });
+      });
+    });
+    return out;
+  }
+
+  function deplacerDe(o, base, dx, dy) {
+    if (o.pts) { for (var i = 0; i < base.length; i += 2) { o.pts[i] = base[i] + dx; o.pts[i + 1] = base[i + 1] + dy; } }
+    else { o.x = base[0] + dx; o.y = base[1] + dy; }
+  }
+
+  function supprimerSelection() {
+    var liste = selectionListe();
+    if (!liste.length) return;
+    if (liste.length === 1) { supprimerObjet(liste[0].coll, liste[0].obj); return; }
+    // Triées par rang : « Annuler » remet chaque objet à sa place d'origine.
+    var actions = liste.map(function (m) { return { t: "suppr", coll: m.coll, obj: m.obj, idx: collection(m.coll).indexOf(m.obj) }; })
+      .sort(function (a, b) { return a.idx - b.idx; });
+    E.multi = [];
+    executer({ t: "lot", actions: actions });
+  }
+
+  function dupliquerSelection() {
+    var liste = selectionListe();
+    if (!liste.length) return;
+    if (liste.length === 1) { dupliquer(liste[0].coll, liste[0].obj); return; }
+    var d = 26 / E.vue.zoom, copies = [], compte = {};
+    var actions = liste.map(function (m) {
+      var c = cloner(m.obj);
+      c.id = nouvelId(m.coll.charAt(0));
+      delete c.carteId;
+      if (c.pts) for (var i = 0; i < c.pts.length; i += 2) { c.pts[i] += d; c.pts[i + 1] += d; }
+      else { c.x += d; c.y += d; }
+      compte[m.coll] = (compte[m.coll] || 0) + 1;
+      copies.push({ coll: m.coll, obj: c });
+      return { t: "ajout", coll: m.coll, obj: c, idx: collection(m.coll).length + compte[m.coll] - 1 };
+    });
+    executer({ t: "lot", actions: actions });
+    selectionnerListe(copies);
+  }
+
+  // Agrandit ou réduit tous les objets de la sélection (lieux, décors, noms), sur place.
+  function echelleSelection(f) {
+    var avant = E.multi.map(function (m) { return JSON.stringify(m.obj); });
+    E.multi.forEach(function (m) {
+      var o = m.obj;
+      if (m.coll === "lieux") o.ech = borne((o.ech || 1) * f, 0.4, 3);
+      else if (m.coll === "tampons") { var pied = o.y - o.s * 0.3; o.s *= f; o.y = pied + o.s * 0.3; }
+      else if (m.coll === "etiquettes") o.taille *= f;
+    });
+    var actions = [];
+    E.multi.forEach(function (m, i) {
+      var ap = JSON.stringify(m.obj);
+      if (ap !== avant[i]) actions.push({ t: "modif", coll: m.coll, id: m.obj.id, avant: JSON.parse(avant[i]), apres: JSON.parse(ap) });
+    });
+    if (actions.length) { enregistrer({ t: "lot", actions: actions }); marquer(); rendre(); }
+  }
+
+  // ----- Calques -----
+  //
+  // Chaque famille d'objets peut être masquée (elle n'est plus dessinée, ni à l'écran ni
+  // dans l'export) ou verrouillée (on ne peut plus la sélectionner : elle ne bouge plus par
+  // erreur). L'état est enregistré avec la carte (`carte.calques`).
+  var CALQUES = [
+    ["decors", "Décors du terrain"], ["tampons", "Décors posés"], ["lignes", "Tracés"], ["lacs", "Lacs"],
+    ["etiquettes", "Noms"], ["lieux", "Lieux"], ["ornements", "Ornements"]
+  ];
+  function etatCalque(cle) { var c = E.carte.calques; return (c && c[cle]) || {}; }
+  function calqueLibre(coll) { var e = etatCalque(coll); return !e.cache && !e.verrou; }
+  function calquesCaches() {
+    var out = null;
+    CALQUES.forEach(function (c) { if (etatCalque(c[0]).cache) { out = out || {}; out[c[0]] = true; } });
+    return out;
+  }
+  function basculerCalque(cle, champ) {
+    var c = E.carte.calques = E.carte.calques || {};
+    c[cle] = c[cle] || {};
+    if (c[cle][champ]) delete c[cle][champ]; else c[cle][champ] = true;
+    if (!c[cle].cache && !c[cle].verrou) delete c[cle];
+    // Ce qui devient intouchable sort de la sélection.
+    if (E.selection && !calqueLibre(E.selection.coll)) selectionner(null, null);
+    if (E.multi.length) selectionnerListe(E.multi.filter(function (m) { return calqueLibre(m.coll); }));
+    majCalques();
+    marquer();
+    rendre();
+  }
+  function majCalques() {
+    var zone = $("listeCalques");
+    if (!zone) return;
+    zone.innerHTML = "";
+    CALQUES.forEach(function (c) {
+      var e = etatCalque(c[0]);
+      var oeil = el("button", { type: "button", classe: "btn-calque" + (e.cache ? " inactif" : ""), title: e.cache ? "Afficher" : "Masquer", "aria-pressed": String(!e.cache), "aria-label": (e.cache ? "Afficher " : "Masquer ") + c[1] });
+      oeil.innerHTML = e.cache
+        ? '<svg viewBox="0 0 24 24"><path d="M3 3l18 18"/><path d="M10.600 6.200A9.500 9.500 0 0 1 12 6c5 0 8.500 4 9.500 6-.400.800-1.200 2-2.400 3.200M6.300 7.700C4.300 9 3 10.900 2.500 12c1 2 4.500 6 9.500 6 1.300 0 2.500-.300 3.600-.700"/></svg>'
+        : '<svg viewBox="0 0 24 24"><path d="M2.500 12C3.500 10 7 6 12 6s8.500 4 9.500 6c-1 2-4.500 6-9.500 6s-8.500-4-9.500-6z"/><circle cx="12" cy="12" r="2.800"/></svg>';
+      oeil.addEventListener("click", function () { basculerCalque(c[0], "cache"); });
+      var ligne = el("div", { classe: "ligne-calque" + (e.cache ? " cache" : "") }, [oeil]);
+      if (c[0] !== "decors" && c[0] !== "ornements") {
+        var cadenas = el("button", { type: "button", classe: "btn-calque" + (e.verrou ? " verrou" : " inactif"), title: e.verrou ? "Déverrouiller" : "Verrouiller (ne plus pouvoir sélectionner)", "aria-pressed": String(!!e.verrou), "aria-label": (e.verrou ? "Déverrouiller " : "Verrouiller ") + c[1] });
+        cadenas.innerHTML = e.verrou
+          ? '<svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="1.500"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>'
+          : '<svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="1.500"/><path d="M8 11V8a4 4 0 0 1 7.500-2"/></svg>';
+        cadenas.addEventListener("click", function () { basculerCalque(c[0], "verrou"); });
+        ligne.appendChild(cadenas);
+      } else ligne.appendChild(el("span", { classe: "btn-calque vide" }));
+      ligne.appendChild(el("span", { classe: "nom-calque", texte: c[1] }));
+      zone.appendChild(ligne);
+    });
+  }
+
   function trouver(px, py) {
     var z = E.vue.zoom, niv = niveauActuel(), w = versMonde(px, py), i;
-    var lieux = E.carte.lieux;
+    var lieux = calqueLibre("lieux") ? E.carte.lieux : [];
     for (i = lieux.length - 1; i >= 0; i--) {
       var l = lieux[i];
       if (!Moteur.visibleLieu(l, niv)) continue;
       var s = versEcran(l.x, l.y);
       if (Math.hypot(s[0] - px, s[1] - py) <= Moteur.tailleIcone(l, themeActuel()) / 2 + 6) return { coll: "lieux", obj: l };
     }
-    var et = E.carte.etiquettes;
+    var et = calqueLibre("etiquettes") ? E.carte.etiquettes : [];
     for (i = et.length - 1; i >= 0; i--) {
       var e = et[i];
       var tpx = e.taille * z;
       if (!e.texte || tpx < 6 || tpx > 1400) continue;
       var b = Moteur.boiteEtiquette(e);
-      var dx = w[0] - e.x, dy = w[1] - e.y;
-      var a = -(e.angle || 0) * Math.PI / 180;
+      var pe = Moteur.poseEtiquette(E.carte, e);
+      if (pe.suit) b = { w: Moteur.boiteEtiquette({ texte: e.texte, style: e.style, espace: e.espace, taille: e.taille }).w, h: e.taille * 1.1, dy: 0 };
+      var dx = w[0] - pe.x, dy = w[1] - pe.y;
+      var a = -pe.angle * Math.PI / 180;
       var lx = dx * Math.cos(a) - dy * Math.sin(a), ly = dx * Math.sin(a) + dy * Math.cos(a);
       if (Math.abs(lx) <= b.w / 2 + 4 / z && Math.abs(ly - (b.dy || 0)) <= b.h / 2 + 2 / z) return { coll: "etiquettes", obj: e };
     }
-    var li = E.carte.lignes;
+    var li = calqueLibre("lignes") ? E.carte.lignes : [];
     for (i = li.length - 1; i >= 0; i--) {
       var ln = li[i];
       var seuil = Math.max(7, ln.taille * z / 2 + 4) / z;
@@ -494,7 +679,7 @@
       }
     }
     // Les décors posés à la main : du premier plan vers le fond.
-    var tp = E.carte.tampons, meilleur = null;
+    var tp = calqueLibre("tampons") ? E.carte.tampons : [], meilleur = null;
     for (i = 0; i < tp.length; i++) {
       // (x, yc) : le centre du décor, fixe ; `ts` : sa taille à ce zoom (plafonnée à l'écran).
       var t = tp[i], ts = Moteur.tailleTampon(t, z), yc = t.y - t.s * 0.3;
@@ -503,7 +688,7 @@
     }
     if (meilleur) return { coll: "tampons", obj: meilleur };
     // Les lacs en dernier : au-dessous des tracés (une route sur un lac se clique avant lui).
-    var lacs = E.carte.lacs;
+    var lacs = calqueLibre("lacs") ? E.carte.lacs : [];
     for (i = lacs.length - 1; i >= 0; i--) {
       if (lacs[i].pts && lacs[i].pts.length >= 6 && Moteur.dansPolygone(w[0], w[1], lacs[i].pts)) return { coll: "lacs", obj: lacs[i] };
     }
@@ -560,6 +745,18 @@
 
   function tailleMondePinceau() { return Math.max(E.taillePx / E.vue.zoom, 1e-6); }
 
+  // La finesse des décors du prochain trait : chaque cran les rend deux fois plus petits (et
+  // quatre fois plus nombreux). En « auto », elle suit le zoom : peindre de près donne des
+  // décors fins, peindre de loin des décors visibles de loin. Une fois peints, ils ne
+  // changent plus — ils sont fixés dans le monde.
+  function finesseActuelle() {
+    if (E.finesse !== "auto") return E.finesse;
+    // L'échelle générale de la carte compte déjà pour un ou deux crans : on vise des décors
+    // de taille normale À L'ÉCRAN au zoom où l'on peint.
+    var generale = typeof E.carte.finesse === "number" ? E.carte.finesse : 1;
+    return borne(Math.round(Math.log(Math.max(niveauActuel(), 0.01)) / Math.LN2) - generale, 0, Moteur.FINESSE_MAX);
+  }
+
   // Un décor posé à la main : sa taille est celle de l'écran au moment du clic, puis il
   // appartient au monde (il grandit quand on s'approche, comme un vrai relief).
   function nouveauTampon(w) {
@@ -595,10 +792,14 @@
           trait: Moteur.nouveauTrait(E.outil === "gomme" ? "eau" : E.materiau, tailleMondePinceau(), [w[0], w[1]], false),
           dernier: w
         };
+        if (E.outil === "pinceau" && E.materiau === "@affiner") { geste.affiner = true; geste.trait.mat = "@affiner"; geste.trait.fin = finesseActuelle(); surcouche(); break; }
+        if (E.outil === "pinceau" && E.materiau === "@eclaircir") { geste.affiner = true; geste.trait.mat = "@eclaircir"; geste.trait.dens = E.eclaircir; surcouche(); break; }
         if (E.rugosite > 0) geste.trait.rug = E.rugosite;
         if (E.outil === "pinceau") {
           if (E.densite !== 2) geste.trait.dens = E.densite;
           if (E.echDecor !== 1) geste.trait.ech = E.echDecor;
+          var fin = finesseActuelle();
+          if (fin > 0) geste.trait.fin = fin;
         }
         surcouche();
         break;
@@ -619,7 +820,7 @@
         geste = { type: "clic", x: p.x, y: p.y };
         break;
       case "selection":
-        debutSelection(p, w);
+        debutSelection(p, w, ev.shiftKey);
         break;
     }
   }
@@ -639,7 +840,25 @@
     return out;
   }
 
-  function debutSelection(p, w) {
+  function debutSelection(p, w, maj) {
+    var touche = trouver(p.x, p.y);
+    if (maj) {
+      // Maj + clic : ajouter ou retirer un objet ; Maj + glisser dans le vide : un cadre.
+      if (touche) {
+        var liste = selectionListe().slice(), rang = -1;
+        liste.forEach(function (m, q) { if (m.obj === touche.obj) rang = q; });
+        if (rang >= 0) liste.splice(rang, 1); else liste.push(touche);
+        selectionnerListe(liste);
+        geste = { type: "rien" };
+      } else geste = { type: "cadre", x0: p.x, y0: p.y, x1: p.x, y1: p.y, base: selectionListe().slice() };
+      return;
+    }
+    if (touche && dansSelection(touche.obj)) {
+      // Glisser l'un des objets sélectionnés les déplace tous.
+      geste = { type: "deplaceMulti", x0: w[0], y0: w[1], bouge: false,
+        bases: E.multi.map(function (m) { return { avant: JSON.stringify(m.obj), base: m.obj.pts ? m.obj.pts.slice() : [m.obj.x, m.obj.y] }; }) };
+      return;
+    }
     var sel = E.selection;
     if (sel && (sel.coll === "lignes" || sel.coll === "lacs")) {
       var i = sommetProche(sel.obj, p.x, p.y);
@@ -767,6 +986,15 @@
           surcouche();
         }
         break;
+      case "cadre":
+        geste.x1 = p.x; geste.y1 = p.y;
+        surcouche();
+        break;
+      case "deplaceMulti":
+        E.multi.forEach(function (m, q) { deplacerDe(m.obj, geste.bases[q].base, w[0] - geste.x0, w[1] - geste.y0); });
+        geste.bouge = true;
+        rendre();
+        break;
       case "deplaceLac":
         var ddx = w[0] - geste.x0, ddy = w[1] - geste.y0;
         for (var q = 0; q < geste.base.length; q += 2) {
@@ -784,6 +1012,10 @@
         }
         break;
       case "deplace":
+        if (geste.coll === "etiquettes" && geste.obj.ligne) {
+          var frac = Moteur.positionSurLigne(E.carte, geste.obj, w[0], w[1]);
+          if (frac != null) { geste.obj.pos = frac; geste.bouge = true; rendre(); break; }
+        }
         geste.obj.x = w[0] + geste.dx;
         geste.obj.y = w[1] + geste.dy;
         geste.bouge = true;
@@ -813,7 +1045,12 @@
     switch (g.type) {
       case "trait":
         g.trait.bb = Moteur.boiteTrait(g.trait.pts, g.trait.taille);
-        ajouter("traits", g.trait);
+        if (g.affiner) {
+          var zone = { id: g.trait.id, taille: g.trait.taille, pts: g.trait.pts, bb: g.trait.bb };
+          if (g.trait.mat === "@eclaircir") zone.dens = g.trait.dens; else zone.fin = g.trait.fin;
+          ajouter("finesses", zone);
+        }
+        else ajouter("traits", g.trait);
         break;
       case "tampons":
         ajouterLot("tampons", g.poses);
@@ -828,6 +1065,23 @@
           ajouter("lacs", lac);
           selectionner("lacs", lac);
           choisirOutil("selection");
+        }
+        break;
+      case "cadre":
+        var c0 = versMonde(Math.min(g.x0, g.x1), Math.min(g.y0, g.y1)), c1 = versMonde(Math.max(g.x0, g.x1), Math.max(g.y0, g.y1));
+        var pris = objetsDans(c0[0], c0[1], c1[0], c1[1]);
+        g.base.forEach(function (m) { if (!pris.some(function (x) { return x.obj === m.obj; })) pris.push(m); });
+        selectionnerListe(pris);
+        break;
+      case "deplaceMulti":
+        if (g.bouge) {
+          var modifs = [];
+          E.multi.forEach(function (m, q) {
+            if (m.obj.bb && m.obj.taille != null) m.obj.bb = Moteur.boiteTrait(m.obj.pts, m.obj.taille);
+            modifs.push({ t: "modif", coll: m.coll, id: m.obj.id, avant: JSON.parse(g.bases[q].avant), apres: cloner(m.obj) });
+          });
+          enregistrer({ t: "lot", actions: modifs });
+          marquer();
         }
         break;
       case "deplaceLac":
@@ -1043,13 +1297,48 @@
   // ----- Création d'objets -----
   function creerEtiquetteA(p) {
     var w = versMonde(p.x, p.y);
-    var defaut = { pays: "Nouveau pays", region: "Région", mer: "Mer", libre: "Texte" }[E.styleEtiq] || "Texte";
+    var defaut = { pays: "Nouveau pays", region: "Région", mer: "Mer", relief: "Monts", lieudit: "Lieu-dit", libre: "Texte" }[E.styleEtiq] || "Texte";
+    // « Le long d'un tracé » : le clic doit tomber sur une rivière, une route, une frontière…
+    var support = null;
+    if (E.suivre) {
+      var seuil = 14 / E.vue.zoom, dMin = seuil;
+      E.carte.lignes.forEach(function (l) {
+        var d = Moteur.pointsAffiches(l);
+        for (var j = 0; j + 3 < d.length; j += 2) {
+          var r = distanceSegment(w[0], w[1], d[j], d[j + 1], d[j + 2], d[j + 3]);
+          if (r.d < dMin) { dMin = r.d; support = l; }
+        }
+      });
+      if (!support) { etat("Cliquez sur un tracé (rivière, route, frontière…) pour y poser le nom."); return; }
+      defaut = (Moteur.TYPES_LIGNES[support.type] || {}).nom || defaut;
+    }
     demanderTexte(p.x, p.y, defaut, function (texte) {
       var e = { id: nouvelId("e"), texte: texte, x: w[0], y: w[1], taille: E.taillePxEtiq / E.vue.zoom, angle: 0, style: E.styleEtiq };
+      if (support) { e.ligne = support.id; e.pos = Moteur.positionSurLigne(E.carte, e, w[0], w[1]); }
       ajouter("etiquettes", e);
       choisirOutil("selection");     // l'élément est posé : on rend la main
       selectionner("etiquettes", e);
     });
+  }
+
+  // Attache un nom existant au tracé le plus proche de lui (ou l'en détache).
+  function attacherAuTrace(e) {
+    var meilleur = null, dMin = Infinity;
+    E.carte.lignes.forEach(function (l) {
+      var d = Moteur.pointsAffiches(l);
+      for (var j = 0; j + 3 < d.length; j += 2) {
+        var r = distanceSegment(e.x, e.y, d[j], d[j + 1], d[j + 2], d[j + 3]);
+        if (r.d < dMin) { dMin = r.d; meilleur = l; }
+      }
+    });
+    if (!meilleur) { etat("Aucun tracé sur cette carte : dessinez d'abord une rivière ou une route."); return; }
+    editer(function (x) { x.ligne = meilleur.id; x.pos = Moteur.positionSurLigne(E.carte, { ligne: meilleur.id }, e.x, e.y); delete x.courbe; });
+    panneauSelection();
+  }
+  function detacherDuTrace(e) {
+    var po = Moteur.poseEtiquette(E.carte, e);
+    editer(function (x) { x.x = po.x; x.y = po.y; x.angle = Math.round(po.angle); delete x.ligne; delete x.pos; delete x.ecart; });
+    panneauSelection();
   }
 
   function creerLieuA(p) {
@@ -1164,6 +1453,14 @@
 
   function sousTitre(texte) { return el("h3", { classe: "sous-titre", texte: texte }); }
 
+  function majLibelleFinesse() {
+    var out = $("libFinesse");
+    if (!out) return;
+    var fin = finesseActuelle();
+    out.textContent = (E.finesse === "auto" ? "Auto : à ce zoom, ×" + Math.pow(2, fin) + ". " : "") +
+      (fin === 0 ? "Décors à l'échelle de la carte entière." : "Décors " + Math.pow(2, fin) + " fois plus petits : pour détailler une région vue de près.");
+  }
+
   function majLibelleTaille() {
     var out = $("libTaillePinceau");
     if (out) out.textContent = "≈ " + formatKm((E.outil === "tampon" ? E.taillePxTampon : E.taillePx) / E.vue.zoom) + " dans le monde, à ce zoom";
@@ -1185,7 +1482,7 @@
     c.fillStyle = m.couleur; c.fillRect(0, 0, 34, 34);
     var d = Moteur.DECORS[m.decor];
     if (d) {
-      var ch = d.choix[0], grand = ch[2] > 22;
+      var ch = d.apercu ? [d.apercu, 1, 40] : d.choix[0], grand = ch[2] > 22;
       if (grand) Moteur.apercuDecor(c, ch[0], 1, 17, 17, 30);
       else { Moteur.apercuDecor(c, ch[0], 0, 10, 12, 17); Moteur.apercuDecor(c, ch[0], 1, 24, 15, 17); Moteur.apercuDecor(c, ch[0], 2, 15, 25, 17); }
     }
@@ -1212,21 +1509,61 @@
         zone.appendChild(pal);
       });
     }
+    if (E.outil === "pinceau") {
+      // « Affiner » : repasser sur un terrain déjà peint pour en changer la finesse des
+      // décors, sans toucher au terrain lui-même.
+      zone.appendChild(sousTitre("Détail"));
+      var palA = el("div", { classe: "palette" });
+      var bA = el("button", { type: "button", classe: "mat" + (E.materiau === "@affiner" ? " actif" : ""), title: "Change la taille des décors d'une zone sans repeindre le terrain" },
+        [el("span", { classe: "plus-image", style: "width:34px;height:34px;font-size:19px", texte: "⁂" }), el("span", { texte: "Affiner les décors" })]);
+      bA.addEventListener("click", function () { E.materiau = "@affiner"; panneauOutil(); });
+      palA.appendChild(bA);
+      var bE = el("button", { type: "button", classe: "mat" + (E.materiau === "@eclaircir" ? " actif" : ""), title: "Retire les arbres, pics ou rochers d'une zone sans repeindre le terrain" },
+        [el("span", { classe: "plus-image", style: "width:34px;height:34px;font-size:19px", texte: "∅" }), el("span", { texte: "Gomme à décors" })]);
+      bE.addEventListener("click", function () { E.materiau = "@eclaircir"; panneauOutil(); });
+      palA.appendChild(bE);
+      if (E.carte.finesses.length) {
+        var bR = el("button", { type: "button", classe: "mat", title: "Retire toutes les zones affinées ou éclaircies : les décors reprennent les réglages de leur terrain" }, [el("span", { texte: "Retirer ces zones (" + E.carte.finesses.length + ")" })]);
+        bR.addEventListener("click", function () {
+          executer({ t: "lot", actions: E.carte.finesses.map(function (o, i) { return { t: "suppr", coll: "finesses", obj: o, idx: i }; }).reverse() });
+          panneauOutil();
+        });
+        palA.appendChild(bR);
+      }
+      zone.appendChild(palA);
+    }
     if (E.outil === "pinceau" || E.outil === "gomme") {
       zone.appendChild(sousTitre("Pinceau"));
       zone.appendChild(champCurseur("Taille", 3, 240, 1, E.taillePx, function (v) { return Math.round(v) + " px"; },
         function (v) { E.taillePx = v; majLibelleTaille(); surcouche(); }));
       zone.appendChild(el("p", { classe: "aide", id: "libTaillePinceau" }));
-      zone.appendChild(champCurseur("Bord", 0, 1, 0.05, E.rugosite, function (v) { return v === 0 ? "lisse" : v < 0.5 ? "irrégulier" : "découpé"; },
+      if (!(E.outil === "pinceau" && E.materiau.charAt(0) === "@")) zone.appendChild(champCurseur("Bord", 0, 1, 0.05, E.rugosite, function (v) { return v === 0 ? "lisse" : v < 0.5 ? "irrégulier" : "découpé"; },
         function (v) { E.rugosite = v; }));
+      if (E.outil === "pinceau" && E.materiau === "@affiner") {
+        zone.appendChild(champSegments("Finesse (échelle des décors)", [["auto", "Auto"], [0, "×1"], [1, "×2"], [2, "×4"], [3, "×8"], [4, "×16"]], E.finesse, function (v) { E.finesse = v; majLibelleFinesse(); }));
+        zone.appendChild(el("p", { classe: "aide", id: "libFinesse" }));
+        zone.appendChild(el("p", { classe: "aide", texte: "Passez sur une région déjà peinte : ses arbres, ses pics et ses collines prennent cette finesse, le terrain ne change pas. En Auto, zoomez d'abord sur la région : les décors seront à la bonne taille pour ce zoom." }));
+        majLibelleFinesse();
+        majLibelleTaille();
+        return;
+      }
+      if (E.outil === "pinceau" && E.materiau === "@eclaircir") {
+        zone.appendChild(champSegments("Ce qu'il reste", [[0, "Rien"], [1, "Quelques décors"]], E.eclaircir, function (v) { E.eclaircir = v; }));
+        zone.appendChild(el("p", { classe: "aide", texte: "Passez sur une région : ses arbres, ses pics ou ses rochers disparaissent (ou se raréfient), le terrain ne change pas. Pour ouvrir une clairière, dégager un col, faire de la place à une ville." }));
+        majLibelleTaille();
+        return;
+      }
       if (E.outil === "pinceau" && Moteur.MAT[E.materiau].decor) {
         zone.appendChild(champSegments("Décors du terrain", [[0, "Aucun"], [1, "Rares"], [2, "Normal"], [3, "Dense"]], E.densite, function (v) { E.densite = v; }));
         zone.appendChild(champSegments("Taille des décors", [[0, "Petits"], [1, "Normaux"], [2, "Grands"]], E.echDecor, function (v) { E.echDecor = v; }));
+        zone.appendChild(champSegments("Finesse (échelle des décors)", [["auto", "Auto"], [0, "×1"], [1, "×2"], [2, "×4"], [3, "×8"], [4, "×16"]], E.finesse, function (v) { E.finesse = v; majLibelleFinesse(); }));
+        zone.appendChild(el("p", { classe: "aide", id: "libFinesse" }));
       }
       zone.appendChild(el("p", { classe: "aide", texte: E.outil === "gomme"
         ? "Efface la terre : la mer réapparaît. Un bord découpé donne des anses et des caps. Zoomez pour ciseler la côte."
-        : "Le terrain se couvre de lui-même de ses décors (arbres, pics, dunes…), qui restent lisibles à tous les zooms. Rien d'autre n'est ajouté : chemins, villages et grottes se posent avec les outils Tracés et Lieux." }));
+        : "Le terrain se couvre de ses décors (arbres, pics, dunes…), fixés une fois pour toutes : zoomer ou dézoomer n'en ajoute ni n'en retire aucun, comme sur une carte imprimée. Pour en changer la quantité, repassez avec une autre densité (ou « Aucun »)." }));
       majLibelleTaille();
+      majLibelleFinesse();
     }
 
     if (E.outil === "tampon") {
@@ -1246,7 +1583,7 @@
         function (v) { E.taillePxTampon = v; majLibelleTaille(); surcouche(); }));
       zone.appendChild(el("p", { classe: "aide", id: "libTaillePinceau" }));
       zone.appendChild(champCurseur("Variation de taille", 0, 1, 0.05, E.variation, function (v) { return Math.round(v * 100) + " %"; }, function (v) { E.variation = v; }));
-      zone.appendChild(el("p", { classe: "aide", texte: "Cliquez pour poser un décor, glissez pour en semer plusieurs. Un décor posé appartient au monde : il grandit quand on s'approche. Les décors du terrain lui laissent la place." }));
+      zone.appendChild(el("p", { classe: "aide", texte: "Cliquez pour poser un décor, glissez pour en semer plusieurs. Un décor posé appartient au monde : sa taille est celle de l'écran au moment où vous le posez, puis il grandit et rétrécit avec le zoom. Les décors du terrain lui laissent la place." }));
       majLibelleTaille();
     }
 
@@ -1279,6 +1616,7 @@
       var styles = Object.keys(Moteur.STYLES_ETIQ).map(function (k) { return [k, Moteur.STYLES_ETIQ[k].nom]; });
       zone.appendChild(champChoix("Style", styles, E.styleEtiq, function (v) { E.styleEtiq = v; }));
       zone.appendChild(champCurseur("Taille du texte", 12, 160, 1, E.taillePxEtiq, function (v) { return Math.round(v) + " px"; }, function (v) { E.taillePxEtiq = v; }));
+      zone.appendChild(champCase("Le long d'un tracé (cliquer sur une rivière, une route…)", E.suivre, function (v) { E.suivre = v; }));
       zone.appendChild(el("p", { classe: "aide", texte: "Cliquez sur la carte, tapez le nom, Entrée. La taille est celle de l'écran au moment où vous cliquez : le texte grandit et rétrécit avec le zoom. Une fois posé, il peut être incliné, courbé, espacé." }));
     }
 
@@ -1315,7 +1653,7 @@
 
     if (E.outil === "lac") zone.appendChild(el("p", { classe: "aide", texte: "Dessinez le contour du lac à main levée, en maintenant le bouton : il se referme tout seul au relâchement. On peut ensuite le déplacer, le remodeler, l'agrandir. Les rivières et les routes qui le traversent s'y raccordent." }));
     if (E.outil === "main") zone.appendChild(el("p", { classe: "aide", texte: "Faites glisser pour déplacer la carte. La molette zoome, Espace + glisser déplace avec n'importe quel outil." }));
-    if (E.outil === "selection") zone.appendChild(el("p", { classe: "aide", texte: "Cliquez un lieu, un nom, un décor ou un tracé pour le régler, le déplacer ou le supprimer. Double-clic pour renommer ; sur un tracé, double-clic ajoute un point. Clic droit : dupliquer, supprimer. Ctrl+D duplique." }));
+    if (E.outil === "selection") zone.appendChild(el("p", { classe: "aide", texte: "Cliquez un lieu, un nom, un décor ou un tracé pour le régler, le déplacer ou le supprimer. Double-clic pour renommer ; sur un tracé, double-clic ajoute un point. Clic droit : dupliquer, supprimer. Plusieurs objets : Maj + clic, ou Maj + glisser pour tracer un cadre ; Ctrl+A prend tout." }));
   }
 
   // ----- Panneau : sélection -----
@@ -1323,6 +1661,26 @@
     var bloc = $("blocSelection"), zone = $("optionsSelection");
     var sel = E.selection;
     zone.innerHTML = "";
+    if (E.multi.length) {
+      bloc.hidden = false;
+      $("titreSelection").textContent = "Sélection (" + E.multi.length + ")";
+      var compte = {};
+      E.multi.forEach(function (m) { compte[m.coll] = (compte[m.coll] || 0) + 1; });
+      var noms = { lieux: ["lieu", "lieux"], etiquettes: ["nom", "noms"], lignes: ["tracé", "tracés"], lacs: ["lac", "lacs"], tampons: ["décor", "décors"] };
+      zone.appendChild(el("p", { classe: "aide", texte: Object.keys(compte).map(function (k) { return compte[k] + " " + noms[k][compte[k] > 1 ? 1 : 0]; }).join(", ") + "." }));
+      if (compte.lieux || compte.tampons || compte.etiquettes) {
+        zone.appendChild(el("div", { classe: "rangee" }, [
+          el("button", { type: "button", classe: "btn", texte: "Plus petits", onclick: function () { echelleSelection(1 / 1.15); } }),
+          el("button", { type: "button", classe: "btn", texte: "Plus grands", onclick: function () { echelleSelection(1.15); } })
+        ]));
+      }
+      zone.appendChild(el("p", { classe: "aide", texte: "Glissez l'un des objets pour les déplacer tous. Maj + clic ajoute ou retire un objet, Maj + glisser trace un cadre, Ctrl+A prend tout." }));
+      zone.appendChild(el("div", { classe: "rangee rangee-fin" }, [
+        el("button", { type: "button", classe: "btn", texte: "Dupliquer", onclick: dupliquerSelection }),
+        el("button", { type: "button", classe: "btn danger", texte: "Supprimer", onclick: supprimerSelection })
+      ]));
+      return;
+    }
     bloc.hidden = !sel;
     if (!sel) return;
     var o = sel.obj;
@@ -1374,7 +1732,7 @@
 
       zone.appendChild(sousTitre("Visibilité"));
       var niv = typeof o.niv === "number" ? o.niv : tp.niv;
-      zone.appendChild(champCurseur("Visible à partir du zoom", 0, 100, 0.1, Math.min(niv, 100), function (v) { return v === 0 ? "toujours" : "×" + nb(v, 1); },
+      zone.appendChild(champCurseur("Visible à partir du zoom", 0, 15, 0.1, Math.min(niv, 15), function (v) { return v === 0 ? "toujours" : "×" + nb(v, 1); },
         function (v) { editer(function (x) { x.niv = v; }); }));
       zone.appendChild(el("div", { classe: "rangee" }, [
         el("button", { type: "button", classe: "btn", texte: "Dès ce zoom (×" + nb(niveauActuel(), 1) + ")", onclick: function () { editer(function (x) { x.niv = Math.round(niveauActuel() * 0.9 * 10) / 10; }); panneauSelection(); } }),
@@ -1394,10 +1752,21 @@
         function (v) { editer(function (x) { x.style = v; delete x.espace; }); panneauSelection(); }));
       zone.appendChild(champCurseur("Taille", 6, 400, 1, borne(o.taille * E.vue.zoom, 6, 400), function (v) { return Math.round(v) + " px"; },
         function (v) { editer(function (x) { x.taille = v / E.vue.zoom; }); }));
-      zone.appendChild(champCurseur("Orientation", -180, 180, 1, o.angle || 0, function (v) { return Math.round(v) + "°"; },
-        function (v) { editer(function (x) { x.angle = v; }); }));
-      zone.appendChild(champCurseur("Courbure", -100, 100, 1, o.courbe || 0, function (v) { return v === 0 ? "droit" : (v > 0 ? "⌢ " : "⌣ ") + Math.abs(Math.round(v)) + " %"; },
-        function (v) { editer(function (x) { if (v) x.courbe = v; else delete x.courbe; }); }));
+      if (Moteur.poseEtiquette(E.carte, o).suit) {
+        zone.appendChild(sousTitre("Le long du tracé"));
+        zone.appendChild(champCurseur("Position", 0, 1, 0.005, o.pos == null ? 0.5 : o.pos, function (v) { return Math.round(v * 100) + " %"; },
+          function (v) { editer(function (x) { x.pos = v; }); }));
+        zone.appendChild(champCurseur("Écart au tracé", -3, 3, 0.05, typeof o.ecart === "number" ? o.ecart : -0.85, function (v) { return Math.abs(v) < 0.03 ? "dessus" : (v < 0 ? "au-dessus " : "au-dessous ") + nb(Math.abs(v), 1); },
+          function (v) { editer(function (x) { x.ecart = v; }); }));
+        zone.appendChild(el("div", { classe: "rangee" }, [el("button", { type: "button", classe: "btn", texte: "Détacher du tracé", onclick: function () { detacherDuTrace(o); } })]));
+        zone.appendChild(el("p", { classe: "aide", texte: "Glissez le nom : il coulisse le long du tracé. Si le tracé change de forme, le nom suit." }));
+      } else {
+        zone.appendChild(champCurseur("Orientation", -180, 180, 1, o.angle || 0, function (v) { return Math.round(v) + "°"; },
+          function (v) { editer(function (x) { x.angle = v; }); }));
+        zone.appendChild(champCurseur("Courbure", -100, 100, 1, o.courbe || 0, function (v) { return v === 0 ? "droit" : (v > 0 ? "⌢ " : "⌣ ") + Math.abs(Math.round(v)) + " %"; },
+          function (v) { editer(function (x) { if (v) x.courbe = v; else delete x.courbe; }); }));
+        zone.appendChild(el("div", { classe: "rangee" }, [el("button", { type: "button", classe: "btn", texte: "Suivre le tracé le plus proche", onclick: function () { attacherAuTrace(o); } })]));
+      }
       var stE = Moteur.STYLES_ETIQ[o.style] || Moteur.STYLES_ETIQ.libre;
       zone.appendChild(champCurseur("Espacement des lettres", 0, 1.5, 0.02, typeof o.espace === "number" ? o.espace : stE.espace, function (v) { return Math.round(v * 100) + " %"; },
         function (v) { editer(function (x) { x.espace = v; }); }));
@@ -1638,6 +2007,7 @@
     $("rgNom").value = E.carte.nom;
     $("rgLarg").value = E.carte.largeur;
     $("rgHaut").value = E.carte.hauteur;
+    $("rgFinesse").value = String(typeof E.carte.finesse === "number" ? E.carte.finesse : 1);
     var orn = E.carte.ornements || {};
     $("rgRose").value = orn.rose || "";
     $("rgEchelle").checked = !!orn.echelle;
@@ -1653,6 +2023,7 @@
       $("rgMessage").textContent = "La largeur et la hauteur doivent être comprises entre 0,05 et 40 000 km.";
       return;
     }
+    E.carte.finesse = parseInt($("rgFinesse").value, 10) || 0;
     if ($("rgRose").value || $("rgEchelle").checked || $("rgTitre").checked) {
       E.carte.ornements = { rose: $("rgRose").value, echelle: $("rgEchelle").checked, titre: $("rgTitre").checked };
     } else delete E.carte.ornements;
@@ -1711,7 +2082,7 @@
     Moteur.preparerImages(c).then(function () {
       try {
         var cv = document.createElement("canvas");
-        Moteur.dessiner(cv, c, vue, { cle: "export", grille: $("exGrille").checked });
+        Moteur.dessiner(cv, c, vue, { cle: "export", grille: $("exGrille").checked, cacher: calquesCaches() });
         cv.toBlob(function (blob) {
           if (!blob) { $("exMessage").textContent = "Le navigateur n'a pas pu produire cette image : essayez une taille plus petite."; return; }
           telecharger(blob, nomFichier() + (vueSeule ? "-detail" : "") + ".png");
@@ -1814,19 +2185,25 @@
 
     if (mod && (k === "z" || k === "Z")) { ev.preventDefault(); if (ev.shiftKey) refaire(); else annuler(); return; }
     if (mod && (k === "y" || k === "Y")) { ev.preventDefault(); refaire(); return; }
-    if (mod && (k === "d" || k === "D")) { ev.preventDefault(); if (E.selection) dupliquer(E.selection.coll, E.selection.obj); return; }
+    if (mod && (k === "d" || k === "D")) { ev.preventDefault(); dupliquerSelection(); return; }
+    if (mod && (k === "a" || k === "A")) {
+      ev.preventDefault();
+      choisirOutil("selection");
+      selectionnerListe(objetsDans(-Infinity, -Infinity, Infinity, Infinity));
+      return;
+    }
     if (mod) return;
 
     if (k === " ") { E.espace = true; scene.classList.add("main"); ev.preventDefault(); return; }
     if (k === "Escape") {
       if (!$("menuContexte").hidden) fermerMenu();
       else if (E.ligneEnCours) { E.ligneEnCours = null; surcouche(); }
-      else if (E.selection) selectionner(null, null);
+      else if (E.selection || E.multi.length) selectionner(null, null);
       else if (E.outil !== "selection") choisirOutil("selection");   // Échap : quitter l'outil
       return;
     }
     if (k === "Enter" && E.ligneEnCours) { terminerLigne(); return; }
-    if ((k === "Delete" || k === "Backspace") && E.selection) { ev.preventDefault(); supprimerObjet(E.selection.coll, E.selection.obj); return; }
+    if ((k === "Delete" || k === "Backspace") && (E.selection || E.multi.length)) { ev.preventDefault(); supprimerSelection(); return; }
     if (k === "Backspace" && E.ligneEnCours) { E.ligneEnCours.pts.length -= 2; if (!E.ligneEnCours.pts.length) E.ligneEnCours = null; surcouche(); return; }
 
     var outils = { v: "selection", h: "main", b: "pinceau", e: "gomme", d: "tampon", l: "ligne", k: "lac", t: "etiquette", p: "lieu" };
@@ -1867,6 +2244,7 @@
     carte.lieux = carte.lieux || [];
     carte.lacs = carte.lacs || [];
     carte.tampons = carte.tampons || [];
+    carte.finesses = carte.finesses || [];
     Moteur.surImage = function () { rendre(); };
     $("filtreLieux").addEventListener("input", majIndex);
     carte.theme = Moteur.THEMES[carte.theme] ? carte.theme : "atlas";
@@ -1882,12 +2260,13 @@
       lp.addEventListener("click", function (ev) { ev.preventDefault(); allerVers(lp.href); });
     }
     tailleScene();
-    if (carte.vue && carte.vue.zoom > 0) { E.vue.cx = carte.vue.cx; E.vue.cy = carte.vue.cy; E.vue.zoom = carte.vue.zoom; }
+    if (carte.vue && carte.vue.zoom > 0) { E.vue.cx = carte.vue.cx; E.vue.cy = carte.vue.cy; E.vue.zoom = borne(carte.vue.zoom, zoomMin(), zoomMax()); }
     else ajusterVue();
     panneauOutil();
     panneauSelection();
     infosCarte();
     majIndex();
+    majCalques();
     majBoutonsHisto();
     infosVue();
     etat("Enregistré");
