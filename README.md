@@ -2015,6 +2015,16 @@ Outil Noms : case « Le long d'un tracé », puis clic sur une rivière ou une r
 s'attache au tracé le plus proche ou s'en détache. Glisser le nom le fait coulisser
 (`positionSurLigne`) ; si le tracé change, le nom suit ; si le tracé disparaît, il redevient droit.
 
+**Plan des villes (`semerVille`).** Les terrains « Ville » et « Faubourg » ne sèment plus leurs
+maisons au hasard (un tas sans logique) : ils ont un plan. Un quadrillage déformé — le même que celui
+des champs, `coinChamp` — découpe la ville en **îlots** ; leurs côtés sont des **rues** (`peindreRues`,
+dans la terre, sous les routes de l'auteur), et les maisons s'alignent en rang le long de chaque rue,
+en retrait, vers l'intérieur de l'îlot. Le cœur de l'îlot est une cour : un arbre, une grande bâtisse,
+parfois l'église. Le faubourg a le même plan en plus lâche (trois emplacements par côté, près de la
+moitié laissés libres, jardins et parcelles au milieu). Chaque maison vérifie son propre pied dans le
+masque : en lisière, les rangs s'arrêtent où le terrain s'arrête, et une route tracée à travers écarte
+les maisons. Finesse, densité, taille des décors et gomme à décors s'appliquent comme ailleurs.
+
 Les cartes d'avant s'ouvrent telles quelles : seuls leurs décors changent (ils viennent maintenant
 du terrain) et leurs petits lieux automatiques ont disparu.
 

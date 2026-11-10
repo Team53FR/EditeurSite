@@ -623,8 +623,13 @@
     toundra:  { C: 15,   p: 0.5,  marge: 0.1,  choix: [["rocher", 0.35, 15], ["seche", 0.65, 14]] },
     // Une ville qui s'étale : des maisons serrées, quelques grandes bâtisses et clochers.
     // Tracer une route à travers ouvre une rue (les maisons s'en écartent d'elles-mêmes).
-    ville:    { C: 10,   p: 0.97, marge: 0.1,  choix: [["maison", 0.86, 27], ["batisse", 0.09, 36], ["clocher", 0.05, 46]] },
-    faubourg: { C: 14,   p: 0.5,  marge: 0.1,  choix: [["maison", 0.7, 26], ["arbre", 0.22, 24], ["champ", 0.08, 34]] },
+    // `rues` : ces terrains ne sèment pas leurs maisons au hasard, ils les alignent le long
+    // d'un réseau de rues (voir « Villes »). `parCote` : maisons par côté d'îlot ; `vide` :
+    // part des emplacements laissés libres ; `coeur` : ce qu'on trouve au milieu d'un îlot.
+    ville:    { C: 10,   p: 1,    marge: 0.1,  choix: [["maison", 1, 27]],
+                rues: { parCote: 4, vide: 0.04, rue: "#d8c596", coeur: [["clocher", 0.08, 5.2], ["batisse", 0.2, 4.4], ["arbre", 0.45, 2.5]] } },
+    faubourg: { C: 10,   p: 1,    marge: 0.1,  choix: [["maison", 1, 27]],
+                rues: { parCote: 3, vide: 0.42, rue: "#cbb98a", coeur: [["champ", 0.45, 4.6], ["arbre", 0.4, 2.6]] } },
     glace:    { C: 24,   p: 0.45, marge: 0.2,  choix: [["glacon", 1, 24]] },
     marais:   { C: 15,   p: 0.75, marge: 0.2,  choix: [["marais", 1, 30]] }
   };
@@ -915,6 +920,7 @@
   // sur quatre, deux fois plus grand, aux mêmes endroits — la forêt reste une forêt.
   // `tampons` : les décors posés à la main, dont les autres s'écartent.
   function semerDecors(carte, vue, masque, X0, Y0, X1, Y1, tampons, liste) {
+    liste.rues = [];
     if (!masque) return;
     var zoom = vue.zoom, data = masque.data, mw = masque.mw, mh = masque.mh, zb = zoomBase(carte);
     if (memoCases.size > 400000) memoCases.clear();
@@ -947,6 +953,7 @@
       var i0 = Math.max(0, Math.floor((X0 - m) / D)), i1 = Math.min(Math.floor(L / D), Math.floor((X1 + m) / D));
       var j0 = Math.max(0, Math.floor((Y0 - m) / D)), j1 = Math.min(Math.floor(H / D), Math.floor((Y1 + m) / D));
       if ((i1 - i0 + 1) * (j1 - j0 + 1) > 450000) return;
+      semerVille(carte, masque, zb, zoom, k, kv, grossi, X0, Y0, X1, Y1, liste);
       for (var cj = j0; cj <= j1; cj++) {
         for (var ci = i0; ci <= i1; ci++) {
           var pt = pointCase(kv, ci, cj);
@@ -955,7 +962,7 @@
           if (data[px + 1] > 128) continue;                           // une route
           var mt = MATERIAUX[Math.round(data[px] / 10) - 1];
           var dd = mt && DECORS[mt.decor];
-          if (!dd) continue;
+          if (!dd || dd.rues) continue;                               // les villes ont leur propre plan
           var code = Math.round(data[px + 2] / 20) - 1;               // densité × 3 + échelle
           if (code < 0) continue;
           // La finesse : celle d'une zone « Affiner » si le point y est, sinon celle du trait.
@@ -997,6 +1004,100 @@
         }
       }
     });
+  }
+
+  // ----- Villes -----
+  //
+  // Une ville n'est pas un tas de maisons : elle a des rues, et les maisons les bordent.
+  // Le plan est un quadrillage déformé (comme celui des champs : chaque carrefour est
+  // déplacé par son hachage, les rues ne sont ni droites ni parallèles). Chaque case est un
+  // ÎLOT : ses quatre côtés sont des rues, les maisons s'alignent en rang le long de chacun,
+  // tournées vers la rue, et le cœur de l'îlot est une cour — un arbre, une grande bâtisse,
+  // parfois l'église sur sa place. Un faubourg a le même plan, en plus lâche : des maisons
+  // espacées, des jardins et des parcelles au milieu.
+  // Les maisons vont dans `liste` (triées et peintes avec les autres décors) ; les rues dans
+  // `liste.rues`, peintes dans la terre avant les décors. Une route tracée par l'auteur
+  // reste prioritaire : les maisons s'en écartent.
+  function semerVille(carte, masque, zb, zoom, k, kv, grossi, X0, Y0, X1, Y1, liste) {
+    var data = masque.data, dataFin = masque.fin;
+    // Un îlot fait huit cases de côté : quatre maisons le long de chaque rue.
+    var kb = kv - 3;
+    if (kb < 0) return;
+    var Dk = CASE0 / Math.pow(2, k) * grossi, B = CASE0 / Math.pow(2, kb), m = B;
+    var i0 = Math.max(0, Math.floor((X0 - m) / B)), i1 = Math.min(Math.floor(carte.largeur / B), Math.floor((X1 + m) / B));
+    var j0 = Math.max(0, Math.floor((Y0 - m) / B)), j1 = Math.min(Math.floor(carte.hauteur / B), Math.floor((Y1 + m) / B));
+    // Ce point est-il en ville (à ce niveau de finesse) ? Renvoie sa fiche, ou null.
+    var enVille = function (x, y) {
+      var px = pixelMasque(masque, x, y);
+      if (px < 0 || data[px + 3] < 128) return null;
+      var mt = MATERIAUX[Math.round(data[px] / 10) - 1], dd = mt && DECORS[mt.decor];
+      if (!dd || !dd.rues) return null;
+      var code = Math.round(data[px + 2] / 20) - 1;
+      if (code < 0) return null;
+      var surZone = dataFin && dataFin[px + 3] > 200;
+      var zf = surZone ? Math.round(dataFin[px] / 40) : 0, zd = surZone ? Math.round(dataFin[px + 1] / 60) : 0;
+      if (niveauDecor(zb, dd.C, zf ? zf - 1 : Math.round(data[px + 1] / 24)) !== k) return null;
+      return { dd: dd, route: data[px + 1] > 128, ech: ECHELLES[code % 3], dens: DENSITES[zd ? zd - 1 : Math.floor(code / 3)], mat: data[px] };
+    };
+    for (var cj = j0; cj <= j1; cj++) {
+      for (var ci = i0; ci <= i1; ci++) {
+        var c = [coinChamp(kb, ci, cj, kb, 1), coinChamp(kb, ci + 1, cj, kb, 1), coinChamp(kb, ci + 1, cj + 1, kb, 1), coinChamp(kb, ci, cj + 1, kb, 1)];
+        var cx = (c[0][0] + c[1][0] + c[2][0] + c[3][0]) / 4, cy = (c[0][1] + c[1][1] + c[2][1] + c[3][1]) / 4;
+        var ici = enVille(cx, cy);
+        var h = (ci * 73856093) ^ (cj * 19349663), g = kb * 41 + 3;
+        for (var q = 0; q < 4; q++) {
+          var a = c[q], b = c[(q + 1) % 4], dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy) || 1;
+          var va = enVille(a[0], a[1]), vb = enVille(b[0], b[1]);
+          // La rue : seulement si ses deux bouts sont en ville (elle ne part pas dans les champs).
+          if (va && vb && ici) liste.rues.push([a[0], a[1], b[0], b[1], Dk * 0.95, ici.dd.rues.rue]);
+          if (!ici) continue;
+          // Le rang de maisons de ce côté, en retrait de la rue, vers l'intérieur de l'îlot.
+          var nx = -dy / L, ny = dx / L;
+          if ((cx - a[0]) * nx + (cy - a[1]) * ny < 0) { nx = -nx; ny = -ny; }
+          var N = ici.dd.rues.parCote;
+          for (var r = 0; r < N; r++) {
+            var hr = alea(g + q * 7 + r, h), t = 0.17 + 0.66 * (N > 1 ? r / (N - 1) : 0.5) + (hr - 0.5) * 0.05;
+            if (alea(g + 60 + q * 7 + r, h) < ici.dd.rues.vide) continue;
+            var x = a[0] + dx * t + nx * Dk * 1.45, y = a[1] + dy * t + ny * Dk * 1.45;
+            var v = enVille(x, y);
+            if (!v || v.route || v.mat !== ici.mat || alea(g + 90 + q * 7 + r, h) >= v.dens) continue;
+            // (La maison n'occupe que la moitié de la largeur de sa vignette.)
+            var s = Dk * 2.9 * v.ech * ECH_THEME * (0.9 + 0.2 * hr);
+            if (s * zoom < 3) continue;
+            liste.push({ x: x, y: y + s * 0.16, s: s, sprite: "maison", r: alea(g + 120 + q * 7 + r, h) });
+          }
+        }
+        if (!ici) continue;
+        // Le cœur de l'îlot.
+        var tirage = alea(g + 200, h), cumul = 0, coeur = ici.dd.rues.coeur;
+        for (var n = 0; n < coeur.length; n++) {
+          cumul += coeur[n][1];
+          if (tirage < cumul) {
+            var sc = Dk * coeur[n][2] * ici.ech * ECH_THEME;
+            if (sc * zoom >= 3 && !ici.route && tirage / cumul < ici.dens + 0.01) liste.push({ x: cx, y: cy + sc * 0.25, s: sc, sprite: coeur[n][0], r: alea(g + 201, h) });
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  // Les rues d'une ville, peintes dans la terre : un bord sombre, la chaussée de terre claire.
+  function peindreRues(lc, rues, zoom) {
+    if (!rues || !rues.length) return;
+    lc.save();
+    lc.globalCompositeOperation = "source-atop";
+    lc.lineCap = lc.lineJoin = "round";
+    [["rgba(70,50,24,0.5)", 1.5], [null, 1]].forEach(function (passe) {
+      rues.forEach(function (r) {
+        if (r[4] * zoom < 0.7) return;
+        lc.strokeStyle = passe[0] || r[5];
+        lc.lineWidth = r[4] * passe[1];
+        lc.beginPath(); lc.moveTo(r[0], r[1]); lc.lineTo(r[2], r[3]); lc.stroke();
+      });
+    });
+    lc.restore();
+    lc.globalCompositeOperation = "source-over";
   }
 
   // Peint les décors (semés et tampons), du fond vers l'avant.
@@ -3243,6 +3344,7 @@
       lc.rect(0, 0, carte.largeur, carte.hauteur);
       lc.clip();
       dessinerChamps(lc, carte, vue, masque, X0, Y0, X1, Y1, !!th.encreDecors);
+      peindreRues(lc, decors.rues, vue.zoom);
       fissuresLave(lc, carte, vue, masque, X0, Y0, X1, Y1);
       // Routes et sentiers sont peints DANS la terre, avant les décors : les arbres qui les
       // bordent passent devant, au lieu d'un ruban posé par-dessus la forêt. « source-atop » :
