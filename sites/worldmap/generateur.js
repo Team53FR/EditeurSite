@@ -150,7 +150,7 @@
       choisis.push(cand);
       carte.lignes.push({
         id: "r" + (carte.lignes.length + 1) + Math.floor(Moteur.alea(g, tentative) * 1e6).toString(36),
-        type: "riviere", pts: Array.prototype.slice.call(pts), taille: cell * 0.3, meandre: 0.5, delta: true
+        type: "riviere", pts: Array.prototype.slice.call(pts), taille: cell * 0.34, meandre: 0.38, delta: true
       });
     }
 

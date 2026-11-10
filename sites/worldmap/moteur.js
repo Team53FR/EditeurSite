@@ -72,7 +72,8 @@
     couleurs: {
       plaine: "#8ea343", foret: "#47752b", taiga: "#3c6a45", colline: "#98a04a", montagne: "#8f8878", cime: "#cdd3d6",
       volcan: "#b58a4f", desert: "#d8b670", steppe: "#b8a658", marais: "#5c784c", cendres: "#a8804a", champs: "#a6ae4a",
-      savane: "#c1ab55", automne: "#9a7833", jungle: "#326b31", morte: "#7b6f56", rocaille: "#9b917b", plage: "#e5cf98", toundra: "#989e7a"
+      savane: "#c1ab55", automne: "#9a7833", jungle: "#326b31", morte: "#7b6f56", rocaille: "#9b917b", plage: "#e5cf98", toundra: "#989e7a",
+      ville: "#bfa878", faubourg: "#a9a866"
     }
   };
 
@@ -101,11 +102,13 @@
     { id: "morte",    nom: "Forêt morte",     couleur: "#857a62", decor: "morte",    type: "terre", groupe: "Forêts" },
     { id: "rocaille", nom: "Rocaille",        couleur: "#a89f8c", decor: "rocaille", type: "terre", groupe: "Reliefs" },
     { id: "plage",    nom: "Sable",           couleur: "#ecdcab", decor: null,       type: "terre", groupe: "Terres arides" },
-    { id: "toundra",  nom: "Toundra",         couleur: "#a9ad8c", decor: "toundra",  type: "terre", groupe: "Eaux et froid" }
+    { id: "toundra",  nom: "Toundra",         couleur: "#a9ad8c", decor: "toundra",  type: "terre", groupe: "Eaux et froid" },
+    { id: "ville",    nom: "Ville (quartiers)", couleur: "#c4b08a", decor: "ville",  type: "terre", groupe: "Bâti" },
+    { id: "faubourg", nom: "Faubourg",        couleur: "#b3b077", decor: "faubourg", type: "terre", groupe: "Bâti" }
   ];
   var MAT = {};
   MATERIAUX.forEach(function (m, i) { MAT[m.id] = m; m.code = i + 1; });
-  var GROUPES_MATERIAUX = ["Plaines", "Forêts", "Reliefs", "Terres arides", "Eaux et froid"];
+  var GROUPES_MATERIAUX = ["Plaines", "Forêts", "Reliefs", "Terres arides", "Eaux et froid", "Bâti"];
 
   // ----- Décors : peints une fois, semés ensuite -----
   //
@@ -538,6 +541,28 @@
     });
   }
 
+  // Les maisons d'un quartier, à semer par centaines : toits de tuiles de teintes variées
+  // (rouge, brun, ardoise), une grande bâtisse à deux corps, un clocher.
+  var TOITS_VILLE = ["#a8452f", "#b5552f", "#8f3b2a", "#9a5a36", "#6f6a72", "#b0603a"];
+  function peintMaisonVille(g, v, genre) {
+    g.lineWidth = 2.2; g.strokeStyle = "#2a1c0e"; g.lineJoin = "round";
+    var avant = TOIT;
+    TOIT = TOITS_VILLE[v % TOITS_VILLE.length];
+    ombreDecor(g, 4, 31, 30, 6, 0.3);
+    if (genre === "clocher") {
+      maison(g, -12, 31, 34, 22);
+      tourPierre(g, 14, 31, 18, 50, 24);
+      g.beginPath(); g.moveTo(14, -43); g.lineTo(14, -52); g.moveTo(10, -48); g.lineTo(18, -48); g.stroke();
+    } else if (genre === "batisse") {
+      maison(g, -14, 28, 34, 26);
+      maison(g, 14, 31, 40, 30);
+    } else {
+      var w = 44 + (v % 3) * 6, h = 26 + (v % 2) * 6;
+      maison(g, 0, 31, w, h);
+    }
+    TOIT = avant;
+  }
+
   var PEINTRES = {
     arbre: peintArbre, conifere: peintConifere,
     automne: function (g, v) { peintArbre(g, v, "automne"); },
@@ -549,10 +574,13 @@
     seche: function (g, v) { peintHerbe(g, v, true); },
     rocher: function (g, v) { peintRocher(g, v, false); },
     basalte: function (g, v) { peintRocher(g, v, true); },
-    champ: peintChamp, glacon: peintGlacon, cratere: peintCratere, aiguilles: peintAiguilles
+    champ: peintChamp, glacon: peintGlacon, cratere: peintCratere, aiguilles: peintAiguilles,
+    maison: function (g, v) { peintMaisonVille(g, v, "maison"); },
+    batisse: function (g, v) { peintMaisonVille(g, v, "batisse"); },
+    clocher: function (g, v) { peintMaisonVille(g, v, "clocher"); }
   };
   var VARIANTES = { arbre: 6, conifere: 4, automne: 6, tropical: 6, palmier: 4, acacia: 4, mort: 4, montagne: 6, cime: 6,
-    colline: 4, dune: 4, marais: 3, herbe: 3, seche: 3, rocher: 6, basalte: 6, champ: 6, glacon: 4, cratere: 2, aiguilles: 6 };
+    colline: 4, dune: 4, marais: 3, herbe: 3, seche: 3, rocher: 6, basalte: 6, champ: 6, glacon: 4, cratere: 2, aiguilles: 6, maison: 12, batisse: 6, clocher: 4 };
 
   // Colle un décor peint : (x, y) est le point où il touche le sol, s la taille de sa boîte.
   function colle(ctx, type, v, x, y, s) {
@@ -593,6 +621,10 @@
     dune:     { C: 20,   p: 0.7,  marge: 0.25, choix: [["dune", 1, 44]] },
     cendres:  { C: 19,   p: 0.5,  marge: 0.15, choix: [["basalte", 0.6, 20], ["mort", 0.4, 24]] },
     toundra:  { C: 15,   p: 0.5,  marge: 0.1,  choix: [["rocher", 0.35, 15], ["seche", 0.65, 14]] },
+    // Une ville qui s'étale : des maisons serrées, quelques grandes bâtisses et clochers.
+    // Tracer une route à travers ouvre une rue (les maisons s'en écartent d'elles-mêmes).
+    ville:    { C: 10,   p: 0.97, marge: 0.1,  choix: [["maison", 0.86, 27], ["batisse", 0.09, 36], ["clocher", 0.05, 46]] },
+    faubourg: { C: 14,   p: 0.5,  marge: 0.1,  choix: [["maison", 0.7, 26], ["arbre", 0.22, 24], ["champ", 0.08, 34]] },
     glace:    { C: 24,   p: 0.45, marge: 0.2,  choix: [["glacon", 1, 24]] },
     marais:   { C: 15,   p: 0.75, marge: 0.2,  choix: [["marais", 1, 30]] }
   };
@@ -609,7 +641,7 @@
     { id: "mort", nom: "Arbre mort" }, { id: "montagne", nom: "Montagne", max: 230 }, { id: "cime", nom: "Pic enneigé", max: 230 },
     { id: "cratere", nom: "Volcan", max: 230 }, { id: "aiguilles", nom: "Aiguilles noires", max: 170 }, { id: "colline", nom: "Colline", max: 170 }, { id: "dune", nom: "Dune", max: 170 },
     { id: "rocher", nom: "Rochers" }, { id: "basalte", nom: "Roche sombre" }, { id: "glacon", nom: "Glace" },
-    { id: "champ", nom: "Champ" }, { id: "marais", nom: "Roseaux" }, { id: "herbe", nom: "Herbes" }, { id: "seche", nom: "Herbes sèches" }
+    { id: "champ", nom: "Champ" }, { id: "maison", nom: "Maison" }, { id: "batisse", nom: "Bâtisse" }, { id: "clocher", nom: "Église" }, { id: "marais", nom: "Roseaux" }, { id: "herbe", nom: "Herbes" }, { id: "seche", nom: "Herbes sèches" }
   ];
 
   var MAX_TAMPON = {};
@@ -1320,7 +1352,8 @@
     if (!(total > 0)) return p;
 
     var onde = Math.max((l.taille || 1) * 14, total / 60);
-    var amp = onde * 0.3 * force;
+    var amp = onde * 0.26 * force;
+    var ph3 = alea(hashTexte(String(l.id || "")), 3) * TAU;
     var h = hashTexte(String(l.id || "")), ph1 = alea(h, 1) * TAU, ph2 = alea(h, 2) * TAU;
     var out = [];
     for (i = 0; i < m; i++) {
@@ -1329,7 +1362,10 @@
       var tl = Math.hypot(tx, ty) || 1;
       var env = Math.min(1, cum[i] / (onde * 0.8), (total - cum[i]) / (onde * 0.8));
       env = env * env * (3 - 2 * env);
-      var off = amp * env * (Math.sin(cum[i] / onde * TAU + ph1) * 0.75 + Math.sin(cum[i] / (onde * 0.57) * TAU + ph2) * 0.25);
+      // Des méandres inégaux : amples par endroits, presque droits ailleurs, comme un vrai
+      // cours d'eau — une onde lente module l'amplitude des deux autres.
+      var module = 0.45 + 0.85 * (0.5 + 0.5 * Math.sin(cum[i] / (onde * 4.3) * TAU + ph3));
+      var off = amp * env * module * (Math.sin(cum[i] / onde * TAU + ph1) * 0.75 + Math.sin(cum[i] / (onde * 0.57) * TAU + ph2) * 0.25);
       out.push(dense[2 * i] - ty / tl * off, dense[2 * i + 1] + tx / tl * off);
     }
     return out;
@@ -1369,18 +1405,38 @@
     var d = pointsAffiches(l), m = d.length / 2;
     if (m < 2) return;
     var lw = Math.max(l.taille || 0, 1.4 / vue.zoom);
-    var troncons = l.delta ? Math.min(28, Math.max(1, Math.floor(m / 6))) : 1;
     c.lineCap = c.lineJoin = "round";
     c.setLineDash([]);
-    for (var k = 0; k < troncons; k++) {
-      var a = Math.floor(k * (m - 1) / troncons), b = Math.floor((k + 1) * (m - 1) / troncons);
-      var t = (k + 0.5) / troncons;
-      c.lineWidth = Math.max(l.delta ? lw * (0.35 + 0.9 * t) : lw, min || 0) + (extra || 0);
-      c.beginPath();
-      c.moveTo(d[2 * a], d[2 * a + 1]);
-      for (var j = a + 1; j <= b; j++) c.lineTo(d[2 * j], d[2 * j + 1]);
-      c.stroke();
+    c.fillStyle = c.strokeStyle;
+    // Un filet continu, de la largeur minimale : la rivière n'est jamais interrompue.
+    c.lineWidth = Math.max(l.delta ? lw * 0.18 : lw, min || 0) + (extra || 0);
+    c.beginPath();
+    c.moveTo(d[0], d[1]);
+    for (var j = 1; j < m; j++) c.lineTo(d[2 * j], d[2 * j + 1]);
+    c.stroke();
+    if (!l.delta) return;
+    // Le corps de la rivière : un ruban dont la largeur croît de la source (un filet) à
+    // l'embouchure, sans paliers, et ondule un peu — des biefs larges, des passages resserrés.
+    var h = hashTexte(String(l.id || "")), p1 = alea(h, 7) * TAU, p2 = alea(h, 8) * TAU;
+    var cum = [0], i;
+    for (i = 1; i < m; i++) cum[i] = cum[i - 1] + Math.hypot(d[2 * i] - d[2 * i - 2], d[2 * i + 1] - d[2 * i - 1]);
+    var total = cum[m - 1] || 1, gauche = [], droite = [];
+    for (i = 0; i < m; i++) {
+      var t = cum[i] / total;
+      var w = lw * (0.18 + 1.07 * Math.pow(t, 0.75)) * (1 + 0.16 * Math.sin(cum[i] / (lw * 9) + p1) + 0.08 * Math.sin(cum[i] / (lw * 3.7) + p2));
+      w = Math.max(w, min || 0) + (extra || 0);
+      var a = Math.max(0, i - 1), b = Math.min(m - 1, i + 1);
+      var tx = d[2 * b] - d[2 * a], ty = d[2 * b + 1] - d[2 * a + 1], tl = Math.hypot(tx, ty) || 1;
+      gauche.push(d[2 * i] - ty / tl * w / 2, d[2 * i + 1] + tx / tl * w / 2);
+      droite.push(d[2 * i] + ty / tl * w / 2, d[2 * i + 1] - tx / tl * w / 2);
+      if (i === m - 1) { c.beginPath(); c.arc(d[2 * i], d[2 * i + 1], w / 2, 0, TAU); c.fill(); }   // l'embouchure, arrondie
     }
+    c.beginPath();
+    c.moveTo(gauche[0], gauche[1]);
+    for (i = 1; i < m; i++) c.lineTo(gauche[2 * i], gauche[2 * i + 1]);
+    for (i = m - 1; i >= 0; i--) c.lineTo(droite[2 * i], droite[2 * i + 1]);
+    c.closePath();
+    c.fill();
   }
 
   // Lacs et rivières CREUSENT la terre, exactement comme la mer : la côte, le halo d'eau
@@ -1962,6 +2018,54 @@
     return { w: w, h: h, dy: 0 };
   }
 
+  // ----- Noms qui suivent un tracé -----
+  //
+  // Un nom peut être attaché à un tracé (`ligne` : son identifiant) : il s'écrit alors le
+  // long de la rivière ou de la route, lettre à lettre, centré à la fraction `pos` de sa
+  // longueur et décalé de `ecart` hauteurs de texte sur le côté. Le tracé suivi est celui
+  // qui est dessiné (méandres compris). Si le texte irait de droite à gauche, il est écrit
+  // dans l'autre sens : un nom ne se lit jamais la tête en bas.
+  function cheminEtiquette(carte, e) {
+    if (!e.ligne) return null;
+    var lignes = carte.lignes || [], l = null;
+    for (var i = 0; i < lignes.length; i++) if (lignes[i].id === e.ligne) { l = lignes[i]; break; }
+    if (!l || !l.pts || l.pts.length < 4) return null;
+    var d = pointsAffiches(l), m = d.length / 2, cum = [0];
+    for (i = 1; i < m; i++) cum[i] = cum[i - 1] + Math.hypot(d[2 * i] - d[2 * i - 2], d[2 * i + 1] - d[2 * i - 1]);
+    return cum[m - 1] > 0 ? { d: d, cum: cum, total: cum[m - 1], m: m } : null;
+  }
+  // Le point du chemin à l'abscisse s (prolongé en ligne droite au-delà des bouts), et sa
+  // direction.
+  function pointChemin(ch, s) {
+    var i = 1;
+    while (i < ch.m - 1 && ch.cum[i] < s) i++;
+    var a = ch.cum[i - 1], b = ch.cum[i], dx = ch.d[2 * i] - ch.d[2 * i - 2], dy = ch.d[2 * i + 1] - ch.d[2 * i - 1], L = b - a || 1;
+    var f = (s - a) / L;
+    return { x: ch.d[2 * i - 2] + dx * f, y: ch.d[2 * i - 1] + dy * f, ux: dx / L, uy: dy / L };
+  }
+  function ecartEtiquette(e) { return (typeof e.ecart === "number" ? e.ecart : -0.85) * e.taille; }
+  // Où est le nom, et sous quel angle (degrés) : ses propres x, y, angle, ou ceux que lui
+  // donne le tracé qu'il suit. Sert à la sélection dans l'éditeur.
+  function poseEtiquette(carte, e) {
+    var ch = cheminEtiquette(carte, e);
+    if (!ch) return { x: e.x, y: e.y, angle: e.angle || 0, suit: false };
+    var p = pointChemin(ch, (e.pos == null ? 0.5 : e.pos) * ch.total), sens = p.ux < 0 ? -1 : 1, ec = ecartEtiquette(e);
+    return { x: p.x - p.uy * sens * ec, y: p.y + p.ux * sens * ec, angle: Math.atan2(p.uy * sens, p.ux * sens) * 180 / Math.PI, suit: true };
+  }
+  // La fraction du tracé la plus proche d'un point : pour faire glisser le nom le long.
+  function positionSurLigne(carte, e, wx, wy) {
+    var ch = cheminEtiquette(carte, e);
+    if (!ch) return null;
+    var best = 0, dMin = Infinity;
+    for (var i = 1; i < ch.m; i++) {
+      var ax = ch.d[2 * i - 2], ay = ch.d[2 * i - 1], dx = ch.d[2 * i] - ax, dy = ch.d[2 * i + 1] - ay, l2 = dx * dx + dy * dy;
+      var t = l2 ? Math.max(0, Math.min(1, ((wx - ax) * dx + (wy - ay) * dy) / l2)) : 0;
+      var dd = Math.hypot(wx - ax - dx * t, wy - ay - dy * t);
+      if (dd < dMin) { dMin = dd; best = (ch.cum[i - 1] + (ch.cum[i] - ch.cum[i - 1]) * t) / ch.total; }
+    }
+    return best;
+  }
+
   function dessinerEtiquettes(ctx, carte, vue, th, tx, ty, z, pw, ph, dpr) {
     var liste = carte.etiquettes || [];
     if (!liste.length) return;
@@ -1976,15 +2080,18 @@
       if (!e.texte) continue;
       var px = e.taille * z;
       if (px < 6 * dpr || px > 1400 * dpr) continue;
-      var sx = e.x * z + tx, sy = e.y * z + ty;
+      var chemin = cheminEtiquette(carte, e), pose = chemin ? poseEtiquette(carte, e) : e;
+      var sx = pose.x * z + tx, sy = pose.y * z + ty;
       var largeur = largeurEtiquette(e) * px;
       var demi = largeur / 2 + px * 2;
       if (sx + demi < 0 || sx - demi > pw || sy + demi < 0 || sy - demi > ph) continue;
       var st = STYLES_ETIQ[e.style] || STYLES_ETIQ.libre;
       var texte = texteEtiquette(e, st), espace = px * espaceEtiquette(e, st);
       ctx.save();
-      ctx.translate(sx, sy);
-      if (e.angle) ctx.rotate(e.angle * Math.PI / 180);
+      if (!chemin) {
+        ctx.translate(sx, sy);
+        if (e.angle) ctx.rotate(e.angle * Math.PI / 180);
+      }
       ctx.globalAlpha = e.opacite == null ? 1 : e.opacite;
       ctx.font = policeEtiquette(st, px);
       ctx.lineWidth = Math.max(2, px * 0.18);
@@ -1994,12 +2101,26 @@
       // (tous les navigateurs n'ont pas `letterSpacing` sur un canvas).
       var lettres = Array.from(texte), avances = [], k;
       for (k = 0; k < lettres.length; k++) avances.push(ctx.measureText(lettres[k]).width);
-      var theta = e.courbe ? e.courbe / 100 * Math.PI : 0, R = theta ? largeur / Math.abs(theta) : 0, sens = theta > 0 ? 1 : -1;
+      var theta = e.courbe && !chemin ? e.courbe / 100 * Math.PI : 0, R = theta ? largeur / Math.abs(theta) : 0, sens = theta > 0 ? 1 : -1;
+      // Le long d'un tracé : l'abscisse du milieu (en unités du monde), le sens de lecture.
+      var s0 = 0, lecture = 1, ecartM = 0;
+      if (chemin) {
+        s0 = (e.pos == null ? 0.5 : e.pos) * chemin.total;
+        lecture = pointChemin(chemin, s0).ux < 0 ? -1 : 1;
+        ecartM = ecartEtiquette(e);
+      }
       for (var passe = 0; passe < 2; passe++) {
         var x = -largeur / 2;
         for (k = 0; k < lettres.length; k++) {
           var cx = x + avances[k] / 2;
-          if (theta) {
+          if (chemin) {
+            var pc = pointChemin(chemin, s0 + lecture * cx / z);
+            ctx.save();
+            ctx.translate((pc.x - pc.uy * lecture * ecartM) * z + tx, (pc.y + pc.ux * lecture * ecartM) * z + ty);
+            ctx.rotate(Math.atan2(pc.uy * lecture, pc.ux * lecture));
+            if (passe === 0) ctx.strokeText(lettres[k], 0, 0); else ctx.fillText(lettres[k], 0, 0);
+            ctx.restore();
+          } else if (theta) {
             var phi = cx / R;
             ctx.save();
             ctx.translate(R * Math.sin(phi), sens * (R - R * Math.cos(phi)));
@@ -3304,7 +3425,7 @@
     alea: alea, joli: joli,
     niveau: niveau, zoomAjuste: zoomAjuste,
     boiteTrait: boiteTrait, nouveauTrait: nouveauTrait,
-    boiteEtiquette: boiteEtiquette, visibleLieu: visibleLieu, tailleIcone: tailleIcone,
+    boiteEtiquette: boiteEtiquette, poseEtiquette: poseEtiquette, positionSurLigne: positionSurLigne, visibleLieu: visibleLieu, tailleIcone: tailleIcone,
     styleLigne: styleLigne, pointsAffiches: pointsAffiches, dansPolygone: dansPolygone,
     icone: icone, iconeAuto: iconeAuto, dessinerIconeLieu: dessinerIconeLieu,
     apercuDecor: apercuDecor, tailleTampon: tailleTampon, FINESSE_MAX: FINESSE_MAX, preparerImages: preparerImages, surImage: null,

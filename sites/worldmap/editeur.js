@@ -33,6 +33,7 @@
     meandre: 0.6,            // rivières : amplitude des méandres (0 = droit)
     delta: true,             // rivières : s'élargissent vers l'embouchure
     fermer: false,           // frontières : refermer en territoire coloré
+    suivre: false,           // noms : poser le nom le long d'un tracé
     styleEtiq: "pays",
     taillePxEtiq: 30,
     typeLieu: "ville",
@@ -333,13 +334,13 @@
       ctx.stroke();
       ctx.setLineDash([]);
     } else if (sel.coll === "etiquettes") {
-      var e = sel.obj, b = Moteur.boiteEtiquette(e), sc = versEcran(e.x, e.y);
+      var e = sel.obj, po = Moteur.poseEtiquette(E.carte, e), b = po.suit ? { w: Moteur.boiteEtiquette({ texte: e.texte, style: e.style, espace: e.espace, taille: e.taille }).w, h: e.taille * 1.1, dy: 0 } : Moteur.boiteEtiquette(e), sc = versEcran(po.x, po.y);
       var w = b.w * E.vue.zoom, h = b.h * E.vue.zoom;
       // Hors des tailles où le texte est dessiné (6 à 1 400 px), il n'y a rien à entourer.
       if (e.taille * E.vue.zoom < 6 || e.taille * E.vue.zoom > 1400) return;
       ctx.save();
       ctx.translate(sc[0], sc[1]);
-      if (e.angle) ctx.rotate(e.angle * Math.PI / 180);
+      if (po.angle) ctx.rotate(po.angle * Math.PI / 180);
       ctx.setLineDash([5, 3]);
       ctx.strokeRect(-w / 2 - 4, -h / 2 - 2 + (b.dy || 0) * E.vue.zoom, w + 8, h + 4);   // `dy` : la flèche d'un nom courbe
       ctx.restore();
@@ -661,8 +662,10 @@
       var tpx = e.taille * z;
       if (!e.texte || tpx < 6 || tpx > 1400) continue;
       var b = Moteur.boiteEtiquette(e);
-      var dx = w[0] - e.x, dy = w[1] - e.y;
-      var a = -(e.angle || 0) * Math.PI / 180;
+      var pe = Moteur.poseEtiquette(E.carte, e);
+      if (pe.suit) b = { w: Moteur.boiteEtiquette({ texte: e.texte, style: e.style, espace: e.espace, taille: e.taille }).w, h: e.taille * 1.1, dy: 0 };
+      var dx = w[0] - pe.x, dy = w[1] - pe.y;
+      var a = -pe.angle * Math.PI / 180;
       var lx = dx * Math.cos(a) - dy * Math.sin(a), ly = dx * Math.sin(a) + dy * Math.cos(a);
       if (Math.abs(lx) <= b.w / 2 + 4 / z && Math.abs(ly - (b.dy || 0)) <= b.h / 2 + 2 / z) return { coll: "etiquettes", obj: e };
     }
@@ -1009,6 +1012,10 @@
         }
         break;
       case "deplace":
+        if (geste.coll === "etiquettes" && geste.obj.ligne) {
+          var frac = Moteur.positionSurLigne(E.carte, geste.obj, w[0], w[1]);
+          if (frac != null) { geste.obj.pos = frac; geste.bouge = true; rendre(); break; }
+        }
         geste.obj.x = w[0] + geste.dx;
         geste.obj.y = w[1] + geste.dy;
         geste.bouge = true;
@@ -1290,13 +1297,48 @@
   // ----- Création d'objets -----
   function creerEtiquetteA(p) {
     var w = versMonde(p.x, p.y);
-    var defaut = { pays: "Nouveau pays", region: "Région", mer: "Mer", libre: "Texte" }[E.styleEtiq] || "Texte";
+    var defaut = { pays: "Nouveau pays", region: "Région", mer: "Mer", relief: "Monts", lieudit: "Lieu-dit", libre: "Texte" }[E.styleEtiq] || "Texte";
+    // « Le long d'un tracé » : le clic doit tomber sur une rivière, une route, une frontière…
+    var support = null;
+    if (E.suivre) {
+      var seuil = 14 / E.vue.zoom, dMin = seuil;
+      E.carte.lignes.forEach(function (l) {
+        var d = Moteur.pointsAffiches(l);
+        for (var j = 0; j + 3 < d.length; j += 2) {
+          var r = distanceSegment(w[0], w[1], d[j], d[j + 1], d[j + 2], d[j + 3]);
+          if (r.d < dMin) { dMin = r.d; support = l; }
+        }
+      });
+      if (!support) { etat("Cliquez sur un tracé (rivière, route, frontière…) pour y poser le nom."); return; }
+      defaut = (Moteur.TYPES_LIGNES[support.type] || {}).nom || defaut;
+    }
     demanderTexte(p.x, p.y, defaut, function (texte) {
       var e = { id: nouvelId("e"), texte: texte, x: w[0], y: w[1], taille: E.taillePxEtiq / E.vue.zoom, angle: 0, style: E.styleEtiq };
+      if (support) { e.ligne = support.id; e.pos = Moteur.positionSurLigne(E.carte, e, w[0], w[1]); }
       ajouter("etiquettes", e);
       choisirOutil("selection");     // l'élément est posé : on rend la main
       selectionner("etiquettes", e);
     });
+  }
+
+  // Attache un nom existant au tracé le plus proche de lui (ou l'en détache).
+  function attacherAuTrace(e) {
+    var meilleur = null, dMin = Infinity;
+    E.carte.lignes.forEach(function (l) {
+      var d = Moteur.pointsAffiches(l);
+      for (var j = 0; j + 3 < d.length; j += 2) {
+        var r = distanceSegment(e.x, e.y, d[j], d[j + 1], d[j + 2], d[j + 3]);
+        if (r.d < dMin) { dMin = r.d; meilleur = l; }
+      }
+    });
+    if (!meilleur) { etat("Aucun tracé sur cette carte : dessinez d'abord une rivière ou une route."); return; }
+    editer(function (x) { x.ligne = meilleur.id; x.pos = Moteur.positionSurLigne(E.carte, { ligne: meilleur.id }, e.x, e.y); delete x.courbe; });
+    panneauSelection();
+  }
+  function detacherDuTrace(e) {
+    var po = Moteur.poseEtiquette(E.carte, e);
+    editer(function (x) { x.x = po.x; x.y = po.y; x.angle = Math.round(po.angle); delete x.ligne; delete x.pos; delete x.ecart; });
+    panneauSelection();
   }
 
   function creerLieuA(p) {
@@ -1574,6 +1616,7 @@
       var styles = Object.keys(Moteur.STYLES_ETIQ).map(function (k) { return [k, Moteur.STYLES_ETIQ[k].nom]; });
       zone.appendChild(champChoix("Style", styles, E.styleEtiq, function (v) { E.styleEtiq = v; }));
       zone.appendChild(champCurseur("Taille du texte", 12, 160, 1, E.taillePxEtiq, function (v) { return Math.round(v) + " px"; }, function (v) { E.taillePxEtiq = v; }));
+      zone.appendChild(champCase("Le long d'un tracé (cliquer sur une rivière, une route…)", E.suivre, function (v) { E.suivre = v; }));
       zone.appendChild(el("p", { classe: "aide", texte: "Cliquez sur la carte, tapez le nom, Entrée. La taille est celle de l'écran au moment où vous cliquez : le texte grandit et rétrécit avec le zoom. Une fois posé, il peut être incliné, courbé, espacé." }));
     }
 
@@ -1709,10 +1752,21 @@
         function (v) { editer(function (x) { x.style = v; delete x.espace; }); panneauSelection(); }));
       zone.appendChild(champCurseur("Taille", 6, 400, 1, borne(o.taille * E.vue.zoom, 6, 400), function (v) { return Math.round(v) + " px"; },
         function (v) { editer(function (x) { x.taille = v / E.vue.zoom; }); }));
-      zone.appendChild(champCurseur("Orientation", -180, 180, 1, o.angle || 0, function (v) { return Math.round(v) + "°"; },
-        function (v) { editer(function (x) { x.angle = v; }); }));
-      zone.appendChild(champCurseur("Courbure", -100, 100, 1, o.courbe || 0, function (v) { return v === 0 ? "droit" : (v > 0 ? "⌢ " : "⌣ ") + Math.abs(Math.round(v)) + " %"; },
-        function (v) { editer(function (x) { if (v) x.courbe = v; else delete x.courbe; }); }));
+      if (Moteur.poseEtiquette(E.carte, o).suit) {
+        zone.appendChild(sousTitre("Le long du tracé"));
+        zone.appendChild(champCurseur("Position", 0, 1, 0.005, o.pos == null ? 0.5 : o.pos, function (v) { return Math.round(v * 100) + " %"; },
+          function (v) { editer(function (x) { x.pos = v; }); }));
+        zone.appendChild(champCurseur("Écart au tracé", -3, 3, 0.05, typeof o.ecart === "number" ? o.ecart : -0.85, function (v) { return Math.abs(v) < 0.03 ? "dessus" : (v < 0 ? "au-dessus " : "au-dessous ") + nb(Math.abs(v), 1); },
+          function (v) { editer(function (x) { x.ecart = v; }); }));
+        zone.appendChild(el("div", { classe: "rangee" }, [el("button", { type: "button", classe: "btn", texte: "Détacher du tracé", onclick: function () { detacherDuTrace(o); } })]));
+        zone.appendChild(el("p", { classe: "aide", texte: "Glissez le nom : il coulisse le long du tracé. Si le tracé change de forme, le nom suit." }));
+      } else {
+        zone.appendChild(champCurseur("Orientation", -180, 180, 1, o.angle || 0, function (v) { return Math.round(v) + "°"; },
+          function (v) { editer(function (x) { x.angle = v; }); }));
+        zone.appendChild(champCurseur("Courbure", -100, 100, 1, o.courbe || 0, function (v) { return v === 0 ? "droit" : (v > 0 ? "⌢ " : "⌣ ") + Math.abs(Math.round(v)) + " %"; },
+          function (v) { editer(function (x) { if (v) x.courbe = v; else delete x.courbe; }); }));
+        zone.appendChild(el("div", { classe: "rangee" }, [el("button", { type: "button", classe: "btn", texte: "Suivre le tracé le plus proche", onclick: function () { attacherAuTrace(o); } })]));
+      }
       var stE = Moteur.STYLES_ETIQ[o.style] || Moteur.STYLES_ETIQ.libre;
       zone.appendChild(champCurseur("Espacement des lettres", 0, 1.5, 0.02, typeof o.espace === "number" ? o.espace : stE.espace, function (v) { return Math.round(v * 100) + " %"; },
         function (v) { editer(function (x) { x.espace = v; }); }));

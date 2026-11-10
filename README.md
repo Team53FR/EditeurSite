@@ -1997,6 +1997,24 @@ cadenas (verrouiller : plus sélectionnable, donc plus déplaçable par erreur).
 dessiné ni à l'écran ni dans l'export : `Moteur.dessiner` reçoit `cacher` et travaille sur une copie
 de la carte aux collections vidées, si bien que masque, ponts et creusement suivent d'eux-mêmes.
 
+**Villes qui s'étalent.** Deux terrains « Bâti » : **Ville (quartiers)** — maisons serrées aux toits
+de teintes variées, grandes bâtisses, clochers (`peintMaisonVille`, qui réutilise `maison` et
+`tourPierre`) — et **Faubourg** (maisons éparses, arbres, parcelles). Ce sont des terrains comme les
+autres : finesse, densité, gomme à décors s'y appliquent, et une route tracée à travers ouvre une rue
+(les maisons s'en écartent). Maison, bâtisse et église existent aussi en tampons.
+
+**Rivières plus naturelles.** `traceRiviereEau` dessine un ruban continu (deux rives décalées du
+tracé) au lieu de tronçons à paliers : un filet à la source, une largeur qui croît sans à-coups
+jusqu'à l'embouchure arrondie, des biefs larges et des passages resserrés. `serpenter` module
+l'amplitude des méandres par une onde lente : amples par endroits, presque droits ailleurs.
+
+**Noms qui suivent un tracé.** Un nom peut porter `ligne` (identifiant d'un tracé), `pos` (fraction
+de sa longueur) et `ecart` (décalage latéral, en hauteurs de texte) : il s'écrit lettre à lettre le
+long du tracé dessiné, méandres compris, et jamais la tête en bas (`cheminEtiquette`, `pointChemin`).
+Outil Noms : case « Le long d'un tracé », puis clic sur une rivière ou une route ; un nom existant
+s'attache au tracé le plus proche ou s'en détache. Glisser le nom le fait coulisser
+(`positionSurLigne`) ; si le tracé change, le nom suit ; si le tracé disparaît, il redevient droit.
+
 Les cartes d'avant s'ouvrent telles quelles : seuls leurs décors changent (ils viennent maintenant
 du terrain) et leurs petits lieux automatiques ont disparu.
 
