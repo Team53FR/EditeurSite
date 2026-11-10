@@ -268,7 +268,7 @@ fieldset.champ-groupe legend { padding: 0 8px; color: var(--cire); font-size: 16
 .atelier {
   flex: 1; min-height: 0;
   display: grid;
-  grid-template-columns: 76px minmax(0, 1fr) 310px;
+  grid-template-columns: 76px minmax(0, 1fr) 330px;
 }
 
 /* La barre d'outils : une planche de chêne, un bouton de laiton par outil. */
@@ -328,6 +328,27 @@ fieldset.champ-groupe legend { padding: 0 8px; color: var(--cire); font-size: 16
   color: var(--parchemin); font-size: 14px; pointer-events: none; font-variant-numeric: tabular-nums;
   text-shadow: 0 1px 3px #000, 0 0 2px #000;
 }
+/* La minicarte : un médaillon dans le coin, replié d'un clic. */
+.mini {
+  position: absolute; right: 12px; top: 12px; z-index: 4;
+  background: var(--bois-2);
+  border: 2px solid var(--or-fonce); border-radius: 4px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+  overflow: hidden; min-width: 96px;
+}
+.mini canvas { position: static; display: block; width: 100%; height: auto; cursor: crosshair; touch-action: none; }
+.mini-bouton {
+  appearance: none; display: block; width: 100%;
+  background: linear-gradient(#4a321d, #2b1b0e); color: var(--or);
+  border: none; border-bottom: 1px solid var(--or-fonce);
+  font: inherit; font-size: 13px; font-variant: small-caps; letter-spacing: 0.08em; padding: 1px 8px 2px; cursor: pointer; text-align: left;
+}
+.mini-bouton::after { content: "▾"; float: right; }
+.mini.repliee { width: auto !important; }
+.mini.repliee canvas { display: none; }
+.mini.repliee .mini-bouton { border-bottom: none; }
+.mini.repliee .mini-bouton::after { content: "▸"; margin-left: 10px; }
+
 .saisie {
   position: absolute; z-index: 5;
   transform: translate(-50%, -50%);
@@ -378,6 +399,14 @@ fieldset.champ-groupe legend { padding: 0 8px; color: var(--cire); font-size: 16
 .bloc p.aide { margin: 6px 0 0; font-size: 15px; color: var(--encre-douce); font-style: italic; }
 
 .palette { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
+.palette-3 { grid-template-columns: repeat(3, 1fr); }
+.sous-titre {
+  margin: 12px 0 5px; font-size: 14px; font-weight: 600; color: var(--encre-douce);
+  font-variant: small-caps; letter-spacing: 0.08em;
+  display: flex; align-items: center; gap: 8px;
+}
+.sous-titre::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, rgba(141, 107, 46, 0.6), transparent); }
+#optionsOutil > .sous-titre:first-child { margin-top: 0; }
 .mat {
   appearance: none; display: flex; align-items: center; gap: 8px;
   background: rgba(255, 249, 226, 0.55); color: var(--encre);
@@ -386,8 +415,61 @@ fieldset.champ-groupe legend { padding: 0 8px; color: var(--cire); font-size: 16
 }
 .mat:hover { border-color: var(--or-fonce); background: rgba(255, 249, 226, 0.95); }
 .mat.actif { border-color: var(--cire); box-shadow: inset 0 0 0 1px var(--cire); background: rgba(255, 245, 214, 1); }
-.mat .pastille-mat { width: 22px; height: 22px; border-radius: 3px; border: 1px solid rgba(40, 24, 8, 0.7); flex: none; }
+.mat { line-height: 1.15; min-width: 0; }
+.mat > span { min-width: 0; overflow-wrap: anywhere; }
+.mat .pastille-mat { width: 34px; height: 34px; border-radius: 3px; border: 1px solid rgba(40, 24, 8, 0.7); flex: none; }
 .mat canvas { flex: none; }
+.mat-haut { flex-direction: column; gap: 1px; padding: 4px 2px 3px; text-align: center; font-size: 14px; }
+.mat-haut canvas { background: #f4ecd6; border-radius: 5px; border: 1px solid rgba(40, 24, 8, 0.35); }
+.plus-image {
+  width: 44px; height: 44px; display: grid; place-items: center;
+  border: 1px dashed #9c7f4d; border-radius: 5px; font-size: 26px; color: var(--encre-douce);
+}
+
+/* Quelques choix côte à côte, comme des touches. */
+.segments { display: flex; border: 1px solid #9c7f4d; border-radius: 3px; overflow: hidden; }
+.segments button {
+  appearance: none; flex: 1; min-width: 0;
+  background: rgba(255, 249, 226, 0.55); color: var(--encre);
+  border: none; border-left: 1px solid rgba(156, 127, 77, 0.6);
+  padding: 4px 2px; cursor: pointer; font: inherit; font-size: 14.5px; font-variant: normal; letter-spacing: 0;
+}
+.segments button:first-child { border-left: none; }
+.segments button:hover { background: rgba(255, 249, 226, 0.95); }
+.segments button[aria-pressed="true"] { background: var(--cire); color: #fdf1cf; }
+.ligne-couleur { display: flex; gap: 6px; align-items: center; }
+.ligne-couleur input[type="color"] { flex: 1; }
+.ligne-couleur .btn { padding: 3px 9px; font-size: 14px; white-space: nowrap; font-variant: normal; letter-spacing: 0; }
+.champ-p textarea {
+  background: rgba(255, 249, 226, 0.8); border: 1px solid #9c7f4d; border-radius: 3px;
+  box-shadow: inset 0 1px 3px rgba(90, 60, 20, 0.3);
+  padding: 5px 8px; color: var(--encre); font: inherit; font-size: 16px; font-variant: normal; letter-spacing: 0;
+  resize: vertical; min-height: 60px;
+}
+.rangee-fin { margin-top: 16px; padding-top: 10px; border-top: 1px dotted rgba(80, 52, 20, 0.45); }
+
+/* Blocs repliables (index des lieux, infos de la carte). */
+details.repli > summary { list-style: none; cursor: pointer; }
+details.repli > summary::-webkit-details-marker { display: none; }
+details.repli > summary h2 { margin-bottom: 0; }
+details.repli > summary h2::before { content: "▸"; font-size: 15px; color: var(--or-fonce); width: 12px; }
+details.repli[open] > summary h2::before { content: "▾"; }
+details.repli[open] > summary { margin-bottom: 8px; }
+details.repli h2 small { font-size: 16px; color: var(--encre-douce); font-variant: normal; letter-spacing: 0; font-weight: 500; }
+.filtre {
+  width: 100%; background: rgba(255, 249, 226, 0.8); border: 1px solid #9c7f4d; border-radius: 3px;
+  padding: 5px 8px; color: var(--encre); font: inherit; font-size: 16px; margin-bottom: 6px;
+}
+.index { max-height: 260px; overflow-y: auto; display: flex; flex-direction: column; scrollbar-color: #8d6b2e transparent; }
+.ligne-index {
+  appearance: none; background: none; border: none; border-bottom: 1px dotted rgba(80, 52, 20, 0.35);
+  display: flex; justify-content: space-between; gap: 8px; align-items: baseline;
+  padding: 3px 4px; cursor: pointer; font: inherit; font-size: 16px; color: var(--encre); text-align: left;
+}
+.ligne-index span { color: var(--encre-douce); font-size: 14px; font-style: italic; white-space: nowrap; }
+.ligne-index strong { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ligne-index:hover { background: rgba(142, 43, 34, 0.12); }
+.ligne-index.actif { background: rgba(142, 43, 34, 0.2); }
 
 .champ-p { display: flex; flex-direction: column; gap: 3px; margin-top: 10px; font-size: 15px; color: var(--encre-douce); font-variant: small-caps; letter-spacing: 0.03em; }
 .champ-p .valeur { color: var(--encre); float: right; font-variant: normal; font-weight: 600; }
@@ -412,6 +494,9 @@ fieldset.champ-groupe legend { padding: 0 8px; color: var(--cire); font-size: 16
 /* ----- Export ----- */
 .options-export { display: flex; flex-direction: column; gap: 8px; margin: 10px 0 14px; }
 .options-export label { display: flex; gap: 8px; align-items: center; font-size: 17px; }
+.options-export select { flex: 1; min-width: 0; }
+.case-dialogue { display: flex; gap: 8px; align-items: center; font-size: 17px; color: var(--encre); margin-top: 4px; }
+fieldset.champ-groupe .champ { margin-bottom: 6px; }
 
 /* ----- Petits écrans ----- */
 @media (max-width: 860px) {
@@ -421,4 +506,5 @@ fieldset.champ-groupe legend { padding: 0 8px; color: var(--cire); font-size: 16
   .panneau { border-left: none; border-top: 3px double var(--or-fonce); }
   .nom-carte { width: 100%; order: 5; }
   .raccourcis { display: none; }
+  .mini { display: none; }
 }
