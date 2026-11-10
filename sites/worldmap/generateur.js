@@ -39,7 +39,7 @@
     var echelle = 3.4;
     var g = graine | 0;
 
-    var listes = { plaine: [], steppe: [], desert: [], marais: [], foret: [], taiga: [], glace: [], colline: [], montagne: [], cime: [], volcan: [] };
+    var listes = { champs: [], plaine: [], steppe: [], desert: [], marais: [], foret: [], taiga: [], glace: [], colline: [], montagne: [], cime: [], volcan: [] };
 
     // Une valeur par cellule, pour les rivières : hauteur (−1 hors carte), position, altitude.
     var total = cols * rows;
@@ -85,6 +85,8 @@
       else if (m > 0.56) biome = temp > 0.5 ? (alt < 0.2 && m > 0.62 ? "marais" : "foret") : "taiga";
       else if (m < 0.4 && temp > 0.5) biome = "desert";
       else if (m < 0.47 && temp > 0.4) biome = "steppe";
+      // Des terres cultivées dans les basses plaines tempérées, par plaques.
+      else if (alt < 0.4 && temp > 0.42 && fbm(px2 / M * echelle * 3.1 + 90, py2 / M * echelle * 3.1 + 90, g + 555) > 0.55) biome = "champs";
       if (biome) listes[biome].push(px2, py2);
     }
 
@@ -117,7 +119,7 @@
     }
 
     // La plaine d'abord (la terre de base), puis les biomes par-dessus.
-    var ordre = ["plaine", "steppe", "desert", "marais", "glace", "foret", "taiga", "colline", "montagne", "cime", "volcan"];
+    var ordre = ["plaine", "champs", "steppe", "desert", "marais", "glace", "foret", "taiga", "colline", "montagne", "cime", "volcan"];
     ordre.forEach(function (mat) {
       var pts = listes[mat];
       if (!pts.length) return;

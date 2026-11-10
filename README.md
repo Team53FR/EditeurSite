@@ -1939,6 +1939,14 @@ projetée sur la terre, `ombreCote`) ; les terrains ont des couleurs plus denses
 est assombri puis sa silhouette, décalée dans huit directions, est glissée dessous (`encreDecors`,
 mis en cache à part) ; le cadre gagne volutes et fleurons (`orneRiche`).
 
+**Terres volcaniques.** `fissuresLave` trace un réseau de fissures rougeoyantes sur le terrain
+« Volcan » : chaque emplacement des cases emboîtées est relié à celui de la case qui le contient au
+niveau au-dessus, d'où un réseau en arbre (grosses coulées, ramifications de plus en plus fines) qui
+reste en place quand on zoome, s'épaissit doucement et se ramifie en fondu. Le décor du terrain est
+un bouquet d'aiguilles d'obsidienne (`peintAiguilles`, aussi en tampon) mêlé de roches sombres.
+**Montagnes** : plus massives (96 px) et à facettes claires et sombres. **Forêts** : trois essences
+mêlées. Le monde aléatoire sème aussi des plaques de **champs** dans les basses plaines.
+
 Les cartes d'avant s'ouvrent telles quelles : seuls leurs décors changent (ils viennent maintenant
 du terrain) et leurs petits lieux automatiques ont disparu.
 

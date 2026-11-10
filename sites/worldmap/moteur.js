@@ -261,6 +261,21 @@
       g.quadraticCurveTo(x1 + (R(80 + i) - 0.5) * 6, (y1 + base) / 2, x1 + (R(90 + i) - 0.3) * 14, base - 2);
     }
     g.stroke();
+    // Les facettes : de chaque sommet descendent des pans de roche, tour à tour clairs et
+    // sombres — le massif a du volume, pas seulement deux versants.
+    sommets.forEach(function (s0, q) {
+      var nf = 5;
+      for (var f = 0; f < nf; f++) {
+        var a0 = -1 + 2 * f / nf, a1 = -1 + 2 * (f + 1) / nf, hm = s0.h * (0.35 + R(110 + q * 9 + f) * 0.3);
+        g.fillStyle = f % 2 ? "rgba(26,20,12,0.2)" : "rgba(255,250,236,0.16)";
+        g.beginPath();
+        g.moveTo(s0.x, base - s0.h);
+        g.lineTo(s0.x + a0 * s0.w * 0.95, base);
+        g.lineTo(s0.x + (a0 + a1) / 2 * s0.w * 0.7, base - hm);
+        g.lineTo(s0.x + a1 * s0.w * 0.95, base);
+        g.closePath(); g.fill();
+      }
+    });
     var limite = neige ? 0.42 : 0.7;                             // au-dessus de cette fraction, il neige
     sommets.forEach(function (s, k) {
       if (!neige && k > 0 && s.h < 44) return;                  // les petits sommets restent nus
@@ -495,6 +510,34 @@
     forme(); g.strokeStyle = "rgba(30,22,16,0.5)"; g.lineWidth = 1; g.stroke();
   }
 
+  // Un bouquet d'aiguilles d'obsidienne : des flèches noires, penchées, d'inégale hauteur,
+  // une arête claire sur le flanc au soleil et, parfois, la lueur de la lave à leur pied.
+  function peintAiguilles(g, v) {
+    var R = function (i) { return alea(1900 + v, i); };
+    ombreDecor(g, 6, 30, 40, 7, 0.34);
+    var n = 5 + (v % 3), liste = [];
+    for (var i = 0; i < n; i++) {
+      var centre = 1 - Math.abs(i - (n - 1) / 2) / (n / 2);
+      liste.push({ x: -34 + 68 * i / (n - 1) + (R(i) - 0.5) * 8, h: 24 + centre * 46 * (0.6 + R(10 + i) * 0.5), w: 9 + R(20 + i) * 7, p: (R(30 + i) - 0.5) * 14 });
+    }
+    if (v % 2 === 0) {
+      var lave = g.createRadialGradient(0, 28, 1, 0, 28, 30);
+      lave.addColorStop(0, "rgba(255,170,40,0.9)"); lave.addColorStop(1, "rgba(255,90,10,0)");
+      g.fillStyle = lave; g.beginPath(); g.ellipse(0, 28, 34, 9, 0, 0, TAU); g.fill();
+    }
+    liste.sort(function (a, b) { return a.h - b.h; }).reverse().forEach(function (a) {
+      var gr = g.createLinearGradient(a.x - a.w, 0, a.x + a.w, 0);
+      gr.addColorStop(0, "#4a4442"); gr.addColorStop(0.45, "#221d1c"); gr.addColorStop(1, "#0c0a0a");
+      g.fillStyle = gr;
+      g.beginPath();
+      g.moveTo(a.x - a.w, 31); g.lineTo(a.x - a.w * 0.5 + a.p * 0.4, 31 - a.h * 0.55); g.lineTo(a.x + a.p, 31 - a.h);
+      g.lineTo(a.x + a.w * 0.45 + a.p * 0.5, 31 - a.h * 0.5); g.lineTo(a.x + a.w, 31);
+      g.closePath(); g.fill();
+      g.strokeStyle = "rgba(150,140,138,0.55)"; g.lineWidth = 1.1;
+      g.beginPath(); g.moveTo(a.x - a.w * 0.7, 29); g.lineTo(a.x - a.w * 0.4 + a.p * 0.4, 31 - a.h * 0.55); g.lineTo(a.x + a.p, 31 - a.h); g.stroke();
+    });
+  }
+
   var PEINTRES = {
     arbre: peintArbre, conifere: peintConifere,
     automne: function (g, v) { peintArbre(g, v, "automne"); },
@@ -506,10 +549,10 @@
     seche: function (g, v) { peintHerbe(g, v, true); },
     rocher: function (g, v) { peintRocher(g, v, false); },
     basalte: function (g, v) { peintRocher(g, v, true); },
-    champ: peintChamp, glacon: peintGlacon, cratere: peintCratere
+    champ: peintChamp, glacon: peintGlacon, cratere: peintCratere, aiguilles: peintAiguilles
   };
   var VARIANTES = { arbre: 6, conifere: 4, automne: 6, tropical: 6, palmier: 4, acacia: 4, mort: 4, montagne: 6, cime: 6,
-    colline: 4, dune: 4, marais: 3, herbe: 3, seche: 3, rocher: 6, basalte: 6, champ: 6, glacon: 4, cratere: 2 };
+    colline: 4, dune: 4, marais: 3, herbe: 3, seche: 3, rocher: 6, basalte: 6, champ: 6, glacon: 4, cratere: 2, aiguilles: 6 };
 
   // Colle un décor peint : (x, y) est le point où il touche le sol, s la taille de sa boîte.
   function colle(ctx, type, v, x, y, s) {
@@ -519,67 +562,6 @@
   function variante(type, r) {
     var n = VARIANTES[type];
     return Math.min(n - 1, Math.floor(r * n));
-  }
-
-  // Terres volcaniques : aiguilles d'obsidienne, fissures de lave, cailloux sombres.
-  function volcan(ctx, x, y, s, r) {
-    ctx.lineJoin = "round";
-    ctx.lineCap = "round";
-    if (r < 0.4) {
-      var w = s * 0.34, h = s * (0.75 + r * 0.6);
-      ctx.fillStyle = "#1f1a19";
-      ctx.strokeStyle = "#0b0909";
-      ctx.lineWidth = s * 0.04;
-      ctx.beginPath();
-      ctx.moveTo(x - w, y + h * 0.35);
-      ctx.lineTo(x - w * 0.55, y - h * 0.18);
-      ctx.lineTo(x - w * 0.32, y - h * 0.1);
-      ctx.lineTo(x, y - h * 0.52);
-      ctx.lineTo(x + w * 0.22, y - h * 0.08);
-      ctx.lineTo(x + w * 0.58, y - h * 0.26);
-      ctx.lineTo(x + w, y + h * 0.35);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-      ctx.strokeStyle = "rgba(140,128,128,0.55)";
-      ctx.lineWidth = s * 0.03;
-      ctx.beginPath();
-      ctx.moveTo(x - w * 0.9, y + h * 0.3); ctx.lineTo(x - w * 0.52, y - h * 0.14); ctx.lineTo(x, y - h * 0.48);
-      ctx.stroke();
-      ctx.strokeStyle = "#ff9a2a";
-      ctx.lineWidth = s * 0.06;
-      ctx.beginPath();
-      ctx.moveTo(x - w * 0.05, y + h * 0.33); ctx.lineTo(x + w * 0.08, y + h * 0.05); ctx.lineTo(x - w * 0.02, y - h * 0.2);
-      ctx.stroke();
-    } else if (r < 0.75) {
-      var chemin = function () {
-        ctx.beginPath();
-        ctx.moveTo(x - s * 0.5, y);
-        ctx.lineTo(x - s * 0.22, y - s * 0.12);
-        ctx.lineTo(x, y + s * 0.06);
-        ctx.lineTo(x + s * 0.26, y - s * 0.1);
-        ctx.lineTo(x + s * 0.5, y + s * 0.05);
-      };
-      ctx.strokeStyle = "#c23c10";
-      ctx.lineWidth = s * 0.1;
-      chemin(); ctx.stroke();
-      ctx.strokeStyle = "#ff8a1c";
-      ctx.lineWidth = s * 0.06;
-      chemin(); ctx.stroke();
-      ctx.strokeStyle = "#ffd86a";
-      ctx.lineWidth = s * 0.026;
-      chemin(); ctx.stroke();
-    } else {
-      ctx.fillStyle = "#2a2220";
-      ctx.strokeStyle = "#0b0909";
-      ctx.lineWidth = s * 0.03;
-      ctx.beginPath();
-      ctx.moveTo(x - s * 0.3, y + s * 0.12); ctx.lineTo(x - s * 0.18, y - s * 0.1); ctx.lineTo(x - s * 0.02, y + s * 0.12);
-      ctx.moveTo(x + s * 0.02, y + s * 0.14); ctx.lineTo(x + s * 0.14, y - s * 0.04); ctx.lineTo(x + s * 0.3, y + s * 0.14);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-    }
   }
 
   // ----- Table des décors -----
@@ -595,15 +577,15 @@
     seche:    { C: 17,   p: 0.2,  marge: 0.1,  choix: [["seche", 1, 17]] },
     champs:   { C: 15,   p: 1,    marge: 0.3,  choix: [["champ", 1, 46]] },
     savane:   { C: 17,   p: 0.8,  marge: 0.15, choix: [["acacia", 0.3, 36], ["seche", 0.7, 15]] },
-    foret:    { C: 8.5, p: 1,    marge: 0.12, choix: [["arbre", 0.9, 28], ["conifere", 0.1, 28]] },
+    foret:    { C: 8.5, p: 1,    marge: 0.12, choix: [["arbre", 0.68, 28], ["tropical", 0.2, 31], ["conifere", 0.12, 28]] },
     automne:  { C: 8.5, p: 1,    marge: 0.12, choix: [["automne", 1, 28]] },
     taiga:    { C: 8.5, p: 1,    marge: 0.12, choix: [["conifere", 1, 28]] },
     jungle:   { C: 8.5,   p: 1,    marge: 0.12, choix: [["tropical", 0.72, 29], ["palmier", 0.28, 33]] },
     morte:    { C: 12,   p: 0.8,  marge: 0.12, choix: [["mort", 1, 27]] },
     colline:  { C: 19,   p: 0.85, marge: 0.25, choix: [["colline", 1, 46]] },
-    montagne: { C: 22,   p: 0.9,  marge: 0.28, choix: [["montagne", 1, 64]] },
-    cime:     { C: 22,   p: 0.9,  marge: 0.28, choix: [["cime", 1, 64]] },
-    volcan:   { C: 21,   p: 0.7,  marge: 0.2,  choix: [["@volcan", 1, 30]] },
+    montagne: { C: 25,   p: 0.95, marge: 0.2,  choix: [["montagne", 1, 96]] },
+    cime:     { C: 25,   p: 0.95, marge: 0.2,  choix: [["cime", 1, 96]] },
+    volcan:   { C: 21,   p: 0.62, marge: 0.2,  choix: [["aiguilles", 0.5, 52], ["basalte", 0.5, 17]] },
     rocaille: { C: 13,   p: 0.8,  marge: 0.15, choix: [["rocher", 1, 24]] },
     dune:     { C: 20,   p: 0.7,  marge: 0.25, choix: [["dune", 1, 44]] },
     cendres:  { C: 19,   p: 0.5,  marge: 0.15, choix: [["basalte", 0.6, 20], ["mort", 0.4, 24]] },
@@ -622,7 +604,7 @@
     { id: "arbre", nom: "Feuillu" }, { id: "conifere", nom: "Sapin" }, { id: "automne", nom: "Arbre d'automne" },
     { id: "tropical", nom: "Arbre tropical" }, { id: "palmier", nom: "Palmier" }, { id: "acacia", nom: "Acacia" },
     { id: "mort", nom: "Arbre mort" }, { id: "montagne", nom: "Montagne", max: 230 }, { id: "cime", nom: "Pic enneigé", max: 230 },
-    { id: "cratere", nom: "Volcan", max: 230 }, { id: "colline", nom: "Colline", max: 170 }, { id: "dune", nom: "Dune", max: 170 },
+    { id: "cratere", nom: "Volcan", max: 230 }, { id: "aiguilles", nom: "Aiguilles noires", max: 170 }, { id: "colline", nom: "Colline", max: 170 }, { id: "dune", nom: "Dune", max: 170 },
     { id: "rocher", nom: "Rochers" }, { id: "basalte", nom: "Roche sombre" }, { id: "glacon", nom: "Glace" },
     { id: "champ", nom: "Champ" }, { id: "marais", nom: "Roseaux" }, { id: "herbe", nom: "Herbes" }, { id: "seche", nom: "Herbes sèches" }
   ];
@@ -959,9 +941,68 @@
     liste.sort(function (a, b) { return a.y - b.y; });
     for (var i = 0; i < liste.length; i++) {
       var o = liste[i];
-      if (o.sprite === "@volcan") volcan(lc, o.x, o.y - o.s * 0.2, o.s, o.r);
-      else colle(lc, o.sprite, o.v != null ? o.v % VARIANTES[o.sprite] : variante(o.sprite, o.r), o.x, o.y, o.s);
+      colle(lc, o.sprite, o.v != null ? o.v % VARIANTES[o.sprite] : variante(o.sprite, o.r), o.x, o.y, o.s);
     }
+  }
+
+  // ----- Fissures de lave -----
+  //
+  // Sur les terres volcaniques, un réseau de fissures rougeoyantes. Il s'appuie sur les mêmes
+  // cases emboîtées que les décors : chaque emplacement est relié à celui de la case qui le
+  // contient, au niveau au-dessus — d'où un réseau en ARBRE, de grosses coulées qui se
+  // ramifient en fissures de plus en plus fines. En zoomant, les coulées restent en place,
+  // s'épaississent doucement, et de nouvelles ramifications apparaissent en fondu.
+  function fissuresLave(lc, carte, vue, masque, X0, Y0, X1, Y1) {
+    if (!masque) return;
+    var volcan = MAT.volcan, visible = false, traits = carte.traits || [];
+    for (var t = 0; t < traits.length && !visible; t++) if (traits[t].mat === "volcan" && traits[t].bb && chevauche(traits[t].bb, X0, Y0, X1, Y1)) visible = true;
+    if (!visible) return;
+    var zoom = vue.zoom, data = masque.data, code = volcan.code * 10, u = 1 / zoom;
+    var niveauReel = Math.log(CASE0 * zoom / 46) / Math.LN2, kFin = Math.floor(niveauReel), f = niveauReel - kFin;
+    var surLave = function (x, y) {
+      var px = pixelMasque(masque, x, y);
+      return px >= 0 && data[px + 3] >= 128 && data[px] === code;
+    };
+    var segments = [];
+    for (var k = Math.max(1, kFin - 5); k <= kFin; k++) {
+      var D = CASE0 / Math.pow(2, k), m = D * 2;
+      var i0 = Math.max(0, Math.floor((X0 - m) / D)), i1 = Math.min(Math.floor(carte.largeur / D), Math.floor((X1 + m) / D));
+      var j0 = Math.max(0, Math.floor((Y0 - m) / D)), j1 = Math.min(Math.floor(carte.hauteur / D), Math.floor((Y1 + m) / D));
+      if ((i1 - i0 + 1) * (j1 - j0 + 1) > 40000) continue;
+      var age = niveauReel - k;                       // 0 : tout juste née ; grandit avec le zoom
+      var largeur = Math.min(7, 1.3 * Math.pow(1.55, age)) * u, alpha = k === kFin ? Math.min(1, f / 0.5) : 1;
+      for (var cj = j0; cj <= j1; cj++) {
+        for (var ci = i0; ci <= i1; ci++) {
+          var p = pointCase(k, ci, cj);
+          if (p.k !== k || p.r2 > 0.7) continue;      // un emplacement hérité est déjà relié plus haut
+          var q = pointCase(k - 1, ci >> 1, cj >> 1);
+          if (!surLave(p.x, p.y) || !surLave(q.x, q.y)) continue;
+          // Deux coudes entre les deux bouts : une fissure, pas un trait à la règle.
+          var dx = q.x - p.x, dy = q.y - p.y, e = Math.hypot(dx, dy) * 0.22;
+          var ax = p.x + dx * 0.33 - dy / (e * 4.5 || 1) * e * (p.r - 0.5) * 2, ay = p.y + dy * 0.33 + dx / (e * 4.5 || 1) * e * (p.r - 0.5) * 2;
+          var bx = p.x + dx * 0.67 - dy / (e * 4.5 || 1) * e * (p.r3 - 0.5) * 2, by = p.y + dy * 0.67 + dx / (e * 4.5 || 1) * e * (p.r3 - 0.5) * 2;
+          if (!surLave(ax, ay) || !surLave(bx, by)) continue;
+          segments.push({ pts: [p.x, p.y, ax, ay, bx, by, q.x, q.y], w: largeur, a: alpha });
+        }
+      }
+    }
+    if (!segments.length) return;
+    lc.save();
+    lc.lineCap = lc.lineJoin = "round";
+    // Trois passes : la roche brûlée autour, la lave, puis son cœur incandescent.
+    [["rgba(58,26,8,0.6)", 2.6], ["#e2560f", 1.25], ["#ffc23a", 0.5]].forEach(function (passe) {
+      segments.forEach(function (sg) {
+        lc.globalAlpha = sg.a;
+        lc.strokeStyle = passe[0];
+        lc.lineWidth = sg.w * passe[1];
+        lc.beginPath();
+        lc.moveTo(sg.pts[0], sg.pts[1]);
+        for (var n = 2; n < 8; n += 2) lc.lineTo(sg.pts[n], sg.pts[n + 1]);
+        lc.stroke();
+      });
+    });
+    lc.restore();
+    lc.globalAlpha = 1;
   }
 
   // ----- Texture du sol -----
@@ -2803,6 +2844,7 @@
       lc.beginPath();
       lc.rect(0, 0, carte.largeur, carte.hauteur);
       lc.clip();
+      fissuresLave(lc, carte, vue, masque, X0, Y0, X1, Y1);
       peindreDecors(lc, decors);
       lc.restore();
       // L'ombre des rivages (style Enluminé) : la silhouette de l'EAU projette une ombre
@@ -2966,8 +3008,7 @@
   function apercuDecor(ctx, sprite, v, x, y, s) {
     var avant = ZPX;
     ZPX = 2;
-    if (sprite === "@volcan") volcan(ctx, x, y, s * 0.9, 0.2);
-    else if (PEINTRES[sprite]) colle(ctx, sprite, v || 0, x, y + s * 0.31, s);
+    if (PEINTRES[sprite]) colle(ctx, sprite, v || 0, x, y + s * 0.31, s);
     ZPX = avant;
   }
 
