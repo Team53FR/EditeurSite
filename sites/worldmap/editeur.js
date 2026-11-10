@@ -21,6 +21,7 @@
     taillePx: 40,
     densite: 2,              // pinceau : décors du terrain (0 aucun, 1 clairsemé, 2 normal, 3 dense)
     echDecor: 1,             // pinceau : taille des décors (0 petits, 1 normaux, 2 grands)
+    finesse: "auto",         // pinceau : finesse des décors (0 à 4, ou « auto » : d'après le zoom)
     rugosite: 0,             // pinceau et gomme : bord découpé (0 = bord lisse)
     tampon: "arbre",         // outil Décors : le décor posé à la main
     taillePxTampon: 36,
@@ -161,6 +162,7 @@
     var px = pas * E.vue.zoom;
     $("echelle").innerHTML = '<div class="regle" style="width:' + px.toFixed(0) + 'px"></div>' + formatKm(pas);
     majLibelleTaille();
+    majLibelleFinesse();
   }
 
   function vueChangee() {
@@ -560,6 +562,15 @@
 
   function tailleMondePinceau() { return Math.max(E.taillePx / E.vue.zoom, 1e-6); }
 
+  // La finesse des décors du prochain trait : chaque cran les rend deux fois plus petits (et
+  // quatre fois plus nombreux). En « auto », elle suit le zoom : peindre de près donne des
+  // décors fins, peindre de loin des décors visibles de loin. Une fois peints, ils ne
+  // changent plus — ils sont fixés dans le monde.
+  function finesseActuelle() {
+    if (E.finesse !== "auto") return E.finesse;
+    return borne(Math.round(Math.log(Math.max(niveauActuel(), 0.01)) / Math.LN2), 0, Moteur.FINESSE_MAX);
+  }
+
   // Un décor posé à la main : sa taille est celle de l'écran au moment du clic, puis il
   // appartient au monde (il grandit quand on s'approche, comme un vrai relief).
   function nouveauTampon(w) {
@@ -599,6 +610,8 @@
         if (E.outil === "pinceau") {
           if (E.densite !== 2) geste.trait.dens = E.densite;
           if (E.echDecor !== 1) geste.trait.ech = E.echDecor;
+          var fin = finesseActuelle();
+          if (fin > 0) geste.trait.fin = fin;
         }
         surcouche();
         break;
@@ -1164,6 +1177,14 @@
 
   function sousTitre(texte) { return el("h3", { classe: "sous-titre", texte: texte }); }
 
+  function majLibelleFinesse() {
+    var out = $("libFinesse");
+    if (!out) return;
+    var fin = finesseActuelle();
+    out.textContent = (E.finesse === "auto" ? "Auto : à ce zoom, ×" + Math.pow(2, fin) + ". " : "") +
+      (fin === 0 ? "Décors à l'échelle de la carte entière." : "Décors " + Math.pow(2, fin) + " fois plus petits : pour détailler une région vue de près.");
+  }
+
   function majLibelleTaille() {
     var out = $("libTaillePinceau");
     if (out) out.textContent = "≈ " + formatKm((E.outil === "tampon" ? E.taillePxTampon : E.taillePx) / E.vue.zoom) + " dans le monde, à ce zoom";
@@ -1222,11 +1243,14 @@
       if (E.outil === "pinceau" && Moteur.MAT[E.materiau].decor) {
         zone.appendChild(champSegments("Décors du terrain", [[0, "Aucun"], [1, "Rares"], [2, "Normal"], [3, "Dense"]], E.densite, function (v) { E.densite = v; }));
         zone.appendChild(champSegments("Taille des décors", [[0, "Petits"], [1, "Normaux"], [2, "Grands"]], E.echDecor, function (v) { E.echDecor = v; }));
+        zone.appendChild(champSegments("Finesse (échelle des décors)", [["auto", "Auto"], [0, "×1"], [1, "×2"], [2, "×4"], [3, "×8"], [4, "×16"]], E.finesse, function (v) { E.finesse = v; majLibelleFinesse(); }));
+        zone.appendChild(el("p", { classe: "aide", id: "libFinesse" }));
       }
       zone.appendChild(el("p", { classe: "aide", texte: E.outil === "gomme"
         ? "Efface la terre : la mer réapparaît. Un bord découpé donne des anses et des caps. Zoomez pour ciseler la côte."
-        : "Le terrain se couvre de lui-même de ses décors (arbres, pics, dunes…), qui restent lisibles à tous les zooms. Rien d'autre n'est ajouté : chemins, villages et grottes se posent avec les outils Tracés et Lieux." }));
+        : "Le terrain se couvre de ses décors (arbres, pics, dunes…), fixés une fois pour toutes : zoomer ou dézoomer n'en ajoute ni n'en retire aucun, comme sur une carte imprimée. Pour en changer la quantité, repassez avec une autre densité (ou « Aucun »)." }));
       majLibelleTaille();
+      majLibelleFinesse();
     }
 
     if (E.outil === "tampon") {
@@ -1246,7 +1270,7 @@
         function (v) { E.taillePxTampon = v; majLibelleTaille(); surcouche(); }));
       zone.appendChild(el("p", { classe: "aide", id: "libTaillePinceau" }));
       zone.appendChild(champCurseur("Variation de taille", 0, 1, 0.05, E.variation, function (v) { return Math.round(v * 100) + " %"; }, function (v) { E.variation = v; }));
-      zone.appendChild(el("p", { classe: "aide", texte: "Cliquez pour poser un décor, glissez pour en semer plusieurs. Un décor posé appartient au monde : il grandit quand on s'approche. Les décors du terrain lui laissent la place." }));
+      zone.appendChild(el("p", { classe: "aide", texte: "Cliquez pour poser un décor, glissez pour en semer plusieurs. Un décor posé appartient au monde : sa taille est celle de l'écran au moment où vous le posez, puis il grandit et rétrécit avec le zoom. Les décors du terrain lui laissent la place." }));
       majLibelleTaille();
     }
 
@@ -1638,6 +1662,7 @@
     $("rgNom").value = E.carte.nom;
     $("rgLarg").value = E.carte.largeur;
     $("rgHaut").value = E.carte.hauteur;
+    $("rgFinesse").value = String(typeof E.carte.finesse === "number" ? E.carte.finesse : 1);
     var orn = E.carte.ornements || {};
     $("rgRose").value = orn.rose || "";
     $("rgEchelle").checked = !!orn.echelle;
@@ -1653,6 +1678,7 @@
       $("rgMessage").textContent = "La largeur et la hauteur doivent être comprises entre 0,05 et 40 000 km.";
       return;
     }
+    E.carte.finesse = parseInt($("rgFinesse").value, 10) || 0;
     if ($("rgRose").value || $("rgEchelle").checked || $("rgTitre").checked) {
       E.carte.ornements = { rose: $("rgRose").value, echelle: $("rgEchelle").checked, titre: $("rgTitre").checked };
     } else delete E.carte.ornements;

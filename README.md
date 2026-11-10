@@ -1960,6 +1960,18 @@ les nouveaux coins et les nouvelles haies apparaissent en fondu. **Montagnes** :
 écart et marge réduits — une crête étroite porte sa rangée de sommets dès la vue d'ensemble.
 **Zoom** plafonné à ×15 (`NIVEAU_MAX`).
 
+**Décors fixés dans le monde (remplace « qui poussent en zoomant »).** Comme sur une carte
+imprimée : même nombre de décors, aux mêmes places, de la même taille en km à tous les zooms — zoomer
+les agrandit, rien n'apparaît ni ne disparaît. Le niveau de cases d'un terrain (`niveauDecor`) ne
+dépend plus de la vue mais de la carte (`zoomBase` : la carte tenant dans 1 400 px), de son **échelle
+des décors** (`carte.finesse`, 0 à 2, réglée dans « Carte… », 1 par défaut) et de la **finesse du
+trait** (`fin`, 0 à 4, dans le canal vert du masque) : chaque cran divise la taille par deux. Au
+pinceau, « Auto » la tire du zoom au moment de peindre — peindre de près donne des décors fins — ou
+on la fixe (×1 à ×16). La taille d'un décor est proportionnelle à sa case. Seule entorse, pour la
+lisibilité et la vitesse : des décors qui feraient moins de quelques pixels sont dessinés un sur
+quatre, deux fois plus grands, aux mêmes endroits. Champs et fissures de lave sont fixés de même ; les
+tampons n'ont plus de taille plafonnée à l'écran.
+
 Les cartes d'avant s'ouvrent telles quelles : seuls leurs décors changent (ils viennent maintenant
 du terrain) et leurs petits lieux automatiques ont disparu.
 

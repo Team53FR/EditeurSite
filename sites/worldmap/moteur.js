@@ -583,12 +583,12 @@
     taiga:    { C: 8.5, p: 1,    marge: 0.12, choix: [["conifere", 1, 28]] },
     jungle:   { C: 8.5,   p: 1,    marge: 0.12, choix: [["tropical", 0.72, 29], ["palmier", 0.28, 33]] },
     morte:    { C: 12,   p: 0.8,  marge: 0.12, choix: [["mort", 1, 27]] },
-    colline:  { C: 19,   p: 0.85, marge: 0.25, choix: [["colline", 1, 46]] },
+    colline:  { C: 19,   p: 0.85, marge: 0.12, choix: [["colline", 1, 62]] },
     // Une chaîne : de grands massifs et, serrés entre eux, des pics plus petits. La marge
     // est faible pour qu'une crête étroite, vue de loin, porte déjà sa rangée de sommets.
-    montagne: { C: 15,   p: 0.92, marge: 0.07, choix: [["montagne", 0.4, 86], ["montagne", 0.6, 54]] },
-    cime:     { C: 15,   p: 0.92, marge: 0.07, choix: [["cime", 0.4, 86], ["cime", 0.6, 54]] },
-    volcan:   { C: 21,   p: 0.62, marge: 0.2,  choix: [["aiguilles", 0.5, 52], ["basalte", 0.5, 17]] },
+    montagne: { C: 24,   p: 0.94, marge: 0.05, choix: [["montagne", 0.4, 170], ["montagne", 0.6, 104]] },
+    cime:     { C: 24,   p: 0.94, marge: 0.05, choix: [["cime", 0.4, 170], ["cime", 0.6, 104]] },
+    volcan:   { C: 21,   p: 0.62, marge: 0.2,  choix: [["aiguilles", 0.5, 84], ["basalte", 0.5, 24]] },
     rocaille: { C: 13,   p: 0.8,  marge: 0.15, choix: [["rocher", 1, 24]] },
     dune:     { C: 20,   p: 0.7,  marge: 0.25, choix: [["dune", 1, 44]] },
     cendres:  { C: 19,   p: 0.5,  marge: 0.15, choix: [["basalte", 0.6, 20], ["mort", 0.4, 24]] },
@@ -615,7 +615,7 @@
   var MAX_TAMPON = {};
   TAMPONS.forEach(function (t) { MAX_TAMPON[t.id] = t.max || 120; });
   // La taille d'un tampon dans le monde, à ce zoom (px CSS par unité).
-  function tailleTampon(t, zoom) { return Math.min(t.s, MAX_TAMPON[t.type] / zoom); }
+  function tailleTampon(t) { return t.s; }
 
   // ----- Types d'objets -----
   var TYPES_LIGNES = {
@@ -860,16 +860,38 @@
 
   // Rassemble dans `liste` les décors à dessiner pour cette vue : { x, y, s, sprite, v } en
   // unités du monde. `tampons` : les décors posés à la main, dont les autres s'écartent.
+  // Le zoom de référence d'une carte : celui où elle tient dans 1 400 px. C'est à cette
+  // échelle que les décors ont leur taille « normale » ; il ne dépend ni de l'écran ni de la vue.
+  // `carte.finesse` (0, 1 ou 2 ; 1 par défaut) règle l'échelle générale des décors : à 1, un
+  // arbre fait une quinzaine de pixels à la vue d'ensemble — une carte fouillée, qui supporte
+  // d'être regardée de près.
+  function zoomBase(carte) {
+    var fin = typeof carte.finesse === "number" ? carte.finesse : 1;
+    return 1400 / Math.max(carte.largeur, carte.hauteur) * Math.pow(2, fin);
+  }
+  var FINESSE_MAX = 4;
+
+  // Le niveau de cases d'un terrain : fixé par la carte et par la finesse du trait (`fin` :
+  // chaque cran divise par deux la taille des décors), JAMAIS par le zoom de la vue.
+  function niveauDecor(zb, C, fin) { return Math.max(0, Math.floor(Math.log(CASE0 * zb * Math.pow(2, fin) / C) / Math.LN2)); }
+
+  // Rassemble dans `liste` les décors à dessiner pour cette vue : { x, y, s, sprite } en
+  // unités du monde. Les décors sont FIXÉS DANS LE MONDE, comme sur une carte imprimée :
+  // même nombre, mêmes places, même taille (en km) à tous les zooms — zoomer les agrandit,
+  // rien n'apparaît ni ne disparaît. Seule exception, la lisibilité : quand des décors
+  // feraient moins de quelques pixels (une forêt fine vue de très loin), on en dessine un
+  // sur quatre, deux fois plus grand, aux mêmes endroits — la forêt reste une forêt.
+  // `tampons` : les décors posés à la main, dont les autres s'écartent.
   function semerDecors(carte, vue, masque, X0, Y0, X1, Y1, tampons, liste) {
     if (!masque) return;
-    var zoom = vue.zoom, data = masque.data, mw = masque.mw, mh = masque.mh;
+    var zoom = vue.zoom, data = masque.data, mw = masque.mw, mh = masque.mh, zb = zoomBase(carte);
     if (memoCases.size > 400000) memoCases.clear();
-    // Quels écarts (C × échelle) faut-il parcourir ? Ceux des traits visibles.
-    var ecarts = {}, traits = carte.traits || [], i;
+    // Quels niveaux de cases faut-il parcourir ? Ceux des traits visibles.
+    var niveaux = {}, traits = carte.traits || [], i;
     for (i = 0; i < traits.length; i++) {
       var t = traits[i], mat = MAT[t.mat], d = mat && DECORS[mat.decor];
       if (!d || t.sansDecor || t.dens === 0 || !t.bb || !chevauche(t.bb, X0, Y0, X1, Y1)) continue;
-      ecarts[d.C * ECHELLES[t.ech == null ? 1 : t.ech]] = true;
+      niveaux[niveauDecor(zb, d.C, t.fin || 0)] = true;
     }
     // Une petite grille des tampons, pour s'en écarter sans tout comparer.
     var gt = null, gc = 0;
@@ -882,20 +904,18 @@
       });
     }
     var L = carte.largeur, H = carte.hauteur;
-    Object.keys(ecarts).forEach(function (cleEcart) {
-      var Ce = parseFloat(cleEcart);
-      var niveauReel = Math.log(CASE0 * zoom / Ce) / Math.LN2;
-      var k = Math.max(0, Math.floor(niveauReel)), f = niveauReel - k;
-      var D = CASE0 / Math.pow(2, k), m = 80 / zoom;
+    Object.keys(niveaux).forEach(function (cle) {
+      var k = parseInt(cle, 10), Dk = CASE0 / Math.pow(2, k);
+      // Trop petits pour être lus : on remonte de `n` niveaux (un décor sur 4ⁿ, 2ⁿ fois plus grand).
+      var n = Dk * zoom < 4.2 ? Math.ceil(Math.log(4.2 / (Dk * zoom)) / Math.LN2) : 0;
+      var kv = Math.max(0, k - n), D = CASE0 / Math.pow(2, kv), grossi = Math.pow(2, k - kv);
+      var m = 140 / zoom + D * 3;
       var i0 = Math.max(0, Math.floor((X0 - m) / D)), i1 = Math.min(Math.floor(L / D), Math.floor((X1 + m) / D));
       var j0 = Math.max(0, Math.floor((Y0 - m) / D)), j1 = Math.min(Math.floor(H / D), Math.floor((Y1 + m) / D));
       if ((i1 - i0 + 1) * (j1 - j0 + 1) > 450000) return;
-      // Un nouveau venu grandit pendant que l'on zoome ; les anciens ont leur taille.
-      var pousse = Math.min(1, f / 0.6); pousse = pousse * pousse * (3 - 2 * pousse);
       for (var cj = j0; cj <= j1; cj++) {
         for (var ci = i0; ci <= i1; ci++) {
-          var pt = pointCase(k, ci, cj);
-          if (pt.k === k && pousse < 0.06) continue;                   // un nouveau venu, encore invisible
+          var pt = pointCase(kv, ci, cj);
           var px = pixelMasque(masque, pt.x, pt.y);
           if (px < 0 || data[px + 3] < 128) continue;                 // hors masque, ou de l'eau
           if (data[px + 1] > 128) continue;                           // une route
@@ -904,17 +924,18 @@
           if (!dd) continue;
           var code = Math.round(data[px + 2] / 20) - 1;               // densité × 3 + échelle
           if (code < 0) continue;
+          if (niveauDecor(zb, dd.C, Math.round(data[px + 1] / 24)) !== k) continue;   // ce terrain a un autre niveau
           var ech = ECHELLES[code % 3], dens = DENSITES[Math.floor(code / 3)];
-          if (Math.abs(dd.C * ech - Ce) > 1e-6) continue;             // ce terrain a un autre écart             // ce terrain a un autre écart
           if (pt.r >= dd.p * dens) continue;
           // Quel décor, parmi ceux du terrain ?
           var ch = dd.choix[0], cumul = 0;
           for (var q = 0; q < dd.choix.length; q++) { cumul += dd.choix[q][1]; if (pt.r2 < cumul) { ch = dd.choix[q]; break; } }
-          var taillePx = ch[2] * ech * ECH_THEME * (0.82 + 0.36 * pt.r3) * (pt.k === k ? pousse : 1);
-          if (taillePx < 3.5) continue;
-          var s = taillePx / zoom;
+          // Sa taille dans le monde : proportionnelle à la case, donc fixe.
+          var s = ch[2] / dd.C * Dk * 0.72 * grossi * ech * ECH_THEME * (0.82 + 0.36 * pt.r3);
+          var taillePx = s * zoom;
+          if (taillePx < 3) continue;
           // Bien à l'intérieur de son terrain : les quatre voisins disent la même chose.
-          var e = Math.max(1, Math.round(dd.marge * taillePx * masque.z / zoom / masque.ech));
+          var e = Math.max(1, Math.round(dd.marge * Math.min(taillePx, 120) * masque.z / zoom / masque.ech));
           var sx = (px / 4) % mw, sy = Math.floor(px / 4 / mw), ok = true;
           for (var w = 0; w < 4 && ok; w++) {
             var nx = sx + (w === 0 ? -e : w === 1 ? e : 0), ny = sy + (w === 2 ? -e : w === 3 ? Math.round(e * 0.5) : 0);
@@ -972,8 +993,10 @@
     for (var t = 0; t < traits.length && !visible; t++) if (traits[t].mat === "champs" && traits[t].bb && chevauche(traits[t].bb, X0, Y0, X1, Y1)) visible = true;
     if (!visible) return;
     var zoom = vue.zoom, data = masque.data, code = MAT.champs.code * 10, u = 1 / zoom;
-    var niveauReel = Math.log(CASE0 * zoom / 30) / Math.LN2, kFin = Math.floor(niveauReel), f = niveauReel - kFin;
-    f = f * f * (3 - 2 * f);
+    // Le découpage est fixé par la carte (parcelles d'une quinzaine de pixels à la vue
+    // d'ensemble), pas par le zoom : zoomer agrandit les mêmes parcelles.
+    var kFin = Math.floor(Math.log(CASE0 * zoomBase(carte) * 2 / 30) / Math.LN2), f = 1;
+    if (CASE0 / Math.pow(2, kFin) * zoom < 5) return;
     var enChamp = function (x, y) {
       var px = pixelMasque(masque, x, y);
       return px >= 0 && data[px + 3] >= 128 && data[px] === code;
@@ -1061,7 +1084,9 @@
     for (var t = 0; t < traits.length && !visible; t++) if (traits[t].mat === "volcan" && traits[t].bb && chevauche(traits[t].bb, X0, Y0, X1, Y1)) visible = true;
     if (!visible) return;
     var zoom = vue.zoom, data = masque.data, code = volcan.code * 10, u = 1 / zoom;
-    var niveauReel = Math.log(CASE0 * zoom / 46) / Math.LN2, kFin = Math.floor(niveauReel), f = niveauReel - kFin;
+    // Réseau fixé par la carte : mêmes fissures, de même largeur (en km), à tous les zooms.
+    var zr = zoomBase(carte) * 2, niveauReel = Math.floor(Math.log(CASE0 * zr / 46) / Math.LN2), kFin = niveauReel, f = 1;
+    u = 1 / zr;
     var surLave = function (x, y) {
       var px = pixelMasque(masque, x, y);
       return px >= 0 && data[px + 3] >= 128 && data[px] === code;
@@ -1073,7 +1098,8 @@
       var j0 = Math.max(0, Math.floor((Y0 - m) / D)), j1 = Math.min(Math.floor(carte.hauteur / D), Math.floor((Y1 + m) / D));
       if ((i1 - i0 + 1) * (j1 - j0 + 1) > 40000) continue;
       var age = niveauReel - k;                       // 0 : tout juste née ; grandit avec le zoom
-      var largeur = Math.min(7, 1.3 * Math.pow(1.55, age)) * u, alpha = k === kFin ? Math.min(1, f / 0.5) : 1;
+      var largeur = Math.min(7, 1.3 * Math.pow(1.55, age)) * u, alpha = 1;
+      if (largeur * zoom < 0.45) continue;            // trop fine pour être vue à ce zoom
       for (var cj = j0; cj <= j1; cj++) {
         for (var ci = i0; ci <= i1; ci++) {
           var p = pointCase(k, ci, cj);
@@ -1616,7 +1642,8 @@
       if (!mat || !t.bb || !chevauche(t.bb, X0, Y0, X1, Y1)) continue;
       // Rouge : le terrain ; bleu : les réglages de décor du trait (densité × 3 + échelle + 1).
       var densT = t.sansDecor ? 0 : (t.dens == null ? 2 : t.dens), echT = t.ech == null ? 1 : t.ech;
-      tracerTrait(c, t, mat, "rgb(" + (mat.code * 10) + ",0," + ((densT * 3 + echT + 1) * 20) + ")");
+      // Vert (jusqu'à 96 ; au-delà de 128 c'est une route) : la finesse des décors du trait.
+      tracerTrait(c, t, mat, "rgb(" + (mat.code * 10) + "," + (Math.min(FINESSE_MAX, t.fin || 0) * 24) + "," + ((densT * 3 + echT + 1) * 20) + ")");
     }
 
     var u = ech / z;                     // un pixel du masque, en unités du monde
@@ -3155,7 +3182,7 @@
     boiteEtiquette: boiteEtiquette, visibleLieu: visibleLieu, tailleIcone: tailleIcone,
     styleLigne: styleLigne, pointsAffiches: pointsAffiches, dansPolygone: dansPolygone,
     icone: icone, iconeAuto: iconeAuto, dessinerIconeLieu: dessinerIconeLieu,
-    apercuDecor: apercuDecor, tailleTampon: tailleTampon, preparerImages: preparerImages, surImage: null,
+    apercuDecor: apercuDecor, tailleTampon: tailleTampon, FINESSE_MAX: FINESSE_MAX, preparerImages: preparerImages, surImage: null,
     dessiner: dessiner, carteEntiere: carteEntiere, vignette: vignette, apercuTrait: apercuTrait
   };
 })();
