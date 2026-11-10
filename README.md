@@ -2015,6 +2015,42 @@ Outil Noms : case « Le long d'un tracé », puis clic sur une rivière ou une r
 s'attache au tracé le plus proche ou s'en détache. Glisser le nom le fait coulisser
 (`positionSurLigne`) ; si le tracé change, le nom suit ; si le tracé disparaît, il redevient droit.
 
+**Plan des villes (`semerVille`).** Les terrains « Ville » et « Faubourg » ne sèment plus leurs
+maisons au hasard (un tas sans logique) : ils ont un plan. Un quadrillage déformé — le même que celui
+des champs, `coinChamp` — découpe la ville en **îlots** ; leurs côtés sont des **rues** (`peindreRues`,
+dans la terre, sous les routes de l'auteur), et les maisons s'alignent en rang le long de chaque rue,
+en retrait, vers l'intérieur de l'îlot. Le cœur de l'îlot est une cour : un arbre, une grande bâtisse,
+parfois l'église. Le faubourg a le même plan en plus lâche (trois emplacements par côté, près de la
+moitié laissés libres, jardins et parcelles au milieu). Chaque maison vérifie son propre pied dans le
+masque : en lisière, les rangs s'arrêtent où le terrain s'arrête, et une route tracée à travers écarte
+les maisons. Finesse, densité, taille des décors et gomme à décors s'appliquent comme ailleurs.
+
+**Style Plan (vue du dessus)** (`THEMES.plan`, drapeau `dessus`) — un plan de village dessiné : terre
+verte à plat, eau turquoise avec liseré de sable (`rive`) et lignes de rivage, chemins clairs (`voie`),
+champs bruns en retrait les uns des autres (`cultures`), pas de touffes d'herbe (`sansDecor`). Les
+décors qui ont un dessin vu d'en haut l'utilisent (`PEINTRES_DESSUS` : arbres en touffes cernées
+d'encre avec ombre portée, rochers) ; les autres gardent leur dessin de profil. Les maisons sont des
+toits vus du dessus, **orientés**, dessinés en vectoriel (`maisonDessus`).
+
+**Maisons : à la main ou le long d'une ligne.** Tracé « Rue bordée de maisons » (`maisons`, une voie
+comme les autres : ponts, accroche) : `maisonsDesRues` range les maisons de part et d'autre du fil de
+la rue (ou d'un seul côté, `cote`), tournées vers elle, pignon sur rue le plus souvent ; taille
+(`maison`) et espacement (`espace`) réglables, et déplacer un point de la rue déplace ses maisons. À
+la main : les tampons Maison, Bâtisse et Église, avec une orientation (`a`, en degrés). Les arbres du
+terrain s'écartent des unes comme des autres. Dans les autres styles, ces maisons sont dessinées de
+profil.
+
+**Murailles et portes automatiques.** `portesMuraille` cherche où chaque voie (route, route pavée,
+sentier, rue bordée de maisons) coupe la muraille (intersection de segments, sur les tracés
+affichés, méandres compris). À chaque franchissement le mur s'interrompt (`sousChemin` entre les
+portes) et une porte prend la place : une tour de garde de chaque côté de l'ouverture, large de
+2,4 largeurs de voie. Une seule porte par franchissement ; les tours d'angle et d'intervalle (écart
+`ecartTours`, en largeurs de mur) ne sont jamais posées dans une porte. `portes: false` les
+supprime. Dans le style Plan, le mur est une bande de pierre vue du dessus (ombre, cerne, chemin
+de ronde clair, deux rangées de créneaux) et les tours sont rondes, à toit conique (`tourDessus`) —
+carrées pour les gardes de porte ; dans les autres styles, les tours de profil de toujours, plus
+grosses aux portes, et une arche entre elles.
+
 Les cartes d'avant s'ouvrent telles quelles : seuls leurs décors changent (ils viennent maintenant
 du terrain) et leurs petits lieux automatiques ont disparu.
 
