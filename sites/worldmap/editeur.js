@@ -26,6 +26,9 @@
     rugosite: 0,             // pinceau et gomme : bord découpé (0 = bord lisse)
     tampon: "arbre",         // outil Décors : le décor posé à la main
     taillePxTampon: 36,
+    angleTampon: "alea",     // outil Décors : orientation d'une maison posée (degrés, ou au hasard)
+    maisonPx: 18,            // tracé « rue bordée de maisons » : taille d'une maison
+    coteMaisons: "deux",     // … de quel côté de la rue
     variation: 0.3,          // outil Décors : écart de taille d'un décor à l'autre
     typeLigne: "riviere",
     couleurFrontiere: "#8a2b2b",
@@ -761,7 +764,9 @@
   // appartient au monde (il grandit quand on s'approche, comme un vrai relief).
   function nouveauTampon(w) {
     var s = E.taillePxTampon / E.vue.zoom * (1 + (Math.random() - 0.5) * 2 * E.variation * 0.6);
-    return { id: nouvelId("d"), type: E.tampon, v: Math.floor(Math.random() * 12), x: w[0], y: w[1] + s * 0.3, s: s };
+    var t = { id: nouvelId("d"), type: E.tampon, v: Math.floor(Math.random() * 12), x: w[0], y: w[1] + s * 0.3, s: s };
+    if (Moteur.BATIMENTS[E.tampon]) t.a = E.angleTampon === "alea" ? Math.round(Math.random() * 180) : E.angleTampon;
+    return t;
   }
 
   function commencerPan(p) {
@@ -883,7 +888,7 @@
   // rivière pour une rivière) se colle exactement dessus — sur son extrémité d'abord,
   // sinon sur le tracé tel qu'il est dessiné. L'embranchement rejoint ainsi la route au
   // lieu de s'arrêter à côté, et les deux chaussées se fondent.
-  var FAMILLES = { route: "voie", pavee: "voie", sentier: "voie", riviere: "riviere" };
+  var FAMILLES = { route: "voie", pavee: "voie", sentier: "voie", maisons: "voie", riviere: "riviere" };
   function accrocher(p, type) {
     var famille = FAMILLES[type];
     if (!famille) return null;
@@ -915,6 +920,7 @@
       };
       if (th === "riviere") { E.ligneEnCours.meandre = E.meandre; E.ligneEnCours.delta = E.delta; }
       if (th === "frontiere" && E.fermer) E.ligneEnCours.ferme = true;
+      if (th === "maisons") { E.ligneEnCours.maison = E.maisonPx / E.vue.zoom; if (E.coteMaisons !== "deux") E.ligneEnCours.cote = E.coteMaisons; }
     }
     var pts = E.ligneEnCours.pts;
     if (pts.length >= 2) {
@@ -1582,6 +1588,11 @@
       zone.appendChild(champCurseur("Taille", 12, 260, 1, E.taillePxTampon, function (v) { return Math.round(v) + " px"; },
         function (v) { E.taillePxTampon = v; majLibelleTaille(); surcouche(); }));
       zone.appendChild(el("p", { classe: "aide", id: "libTaillePinceau" }));
+      if (Moteur.BATIMENTS[E.tampon]) {
+        zone.appendChild(champCase("Orientation au hasard", E.angleTampon === "alea", function (v) { E.angleTampon = v ? "alea" : 0; panneauOutil(); }));
+        if (E.angleTampon !== "alea") zone.appendChild(champCurseur("Orientation", 0, 180, 1, E.angleTampon, function (v) { return Math.round(v) + "°"; }, function (v) { E.angleTampon = v; }));
+        if (!themeActuel().dessus) zone.appendChild(el("p", { classe: "aide", texte: "L'orientation se voit dans le style « Plan (vue du dessus) »." }));
+      }
       zone.appendChild(champCurseur("Variation de taille", 0, 1, 0.05, E.variation, function (v) { return Math.round(v * 100) + " %"; }, function (v) { E.variation = v; }));
       zone.appendChild(el("p", { classe: "aide", texte: "Cliquez pour poser un décor, glissez pour en semer plusieurs. Un décor posé appartient au monde : sa taille est celle de l'écran au moment où vous le posez, puis il grandit et rétrécit avec le zoom. Les décors du terrain lui laissent la place." }));
       majLibelleTaille();
@@ -1608,6 +1619,11 @@
         pavee: "Une route de pierre : elle rejoint les autres voies et reçoit un pont au-dessus de l'eau.",
         maritime: "Un pointillé pour les routes des navires."
       };
+      if (E.typeLigne === "maisons") {
+        zone.appendChild(champCurseur("Taille des maisons", 6, 70, 1, E.maisonPx, function (v) { return Math.round(v) + " px"; }, function (v) { E.maisonPx = v; }));
+        zone.appendChild(champSegments("Maisons", [["deux", "Des deux côtés"], ["gauche", "À gauche"], ["droite", "À droite"]], E.coteMaisons, function (v) { E.coteMaisons = v; }));
+        zone.appendChild(el("p", { classe: "aide", texte: "Tracez la rue : les maisons se rangent le long, tournées vers elle. Déplacez ensuite un point de la rue, les maisons suivent. Pour une maison isolée, utilisez l'outil Décors." }));
+      }
       if (aides[E.typeLigne]) zone.appendChild(el("p", { classe: "aide", texte: aides[E.typeLigne] }));
       zone.appendChild(el("p", { classe: "aide", texte: "Cliquez pour poser les points, ou glissez pour tracer à main levée. Double-clic ou Entrée pour terminer, clic droit pour retirer le dernier point, Échap pour annuler." }));
     }
@@ -1786,7 +1802,15 @@
           function (v) { editer(function (x) { x.meandre = v; }); }));
         zone.appendChild(champCase("S'élargit vers l'embouchure", o.delta, function (v) { editer(function (x) { x.delta = v; }); }));
       }
-      if (Moteur.VOIES[o.type]) {
+      if (o.type === "maisons") {
+        zone.appendChild(champCurseur("Taille des maisons", 6, 70, 1, borne((o.maison || o.taille * 6) * E.vue.zoom, 6, 70), function (v) { return Math.round(v) + " px"; },
+          function (v) { editer(function (x) { x.maison = v / E.vue.zoom; }); }));
+        zone.appendChild(champCurseur("Espacement", 0.8, 3, 0.05, o.espace || 1, function (v) { return "×" + nb(v, 2); },
+          function (v) { editer(function (x) { x.espace = v; }); }));
+        zone.appendChild(champSegments("Maisons", [["deux", "Deux côtés"], ["gauche", "Gauche"], ["droite", "Droite"]], o.cote || "deux",
+          function (v) { editer(function (x) { if (v === "deux") delete x.cote; else x.cote = v; }); }));
+      }
+      if (Moteur.VOIES[o.type] && o.type !== "maisons") {
         var defaut = { route: 0.16, pavee: 0.06, sentier: 0.26 }[o.type];
         zone.appendChild(champCurseur("Sinuosité", 0, 1, 0.02, typeof o.meandre === "number" ? o.meandre : defaut, function (v) { return v === 0 ? "droite" : Math.round(v * 100) + " %"; },
           function (v) { editer(function (x) { x.meandre = v; }); }));
@@ -1817,6 +1841,8 @@
       zone.appendChild(el("div", { classe: "rangee" }, [
         el("button", { type: "button", classe: "btn", texte: "Autre forme", onclick: function () { editer(function (x) { x.v = (x.v || 0) + 1; }); } })
       ]));
+      if (Moteur.BATIMENTS[o.type]) zone.appendChild(champCurseur("Orientation", 0, 180, 1, o.a || 0, function (v) { return Math.round(v) + "°"; },
+        function (v) { editer(function (x) { x.a = v; }); }));
       zone.appendChild(el("p", { classe: "aide", texte: "Glissez le décor pour le déplacer. « Autre forme » en change le dessin." }));
     } else if (sel.coll === "lacs") {
       zone.appendChild(el("div", { classe: "rangee" }, [

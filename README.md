@@ -2025,6 +2025,21 @@ moitié laissés libres, jardins et parcelles au milieu). Chaque maison vérifie
 masque : en lisière, les rangs s'arrêtent où le terrain s'arrête, et une route tracée à travers écarte
 les maisons. Finesse, densité, taille des décors et gomme à décors s'appliquent comme ailleurs.
 
+**Style Plan (vue du dessus)** (`THEMES.plan`, drapeau `dessus`) — un plan de village dessiné : terre
+verte à plat, eau turquoise avec liseré de sable (`rive`) et lignes de rivage, chemins clairs (`voie`),
+champs bruns en retrait les uns des autres (`cultures`), pas de touffes d'herbe (`sansDecor`). Les
+décors qui ont un dessin vu d'en haut l'utilisent (`PEINTRES_DESSUS` : arbres en touffes cernées
+d'encre avec ombre portée, rochers) ; les autres gardent leur dessin de profil. Les maisons sont des
+toits vus du dessus, **orientés**, dessinés en vectoriel (`maisonDessus`).
+
+**Maisons : à la main ou le long d'une ligne.** Tracé « Rue bordée de maisons » (`maisons`, une voie
+comme les autres : ponts, accroche) : `maisonsDesRues` range les maisons de part et d'autre du fil de
+la rue (ou d'un seul côté, `cote`), tournées vers elle, pignon sur rue le plus souvent ; taille
+(`maison`) et espacement (`espace`) réglables, et déplacer un point de la rue déplace ses maisons. À
+la main : les tampons Maison, Bâtisse et Église, avec une orientation (`a`, en degrés). Les arbres du
+terrain s'écartent des unes comme des autres. Dans les autres styles, ces maisons sont dessinées de
+profil.
+
 Les cartes d'avant s'ouvrent telles quelles : seuls leurs décors changent (ils viennent maintenant
 du terrain) et leurs petits lieux automatiques ont disparu.
 
