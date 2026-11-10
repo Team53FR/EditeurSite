@@ -1108,20 +1108,249 @@
   // feraient moins de quelques pixels (une forêt fine vue de très loin), on en dessine un
   // sur quatre, deux fois plus grand, aux mêmes endroits — la forêt reste une forêt.
   // `tampons` : les décors posés à la main, dont les autres s'écartent.
+  // ----- Ce qu'il y a sous un point du monde (sans écran, sans zoom) -----
+  //
+  // Pour qu'un décor automatique ne bouge ni ne disparaisse en zoomant, sa présence ne peut
+  // dépendre que de la carte : jamais d'une image calculée à l'échelle de l'écran. On interroge
+  // donc les objets eux-mêmes, en unités du monde : les lacs et les rivières creusent, le trait
+  // le plus récent qui couvre le point donne le terrain, les zones « Affiner / Gomme à décors »
+  // ajustent la finesse et la densité. Les listes d'objets sont d'abord réduites à la zone qui
+  // nous intéresse (`contexteZone`), si bien qu'une interrogation ne parcourt que quelques objets.
+  var indexTraits = typeof WeakMap !== "undefined" ? new WeakMap() : null;
+
+  function indexTrait(t) {
+    var p = t.pts, cle = p.length + "|" + t.taille + "|" + p[0] + "|" + p[p.length - 1];
+    var c = indexTraits && indexTraits.get(t);
+    if (c && c.cle === cle) return c;
+    var cell = Math.max(t.taille, 1e-9), r = t.taille / 2, grille = {}, i;
+    var ajoute = function (gx, gy, v) { var k = gx + "," + gy; (grille[k] || (grille[k] = [])).push(v); };
+    if (t.nuage || p.length <= 2) {
+      for (i = 0; i < p.length; i += 2) ajoute(Math.floor(p[i] / cell), Math.floor(p[i + 1] / cell), i);
+    } else {
+      for (i = 0; i + 3 < p.length; i += 2) {
+        var gx0 = Math.floor((Math.min(p[i], p[i + 2]) - r) / cell), gx1 = Math.floor((Math.max(p[i], p[i + 2]) + r) / cell);
+        var gy0 = Math.floor((Math.min(p[i + 1], p[i + 3]) - r) / cell), gy1 = Math.floor((Math.max(p[i + 1], p[i + 3]) + r) / cell);
+        for (var gx = gx0; gx <= gx1; gx++) for (var gy = gy0; gy <= gy1; gy++) ajoute(gx, gy, i);
+      }
+    }
+    c = { cle: cle, cell: cell, grille: grille };
+    if (indexTraits) indexTraits.set(t, c);
+    return c;
+  }
+
+  function couvre(t, x, y) {
+    var ix = indexTrait(t), r = t.taille / 2, p = t.pts, dabs = t.nuage || p.length <= 2;
+    var gx = Math.floor(x / ix.cell), gy = Math.floor(y / ix.cell);
+    for (var ax = gx - 1; ax <= gx + 1; ax++) {
+      for (var ay = gy - 1; ay <= gy + 1; ay++) {
+        var l = ix.grille[ax + "," + ay];
+        if (!l) continue;
+        for (var q = 0; q < l.length; q++) {
+          var i = l[q];
+          if (dabs) { if (Math.hypot(p[i] - x, p[i + 1] - y) <= r * 0.92) return true; }
+          else if (distSeg(x, y, p[i], p[i + 1], p[i + 2], p[i + 3]) <= r) return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  // Les objets qui touchent le rectangle (x0, y0, x1, y1), réduits à ce qui compte pour les décors.
+  function contexteZone(carte, x0, y0, x1, y1) {
+    var ctx = { traits: [], lacs: [], rivieres: [], voies: [], zones: [] };
+    (carte.traits || []).forEach(function (t) {
+      if (!t.bb) t.bb = boiteTrait(t.pts, t.taille);
+      if (chevauche(t.bb, x0, y0, x1, y1)) ctx.traits.push(t);
+    });
+    (carte.lacs || []).forEach(function (l) {
+      if (!l.pts || l.pts.length < 6) return;
+      var bb = boiteTrait(l.pts, 0);
+      if (chevauche(bb, x0, y0, x1, y1)) ctx.lacs.push({ l: l, bb: bb });
+    });
+    (carte.lignes || []).forEach(function (l) {
+      if (!l.pts || l.pts.length < 4 || (l.type !== "riviere" && !VOIES[l.type])) return;
+      var d = pointsAffiches(l), m = (l.taille || 0) * 1.5, bb = boiteTrait(d, 0);
+      if (!chevauche([bb[0] - m, bb[1] - m, bb[2] + m, bb[3] + m], x0, y0, x1, y1)) return;
+      (l.type === "riviere" ? ctx.rivieres : ctx.voies).push({ l: l, d: d, bb: bb, m: m });
+    });
+    (carte.finesses || []).forEach(function (f) { if (f.bb && chevauche(f.bb, x0, y0, x1, y1)) ctx.zones.push(f); });
+    return ctx;
+  }
+
+  var SANS_TERRAIN = { eau: true, t: null, m: null };
+  // Le terrain en (x, y) : { eau: true } (mer, gomme, lac, rivière, hors carte) ou { eau: false, t, m }.
+  function sonde(ctx, carte, x, y) {
+    if (x < 0 || y < 0 || x > carte.largeur || y > carte.hauteur) return SANS_TERRAIN;
+    var i, q;
+    for (i = 0; i < ctx.lacs.length; i++) {
+      var lb = ctx.lacs[i].bb;
+      if (x >= lb[0] && x <= lb[2] && y >= lb[1] && y <= lb[3] && dansPolygone(x, y, ctx.lacs[i].l.pts)) return SANS_TERRAIN;
+    }
+    for (i = 0; i < ctx.rivieres.length; i++) {
+      var rv = ctx.rivieres[i], rb = rv.bb, demi = (rv.l.taille || 0) * (rv.l.delta ? 0.65 : 0.5);
+      if (x < rb[0] - demi || x > rb[2] + demi || y < rb[1] - demi || y > rb[3] + demi) continue;
+      for (q = 0; q + 3 < rv.d.length; q += 2) if (distSeg(x, y, rv.d[q], rv.d[q + 1], rv.d[q + 2], rv.d[q + 3]) <= demi) return SANS_TERRAIN;
+    }
+    for (i = ctx.traits.length - 1; i >= 0; i--) {
+      var t = ctx.traits[i], b = t.bb;
+      if (x < b[0] || x > b[2] || y < b[1] || y > b[3] || !couvre(t, x, y)) continue;
+      var m = MAT[t.mat];
+      return !m || m.type === "eau" ? SANS_TERRAIN : { eau: false, t: t, m: m };
+    }
+    return SANS_TERRAIN;
+  }
+
+  // Distance d'un point à la voie la plus proche, moins la demi-largeur de cette voie (négatif :
+  // sur la voie). La largeur est celle de la carte (`taille`), pas celle dessinée à l'écran.
+  function distVoie(ctx, x, y) {
+    var best = Infinity;
+    for (var i = 0; i < ctx.voies.length; i++) {
+      var v = ctx.voies[i], b = v.bb, m = v.m + best;
+      if (best < Infinity && (x < b[0] - m || x > b[2] + m || y < b[1] - m || y > b[3] + m)) continue;
+      var demi = (v.l.taille || 0) * 0.6;
+      for (var q = 0; q + 3 < v.d.length; q += 2) {
+        var d = distSeg(x, y, v.d[q], v.d[q + 1], v.d[q + 2], v.d[q + 3]) - demi;
+        if (d < best) best = d;
+      }
+    }
+    return best;
+  }
+
+  // La zone « Affiner / Gomme à décors » qui couvre ce point (la plus récente), ou null.
+  function zoneEn(ctx, x, y) {
+    var res = null;
+    for (var i = 0; i < ctx.zones.length; i++) {
+      var f = ctx.zones[i];
+      if (f.rect) { if (x >= f.rect[0] && x <= f.rect[2] && y >= f.rect[1] && y <= f.rect[3]) res = f; continue; }
+      var p = f.pts, r = f.taille / 2, ok = false, q;
+      if (p.length <= 2) ok = Math.hypot(p[0] - x, p[1] - y) <= r;
+      else for (q = 0; q + 3 < p.length && !ok; q += 2) ok = distSeg(x, y, p[q], p[q + 1], p[q + 2], p[q + 3]) <= r;
+      if (ok) res = f;
+    }
+    return res;
+  }
+
+  // Réglages d'un point : finesse, densité, taille des décors (la zone prime sur le trait).
+  function reglagesEn(q, zone) {
+    var t = q.t;
+    return {
+      fin: Math.min(FINESSE_MAX, zone && zone.fin != null ? zone.fin : (t.fin || 0)),
+      dens: zone && zone.dens != null ? zone.dens : (t.sansDecor ? 0 : (t.dens == null ? 2 : t.dens)),
+      ech: t.ech == null ? 1 : t.ech
+    };
+  }
+
+  // ----- Les décors du terrain, décidés une fois pour toutes -----
+  //
+  // Chaque case des grilles emboîtées (pointCase) porte un emplacement. On décide, pour chacun, en
+  // coordonnées du monde, s'il porte un décor : le terrain dessous, sa densité, son écart à la
+  // lisière du biome, aux voies. Rien de cela ne dépend du zoom : même décor, même place, même
+  // taille en km, à toutes les échelles. Le résultat est gardé par tuile ; quand un objet change
+  // (un coup de pinceau, un lac déplacé…), seules les tuiles qu'il touche sont recalculées.
+  var TUILE = 24;                                    // côté d'une tuile, en cases
+  var CACHE_DECORS = { sig: "", tuiles: new Map(), objets: new Map(), total: 0 };
+
+  function invaliderDecors(bb) {
+    CACHE_DECORS.tuiles.forEach(function (tu, cle) {
+      if (chevauche(tu.bbm, bb[0], bb[1], bb[2], bb[3])) { CACHE_DECORS.total -= tu.entrees.length + 1; CACHE_DECORS.tuiles.delete(cle); }
+    });
+  }
+
+  // Compare les objets qui influencent les décors à ce qu'ils étaient au rendu précédent.
+  function synchroniserDecors(carte) {
+    var C = CACHE_DECORS, sig = [carte.id, carte.largeur, carte.hauteur, carte.finesse == null ? 1 : carte.finesse].join("|");
+    if (C.sig !== sig || C.total > 900000) { C.sig = sig; C.tuiles.clear(); C.objets.clear(); C.total = 0; }
+    var vus = {};
+    var voir = function (id, signature, bb) {
+      vus[id] = true;
+      var o = C.objets.get(id);
+      if (!o) { C.objets.set(id, { sig: signature, bb: bb }); invaliderDecors(bb); }
+      else if (o.sig !== signature) { invaliderDecors(o.bb); invaliderDecors(bb); o.sig = signature; o.bb = bb; }
+    };
+    var somme = function (p, ini) { var n = ini; for (var i = 0; i < p.length; i++) n += p[i] * (1 + (i % 7) * 0.137); return n; };
+    (carte.traits || []).forEach(function (t, i) {
+      if (!t.bb) t.bb = boiteTrait(t.pts, t.taille);
+      var p = t.pts, mid = p.length >> 2 << 1;
+      var m = MAT[t.mat];
+      voir("t" + (t.id || i), p.length * 1.1 + t.taille * 7.3 + p[0] + p[p.length - 1] * 3.1 + p[mid] * 1.7 + (t.dens == null ? 9 : t.dens) * 17 + (t.ech == null ? 9 : t.ech) * 29 +
+        (t.fin || 0) * 31 + (m ? m.code : 0) * 37 + (t.sansDecor ? 1000 : 0) + (t.rug || 0) * 13, t.bb);
+    });
+    (carte.lacs || []).forEach(function (l, i) {
+      if (l.pts && l.pts.length >= 6) voir("w" + (l.id || i), somme(l.pts, 0), boiteTrait(l.pts, 0));
+    });
+    (carte.lignes || []).forEach(function (l, i) {
+      if (!l.pts || l.pts.length < 4 || (l.type !== "riviere" && !VOIES[l.type])) return;
+      var m = (l.taille || 0) * 2;
+      voir("l" + (l.id || i), somme(l.pts, (l.taille || 0) * 11 + (l.meandre || 0) * 5 + (l.delta ? 3 : 0) + (l.lisse === false ? 7 : 0) + (l.type === "riviere" ? 1 : 2)),
+        (function (bb) { return [bb[0] - m, bb[1] - m, bb[2] + m, bb[3] + m]; })(boiteTrait(l.pts, 0)));
+    });
+    (carte.finesses || []).forEach(function (f, i) {
+      voir("f" + (f.id || i), f.rect ? somme(f.rect, 5 + (f.dens == null ? 9 : f.dens)) : somme(f.pts, f.taille * 3 + (f.fin == null ? 9 : f.fin) + (f.dens == null ? 9 : f.dens) * 7), f.bb || [0, 0, 0, 0]);
+    });
+    C.objets.forEach(function (o, id) { if (!vus[id]) { invaliderDecors(o.bb); C.objets.delete(id); } });
+  }
+
+  function calculerTuile(carte, k, ti, tj, zb) {
+    var D = CASE0 / Math.pow(2, k), x0 = ti * TUILE * D, y0 = tj * TUILE * D, x1 = x0 + TUILE * D, y1 = y0 + TUILE * D, pad = 10 * D;
+    var tu = { entrees: [], bbm: [x0 - pad, y0 - pad, x1 + pad, y1 + pad] };
+    var ctx = contexteZone(carte, tu.bbm[0], tu.bbm[1], tu.bbm[2], tu.bbm[3]);
+    if (!ctx.traits.length) return tu;
+    var L = carte.largeur, H = carte.hauteur;
+    for (var cj = tj * TUILE; cj < (tj + 1) * TUILE; cj++) {
+      for (var ci = ti * TUILE; ci < (ti + 1) * TUILE; ci++) {
+        var pt = pointCase(k, ci, cj);
+        if (pt.x > L || pt.y > H) continue;
+        var q = sonde(ctx, carte, pt.x, pt.y);
+        if (q.eau) continue;
+        var dd = DECORS[q.m.decor];
+        if (!dd || dd.rues) continue;                                 // les villes ont leur propre plan
+        var rg = reglagesEn(q, zoneEn(ctx, pt.x, pt.y));
+        if (niveauDecor(zb, dd.C, rg.fin) !== k) continue;            // ce terrain est à un autre niveau
+        if (pt.r >= dd.p * DENSITES[rg.dens]) continue;
+        var ch = dd.choix[0], cumul = 0, n;
+        for (n = 0; n < dd.choix.length; n++) { cumul += dd.choix[n][1]; if (pt.r2 < cumul) { ch = dd.choix[n]; break; } }
+        // Sa taille dans le monde : proportionnelle à la case, donc fixe.
+        var s = ch[2] / dd.C * D * 0.72 * ECHELLES[rg.ech] * (0.82 + 0.36 * pt.r3);
+        var grand = ch[2] >= 40;
+        if (distVoie(ctx, pt.x, pt.y) < (grand ? 0.45 : 0.22) * s) continue;       // pas sur une voie
+        // Bien à l'intérieur de son terrain : tout autour, le même terrain.
+        var e = dd.marge * s, ok = true, sondes = [[-e, 0], [e, 0], [0, -e], [0, e * 0.5]];
+        for (n = 0; n < 4 && ok; n++) {
+          var qq = sonde(ctx, carte, pt.x + sondes[n][0], pt.y + sondes[n][1]);
+          if (qq.eau || qq.m !== q.m) ok = false;
+          else if (grand && distVoie(ctx, pt.x + sondes[n][0], pt.y + sondes[n][1]) < 0) ok = false;
+        }
+        if (!ok) continue;
+        tu.entrees.push({ x: pt.x, y: pt.y, s: s, sprite: ch[0], r: pt.r3 });
+      }
+    }
+    return tu;
+  }
+
+  // Rassemble dans `liste` les décors à dessiner pour cette vue : { x, y, s, sprite, r }.
+  // Tous les décors de la carte existent en permanence : la vue ne fait que choisir ceux qu'elle
+  // montre. Aucun n'est regroupé, déplacé ou supprimé selon le zoom — un décor trop petit pour
+  // se lire (moins d'un pixel) est simplement invisible, et grandit avec le zoom.
+  // `tampons` : les décors posés à la main, dont les autres s'écartent.
+  // (`masque` ne sert plus qu'à vérifier qu'on dessine pour de vrai, pas pendant un geste.)
   function semerDecors(carte, vue, masque, X0, Y0, X1, Y1, tampons, liste) {
     liste.rues = [];
     if (!masque) return;
-    var zoom = vue.zoom, data = masque.data, mw = masque.mw, mh = masque.mh, zb = zoomBase(carte);
+    var zoom = vue.zoom, zb = zoomBase(carte), i;
     if (memoCases.size > 400000) memoCases.clear();
-    // Quels niveaux de cases faut-il parcourir ? Ceux des traits visibles.
-    var niveaux = {}, traits = carte.traits || [], i;
-    for (i = 0; i < traits.length; i++) {
-      var t = traits[i], mat = MAT[t.mat], d = mat && DECORS[mat.decor];
-      if (!d || t.sansDecor || t.dens === 0 || !t.bb || !chevauche(t.bb, X0, Y0, X1, Y1)) continue;
-      niveaux[niveauDecor(zb, d.C, t.fin || 0)] = true;
-      if (masque.finesses) for (var zf = 0; zf < masque.finesses.length; zf++) niveaux[niveauDecor(zb, d.C, masque.finesses[zf])] = true;
-    }
-    var dataFin = masque.fin;
+    synchroniserDecors(carte);
+    // Quels niveaux de cases ? Ceux des terrains visibles, à chacune des finesses présentes.
+    var Cs = {}, fins = { 0: true }, ville = false;
+    (carte.traits || []).forEach(function (t) {
+      var mat = MAT[t.mat], d = mat && DECORS[mat.decor];
+      if (!d || t.sansDecor || t.dens === 0 || !t.bb || !chevauche(t.bb, X0, Y0, X1, Y1)) return;
+      if (d.rues) ville = true;
+      Cs[d.C] = true;
+      fins[Math.min(FINESSE_MAX, t.fin || 0)] = true;
+    });
+    (carte.finesses || []).forEach(function (f) { if (f.fin != null && f.bb && chevauche(f.bb, X0, Y0, X1, Y1)) fins[Math.min(FINESSE_MAX, f.fin)] = true; });
+    var niveaux = {};
+    Object.keys(Cs).forEach(function (c) { Object.keys(fins).forEach(function (f) { niveaux[niveauDecor(zb, parseFloat(c), parseInt(f, 10))] = true; }); });
     // Une petite grille des tampons, pour s'en écarter sans tout comparer.
     var gt = null, gc = 0;
     if (tampons && tampons.length) {
@@ -1132,67 +1361,36 @@
         for (var a = a0; a <= a1; a++) for (var b = b0; b <= b1; b++) { var kk = a + "," + b; (gt[kk] || (gt[kk] = [])).push(tp); }
       });
     }
-    var L = carte.largeur, H = carte.hauteur;
+    var L = carte.largeur, H = carte.hauteur, C = CACHE_DECORS;
     Object.keys(niveaux).forEach(function (cle) {
-      var k = parseInt(cle, 10), Dk = CASE0 / Math.pow(2, k);
-      // Trop petits pour être lus : on remonte de `n` niveaux (un décor sur 4ⁿ, 2ⁿ fois plus grand).
-      var n = Dk * zoom < 4.2 ? Math.ceil(Math.log(4.2 / (Dk * zoom)) / Math.LN2) : 0;
-      var kv = Math.max(0, k - n), D = CASE0 / Math.pow(2, kv), grossi = Math.pow(2, k - kv);
-      var m = 140 / zoom + D * 3;
-      var i0 = Math.max(0, Math.floor((X0 - m) / D)), i1 = Math.min(Math.floor(L / D), Math.floor((X1 + m) / D));
-      var j0 = Math.max(0, Math.floor((Y0 - m) / D)), j1 = Math.min(Math.floor(H / D), Math.floor((Y1 + m) / D));
-      if ((i1 - i0 + 1) * (j1 - j0 + 1) > 450000) return;
-      semerVille(carte, masque, zb, zoom, k, kv, grossi, X0, Y0, X1, Y1, liste);
-      for (var cj = j0; cj <= j1; cj++) {
-        for (var ci = i0; ci <= i1; ci++) {
-          var pt = pointCase(kv, ci, cj);
-          var px = pixelMasque(masque, pt.x, pt.y);
-          if (px < 0 || data[px + 3] < 128) continue;                 // hors masque, ou de l'eau
-          if (data[px + 1] > 128) continue;                           // une route
-          var mt = MATERIAUX[Math.round(data[px] / 10) - 1];
-          var dd = mt && DECORS[mt.decor];
-          if (!dd || dd.rues) continue;                               // les villes ont leur propre plan
-          var code = Math.round(data[px + 2] / 20) - 1;               // densité × 3 + échelle
-          if (code < 0) continue;
-          // La finesse : celle d'une zone « Affiner » si le point y est, sinon celle du trait.
-          var zf = dataFin && dataFin[px + 3] > 200 ? Math.round(dataFin[px] / 40) : 0, zd = dataFin && dataFin[px + 3] > 200 ? Math.round(dataFin[px + 1] / 60) : 0;
-          var finPt = zf ? zf - 1 : Math.round(data[px + 1] / 24);
-          if (niveauDecor(zb, dd.C, finPt) !== k) continue;           // ce terrain a un autre niveau
-          // La densité : celle d'une zone « Éclaircir » si le point y est, sinon celle du trait.
-          var ech = ECHELLES[code % 3], dens = DENSITES[zd ? zd - 1 : Math.floor(code / 3)];
-          if (pt.r >= dd.p * dens) continue;
-          // Quel décor, parmi ceux du terrain ?
-          var ch = dd.choix[0], cumul = 0;
-          for (var q = 0; q < dd.choix.length; q++) { cumul += dd.choix[q][1]; if (pt.r2 < cumul) { ch = dd.choix[q]; break; } }
-          // Sa taille dans le monde : proportionnelle à la case, donc fixe.
-          var s = ch[2] / dd.C * Dk * 0.72 * grossi * ech * ECH_THEME * (0.82 + 0.36 * pt.r3);
-          var taillePx = s * zoom;
-          if (taillePx < 3) continue;
-          // Bien à l'intérieur de son terrain : les quatre voisins disent la même chose.
-          var e = Math.max(1, Math.round(dd.marge * Math.min(taillePx, 120) * masque.z / zoom / masque.ech));
-          var sx = (px / 4) % mw, sy = Math.floor(px / 4 / mw), ok = true;
-          for (var w = 0; w < 4 && ok; w++) {
-            var nx = sx + (w === 0 ? -e : w === 1 ? e : 0), ny = sy + (w === 2 ? -e : w === 3 ? Math.round(e * 0.5) : 0);
-            if (nx < 0 || ny < 0 || nx >= mw || ny >= mh) continue;
-            var np = (ny * mw + nx) * 4;
-            // Un grand décor (pic, colline) ne déborde pas sur une voie ; un arbre, lui, la borde.
-            if (data[np] !== data[px] || data[np + 3] < 128 || (w !== 2 && ch[2] >= 40 && data[np + 1] > 128)) ok = false;
-          }
-          if (!ok) continue;
-          if (gt) {
-            var voisins = gt[Math.floor(pt.x / gc) + "," + Math.floor(pt.y / gc)];
-            if (voisins) {
-              for (var u = 0; u < voisins.length && ok; u++) {
-                var tp = voisins[u];
-                if (Math.hypot(tp.x - pt.x, (tp.y - tp.s * 0.12 - pt.y) * 1.3) < tp.s * 0.36 + s * 0.2) ok = false;
+      var k = parseInt(cle, 10), D = CASE0 / Math.pow(2, k), T = TUILE * D, m = 10 * D;
+      var ti0 = Math.max(0, Math.floor((X0 - m) / T)), ti1 = Math.min(Math.floor(L / T), Math.floor((X1 + m) / T));
+      var tj0 = Math.max(0, Math.floor((Y0 - m) / T)), tj1 = Math.min(Math.floor(H / T), Math.floor((Y1 + m) / T));
+      if ((ti1 - ti0 + 1) * (tj1 - tj0 + 1) > 4000) return;
+      for (var tj = tj0; tj <= tj1; tj++) {
+        for (var ti = ti0; ti <= ti1; ti++) {
+          var cleT = k + "|" + ti + "|" + tj, tu = C.tuiles.get(cleT);
+          if (!tu) { tu = calculerTuile(carte, k, ti, tj, zb); C.tuiles.set(cleT, tu); C.total += tu.entrees.length + 1; }
+          for (var q = 0; q < tu.entrees.length; q++) {
+            var en = tu.entrees[q], s = en.s * ECH_THEME;
+            if (s * zoom < 0.7) continue;                                   // plus petit qu'un pixel : invisible
+            if (en.x < X0 - s || en.x > X1 + s || en.y < Y0 - s * 0.2 || en.y > Y1 + s) continue;
+            if (SANS_DECOR && SANS_DECOR[en.sprite]) continue;
+            if (gt) {
+              var voisins = gt[Math.floor(en.x / gc) + "," + Math.floor(en.y / gc)], libre = true;
+              if (voisins) {
+                for (var u = 0; u < voisins.length && libre; u++) {
+                  var tp = voisins[u];
+                  if (Math.hypot(tp.x - en.x, (tp.y - tp.s * 0.12 - en.y) * 1.3) < tp.s * 0.36 + s * 0.2) libre = false;
+                }
+                if (!libre) continue;
               }
-              if (!ok) continue;
             }
+            liste.push({ x: en.x, y: en.y, s: s, sprite: en.sprite, r: en.r });
           }
-          if (SANS_DECOR && SANS_DECOR[ch[0]]) continue;
-          liste.push({ x: pt.x, y: pt.y, s: s, sprite: ch[0], r: pt.r3 });
         }
       }
+      if (ville) semerVille(carte, zb, zoom, k, X0, Y0, X1, Y1, liste);
     });
   }
 
@@ -1208,26 +1406,24 @@
   // Les maisons vont dans `liste` (triées et peintes avec les autres décors) ; les rues dans
   // `liste.rues`, peintes dans la terre avant les décors. Une route tracée par l'auteur
   // reste prioritaire : les maisons s'en écartent.
-  function semerVille(carte, masque, zb, zoom, k, kv, grossi, X0, Y0, X1, Y1, liste) {
-    var data = masque.data, dataFin = masque.fin;
+  function semerVille(carte, zb, zoom, k, X0, Y0, X1, Y1, liste) {
     // Un îlot fait huit cases de côté : quatre maisons le long de chaque rue.
-    var kb = kv - 3;
+    var kb = k - 3;
     if (kb < 0) return;
-    var Dk = CASE0 / Math.pow(2, k) * grossi, B = CASE0 / Math.pow(2, kb), m = B;
+    var Dk = CASE0 / Math.pow(2, k), B = CASE0 / Math.pow(2, kb), m = B;
+    var ctx = contexteZone(carte, X0 - 3 * B, Y0 - 3 * B, X1 + 3 * B, Y1 + 3 * B);
+    if (!ctx.traits.length) return;
     var i0 = Math.max(0, Math.floor((X0 - m) / B)), i1 = Math.min(Math.floor(carte.largeur / B), Math.floor((X1 + m) / B));
     var j0 = Math.max(0, Math.floor((Y0 - m) / B)), j1 = Math.min(Math.floor(carte.hauteur / B), Math.floor((Y1 + m) / B));
     // Ce point est-il en ville (à ce niveau de finesse) ? Renvoie sa fiche, ou null.
     var enVille = function (x, y) {
-      var px = pixelMasque(masque, x, y);
-      if (px < 0 || data[px + 3] < 128) return null;
-      var mt = MATERIAUX[Math.round(data[px] / 10) - 1], dd = mt && DECORS[mt.decor];
+      var q = sonde(ctx, carte, x, y);
+      if (q.eau) return null;
+      var dd = DECORS[q.m.decor];
       if (!dd || !dd.rues) return null;
-      var code = Math.round(data[px + 2] / 20) - 1;
-      if (code < 0) return null;
-      var surZone = dataFin && dataFin[px + 3] > 200;
-      var zf = surZone ? Math.round(dataFin[px] / 40) : 0, zd = surZone ? Math.round(dataFin[px + 1] / 60) : 0;
-      if (niveauDecor(zb, dd.C, zf ? zf - 1 : Math.round(data[px + 1] / 24)) !== k) return null;
-      return { dd: dd, route: data[px + 1] > 128, ech: ECHELLES[code % 3], dens: DENSITES[zd ? zd - 1 : Math.floor(code / 3)], mat: data[px] };
+      var rg = reglagesEn(q, zoneEn(ctx, x, y));
+      if (niveauDecor(zb, dd.C, rg.fin) !== k) return null;
+      return { dd: dd, route: distVoie(ctx, x, y) < Dk * 0.4, ech: ECHELLES[rg.ech], dens: DENSITES[rg.dens], mat: q.m.id };
     };
     for (var cj = j0; cj <= j1; cj++) {
       for (var ci = i0; ci <= i1; ci++) {
@@ -1253,7 +1449,7 @@
             if (!v || v.route || v.mat !== ici.mat || alea(g + 90 + q * 7 + r, h) >= v.dens) continue;
             // (La maison n'occupe que la moitié de la largeur de sa vignette.)
             var s = Dk * 2.9 * v.ech * ECH_THEME * (0.9 + 0.2 * hr);
-            if (s * zoom < 3) continue;
+            if (s * zoom < 0.7) continue;
             if (DESSUS) {
               // Pignon sur rue, le plus souvent ; parfois le long de la rue.
               var long = Dk * 1.5 * v.ech * (0.85 + 0.5 * hr), travers = alea(g + 150 + q * 7 + r, h) < 0.7;
@@ -1276,7 +1472,7 @@
               break;
             }
             if (DESSUS && coeur[n][0] === "champ") break;
-            if (sc * zoom >= 3 && !ici.route && tirage / cumul < ici.dens + 0.01) liste.push({ x: cx, y: cy + sc * 0.25, s: sc, sprite: coeur[n][0], r: alea(g + 201, h) });
+            if (sc * zoom >= 0.7 && !ici.route && tirage / cumul < ici.dens + 0.01) liste.push({ x: cx, y: cy + sc * 0.25, s: sc, sprite: coeur[n][0], r: alea(g + 201, h) });
             break;
           }
         }
@@ -1329,10 +1525,11 @@
     });
     if (!rues.length) return [];
     var places = (carte.tampons || []).filter(function (t) { return t.type === "place"; });
+    var ctxH = contexteZone(carte, X0 - 1e9, Y0 - 1e9, X1 + 1e9, Y1 + 1e9);
     var cand = [], Wmax = 0;
     rues.forEach(function (vo) {
       var l = vo.l, d = vo.d, m = d.length / 2, W = l.maison || (l.taille || 1) * 6;
-      if (W * vue.zoom < 2.5) return;
+      if (W * vue.zoom < 0.7) return;
       Wmax = Math.max(Wmax, W);
       // Hors vue (avec une grande marge) : inutile de calculer cette rue.
       var mg = W * 8 + 200 / vue.zoom;
@@ -1384,7 +1581,7 @@
     gardees.forEach(function (c) {
       var W2 = c.w * 2;
       if (c.x < X0 - W2 || c.x > X1 + W2 || c.y < Y0 - W2 || c.y > Y1 + W2) return;
-      if (masque && materiauEn(masque, c.x, c.y) === null) return;
+      if (sonde(ctxH, carte, c.x, c.y).eau) return;
       out.push({ x: c.x, y: c.y, w: c.w, h: c.h, a: c.a, v: c.v });
     });
     return out;
@@ -1433,15 +1630,13 @@
     var visible = false, traits = carte.traits || [];
     for (var t = 0; t < traits.length && !visible; t++) if (traits[t].mat === "champs" && traits[t].bb && chevauche(traits[t].bb, X0, Y0, X1, Y1)) visible = true;
     if (!visible) return;
-    var zoom = vue.zoom, data = masque.data, code = MAT.champs.code * 10, u = 1 / zoom;
+    var zoom = vue.zoom, u = 1 / zoom;
     // Le découpage est fixé par la carte (parcelles d'une quinzaine de pixels à la vue
     // d'ensemble), pas par le zoom : zoomer agrandit les mêmes parcelles.
     var kFin = Math.floor(Math.log(CASE0 * zoomBase(carte) * 2 / 30) / Math.LN2), f = 1;
-    if (CASE0 / Math.pow(2, kFin) * zoom < 5) return;
-    var enChamp = function (x, y) {
-      var px = pixelMasque(masque, x, y);
-      return px >= 0 && data[px + 3] >= 128 && data[px] === code;
-    };
+    if (CASE0 / Math.pow(2, kFin) * zoom < 1.5) return;                  // des parcelles de moins d'un pixel et demi : à peine un grain
+    var DC = CASE0 / Math.pow(2, kFin), ctxC = contexteZone(carte, X0 - 3 * DC, Y0 - 3 * DC, X1 + 3 * DC, Y1 + 3 * DC);
+    var enChamp = function (x, y) { var q = sonde(ctxC, carte, x, y); return !q.eau && q.m.id === "champs"; };
     var polygone = function (c) {
       lc.beginPath();
       lc.moveTo(c[0][0], c[0][1]); lc.lineTo(c[1][0], c[1][1]); lc.lineTo(c[2][0], c[2][1]); lc.lineTo(c[3][0], c[3][1]);
@@ -1530,14 +1725,12 @@
     var volcan = MAT.volcan, visible = false, traits = carte.traits || [];
     for (var t = 0; t < traits.length && !visible; t++) if (traits[t].mat === "volcan" && traits[t].bb && chevauche(traits[t].bb, X0, Y0, X1, Y1)) visible = true;
     if (!visible) return;
-    var zoom = vue.zoom, data = masque.data, code = volcan.code * 10, u = 1 / zoom;
+    var zoom = vue.zoom, u = 1 / zoom;
     // Réseau fixé par la carte : mêmes fissures, de même largeur (en km), à tous les zooms.
     var zr = zoomBase(carte) * 2, niveauReel = Math.floor(Math.log(CASE0 * zr / 46) / Math.LN2), kFin = niveauReel, f = 1;
     u = 1 / zr;
-    var surLave = function (x, y) {
-      var px = pixelMasque(masque, x, y);
-      return px >= 0 && data[px + 3] >= 128 && data[px] === code;
-    };
+    var DL = CASE0 / Math.pow(2, Math.max(1, kFin - 5)), ctxL = contexteZone(carte, X0 - 2 * DL, Y0 - 2 * DL, X1 + 2 * DL, Y1 + 2 * DL);
+    var surLave = function (x, y) { var q = sonde(ctxL, carte, x, y); return !q.eau && q.m.id === "volcan"; };
     var segments = [];
     for (var k = Math.max(1, kFin - 5); k <= kFin; k++) {
       var D = CASE0 / Math.pow(2, k), m = D * 2;
@@ -3932,7 +4125,7 @@
         if (!PEINTRES[tp.type]) return;
         // Le centre du décor ne bouge pas : c'est autour de lui que la taille est plafonnée.
         var s = tailleTampon(tp, vue.zoom), y = tp.y - tp.s * 0.3 + s * 0.3;
-        if (tp.x + s < X0 || tp.x - s > X1 || y + s < Y0 || y - s > Y1 || s * vue.zoom < 2.5) return;
+        if (tp.x + s < X0 || tp.x - s > X1 || y + s < Y0 || y - s > Y1 || s * vue.zoom < 0.7) return;
         // Les décors du terrain s'écartent des tampons. La place, dessinée à plat et centrée, est
         // traitée à part : on retire ensuite tout décor dont le dessin la recouvre.
         if (tp.type !== "place") visibles.push({ x: tp.x, y: y, s: s });

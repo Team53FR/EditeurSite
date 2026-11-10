@@ -2087,6 +2087,26 @@ rectangulaire de `carte.finesses` (`rect`, `dens: 0`), pour qu'ils ne s'affichen
 tout est un seul pas d'historique, refusé au-delà de 6 000 décors (on zoome davantage). Pour une carte
 entièrement à la main : masquer le calque « Décors du terrain ».
 
+**Décors automatiques : aucun ne bouge ni ne disparaît en zoomant (refonte).** Avant, l'existence d'un
+décor était lue dans une image du terrain calculée à l'échelle de l'écran, et les décors trop petits
+étaient regroupés ou supprimés : des arbres apparaissaient, disparaissaient ou changeaient de place
+en zoomant. Désormais :
+- **Le terrain est interrogé en unités du monde** (`sonde`, `contexteZone`) : lacs et rivières
+  creusent, le trait le plus récent qui couvre le point donne le terrain, les zones « Affiner / Gomme à
+  décors » règlent finesse et densité (`zoneEn`), la distance aux voies se mesure sur la largeur de
+  la carte (`distVoie`), l'écart à la lisière du biome se fait par quatre sondes à une distance
+  proportionnelle à la taille du décor. Aucune étape ne dépend du zoom.
+- **Chaque décor est décidé une fois** et gardé par tuile de 24 × 24 cases (`CACHE_DECORS`,
+  `calculerTuile`). `synchroniserDecors` compare à chaque rendu les objets qui comptent (traits, lacs,
+  rivières, voies, zones) à ce qu'ils étaient et n'invalide que les tuiles touchées : peindre,
+  annuler ou déplacer un lac ne recalcule que ce qu'il faut.
+- **Plus de regroupement** : la vue choisit seulement les décors qu'elle montre. Un décor de moins
+  d'un pixel est invisible (pas supprimé : il grandit avec le zoom). Le même seuil vaut pour les
+  maisons, les décors posés et les rues de maisons.
+- Le plan des villes, les champs et les fissures de lave interrogent eux aussi le terrain du monde.
+Vérifié : sur une zone de 36 × 22 km (3 terrains, une route, un lac), les 41 mêmes décors, aux mêmes
+places et de la même taille, de ×0,5 à ×30.
+
 Les cartes d'avant s'ouvrent telles quelles : seuls leurs décors changent (ils viennent maintenant
 du terrain) et leurs petits lieux automatiques ont disparu.
 
