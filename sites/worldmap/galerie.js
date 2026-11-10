@@ -228,7 +228,6 @@
       hauteur: hauteur,
       theme: actif($("nThemes"), "data-theme") || "atlas",
       traits: [], lignes: [], etiquettes: [], lieux: [], lacs: [], tampons: [],
-      ornements: { rose: "bd", echelle: true, titre: false },
       vue: null,
       creeLe: Date.now(),
       majLe: Date.now(),
