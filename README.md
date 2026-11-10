@@ -2068,6 +2068,25 @@ grosses aux portes, et une arche entre elles.
   ferme, auberge, moulin, phare, puits, menhirs, donjon, grotte, mine, navire, campement. Les autres
   types gardent leur dessin de profil.
 
+**Gizmo : déplacer, tourner, redimensionner tout élément.** Autour de la sélection (un objet ou un
+groupe) : un cadre pointillé, quatre poignées d'angle pour agrandir ou réduire (autour du centre), une
+poignée ronde au-dessus pour tourner (Maj : par 15°) ; glisser l'objet — ou l'intérieur du cadre —
+le déplace, y compris un tracé entier. Le cadre suit l'objet (orienté pour un décor, un lieu ou un
+nom, aligné aux axes pour un tracé, un lac ou un groupe). Au début du geste on garde une copie de
+chaque objet (`debuterGizmo`) et chaque mouvement repart de cette copie (`appliquerGizmo` : échelle,
+rotation autour du pivot, translation) : rien ne dérive, et l'annulation est exacte, en un seul pas
+d'historique. Données : `a` (degrés) sur les décors posés et les lieux — le dessin est tourné autour
+de son centre, le nom d'un lieu reste droit ; `taille`/`maison` des tracés suivent l'échelle ; un nom
+attaché à un tracé ne fait que changer de taille. Panneau : curseur « Rotation » pour les décors et
+les lieux ; l'échelle d'un lieu va jusqu'à ×6.
+
+**Figer les décors automatiques.** Outil Décors → « Figer les décors de la vue » : `Moteur.figerDecors`
+rejoue la génération des décors du terrain pour la vue et les rend en tampons ordinaires, que l'on
+règle un par un avec le gizmo. La zone est retirée de la génération automatique par une zone
+rectangulaire de `carte.finesses` (`rect`, `dens: 0`), pour qu'ils ne s'affichent pas en double ; le
+tout est un seul pas d'historique, refusé au-delà de 6 000 décors (on zoome davantage). Pour une carte
+entièrement à la main : masquer le calque « Décors du terrain ».
+
 Les cartes d'avant s'ouvrent telles quelles : seuls leurs décors changent (ils viennent maintenant
 du terrain) et leurs petits lieux automatiques ont disparu.
 

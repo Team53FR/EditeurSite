@@ -1397,6 +1397,15 @@
     for (var i = 0; i < liste.length; i++) {
       var o = liste[i];
       if (o.maison) { maisonDessus(lc, o.x, o.y, o.maison.w, o.maison.h, o.maison.a, o.maison.v); continue; }
+      if (o.rot) {
+        // Un décor tourné : on le colle autour de son centre (le dessin est centré à 0,31 s au-dessus de son pied).
+        lc.save();
+        lc.translate(o.x, o.y - o.s * 0.31);
+        lc.rotate(o.rot);
+        colle(lc, o.sprite, o.v != null ? o.v % VARIANTES[o.sprite] : variante(o.sprite, o.r), 0, o.s * 0.31, o.s);
+        lc.restore();
+        continue;
+      }
       colle(lc, o.sprite, o.v != null ? o.v % VARIANTES[o.sprite] : variante(o.sprite, o.r), o.x, o.y, o.s);
     }
   }
@@ -2317,6 +2326,7 @@
         cf.strokeStyle = cf.fillStyle = "rgb(" + (f.fin == null ? 0 : (Math.min(FINESSE_MAX, f.fin) + 1) * 40) + "," + (f.dens == null ? 0 : (f.dens + 1) * 60) + ",0)";
         cf.lineWidth = f.taille;
         cf.beginPath();
+        if (f.rect) { cf.fillRect(f.rect[0], f.rect[1], f.rect[2] - f.rect[0], f.rect[3] - f.rect[1]); return; }
         if (f.pts.length <= 2) { cf.arc(f.pts[0], f.pts[1], f.taille / 2, 0, TAU); cf.fill(); }
         else { cf.moveTo(f.pts[0], f.pts[1]); for (var q = 2; q < f.pts.length; q += 2) cf.lineTo(f.pts[q], f.pts[q + 1]); cf.stroke(); }
       });
@@ -3464,6 +3474,16 @@
   }
 
   function dessinerIconeLieu(ctx, carte, l, sx, sy, s, th) {
+    if (l.a) {
+      // Un lieu tourné : tout est dessiné autour de son centre (le nom, lui, reste droit).
+      ctx.save();
+      ctx.translate(sx, sy);
+      ctx.rotate(l.a * Math.PI / 180);
+      dessinerIconeLieu0(ctx, carte, l, 0, 0, s, th);
+      ctx.restore();
+    } else dessinerIconeLieu0(ctx, carte, l, sx, sy, s, th);
+  }
+  function dessinerIconeLieu0(ctx, carte, l, sx, sy, s, th) {
     if (l.type === "image") {
       var im = imageDe(carte, l.image);
       if (im) {
@@ -3920,7 +3940,7 @@
           // Vu du dessus, une maison posée à la main est un toit, orientable (`a`, en degrés).
           var kb = BATIMENTS[tp.type];
           decors.push({ x: tp.x, y: tp.y - tp.s * 0.3, maison: { w: s * 0.62 * kb, h: s * 0.4 * kb, a: (tp.a || 0) * Math.PI / 180, v: tp.v || 0 } });
-        } else decors.push({ x: tp.x, y: y, s: s, sprite: tp.type, v: tp.v || 0 });
+        } else decors.push({ x: tp.x, y: y, s: s, sprite: tp.type, v: tp.v || 0, rot: tp.a ? tp.a * Math.PI / 180 : 0 });
       });
       // Les maisons des rues : les arbres leur laissent la place.
       maisonsDesRues(carte, vue, masque, X0, Y0, X1, Y1).forEach(function (mz) {
@@ -4126,7 +4146,36 @@
     ZPX = avant;
   }
 
+  // Les décors automatiques d'une vue, rendus en objets ordinaires (des tampons) : chacun peut
+  // ensuite être déplacé, tourné, redimensionné ou supprimé. `tampons` : les décors déjà posés,
+  // dont les nouveaux s'écartent comme à l'écran. Rend aussi le rectangle couvert, à retirer des
+  // décors automatiques (sans quoi ils s'afficheraient en double).
+  function figerDecors(carte, vue, tampons) {
+    var th = THEMES[carte.theme] || THEMES.atlas;
+    COULEURS = th.couleurs || null; ENCRE_DECORS = !!th.encreDecors; ECH_THEME = th.echDecors || 1;
+    DESSUS = !!th.dessus; SANS_DECOR = th.sansDecor || null; CULTURES_THEME = th.cultures || null;
+    var pw = Math.max(1, Math.round(vue.largeur)), ph = Math.max(1, Math.round(vue.hauteur)), z = vue.zoom;
+    ZPX = z;
+    var tx = pw / 2 - vue.cx * z, ty = ph / 2 - vue.cy * z;
+    var X0 = vue.cx - vue.largeur / 2 / z, X1 = vue.cx + vue.largeur / 2 / z, Y0 = vue.cy - vue.hauteur / 2 / z, Y1 = vue.cy + vue.hauteur / 2 / z;
+    var masque = construireMasque(carte, { zoom: z, largeur: vue.largeur, hauteur: vue.hauteur, cx: vue.cx, cy: vue.cy }, pw, ph, tx, ty, z, X0, Y0, X1, Y1);
+    var liste = [];
+    var evite = (tampons || []).filter(function (t) { return t.type !== "place"; }).map(function (t) { return { x: t.x, y: t.y, s: t.s }; });
+    semerDecors(carte, vue, masque, X0, Y0, X1, Y1, evite, liste);
+    X0 = Math.max(0, X0); Y0 = Math.max(0, Y0); X1 = Math.min(carte.largeur, X1); Y1 = Math.min(carte.hauteur, Y1);
+    var out = [];
+    liste.forEach(function (o) {
+      if (o.x < X0 || o.x > X1 || o.y < Y0 || o.y > Y1) return;
+      if (o.maison) {
+        var sm = o.maison.w / 0.62;
+        out.push({ type: "maison", v: o.maison.v, x: o.x, y: o.y + sm * 0.3, s: sm, a: Math.round(o.maison.a * 180 / Math.PI * 10) / 10 });
+      } else out.push({ type: o.sprite, v: o.v != null ? o.v : variante(o.sprite, o.r), x: o.x, y: o.y, s: o.s });
+    });
+    return { objets: out, rect: [X0, Y0, X1, Y1] };
+  }
+
   window.Moteur = {
+    figerDecors: figerDecors,
     THEMES: THEMES, MATERIAUX: MATERIAUX, MAT: MAT, GROUPES_MATERIAUX: GROUPES_MATERIAUX,
     DECORS: DECORS, TAMPONS: TAMPONS, VOIES: VOIES,
     TYPES_LIGNES: TYPES_LIGNES, TYPES_LIEUX: TYPES_LIEUX, CATEGORIES_LIEUX: CATEGORIES_LIEUX, STYLES_ETIQ: STYLES_ETIQ,

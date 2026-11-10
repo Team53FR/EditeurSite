@@ -309,6 +309,165 @@
     }
     if (E.multi.length) E.multi.forEach(function (m) { marqueSelection(ctx, m, true); });
     else marqueSelection(ctx, E.selection, false);
+    if (E.outil === "selection") gizmoSurcouche(ctx);
+  }
+
+  // ----- Gizmo : déplacer, tourner, redimensionner -----
+  //
+  // Autour de la sélection (un objet ou plusieurs) : un cadre, quatre poignées d'angle pour
+  // agrandir ou réduire (autour du centre), une poignée ronde au-dessus pour tourner (Maj :
+  // par crans de 15°). Glisser l'objet — ou l'intérieur du cadre — le déplace. Tout se fait sur
+  // des copies de départ : rien ne dérive, et l'annulation rend l'état exact d'avant le geste.
+  var ORIENTES = { tampons: 1, lieux: 1, etiquettes: 1 };
+
+  // La boîte d'un objet, à l'écran : { cx, cy, w, h, ang (rad), oriente } ou null (invisible).
+  function boiteObjet(coll, o) {
+    var z = E.vue.zoom, c, w, h, ang = 0, pts, i, X0 = Infinity, Y0 = Infinity, X1 = -Infinity, Y1 = -Infinity;
+    if (coll === "tampons") {
+      c = versEcran(o.x, o.y - o.s * 0.3);
+      w = h = Moteur.tailleTampon(o, z) * z * 0.9;
+      ang = (o.a || 0) * Math.PI / 180;
+      return { cx: c[0], cy: c[1], w: w, h: h, ang: ang, oriente: true };
+    }
+    if (coll === "lieux") {
+      if (!Moteur.visibleLieu(o, niveauActuel())) return null;
+      c = versEcran(o.x, o.y);
+      w = h = Moteur.tailleIcone(o, themeActuel());
+      return { cx: c[0], cy: c[1], w: w, h: h, ang: (o.a || 0) * Math.PI / 180, oriente: true };
+    }
+    if (coll === "etiquettes") {
+      if (!o.texte || o.taille * z < 6 || o.taille * z > 1400) return null;
+      var po = Moteur.poseEtiquette(E.carte, o), bo = Moteur.boiteEtiquette({ texte: o.texte, style: o.style, espace: o.espace, taille: o.taille });
+      c = versEcran(po.x, po.y);
+      return { cx: c[0], cy: c[1], w: bo.w * z, h: o.taille * 1.1 * z, ang: po.angle * Math.PI / 180, oriente: true };
+    }
+    pts = coll === "lignes" ? Moteur.pointsAffiches(o) : o.pts;
+    if (!pts || pts.length < 2) return null;
+    for (i = 0; i < pts.length; i += 2) {
+      var q = versEcran(pts[i], pts[i + 1]);
+      X0 = Math.min(X0, q[0]); X1 = Math.max(X1, q[0]); Y0 = Math.min(Y0, q[1]); Y1 = Math.max(Y1, q[1]);
+    }
+    return { cx: (X0 + X1) / 2, cy: (Y0 + Y1) / 2, w: X1 - X0, h: Y1 - Y0, ang: 0, oriente: false };
+  }
+
+  function coinsBoite(b) {
+    var c = Math.cos(b.ang), s = Math.sin(b.ang);
+    return [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(function (k) {
+      return [b.cx + k[0] * b.w / 2 * c - k[1] * b.h / 2 * s, b.cy + k[0] * b.w / 2 * s + k[1] * b.h / 2 * c];
+    });
+  }
+  function poigneeRotation(b) {
+    var d = b.h / 2 + 28;
+    return [b.cx + d * Math.sin(b.ang), b.cy - d * Math.cos(b.ang)];
+  }
+
+  function boiteGizmo() {
+    var liste = selectionListe();
+    if (!liste.length) return null;
+    var bs = [];
+    liste.forEach(function (m) { var b = boiteObjet(m.coll, m.obj); if (b) bs.push(b); });
+    if (!bs.length) return null;
+    var pad = 8, b;
+    if (bs.length === 1 && bs[0].oriente) b = { cx: bs[0].cx, cy: bs[0].cy, w: bs[0].w + 2 * pad, h: bs[0].h + 2 * pad, ang: bs[0].ang };
+    else {
+      var X0 = Infinity, Y0 = Infinity, X1 = -Infinity, Y1 = -Infinity;
+      bs.forEach(function (q) { coinsBoite(q).forEach(function (k) { X0 = Math.min(X0, k[0]); X1 = Math.max(X1, k[0]); Y0 = Math.min(Y0, k[1]); Y1 = Math.max(Y1, k[1]); }); });
+      b = { cx: (X0 + X1) / 2, cy: (Y0 + Y1) / 2, w: X1 - X0 + 2 * pad, h: Y1 - Y0 + 2 * pad, ang: 0 };
+    }
+    b.w = Math.max(b.w, 24); b.h = Math.max(b.h, 24);
+    return b;
+  }
+
+  function gizmoSurcouche(ctx) {
+    if (geste && geste.type !== "gizmo" && geste.type !== "rien") return;
+    var b = boiteGizmo();
+    if (!b) return;
+    var coins = coinsBoite(b), rot = poigneeRotation(b), haut = [(coins[0][0] + coins[1][0]) / 2, (coins[0][1] + coins[1][1]) / 2];
+    ctx.save();
+    ctx.lineWidth = 1.4; ctx.strokeStyle = "rgba(255,211,107,0.95)"; ctx.setLineDash([5, 4]);
+    ctx.beginPath(); coins.forEach(function (k, i) { if (i) ctx.lineTo(k[0], k[1]); else ctx.moveTo(k[0], k[1]); }); ctx.closePath(); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(haut[0], haut[1]); ctx.lineTo(rot[0], rot[1]); ctx.stroke();
+    ctx.fillStyle = "#fff"; ctx.strokeStyle = "#8d6b2e"; ctx.lineWidth = 1.6;
+    coins.forEach(function (k) { ctx.fillRect(k[0] - 4.5, k[1] - 4.5, 9, 9); ctx.strokeRect(k[0] - 4.5, k[1] - 4.5, 9, 9); });
+    ctx.beginPath(); ctx.arc(rot[0], rot[1], 6, 0, Math.PI * 2); ctx.fillStyle = "#ffd36b"; ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.arc(rot[0], rot[1], 2.4, 0, Math.PI * 2); ctx.fillStyle = "#6b4a1a"; ctx.fill();
+    ctx.restore();
+  }
+
+  function poigneeEn(p) {
+    var b = boiteGizmo();
+    if (!b) return null;
+    var coins = coinsBoite(b), rot = poigneeRotation(b);
+    if (Math.hypot(rot[0] - p.x, rot[1] - p.y) <= 10) return { mode: "rot", b: b };
+    for (var i = 0; i < 4; i++) if (Math.hypot(coins[i][0] - p.x, coins[i][1] - p.y) <= 9) return { mode: "scale", b: b };
+    return null;
+  }
+  function dansBoite(p, b) {
+    var c = Math.cos(-b.ang), s = Math.sin(-b.ang), dx = p.x - b.cx, dy = p.y - b.cy;
+    return Math.abs(dx * c - dy * s) <= b.w / 2 && Math.abs(dx * s + dy * c) <= b.h / 2;
+  }
+
+  function normAngle(a) { a = a % 360; if (a > 180) a -= 360; if (a < -180) a += 360; return Math.round(a * 10) / 10; }
+
+  // Le geste commence : on garde une copie de chaque objet (c'est d'elle qu'on repart à chaque
+  // mouvement de la souris).
+  function debuterGizmo(p, mode, b) {
+    var bases = selectionListe().map(function (m) {
+      var o = m.obj;
+      return { coll: m.coll, obj: o, avant: JSON.stringify(o), pts: o.pts ? o.pts.slice() : null,
+        x: o.x, y: o.y, s: o.s, a: o.a, ech: o.ech, taille: o.taille, maison: o.maison, angle: o.angle };
+    });
+    var c = b ? [b.cx, b.cy] : [p.x, p.y];
+    geste = { type: "gizmo", mode: mode, c: c, pivot: versMonde(c[0], c[1]), w0: versMonde(p.x, p.y), p0: { x: p.x, y: p.y },
+      a0: Math.atan2(p.y - c[1], p.x - c[0]), d0: Math.max(10, Math.hypot(p.x - c[0], p.y - c[1])), bases: bases, bouge: false, actif: mode !== "move" };
+  }
+
+  // Applique au départ la transformation : échelle f, rotation th (rad) autour du pivot, puis
+  // translation (dx, dy).
+  function appliquerGizmo(g, f, th, dx, dy) {
+    var cos = Math.cos(th), sin = Math.sin(th), px = g.pivot[0], py = g.pivot[1], deg = th * 180 / Math.PI;
+    var rot = function (x, y) { var X = (x - px) * f, Y = (y - py) * f; return [px + X * cos - Y * sin + dx, py + X * sin + Y * cos + dy]; };
+    g.bases.forEach(function (b) {
+      var o = b.obj, q, i;
+      if (b.pts) {                                     // tracés et lacs : chaque point suit
+        for (i = 0; i < b.pts.length; i += 2) { q = rot(b.pts[i], b.pts[i + 1]); o.pts[i] = q[0]; o.pts[i + 1] = q[1]; }
+        if (b.taille != null) o.taille = b.taille * f;
+        if (b.maison != null) o.maison = b.maison * f;
+        return;
+      }
+      if (b.coll === "tampons") {
+        q = rot(b.x, b.y - 0.3 * b.s);
+        o.s = b.s * f; o.x = q[0]; o.y = q[1] + 0.3 * o.s; o.a = normAngle((b.a || 0) + deg);
+      } else if (b.coll === "lieux") {
+        q = rot(b.x, b.y);
+        o.x = q[0]; o.y = q[1]; o.ech = borne((b.ech || 1) * f, 0.2, 8); o.a = normAngle((b.a || 0) + deg);
+      } else if (b.coll === "etiquettes") {
+        o.taille = b.taille * f;
+        if (!o.ligne) { q = rot(b.x, b.y); o.x = q[0]; o.y = q[1]; o.angle = normAngle((b.angle || 0) + deg); }
+      }
+    });
+  }
+
+  // ----- Décors automatiques → objets -----
+  //
+  // Les décors des terrains (arbres, pics…) se placent d'eux-mêmes : pratique pour un continent,
+  // moins pour régler un détail. « Figer » transforme ceux de la vue en décors posés, que l'on
+  // peut chacun déplacer, tourner, agrandir ou supprimer ; la zone est retirée de la
+  // génération automatique pour qu'ils ne s'affichent pas en double.
+  function figerVue() {
+    var c = E.carte;
+    var res = Moteur.figerDecors(c, { cx: E.vue.cx, cy: E.vue.cy, zoom: E.vue.zoom, largeur: W, hauteur: H, dpr: 1 }, c.tampons);
+    var n = res.objets.length;
+    if (!n) { etat("Aucun décor automatique dans cette vue."); return; }
+    if (n > 6000) { etat(nb(n) + " décors dans cette vue : zoomez davantage pour en figer moins à la fois."); return; }
+    var base = c.tampons.length;
+    var actions = res.objets.map(function (o, i) { o.id = nouvelId("d"); return { t: "ajout", coll: "tampons", obj: o, idx: base + i }; });
+    var zone = { id: nouvelId("f"), rect: res.rect, dens: 0, bb: res.rect.slice() };
+    actions.push({ t: "ajout", coll: "finesses", obj: zone, idx: c.finesses.length });
+    executer({ t: "lot", actions: actions });
+    etat(nb(n) + " décors convertis en objets modifiables.");
+    panneauOutil();
   }
 
   // Le repère d'un objet sélectionné. `groupe` : dans une sélection multiple, un tracé ou un
@@ -846,6 +1005,9 @@
   }
 
   function debutSelection(p, w, maj) {
+    // Les poignées du gizmo passent avant tout (sauf Maj, qui sert à la sélection).
+    var poignee = maj ? null : poigneeEn(p);
+    if (poignee) { debuterGizmo(p, poignee.mode, poignee.b); return; }
     var touche = trouver(p.x, p.y);
     if (maj) {
       // Maj + clic : ajouter ou retirer un objet ; Maj + glisser dans le vide : un cadre.
@@ -864,6 +1026,9 @@
         bases: E.multi.map(function (m) { return { avant: JSON.stringify(m.obj), base: m.obj.pts ? m.obj.pts.slice() : [m.obj.x, m.obj.y] }; }) };
       return;
     }
+    // Dans le cadre d'un objet orienté (ou d'un groupe) : glisser le déplace, même à côté du dessin.
+    var gz = !touche ? boiteGizmo() : null;
+    if (gz && (E.multi.length || (E.selection && ORIENTES[E.selection.coll])) && dansBoite(p, gz)) { debuterGizmo(p, "move", gz); return; }
     var sel = E.selection;
     if (sel && (sel.coll === "lignes" || sel.coll === "lacs")) {
       var i = sommetProche(sel.obj, p.x, p.y);
@@ -877,7 +1042,8 @@
       } else if (hit.coll === "lacs") {
         geste = { type: "deplaceLac", obj: hit.obj, avant: JSON.stringify(hit.obj), x0: w[0], y0: w[1], base: hit.obj.pts.slice(), bouge: false };
       } else {
-        geste = { type: "clic", x: p.x, y: p.y, selectionne: true };
+        // Un tracé : le glisser le déplace en entier (un simple clic le sélectionne seulement).
+        debuterGizmo(p, "move", null);
       }
     } else {
       geste = { type: "clic", x: p.x, y: p.y, vide: true };
@@ -992,6 +1158,19 @@
           surcouche();
         }
         break;
+      case "gizmo":
+        if (!geste.actif) { if (Math.hypot(p.x - geste.p0.x, p.y - geste.p0.y) < 4) break; geste.actif = true; }
+        var fg = 1, tg = 0, dxg = 0, dyg = 0;
+        if (geste.mode === "move") { dxg = w[0] - geste.w0[0]; dyg = w[1] - geste.w0[1]; }
+        else if (geste.mode === "scale") fg = borne(Math.hypot(p.x - geste.c[0], p.y - geste.c[1]) / geste.d0, 0.05, 25);
+        else {
+          tg = Math.atan2(p.y - geste.c[1], p.x - geste.c[0]) - geste.a0;
+          if (ev.shiftKey) tg = Math.round(tg / (Math.PI / 12)) * (Math.PI / 12);
+        }
+        appliquerGizmo(geste, fg, tg, dxg, dyg);
+        geste.bouge = true;
+        rendre();
+        break;
       case "cadre":
         geste.x1 = p.x; geste.y1 = p.y;
         surcouche();
@@ -1071,6 +1250,14 @@
           ajouter("lacs", lac);
           selectionner("lacs", lac);
           choisirOutil("selection");
+        }
+        break;
+      case "gizmo":
+        if (g.bouge) {
+          var actionsG = g.bases.map(function (b) { return { t: "modif", coll: b.coll, id: b.obj.id, avant: JSON.parse(b.avant), apres: cloner(b.obj) }; });
+          enregistrer(actionsG.length === 1 ? actionsG[0] : { t: "lot", actions: actionsG });
+          marquer();
+          panneauSelection();
         }
         break;
       case "cadre":
@@ -1596,6 +1783,9 @@
       zone.appendChild(champCurseur("Variation de taille", 0, 1, 0.05, E.variation, function (v) { return Math.round(v * 100) + " %"; }, function (v) { E.variation = v; }));
       zone.appendChild(el("p", { classe: "aide", texte: "Cliquez pour poser un décor, glissez pour en semer plusieurs. Un décor posé appartient au monde : sa taille est celle de l'écran au moment où vous le posez, puis il grandit et rétrécit avec le zoom. Les décors du terrain lui laissent la place." }));
       majLibelleTaille();
+      zone.appendChild(sousTitre("Décors automatiques"));
+      zone.appendChild(el("div", { classe: "rangee" }, [el("button", { type: "button", classe: "btn", texte: "Figer les décors de la vue", onclick: figerVue })]));
+      zone.appendChild(el("p", { classe: "aide", texte: "Transforme les arbres, pics, maisons… que les terrains placent d'eux-mêmes dans cette vue en décors posés : chacun se déplace, se tourne, s'agrandit ou se supprime (outil Sélection, avec ses poignées). Pour une carte entièrement à la main, masquez le calque « Décors du terrain »." }));
     }
 
     if (E.outil === "ligne") {
@@ -1670,7 +1860,7 @@
 
     if (E.outil === "lac") zone.appendChild(el("p", { classe: "aide", texte: "Dessinez le contour du lac à main levée, en maintenant le bouton : il se referme tout seul au relâchement. On peut ensuite le déplacer, le remodeler, l'agrandir. Les rivières et les routes qui le traversent s'y raccordent." }));
     if (E.outil === "main") zone.appendChild(el("p", { classe: "aide", texte: "Faites glisser pour déplacer la carte. La molette zoome, Espace + glisser déplace avec n'importe quel outil." }));
-    if (E.outil === "selection") zone.appendChild(el("p", { classe: "aide", texte: "Cliquez un lieu, un nom, un décor ou un tracé pour le régler, le déplacer ou le supprimer. Double-clic pour renommer ; sur un tracé, double-clic ajoute un point. Clic droit : dupliquer, supprimer. Plusieurs objets : Maj + clic, ou Maj + glisser pour tracer un cadre ; Ctrl+A prend tout." }));
+    if (E.outil === "selection") zone.appendChild(el("p", { classe: "aide", texte: "Cliquez un lieu, un nom, un décor ou un tracé pour le régler, le déplacer ou le supprimer. Double-clic pour renommer ; sur un tracé, double-clic ajoute un point. Clic droit : dupliquer, supprimer. Poignées : coins pour agrandir, rond pour tourner (Maj : par 15°), glisser pour déplacer. Plusieurs objets : Maj + clic, ou Maj + glisser pour tracer un cadre ; Ctrl+A prend tout." }));
   }
 
   // ----- Panneau : sélection -----
@@ -1727,13 +1917,15 @@
       }
 
       zone.appendChild(sousTitre("Apparence"));
-      zone.appendChild(champCurseur("Taille", 0.4, 3, 0.05, o.ech || 1, function (v) { return "×" + nb(v, 2); },
+      zone.appendChild(champCurseur("Taille", 0.2, 6, 0.05, o.ech || 1, function (v) { return "×" + nb(v, 2); },
         function (v) { editer(function (x) { x.ech = v; }); }));
       if (o.type !== "image") {
         zone.appendChild(champCouleur(tp.repere ? "Couleur" : "Couleur (toits, bannière)", o.couleur || (tp.repere ? "#b5362a" : "#a8452f"),
           function (v) { editer(function (x) { x.couleur = v; }); },
           o.couleur ? function () { editer(function (x) { delete x.couleur; }); panneauSelection(); } : null));
       }
+      zone.appendChild(champCurseur("Rotation", -180, 180, 1, o.a || 0, function (v) { return Math.round(v) + "°"; },
+        function (v) { editer(function (x) { if (v) x.a = v; else delete x.a; }); }));
       zone.appendChild(champCase("Retourner (miroir)", o.miroir, function (v) { editer(function (x) { if (v) x.miroir = true; else delete x.miroir; }); }));
 
       zone.appendChild(sousTitre("Nom sur la carte"));
@@ -1849,8 +2041,8 @@
       zone.appendChild(el("div", { classe: "rangee" }, [
         el("button", { type: "button", classe: "btn", texte: "Autre forme", onclick: function () { editer(function (x) { x.v = (x.v || 0) + 1; }); } })
       ]));
-      if (Moteur.BATIMENTS[o.type]) zone.appendChild(champCurseur("Orientation", 0, 180, 1, o.a || 0, function (v) { return Math.round(v) + "°"; },
-        function (v) { editer(function (x) { x.a = v; }); }));
+      zone.appendChild(champCurseur("Rotation", -180, 180, 1, o.a || 0, function (v) { return Math.round(v) + "°"; },
+        function (v) { editer(function (x) { if (v) x.a = v; else delete x.a; }); }));
       zone.appendChild(el("p", { classe: "aide", texte: "Glissez le décor pour le déplacer. « Autre forme » en change le dessin." }));
     } else if (sel.coll === "lacs") {
       zone.appendChild(el("div", { classe: "rangee" }, [
