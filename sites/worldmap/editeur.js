@@ -31,6 +31,7 @@
     coteMaisons: "deux",     // … de quel côté de la rue
     variation: 0.3,          // outil Décors : écart de taille d'un décor à l'autre
     typeLigne: "riviere",
+    reliefTrace: "dessus",   // route, chemin : par-dessus la montagne, "col" (passage dégagé) ou "grotte" (sous la montagne)
     couleurFrontiere: "#8a2b2b",
     epaisseurPx: 2.4,
     meandre: 0.6,            // rivières : amplitude des méandres (0 = droit)
@@ -1140,6 +1141,7 @@
       };
       if (th === "riviere") { E.ligneEnCours.meandre = E.meandre; E.ligneEnCours.delta = E.delta; }
       if (th === "frontiere" && E.fermer) E.ligneEnCours.ferme = true;
+      if (E.reliefTrace !== "dessus" && (th === "route" || th === "pavee" || th === "sentier")) E.ligneEnCours.relief = E.reliefTrace;
       if (th === "maisons") { E.ligneEnCours.maison = E.maisonM / 1000; if (E.coteMaisons !== "deux") E.ligneEnCours.cote = E.coteMaisons; }
     }
     var pts = E.ligneEnCours.pts;
@@ -1866,6 +1868,9 @@
         pavee: "Une route de pierre : elle rejoint les autres voies et reçoit un pont au-dessus de l'eau.",
         maritime: "Un pointillé pour les routes des navires."
       };
+      if (E.typeLigne === "route" || E.typeLigne === "pavee" || E.typeLigne === "sentier") {
+        zone.appendChild(champChoix("Face aux montagnes", [["dessus", "Sur la montagne"], ["col", "Sous : chemin normal (col)"], ["grotte", "Sous : grotte"]], E.reliefTrace, function (v) { E.reliefTrace = v; }));
+      }
       if (E.typeLigne === "maisons") {
         zone.appendChild(champCurseur("Longueur d'une maison", 4, 40, 1, E.maisonM, function (v) { return Math.round(v) + " m"; }, function (v) { E.maisonM = v; }));
         zone.appendChild(champSegments("Maisons", [["deux", "Des deux côtés"], ["gauche", "À gauche"], ["droite", "À droite"]], E.coteMaisons, function (v) { E.coteMaisons = v; }));
@@ -2058,6 +2063,9 @@
           function (v) { editer(function (x) { x.espace = v; }); }));
         zone.appendChild(champSegments("Maisons", [["deux", "Deux côtés"], ["gauche", "Gauche"], ["droite", "Droite"]], o.cote || "deux",
           function (v) { editer(function (x) { if (v === "deux") delete x.cote; else x.cote = v; }); }));
+      }
+      if (o.type === "route" || o.type === "pavee" || o.type === "sentier") {
+        zone.appendChild(champChoix("Face aux montagnes", [["dessus", "Sur la montagne"], ["col", "Sous : chemin normal (col)"], ["grotte", "Sous : grotte"]], o.relief || "dessus", function (v) { editer(function (x) { if (v === "dessus") delete x.relief; else x.relief = v; }); }));
       }
       if (Moteur.VOIES[o.type] && o.type !== "maisons") {
         var defaut = { route: 0.16, pavee: 0.06, sentier: 0.26 }[o.type];
