@@ -866,8 +866,8 @@
     morte:    { C: 12,   p: 0.8,  marge: 0.12, choix: [["mort", 1, 27]] },
     // Une chaîne : de grands massifs et, serrés entre eux, des pics plus petits. La marge
     // est faible pour qu'une crête étroite, vue de loin, porte déjà sa rangée de sommets.
-    montagne: { masse: "relief", C: 24,   p: 0.94, marge: 0.05, choix: [["montagne", 0.4, 170], ["montagne", 0.6, 104]] },
-    cime:     { masse: "relief", C: 24,   p: 0.94, marge: 0.05, choix: [["cime", 0.4, 170], ["cime", 0.6, 104]] },
+    montagne: { C: 24,   p: 0.94, marge: 0.05, choix: [["montagne", 0.4, 170], ["montagne", 0.6, 104]] },
+    cime:     { C: 24,   p: 0.94, marge: 0.05, choix: [["cime", 0.4, 170], ["cime", 0.6, 104]] },
     volcan:   { masse: "eboulis", C: 21,   p: 0.62, marge: 0.2,  choix: [["aiguilles", 0.5, 84], ["basalte", 0.5, 24]] },
     rocaille: { masse: "eboulis", C: 13,   p: 0.8,  marge: 0.15, choix: [["rocher", 1, 24]] },
     cendres:  { C: 19,   p: 0.5,  marge: 0.15, choix: [["basalte", 0.6, 20], ["mort", 0.4, 24]] },
@@ -1413,7 +1413,7 @@
         var grand = ch[2] >= 40;
         // Rien sur un tracé (route, rivière, muraille…) ni contre lui : un couloir reste dégagé,
         // pour qu'on le voie à travers une forêt ; ses bords se comportent comme une lisière.
-        var gaine = (dd.masse === "relief" ? 0.4 : dd.masse ? 0.6 : grand ? 0.45 : 0.22) * s;
+        var gaine = (dd.masse === "eboulis" ? 0.3 : dd.masse ? 0.45 : grand ? 0.45 : 0.22) * s;
         if (distTrace(ctx, pt.x, pt.y) < gaine) continue;
         var relief = dd.masse === "relief" || dd.masse === "eboulis";
         if (!dd.masse || (!relief && !FORET_PROFONDE[ch[0]])) {
@@ -1438,7 +1438,10 @@
         // se rapprochent de la couleur du fond et se réduisent à des arcs en tirets.
         var prof = 0;                                                    // 0 : lisière ; 1, 2 : de plus en plus fondu ; 3 : le cœur
         if (f >= 1) prof = fractionDedans(ctx, carte, q, pt, s * ray[1], 8, grand, gaine) < 1 ? 1 : fractionDedans(ctx, carte, q, pt, s * ray[2], 8, grand, gaine) < 1 ? 2 : 3;
-        if (prof === 3) { if (pt.r2 < 0.05) prof = 2; else continue; }  // au cœur : fond uni, et de rares arcs en tirets
+        if (prof === 3) {
+          // Au cœur d'une forêt : fond uni, et de rares arcs en tirets. Un éboulis garde tous ses rochers (atténués).
+          if (dd.masse === "eboulis" || pt.r2 < 0.05) prof = 2; else continue;
+        }
         if (prof === 0) {
           // Un sujet de lisière : sa silhouette cernée (peinte avant tout le reste) puis son
           // remplissage. Seule la silhouette de l'ensemble reste cernée, côté extérieur.
