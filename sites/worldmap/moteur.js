@@ -755,7 +755,7 @@
     basalte: function (g, v) { rocherDessus(g, v, true); }, aiguilles: function (g, v) { rocherDessus(g, v + 1, true); },
     // Le fond uni d'une forêt : un disque de la couleur du feuillage, sans cerne (les disques voisins fusionnent).
     canopee: function (g, v) {
-      var prof = Math.floor(v / 100), k = (v % 100) % 7, R = k >= 5 ? 30 : 37;
+      var prof = Math.floor(v / 100), k = (v % 100) % 7, R = k >= 5 ? 20 : 37;
       if (prof === 5) { g.fillStyle = "rgba(16,30,28,0.3)"; g.beginPath(); g.arc(5, 7, R, 0, TAU); g.fill(); g.fillStyle = "#1c2622"; g.beginPath(); g.arc(0, 0, R + 3.2, 0, TAU); g.fill(); return; }
       g.fillStyle = k >= 5 ? (k === 6 ? "#c4ccd0" : "#9a978a") : INTERIEUR_DESSUS[["arbre", "conifere", "tropical", "automne", "palmier"][k]];
       g.beginPath(); g.arc(0, 0, R, 0, TAU); g.fill();
@@ -1425,12 +1425,15 @@
         if (dd.masse === "relief") {
           // Un massif est une seule forme : l'union de grands disques (contour peint d'abord, côté
           // extérieur seulement, puis remplissage uni), avec quelques sommets isolés au milieu.
-          if (fractionDedans(ctx, carte, q, pt, s * 0.3, 8, grand, s * 0.3) < 0.75) continue;
+          var fam = FAMILLE_CANOPEE[ch[0]], dedans = fractionDedans(ctx, carte, q, pt, s * 0.3, 8, grand, s * 0.3);
+          if (dedans < 0.75) continue;
           if (fractionDedans(ctx, carte, q, pt, dd.marge * s, 8, grand) >= 1) tu.entrees.push({ x: pt.x, y: pt.y, s: s, sprite: ch[0], r: pt.r3, cl: 1 });
-          var fam = FAMILLE_CANOPEE[ch[0]];
-          tu.entrees.push({ x: pt.x, y: pt.y, s: s, sprite: "canopee", r: pt.r3, v: fam, prof: 5, rel: 1 });
-          tu.entrees.push({ x: pt.x, y: pt.y, s: s, sprite: "canopee", r: pt.r3, v: fam, rel: 1 });
-          if (pt.r2 < 0.15 && fractionDedans(ctx, carte, q, pt, s * 0.9, 8, grand, s * 0.3) >= 1) tu.entrees.push({ x: pt.x, y: pt.y, s: s * 0.7, sprite: ch[0], r: pt.r3, prof: 0, rel: 1 });
+          tu.entrees.push({ x: pt.x, y: pt.y, s: s, sprite: "canopee", r: pt.r3, v: fam, prof: 4, rel: 1 });          // l'intérieur : une couleur unie
+          // Le relief est le bord : seules les montagnes de la lisière sont dessinées (silhouette cernée, puis remplissage).
+          if (fractionDedans(ctx, carte, q, pt, s * 0.75, 8, grand, s * 0.3) < 1) {
+            tu.entrees.push({ x: pt.x, y: pt.y, s: s, sprite: ch[0], r: pt.r3, prof: 5, rel: 1 });
+            tu.entrees.push({ x: pt.x, y: pt.y, s: s, sprite: ch[0], r: pt.r3, prof: 4, rel: 1 });
+          }
           continue;
         }
         var relief = dd.masse === "eboulis";
