@@ -1442,6 +1442,7 @@
       var dd = DECORS[q.m.decor];
       if (!dd || !dd.rues) return null;
       var rg = reglagesEn(q, zoneEn(ctx, x, y));
+      if (!DENSITES[rg.dens]) return null;                            // « Aucun » : pas de ville non plus
       if (niveauDecor(zb, dd.C, rg.fin) !== k) return null;
       return { dd: dd, route: distVoie(ctx, x, y) < Dk * 0.4, ech: ECHELLES[rg.ech], dens: DENSITES[rg.dens], mat: q.m.id };
     };
@@ -4433,7 +4434,10 @@
         out.push({ type: "maison", v: o.maison.v, x: o.x, y: o.y + sm * 0.3, s: sm, a: Math.round(o.maison.a * 180 / Math.PI * 10) / 10 });
       } else out.push({ type: o.sprite, v: o.v != null ? o.v : variante(o.sprite, o.r), x: o.x, y: o.y, s: o.s, alpha: o.alpha });
     });
-    return { objets: out, rect: [X0, Y0, X1, Y1] };
+    var rues = (liste.rues || []).filter(function (r) {
+      return Math.max(r[0], r[2]) >= X0 && Math.min(r[0], r[2]) <= X1 && Math.max(r[1], r[3]) >= Y0 && Math.min(r[1], r[3]) <= Y1;
+    });
+    return { objets: out, rect: [X0, Y0, X1, Y1], rues: rues };
   }
 
   window.Moteur = {
