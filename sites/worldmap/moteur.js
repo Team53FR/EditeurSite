@@ -1225,7 +1225,7 @@
       if (!chevauche([bb[0] - m, bb[1] - m, bb[2] + m, bb[3] + m], x0, y0, x1, y1)) return;
       var vo = { l: l, d: d, bb: bb, m: m };
       if (l.type === "riviere") ctx.rivieres.push(vo); else if (VOIES[l.type]) ctx.voies.push(vo);
-      ctx.traces.push({ l: l, d: d, bb: bb, m: m, demi: (l.taille || 0) * (l.type === "riviere" ? (l.delta ? 0.65 : 0.5) : 0.6) });
+      ctx.traces.push({ l: l, d: d, bb: bb, m: m, demi: (l.taille || 0) * (l.type === "riviere" ? (l.delta ? 0.65 : 0.5) : l.type === "muraille" ? 1.3 : 0.6) });     // (une muraille : ses tours, plus larges que le mur)
     });
     (carte.finesses || []).forEach(function (f) { if (f.bb && chevauche(f.bb, x0, y0, x1, y1)) ctx.zones.push(f); });
     return ctx;
@@ -1399,7 +1399,7 @@
         var grand = ch[2] >= 40;
         // Rien sur un tracé (route, rivière, muraille…) ni contre lui : un couloir reste dégagé,
         // pour qu'on le voie à travers une forêt ; ses bords se comportent comme une lisière.
-        var gaine = (dd.masse === "relief" ? 0.3 : dd.masse ? 0.45 : grand ? 0.45 : 0.22) * s;
+        var gaine = (dd.masse === "relief" ? 0.4 : dd.masse ? 0.6 : grand ? 0.45 : 0.22) * s;
         if (distTrace(ctx, pt.x, pt.y) < gaine) continue;
         var relief = dd.masse === "relief";
         if (!dd.masse || (!relief && !FORET_PROFONDE[ch[0]])) {
