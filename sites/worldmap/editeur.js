@@ -31,6 +31,7 @@
     coteMaisons: "deux",     // … de quel côté de la rue
     variation: 0.3,          // outil Décors : écart de taille d'un décor à l'autre
     typeLigne: "riviere",
+    sousSol: false,           // grotte : passe sous l'eau (sinon elle ressort pour franchir une rivière par un pont)
     reliefTrace: "dessus",   // route, chemin : par-dessus la montagne, "col" (passage dégagé) ou "grotte" (sous la montagne)
     couleurFrontiere: "#8a2b2b",
     epaisseurPx: 2.4,
@@ -1141,7 +1142,7 @@
       };
       if (th === "riviere") { E.ligneEnCours.meandre = E.meandre; E.ligneEnCours.delta = E.delta; }
       if (th === "frontiere" && E.fermer) E.ligneEnCours.ferme = true;
-      if (E.reliefTrace !== "dessus" && (th === "route" || th === "pavee" || th === "sentier")) E.ligneEnCours.relief = E.reliefTrace;
+      if (E.reliefTrace !== "dessus" && (th === "route" || th === "pavee" || th === "sentier")) { E.ligneEnCours.relief = E.reliefTrace; if (E.reliefTrace === "grotte" && E.sousSol) E.ligneEnCours.sousSol = true; }
       if (th === "maisons") { E.ligneEnCours.maison = E.maisonM / 1000; if (E.coteMaisons !== "deux") E.ligneEnCours.cote = E.coteMaisons; }
     }
     var pts = E.ligneEnCours.pts;
@@ -1869,7 +1870,8 @@
         maritime: "Un pointillé pour les routes des navires."
       };
       if (E.typeLigne === "route" || E.typeLigne === "pavee" || E.typeLigne === "sentier") {
-        zone.appendChild(champChoix("Face aux montagnes", [["dessus", "Sur la montagne"], ["col", "Sous : chemin normal (col)"], ["grotte", "Sous : grotte"]], E.reliefTrace, function (v) { E.reliefTrace = v; }));
+        zone.appendChild(champChoix("Face aux montagnes", [["dessus", "Sur la montagne"], ["col", "Sous : chemin normal (col)"], ["grotte", "Sous : grotte"]], E.reliefTrace, function (v) { E.reliefTrace = v; panneauOutil(); }));
+        if (E.reliefTrace === "grotte") zone.appendChild(champCase("Sous-sol (passe sous l'eau, sans pont)", E.sousSol, function (v) { E.sousSol = v; }));
       }
       if (E.typeLigne === "maisons") {
         zone.appendChild(champCurseur("Longueur d'une maison", 4, 40, 1, E.maisonM, function (v) { return Math.round(v) + " m"; }, function (v) { E.maisonM = v; }));
@@ -2065,7 +2067,8 @@
           function (v) { editer(function (x) { if (v === "deux") delete x.cote; else x.cote = v; }); }));
       }
       if (o.type === "route" || o.type === "pavee" || o.type === "sentier") {
-        zone.appendChild(champChoix("Face aux montagnes", [["dessus", "Sur la montagne"], ["col", "Sous : chemin normal (col)"], ["grotte", "Sous : grotte"]], o.relief || "dessus", function (v) { editer(function (x) { if (v === "dessus") delete x.relief; else x.relief = v; }); }));
+        zone.appendChild(champChoix("Face aux montagnes", [["dessus", "Sur la montagne"], ["col", "Sous : chemin normal (col)"], ["grotte", "Sous : grotte"]], o.relief || "dessus", function (v) { editer(function (x) { if (v === "dessus") delete x.relief; else x.relief = v; }); panneauSelection(); }));
+        if (o.relief === "grotte") zone.appendChild(champCase("Sous-sol (passe sous l'eau, sans pont)", !!o.sousSol, function (v) { editer(function (x) { if (v) x.sousSol = true; else delete x.sousSol; }); }));
       }
       if (Moteur.VOIES[o.type] && o.type !== "maisons") {
         var defaut = { route: 0.16, pavee: 0.06, sentier: 0.26 }[o.type];
