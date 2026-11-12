@@ -27,7 +27,7 @@
     tampon: "arbre",         // outil Décors : le décor posé à la main
     taillePxTampon: 36,
     angleTampon: "alea",     // outil Décors : orientation d'une maison posée (degrés, ou au hasard)
-    maisonM: 9,              // tracé « rue bordée de maisons » : longueur réelle d'une maison, en mètres
+    maisonM: 18,              // tracé « rue bordée de maisons » : longueur réelle d'une maison, en mètres
     coteMaisons: "deux",     // … de quel côté de la rue
     variation: 0.3,          // outil Décors : écart de taille d'un décor à l'autre
     typeLigne: "riviere",
@@ -1821,7 +1821,7 @@
         maritime: "Un pointillé pour les routes des navires."
       };
       if (E.typeLigne === "maisons") {
-        zone.appendChild(champCurseur("Longueur d'une maison", 4, 20, 1, E.maisonM, function (v) { return Math.round(v) + " m"; }, function (v) { E.maisonM = v; }));
+        zone.appendChild(champCurseur("Longueur d'une maison", 4, 40, 1, E.maisonM, function (v) { return Math.round(v) + " m"; }, function (v) { E.maisonM = v; }));
         zone.appendChild(champSegments("Maisons", [["deux", "Des deux côtés"], ["gauche", "À gauche"], ["droite", "À droite"]], E.coteMaisons, function (v) { E.coteMaisons = v; }));
         zone.appendChild(el("p", { classe: "aide", texte: "Tracez la rue : les maisons se rangent le long, tournées vers elle. Déplacez ensuite un point de la rue, les maisons suivent. Pour une maison isolée, utilisez l'outil Décors." }));
       }
@@ -2006,7 +2006,7 @@
         zone.appendChild(champCase("S'élargit vers l'embouchure", o.delta, function (v) { editer(function (x) { x.delta = v; }); }));
       }
       if (o.type === "maisons") {
-        zone.appendChild(champCurseur("Longueur d'une maison", 4, 20, 1, borne(Math.round((o.maison || 0.009) * 1000), 4, 20), function (v) { return Math.round(v) + " m"; },
+        zone.appendChild(champCurseur("Longueur d'une maison", 4, 40, 1, borne(Math.round((o.maison || 0.018) * 1000), 4, 40), function (v) { return Math.round(v) + " m"; },
           function (v) { editer(function (x) { x.maison = v / 1000; }); }));
         zone.appendChild(champCurseur("Espacement", 0.8, 3, 0.05, o.espace || 1, function (v) { return "×" + nb(v, 2); },
           function (v) { editer(function (x) { x.espace = v; }); }));

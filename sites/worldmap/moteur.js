@@ -1299,6 +1299,8 @@
     C.objets.forEach(function (o, id) { if (!vus[id]) { invaliderDecors(o.bb); C.objets.delete(id); } });
   }
 
+  // Les arbres qui ne touchent jamais la lisière : au cœur d'une forêt, le sol reste uni.
+  var FORET_PROFONDE = { arbre: 1, conifere: 1, automne: 1, tropical: 1, palmier: 1, acacia: 1, mort: 1 };
   function calculerTuile(carte, k, ti, tj, zb) {
     var D = CASE0 / Math.pow(2, k), x0 = ti * TUILE * D, y0 = tj * TUILE * D, x1 = x0 + TUILE * D, y1 = y0 + TUILE * D, pad = 10 * D;
     var tu = { entrees: [], bbm: [x0 - pad, y0 - pad, x1 + pad, y1 + pad] };
@@ -1334,6 +1336,7 @@
           dans++;
         }
         var f = dans / NS;
+        if (f >= 1 && FORET_PROFONDE[ch[0]]) continue;                 // au cœur de la forêt : fond uni, pas d'arbre
         if (f < 0.25) continue;                                         // trop près du bord : rien
         var fond = Math.min(1, (f - 0.25) / 0.6);
         if (fond < 1 && pt.r2 > fond + 0.1) continue;                     // au bord, seuls quelques sujets restent
@@ -1423,6 +1426,7 @@
   // `liste.rues`, peintes dans la terre avant les décors. Une route tracée par l'auteur
   // reste prioritaire : les maisons s'en écartent.
   function semerVille(carte, zb, zoom, k, X0, Y0, X1, Y1, liste) {
+    var debut = liste.length;
     // Un îlot fait huit cases de côté : quatre maisons le long de chaque rue.
     var kb = k - 3;
     if (kb < 0) return;
@@ -1468,9 +1472,9 @@
             if (s * zoom < 0.7) continue;
             if (DESSUS) {
               // Pignon sur rue, le plus souvent ; parfois le long de la rue.
-              var long = Dk * 1.5 * v.ech * (0.85 + 0.5 * hr), travers = alea(g + 150 + q * 7 + r, h) < 0.7;
+              var long = Dk * 3 * v.ech * (0.85 + 0.5 * hr), travers = alea(g + 150 + q * 7 + r, h) < 0.7;
               liste.push({ x: x + (travers ? nx * Dk * 0.2 : 0), y: y + (travers ? ny * Dk * 0.2 : 0),
-                maison: { w: long, h: Dk * 0.92 * v.ech, a: Math.atan2(dy, dx) + (travers ? Math.PI / 2 : 0) + (hr - 0.5) * 0.16, v: Math.floor(alea(g + 120 + q * 7 + r, h) * 40) } });
+                maison: { w: long, h: Dk * 1.84 * v.ech, a: Math.atan2(dy, dx) + (travers ? Math.PI / 2 : 0) + (hr - 0.5) * 0.16, v: Math.floor(alea(g + 120 + q * 7 + r, h) * 40) } });
               continue;
             }
             liste.push({ x: x, y: y + s * 0.16, s: s, sprite: "maison", r: alea(g + 120 + q * 7 + r, h) });
@@ -1494,6 +1498,36 @@
         }
       }
     }
+    purgerMaisons(liste, debut);
+  }
+
+  // Les maisons de ville ne s'écrasent ni sur une rue ni les unes sur les autres : celles qui
+  // mordraient sont écartées (test exact, par rectangles orientés ; une grille pour aller vite).
+  function purgerMaisons(liste, debut) {
+    var rues = liste.rues || [], mais = [], cs = 1e-9;
+    for (var i = debut; i < liste.length; i++) if (liste[i].maison) {
+      mais.push(liste[i]); cs = Math.max(cs, Math.hypot(liste[i].maison.w, liste[i].maison.h));
+    }
+    if (!mais.length) return;
+    var rectRues = rues.map(function (r) {
+      var dx = r[2] - r[0], dy = r[3] - r[1];
+      return { x: (r[0] + r[2]) / 2, y: (r[1] + r[3]) / 2, w: Math.hypot(dx, dy), h: r[4], a: Math.atan2(dy, dx) };
+    });
+    var grille = {}, ok = new Set();
+    mais.forEach(function (o) {
+      var p = { x: o.x, y: o.y, w: o.maison.w, h: o.maison.h, a: o.maison.a }, q;
+      for (q = 0; q < rectRues.length; q++) if (maisonsSeChevauchent(rectRues[q], p, 0)) return;
+      var gx = Math.floor(p.x / cs), gy = Math.floor(p.y / cs);
+      for (var ax = gx - 1; ax <= gx + 1; ax++) for (var ay = gy - 1; ay <= gy + 1; ay++) {
+        var vs = grille[ax + "," + ay];
+        if (vs) for (q = 0; q < vs.length; q++) if (maisonsSeChevauchent(vs[q], p, 0)) return;
+      }
+      (grille[gx + "," + gy] || (grille[gx + "," + gy] = [])).push(p);
+      ok.add(o);
+    });
+    var garde = liste.slice(debut).filter(function (o) { return !o.maison || ok.has(o); });
+    liste.length = debut;
+    garde.forEach(function (o) { liste.push(o); });
   }
 
   // Les rues d'une ville, peintes dans la terre : un bord sombre, la chaussée de terre claire.
@@ -1528,7 +1562,7 @@
 
   // Une maison de village mesure environ 9 m de long (et 6,5 m de large) : c'est sa taille
   // réelle, en kilomètres du monde, à tous les zooms — l'échelle graphique la montre en mètres.
-  var MAISON_KM = 0.009;
+  var MAISON_KM = 0.018;
   // Deux maisons (rectangles orientés de longueur w, largeur h, angle a) se recouvrent-elles
   // (à `marge` près) ? Test des axes séparateurs : exact, contrairement à un simple cercle.
   function maisonsSeChevauchent(p, q, marge) {

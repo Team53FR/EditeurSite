@@ -1800,7 +1800,7 @@ quelques îlots et des navires en pleine mer (loin du cadre, des côtes et les u
 **Décors peints.** Arbres, conifères, palmiers, acacias, arbres morts ou d'automne, pics, rochers,
 parcelles de champs, blocs de glace, roseaux et herbes sont peints **une seule
 fois** dans de petits canvas (`peintArbre`, `peintMontagne`…) : dégradés, ombre au sol, touches de
-lumière, pas de contour de dessin animé. Près de la lisière de son terrain, un décor se **fond** : il s'éclaircit et rapetisse (`calculerTuile`, sondes à 3,5 tailles, opacité `alpha`), comme une lisière de forêt. On les colle ensuite par milliers (`colle`), avec cinq
+lumière, pas de contour de dessin animé. Près de la lisière de son terrain, un décor se **fond** : il s'éclaircit et rapetisse (`calculerTuile`, sondes à 3,5 tailles, opacité `alpha`), comme une lisière de forêt. Au cœur d'une forêt, il n'y a plus d'arbre : le sol reste uni (`FORET_PROFONDE`). On les colle ensuite par milliers (`colle`), avec cinq
 définitions (64 à 1 024 px) choisies d'après le zoom (`ZPX`). Seules les terres volcaniques restent
 en vectoriel.
 
@@ -2035,7 +2035,7 @@ toits vus du dessus, **orientés**, dessinés en vectoriel (`maisonDessus`).
 **Maisons : à la main ou le long d'une ligne.** Tracé « Rue bordée de maisons » (`maisons`, une voie
 comme les autres : ponts, accroche) : `maisonsDesRues` range les maisons de part et d'autre du fil de
 la rue (ou d'un seul côté, `cote`), tournées vers elle, pignon sur rue le plus souvent ; longueur
-(`maison`, en km : 9 m par défaut, réglable de 4 à 20 m) et espacement (`espace`) réglables, et déplacer un point de la rue déplace ses maisons. Deux maisons ne se recouvrent jamais : le test est exact (rectangles orientés, `maisonsSeChevauchent`). L'échelle graphique affiche les mètres sous le kilomètre. À
+(`maison`, en km : 18 m par défaut, réglable de 4 à 40 m) et espacement (`espace`) réglables, et déplacer un point de la rue déplace ses maisons. Deux maisons ne se recouvrent jamais : le test est exact (rectangles orientés, `maisonsSeChevauchent`). Dans les villes générées, `purgerMaisons` écarte toute maison qui toucherait une rue ou une autre maison. L'échelle graphique affiche les mètres sous le kilomètre. À
 la main : les tampons Maison, Bâtisse et Église, avec une orientation (`a`, en degrés). Les arbres du
 terrain s'écartent des unes comme des autres. Dans les autres styles, ces maisons sont dessinées de
 profil.
