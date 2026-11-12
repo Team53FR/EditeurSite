@@ -538,9 +538,20 @@
     arbre: ["#4b8166", "#3d7059", "#33614d"], tropical: ["#3f7a58", "#33694c", "#295a41"], conifere: ["#356a60", "#2c5c54", "#244e48"],
     automne: ["#c98a3e", "#b5722f", "#9a5a28"], palmier: ["#5a9460", "#4a8452", "#3c7346"], acacia: ["#8fa35a", "#7d924e", "#6b8043"]
   };
+  // Le fond uni d'une forêt, par famille d'arbres : un teal sombre, plus gris que le feuillage.
+  var INTERIEUR_DESSUS = { arbre: "#34564f", tropical: "#2f5546", conifere: "#2b4b48", automne: "#86582a", palmier: "#3d6648", acacia: "#6b8043" };
+  function melange(a, b, t) {
+    var pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16), out = 0;
+    for (var sh = 16; sh >= 0; sh -= 8) out |= Math.round(((pa >> sh) & 255) * (1 - t) + ((pb >> sh) & 255) * t) << sh;
+    return "#" + ("000000" + out.toString(16)).slice(-6);
+  }
   function arbreDessus(famille) {
     return function (g, v) {
+      // v >= 100 : un arbre de la bordure intérieure d'une forêt (profondeur 1 ou 2) : plus de cerne
+      // épais ni d'ombre, sa couleur se rapproche du fond uni et il ne garde que des arcs en tirets.
+      var prof = Math.floor(v / 100); v = v % 100;
       var R = function (i) { return alea(2100 + v, i); }, T = FEUILLES_DESSUS[famille];
+      if (prof) { var mel = prof === 1 ? 0.55 : 0.88, I = INTERIEUR_DESSUS[famille]; T = T.map(function (c) { return melange(c, I, mel); }); }
       var boules = [[0, 0, 21]], n = 6 + (v % 2), i;
       for (i = 0; i < n; i++) {
         var a = i / n * TAU + R(i) * 0.6, d = 17 + R(10 + i) * 6;
@@ -552,16 +563,23 @@
         boules.forEach(function (b) { g.moveTo(b[0] + dx + b[2] + extra, b[1] + dy); g.arc(b[0] + dx, b[1] + dy, b[2] + extra, 0, TAU); });
         g.fill();
       };
-      passe(7, 9, 0, "rgba(16,30,28,0.3)");          // l'ombre
-      passe(0, 0, 2.6, "#1c2622");                    // le cerne
+      if (!prof) {
+        passe(7, 9, 0, "rgba(16,30,28,0.3)");        // l'ombre
+        passe(0, 0, 2.6, "#1c2622");                  // le cerne
+      }
       passe(0, 0, 0, T[1]);
       boules.forEach(function (b, q) {               // le volume : un côté clair, des arcs sombres
         g.fillStyle = q % 2 ? T[0] : T[2];
-        g.globalAlpha = 0.55;
+        g.globalAlpha = prof ? 0.35 : 0.55;
         g.beginPath(); g.arc(b[0] - b[2] * 0.2, b[1] - b[2] * 0.22, b[2] * 0.62, 0, TAU); g.fill();
         g.globalAlpha = 1;
-        g.strokeStyle = "rgba(20,40,32,0.5)"; g.lineWidth = 1.4;
-        g.beginPath(); g.arc(b[0], b[1], b[2] * 0.82, 0.2, 1.7); g.stroke();
+        if (prof) {
+          g.strokeStyle = "rgba(14,30,30," + (prof === 1 ? 0.8 : 0.6) + ")"; g.lineWidth = 1.7; g.setLineDash([4, 5]);
+          g.beginPath(); g.arc(b[0], b[1], b[2] * 0.95, -0.5, 2.3); g.stroke(); g.setLineDash([]);
+        } else {
+          g.strokeStyle = "rgba(20,40,32,0.5)"; g.lineWidth = 1.4;
+          g.beginPath(); g.arc(b[0], b[1], b[2] * 0.82, 0.2, 1.7); g.stroke();
+        }
       });
     };
   }
@@ -710,7 +728,7 @@
     montagne: reduit(montagneDessus(false), 0.62), cime: reduit(montagneDessus(true), 0.62),
     basalte: function (g, v) { rocherDessus(g, v, true); }, aiguilles: function (g, v) { rocherDessus(g, v + 1, true); },
     // Le fond uni d'une forêt : un disque de la couleur du feuillage, sans cerne (les disques voisins fusionnent).
-    canopee: function (g, v) { g.fillStyle = FEUILLES_DESSUS[["arbre", "conifere", "tropical", "automne", "palmier"][v % 5]][1]; g.beginPath(); g.arc(0, 0, 37, 0, TAU); g.fill(); },
+    canopee: function (g, v) { g.fillStyle = INTERIEUR_DESSUS[["arbre", "conifere", "tropical", "automne", "palmier"][v % 5]]; g.beginPath(); g.arc(0, 0, 37, 0, TAU); g.fill(); },
     arbre: arbreDessus("arbre"), tropical: arbreDessus("tropical"), conifere: arbreDessus("conifere"),
     automne: arbreDessus("automne"), palmier: arbreDessus("palmier"), acacia: arbreDessus("acacia"), rocher: function (g, v) { rocherDessus(g, v, false); }
   };
@@ -790,6 +808,12 @@
   function colle(ctx, type, v, x, y, s) {
     var S = tailleSprite(s * ZPX);
     ctx.drawImage(spriteCanvas(type, v, S), x - s / 2, y - s * 0.81, s, s);
+  }
+  // La variante à peindre d'un décor : son dessin (modulo le nombre de variantes) et, pour un arbre
+  // de forêt vu du dessus, sa profondeur (+100 par palier : 0 lisière, 1-2 fondu, voir arbreDessus).
+  function variantePeinte(o) {
+    var base = o.v != null ? (o.v % 100) % VARIANTES[o.sprite] : variante(o.sprite, o.r);
+    return base + 100 * (o.v != null ? Math.floor(o.v / 100) : (o.prof || 0));
   }
   function variante(type, r) {
     var n = VARIANTES[type];
@@ -1356,10 +1380,10 @@
         tu.entrees.push({ x: pt.x, y: pt.y, s: s, sprite: "canopee", r: pt.r3, v: FAMILLE_CANOPEE[ch[0]] || 0 });     // le fond uni, sous les arbres
         // Les arbres sont pleins sur le bord extérieur ; vers l'intérieur ils s'effacent peu à
         // peu (de 1,4 à 2,6 tailles du bord) : leur bord intérieur se fond dans le fond uni.
-        var opacite = 1;
-        if (f >= 1) opacite = fractionDedans(ctx, carte, q, pt, s * 2, 8, grand) < 1 ? 0.6 : fractionDedans(ctx, carte, q, pt, s * 2.6, 8, grand) < 1 ? 0.28 : 0;
-        if (opacite < 0.05) continue;                                   // au cœur : pas d'arbre
-        tu.entrees.push({ x: pt.x, y: pt.y, s: s, sprite: ch[0], r: pt.r3, alpha: opacite < 1 ? opacite : null });
+        var prof = 0;                                                    // 0 : lisière ; 1, 2 : de plus en plus fondu ; 3 : le cœur
+        if (f >= 1) prof = fractionDedans(ctx, carte, q, pt, s * 2, 8, grand) < 1 ? 1 : fractionDedans(ctx, carte, q, pt, s * 2.6, 8, grand) < 1 ? 2 : 3;
+        if (prof === 3) { if (pt.r2 < 0.05) prof = 2; else continue; }  // au cœur : fond uni, et de rares arcs en tirets
+        tu.entrees.push({ x: pt.x, y: pt.y, s: s, sprite: ch[0], r: pt.r3, prof: prof });
       }
     }
     return tu;
@@ -1415,6 +1439,7 @@
             if (en.x < X0 - s || en.x > X1 + s || en.y < Y0 - s * 0.2 || en.y > Y1 + s) continue;
             if (SANS_DECOR && SANS_DECOR[en.sprite]) continue;
             if (en.sprite === "canopee" && !DESSUS) continue;                 // le fond uni n'existe que vu du dessus
+            if (en.prof && !DESSUS) continue;                                 // (de même que les arbres qui s'y fondent)
             if (gt) {
               var voisins = gt[Math.floor(en.x / gc) + "," + Math.floor(en.y / gc)], libre = true;
               if (voisins) {
@@ -1425,7 +1450,7 @@
                 if (!libre) continue;
               }
             }
-            liste.push({ x: en.x, y: en.y, s: s, sprite: en.sprite, r: en.r, v: en.v, alpha: en.alpha });
+            liste.push({ x: en.x, y: en.y, s: s, sprite: en.sprite, r: en.r, v: en.v, prof: en.prof });
           }
         }
       }
@@ -1685,20 +1710,17 @@
     for (var i = 0; i < liste.length; i++) {
       var o = liste[i];
       if (o.maison) { maisonDessus(lc, o.x, o.y, o.maison.w, o.maison.h, o.maison.a, o.maison.v); continue; }
-      // Un arbre de la bordure intérieure d'une forêt est d'autant transparent : il se fond dans le fond uni.
-      var fondu = o.alpha != null && o.alpha < 1;
-      if (fondu) { lc.save(); lc.globalAlpha = o.alpha; }
+      var vp = variantePeinte(o);
       if (o.rot) {
         // Un décor tourné : on le colle autour de son centre (le dessin est centré à 0,31 s au-dessus de son pied).
         lc.save();
         lc.translate(o.x, o.y - o.s * 0.31);
         lc.rotate(o.rot);
-        colle(lc, o.sprite, o.v != null ? o.v % VARIANTES[o.sprite] : variante(o.sprite, o.r), 0, o.s * 0.31, o.s);
+        colle(lc, o.sprite, vp, 0, o.s * 0.31, o.s);
         lc.restore();
-      } else {
-        colle(lc, o.sprite, o.v != null ? o.v % VARIANTES[o.sprite] : variante(o.sprite, o.r), o.x, o.y, o.s);
+        continue;
       }
-      if (fondu) lc.restore();
+      colle(lc, o.sprite, vp, o.x, o.y, o.s);
     }
   }
 
@@ -4222,7 +4244,7 @@
           // Vu du dessus, une maison posée à la main est un toit, orientable (`a`, en degrés).
           var kb = BATIMENTS[tp.type];
           decors.push({ x: tp.x, y: tp.y - tp.s * 0.3, maison: { w: s * 0.62 * kb, h: s * 0.4 * kb, a: (tp.a || 0) * Math.PI / 180, v: tp.v || 0 } });
-        } else decors.push({ x: tp.x, y: y, s: s, sprite: tp.type, v: tp.v || 0, rot: tp.a ? tp.a * Math.PI / 180 : 0, alpha: tp.alpha });
+        } else decors.push({ x: tp.x, y: y, s: s, sprite: tp.type, v: tp.v || 0, rot: tp.a ? tp.a * Math.PI / 180 : 0 });
       });
       // Les maisons des rues : les arbres leur laissent la place.
       maisonsDesRues(carte, vue, masque, X0, Y0, X1, Y1).forEach(function (mz) {
@@ -4455,7 +4477,7 @@
       if (o.maison) {
         var sm = o.maison.w / 0.62;
         out.push({ type: "maison", v: o.maison.v, x: o.x, y: o.y + sm * 0.3, s: sm, a: Math.round(o.maison.a * 180 / Math.PI * 10) / 10 });
-      } else out.push({ type: o.sprite, v: o.v != null ? o.v : variante(o.sprite, o.r), x: o.x, y: o.y, s: o.s, alpha: o.alpha });
+      } else out.push({ type: o.sprite, v: variantePeinte(o), x: o.x, y: o.y, s: o.s });
     });
     var rues = (liste.rues || []).filter(function (r) {
       return Math.max(r[0], r[2]) >= X0 && Math.min(r[0], r[2]) <= X1 && Math.max(r[1], r[3]) >= Y0 && Math.min(r[1], r[3]) <= Y1;
