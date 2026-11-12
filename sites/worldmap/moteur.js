@@ -2616,10 +2616,45 @@
   // là où un embranchement rejoint une route, les deux chaussées se fondent en une seule
   // au lieu que le bord sombre de l'une passe en travers de l'autre.
   // `voies` : [{ l, st, lw }].
-  function tracerVoies(ctx, voies, vue) {
+  // Un chemin en montagne : au lieu de monter en ligne droite il fait des LACETS (un zigzag qui
+  // s'amplifie avec l'altitude), et des MARCHES (petits traits en travers) le long de la pente.
+  // Tout est fixé par le tracé et son épaisseur (`taille`), pas par le zoom. Renvoie { d, marches }.
+  function cheminDeMontagne(d, l, carte) {
+    var U = l.taille || 0, m = d.length / 2, i;
+    if (!(U > 0) || m < 2) return { d: d, marches: [] };
+    var bb = boiteTrait(d, 0), M = U * 60, ctxZ = contexteZone(carte, bb[0] - M, bb[1] - M, bb[2] + M, bb[3] + M);
+    var enMont = function (x, y) { if (distRiviere(ctxZ, x, y) < U * 12) return 0;       // près d'une rivière, le chemin retrouve son pont
+      var q = sonde(ctxZ, carte, x, y); return !q.eau && (q.m.id === "montagne" || q.m.id === "cime") ? 1 : 0; };
+    // Un échantillonnage régulier le long du chemin.
+    var pas = U * 1.5, pts = [], cum = 0, k = 0;
+    for (i = 0; i + 1 < m; i++) {
+      var ax = d[2 * i], ay = d[2 * i + 1], bx = d[2 * i + 2], by = d[2 * i + 3], L = Math.hypot(bx - ax, by - ay);
+      if (!L) continue;
+      for (var t = (k === 0 ? 0 : pas - (cum % pas)); t < L; t += pas) pts.push([ax + (bx - ax) * t / L, ay + (by - ay) * t / L, (bx - ax) / L, (by - ay) / L]);
+      cum += L; k++;
+    }
+    pts.push([d[2 * m - 2], d[2 * m - 1], pts.length ? pts[pts.length - 1][2] : 1, pts.length ? pts[pts.length - 1][3] : 0]);
+    if (pts.length < 6 || !pts.some(function (p) { return enMont(p[0], p[1]); })) return { d: d, marches: [] };
+    var mont = pts.map(function (p) { return enMont(p[0], p[1]); }), lisse = mont.map(function (_, j) {
+      var a = 0, n = 0; for (var w = -6; w <= 6; w++) { var q = mont[j + w]; if (q != null) { a += q; n++; } } return a / n;
+    });
+    var out = [], marches = [], phase = 0, longueur = 34 * U / pas;       // une demi-oscillation = 34 épaisseurs de chemin
+    for (i = 0; i < pts.length; i++) {
+      var p = pts[i], f = lisse[i] * Math.min(1, i / 8, (pts.length - 1 - i) / 8);        // (aux deux bouts, le chemin retrouve son tracé)
+      if (f > 0.01) phase += 1 / longueur;
+      var tri = 2 / Math.PI * Math.asin(Math.sin(Math.PI * phase)), off = f * f * 16 * U * tri;      // triangle arrondi : des virages en épingle
+      var nx = -p[3], ny = p[2], x = p[0] + nx * off, y = p[1] + ny * off;
+      out.push(x, y);
+      if (f > 0.5 && i % 2 === 0) marches.push([x, y, nx, ny]);
+    }
+    return { d: out, marches: marches };
+  }
+
+  function tracerVoies(ctx, voies, vue, carte, dessus) {
     if (!voies.length) return;
     var u = 1 / vue.zoom;
-    voies.forEach(function (v) { v.d = pointsAffiches(v.l); v.sentier = v.l.type === "sentier" || v.l.type === "maisons"; v.pavee = v.l.type === "pavee"; });
+    voies.forEach(function (v) { v.d = pointsAffiches(v.l); v.marches = null;
+      if (dessus && carte && v.l.type !== "maisons") { var cm = cheminDeMontagne(v.d, v.l, carte); v.d = cm.d; v.marches = cm.marches; } v.sentier = v.l.type === "sentier" || v.l.type === "maisons"; v.pavee = v.l.type === "pavee"; });
     var chemin = function (d) {
       ctx.beginPath();
       ctx.moveTo(d[0], d[1]);
@@ -2651,6 +2686,16 @@
     // 3) Le milieu, usé et plus clair.
     passe(toutes, function (v) { return v.pavee ? "rgba(255,255,250,0.2)" : "rgba(255,244,208,0.34)"; }, function (v) { return v.lw * (v.sentier ? 0.42 : 0.52); });
     // 4) Les détails, quand la voie est assez large à l'écran pour qu'on les lise.
+    //    En montagne : des marches (petits traits en travers), qui marquent la montée.
+    ctx.lineCap = "round";
+    voies.forEach(function (v) {
+      if (!v.marches || !v.marches.length) return;
+      var h = v.lw * 0.5;
+      ctx.strokeStyle = "rgba(60,40,18,0.75)"; ctx.lineWidth = Math.max(1.1 * u, v.lw * 0.2);
+      ctx.beginPath();
+      v.marches.forEach(function (q) { ctx.moveTo(q[0] - q[2] * h, q[1] - q[3] * h); ctx.lineTo(q[0] + q[2] * h, q[1] + q[3] * h); });
+      ctx.stroke();
+    });
     ctx.lineCap = "butt";
     //    Pavés : des joints en travers.
     passe(function (v) { return v.pavee && v.lw * vue.zoom >= 4; }, "rgba(60,54,46,0.42)", function (v) { return v.lw * 0.86; },
@@ -4431,7 +4476,7 @@
       var massifs = decors.filter(function (d) { return d.rel; });
       if (massifs.length) { decors = decors.filter(function (d) { return !d.rel; }); peindreDecors(lc, massifs); }
       lc.globalCompositeOperation = "source-atop";
-      tracerVoies(lc, voiesVisibles(carte, vue, th, X0, Y0, X1, Y1), vue);
+      tracerVoies(lc, voiesVisibles(carte, vue, th, X0, Y0, X1, Y1), vue, carte, !!th.dessus);
       lc.globalCompositeOperation = "source-over";
       peindreDecors(lc, decors);
       lc.restore();
