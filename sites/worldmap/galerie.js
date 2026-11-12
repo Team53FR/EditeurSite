@@ -161,7 +161,7 @@
         carte.etiquettes = Array.isArray(carte.etiquettes) ? carte.etiquettes : [];
         carte.lieux = Array.isArray(carte.lieux) ? carte.lieux : [];
         carte.lacs = Array.isArray(carte.lacs) ? carte.lacs : [];
-        carte.tampons = Array.isArray(carte.tampons) ? carte.tampons : [];
+        carte.tampons = Array.isArray(carte.tampons) ? carte.tampons.filter(function (t) { return Moteur.TAMPONS.some(function (x) { return x.id === t.type; }); }) : [];
         if (!(carte.zbFixe > 0)) Moteur.fixerEchelleDecors(carte);
         carte.id = Stockage.nouvelId();
         carte.nom = String(carte.nom || "Carte importée").slice(0, 80);

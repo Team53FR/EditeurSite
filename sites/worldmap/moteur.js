@@ -107,11 +107,11 @@
     { id: "plaine",   nom: "Plaine",          couleur: "#9bb96a", decor: "herbe",    type: "terre", groupe: "Plaines" },
     { id: "foret",    nom: "Forêt",           couleur: "#5f9148", decor: "foret",    type: "terre", groupe: "Forêts" },
     { id: "taiga",    nom: "Taïga",           couleur: "#4f7f5c", decor: "taiga",    type: "terre", groupe: "Forêts" },
-    { id: "colline",  nom: "Collines",        couleur: "#b6b46c", decor: "colline",  type: "terre", groupe: "Reliefs" },
+    { id: "colline",  nom: "Collines",        couleur: "#b6b46c", decor: null,       type: "terre", groupe: "Reliefs", retire: true },
     { id: "montagne", nom: "Montagnes",       couleur: "#9a9486", decor: "montagne", type: "terre", groupe: "Reliefs" },
     { id: "cime",     nom: "Cimes neigeuses", couleur: "#d6dde0", decor: "cime",     type: "terre", groupe: "Reliefs" },
     { id: "volcan",   nom: "Volcan",          couleur: "#8a6b49", decor: "volcan",   type: "terre", groupe: "Reliefs" },
-    { id: "desert",   nom: "Désert",          couleur: "#e0c887", decor: "dune",     type: "terre", groupe: "Terres arides" },
+    { id: "desert",   nom: "Désert",          couleur: "#e0c887", decor: "seche",    type: "terre", groupe: "Terres arides" },
     { id: "steppe",   nom: "Steppe",          couleur: "#c9b872", decor: "seche",    type: "terre", groupe: "Plaines" },
     { id: "marais",   nom: "Marais",          couleur: "#6f8a66", decor: "marais",   type: "terre", groupe: "Eaux et froid" },
     { id: "glace",    nom: "Glace",           couleur: "#eef4f6", decor: "glace",    type: "terre", groupe: "Eaux et froid" },
@@ -134,7 +134,7 @@
 
   // ----- Décors : peints une fois, semés ensuite -----
   //
-  // Chaque décor (arbre, conifère, pic, colline, dune…) est PEINTÉ une seule fois dans un
+  // Chaque décor (arbre, conifère, pic, rocher…) est PEINTÉ une seule fois dans un
   // petit canvas — dégradés, ombre au sol, touches de lumière, aucun contour de dessin
   // animé — puis simplement collé des centaines de fois. C'est plus beau, et bien plus
   // rapide que de retracer chaque arbre à chaque image. Quatre définitions (64, 128, 256
@@ -328,44 +328,6 @@
     });
     g.restore();
     silhouette(); g.strokeStyle = "rgba(46,40,30,0.42)"; g.lineWidth = 1; g.stroke();
-  }
-
-  function peintColline(g, v) {
-    var R = function (i) { return alea(800 + v, i); };
-    ombreDecor(g, 6, 28, 40, 7, 0.26);
-    // Une colline basse et douce, plus large que haute, au sommet décentré.
-    var w = 42 + R(1) * 8, h = 20 + R(2) * 9, dec = (R(3) - 0.5) * 0.5;
-    var forme = function () {
-      g.beginPath(); g.moveTo(-w, 29);
-      g.bezierCurveTo(-w * (0.65 - dec), 29 - h * 1.3, w * (0.35 + dec), 29 - h * 1.4, w, 29);
-      g.closePath();
-    };
-    var gr = g.createLinearGradient(-w * 0.6, -h * 0.4, w * 0.7, 30);
-    gr.addColorStop(0, "#cfd384"); gr.addColorStop(0.5, "#a3ab5a"); gr.addColorStop(1, "#6f7a3c");
-    forme(); g.fillStyle = gr; g.fill();
-    g.save(); forme(); g.clip();
-    g.fillStyle = "rgba(40,48,16,0.18)";                       // le versant à l'ombre
-    g.beginPath(); g.ellipse(w * 0.55, 26, w * 0.6, h * 1.1, 0, 0, TAU); g.fill();
-    for (var i = 0; i < 26; i++) {
-      g.strokeStyle = i % 3 ? "rgba(96,110,40,0.45)" : "rgba(236,232,150,0.45)";
-      g.lineWidth = 1.2;
-      var x = (R(20 + i) - 0.5) * 2 * w * 0.9, y = 29 - R(50 + i) * h * 0.85;
-      g.beginPath(); g.moveTo(x, y); g.lineTo(x + (R(80 + i) - 0.5) * 5, y - 3.2); g.stroke();
-    }
-    g.restore();
-  }
-
-  function peintDune(g, v) {
-    var R = function (i) { return alea(900 + v, i); };
-    ombreDecor(g, 4, 28, 42, 6, 0.2);
-    var gr = g.createLinearGradient(-40, -10, 30, 30);
-    gr.addColorStop(0, "#f4e2a8"); gr.addColorStop(1, "#cdb06a");
-    g.fillStyle = gr;
-    g.beginPath(); g.moveTo(-42, 28); g.bezierCurveTo(-28, 2 + R(1) * 6, 0, -6 + R(2) * 6, 12, 12); g.bezierCurveTo(22, 22, 34, 20, 44, 28); g.closePath(); g.fill();
-    g.beginPath(); g.moveTo(-12, 28); g.bezierCurveTo(0, 12, 14, 6 + R(3) * 6, 28, 18); g.bezierCurveTo(36, 24, 42, 26, 46, 28); g.closePath();
-    g.fillStyle = "rgba(205,176,106,0.75)"; g.fill();
-    g.strokeStyle = "rgba(150,108,40,0.4)"; g.lineWidth = 1.2;       // l'arête de la dune
-    g.beginPath(); g.moveTo(-34, 22); g.bezierCurveTo(-24, 6, -2, -2, 12, 12); g.stroke();
   }
 
   function peintMarais(g, v) {
@@ -651,28 +613,6 @@
       trace(0, 0); g.strokeStyle = "#1c2622"; g.lineWidth = 2.2; g.stroke();
     };
   }
-  function collineDessus(g, v) {
-    var R = function (i) { return alea(2400 + v, i); }, rx = 36 + R(1) * 8, ry = 28 + R(2) * 7, a = (R(3) - 0.5) * 0.5;
-    g.save(); g.translate(5, 7); g.rotate(a); g.fillStyle = "rgba(16,30,28,0.22)"; g.beginPath(); g.ellipse(0, 0, rx, ry, 0, 0, TAU); g.fill(); g.restore();
-    g.save(); g.rotate(a);
-    var gr = g.createRadialGradient(-rx * 0.3, -ry * 0.35, 2, 0, 0, rx);
-    gr.addColorStop(0, "#c3dd9f"); gr.addColorStop(1, "#86b070");
-    g.fillStyle = gr; g.beginPath(); g.ellipse(0, 0, rx, ry, 0, 0, TAU); g.fill();
-    g.strokeStyle = "rgba(50,82,44,0.4)"; g.lineWidth = 1.2;
-    [0.7, 0.4].forEach(function (f) { g.beginPath(); g.ellipse(-rx * 0.1 * (1 - f), -ry * 0.12 * (1 - f), rx * f, ry * f, 0, 0, TAU); g.stroke(); });
-    g.strokeStyle = "rgba(28,48,36,0.55)"; g.lineWidth = 1.6; g.beginPath(); g.ellipse(0, 0, rx, ry, 0, 0, TAU); g.stroke();
-    g.restore();
-  }
-  function duneDessus(g, v) {
-    var R = function (i) { return alea(2500 + v, i); }, rx = 38 + R(1) * 8, ry = 24 + R(2) * 6, a = (R(3) - 0.5) * 0.8;
-    g.save(); g.rotate(a);
-    g.fillStyle = "rgba(120,92,40,0.2)"; g.beginPath(); g.ellipse(4, 5, rx, ry, 0, 0, TAU); g.fill();
-    var gr = g.createLinearGradient(-rx, -ry, rx, ry); gr.addColorStop(0, "#f0e2b0"); gr.addColorStop(1, "#cdb676");
-    g.fillStyle = gr; g.beginPath(); g.ellipse(0, 0, rx, ry, 0, 0, TAU); g.fill();
-    g.strokeStyle = "rgba(150,112,48,0.5)"; g.lineWidth = 1.3;
-    for (var i = -2; i <= 2; i++) { g.beginPath(); g.moveTo(-rx * 0.8, i * ry * 0.32); g.quadraticCurveTo(0, i * ry * 0.32 - ry * 0.28, rx * 0.8, i * ry * 0.32); g.stroke(); }
-    g.restore();
-  }
   // Une place : un disque (ou un carré) de terre battue, son pavage en pointillé et, au
   // milieu, une fontaine ou un monument. Posée sous les maisons et les arbres.
   function peintPlace(g, v) {
@@ -767,7 +707,6 @@
     // Vus d'en haut, ils occupent toute la boîte du dessin de profil : on les réduit pour qu'ils
     // gardent la même emprise sur la carte.
     montagne: reduit(montagneDessus(false), 0.62), cime: reduit(montagneDessus(true), 0.62),
-    colline: reduit(collineDessus, 0.58), dune: reduit(duneDessus, 0.66),
     basalte: function (g, v) { rocherDessus(g, v, true); }, aiguilles: function (g, v) { rocherDessus(g, v + 1, true); },
     arbre: arbreDessus("arbre"), tropical: arbreDessus("tropical"), conifere: arbreDessus("conifere"),
     automne: arbreDessus("automne"), palmier: arbreDessus("palmier"), acacia: arbreDessus("acacia"), rocher: function (g, v) { rocherDessus(g, v, false); }
@@ -830,7 +769,7 @@
     palmier: peintPalmier, acacia: peintAcacia, mort: peintMort,
     montagne: function (g, v) { peintMontagne(g, v, false); },
     cime: function (g, v) { peintMontagne(g, v, true); },
-    colline: peintColline, dune: peintDune, marais: peintMarais, herbe: peintHerbe,
+    marais: peintMarais, herbe: peintHerbe,
     seche: function (g, v) { peintHerbe(g, v, true); },
     rocher: function (g, v) { peintRocher(g, v, false); },
     basalte: function (g, v) { peintRocher(g, v, true); },
@@ -841,7 +780,7 @@
     place: peintPlace
   };
   var VARIANTES = { arbre: 6, conifere: 4, automne: 6, tropical: 6, palmier: 4, acacia: 4, mort: 4, montagne: 6, cime: 6,
-    colline: 4, dune: 4, marais: 3, herbe: 3, seche: 3, rocher: 6, basalte: 6, champ: 6, glacon: 4, cratere: 2, aiguilles: 6, maison: 12, batisse: 6, clocher: 4, place: 2 };
+    marais: 3, herbe: 3, seche: 3, rocher: 6, basalte: 6, champ: 6, glacon: 4, cratere: 2, aiguilles: 6, maison: 12, batisse: 6, clocher: 4, place: 2 };
 
   // Colle un décor peint : (x, y) est le point où il touche le sol, s la taille de sa boîte.
   function colle(ctx, type, v, x, y, s) {
@@ -872,14 +811,12 @@
     taiga:    { C: 8.5, p: 1,    marge: 0.12, choix: [["conifere", 1, 28]] },
     jungle:   { C: 8.5,   p: 1,    marge: 0.12, choix: [["tropical", 0.72, 29], ["palmier", 0.28, 33]] },
     morte:    { C: 12,   p: 0.8,  marge: 0.12, choix: [["mort", 1, 27]] },
-    colline:  { C: 19,   p: 0.85, marge: 0.12, choix: [["colline", 1, 62]] },
     // Une chaîne : de grands massifs et, serrés entre eux, des pics plus petits. La marge
     // est faible pour qu'une crête étroite, vue de loin, porte déjà sa rangée de sommets.
     montagne: { C: 24,   p: 0.94, marge: 0.05, choix: [["montagne", 0.4, 170], ["montagne", 0.6, 104]] },
     cime:     { C: 24,   p: 0.94, marge: 0.05, choix: [["cime", 0.4, 170], ["cime", 0.6, 104]] },
     volcan:   { C: 21,   p: 0.62, marge: 0.2,  choix: [["aiguilles", 0.5, 84], ["basalte", 0.5, 24]] },
     rocaille: { C: 13,   p: 0.8,  marge: 0.15, choix: [["rocher", 1, 24]] },
-    dune:     { C: 20,   p: 0.7,  marge: 0.25, choix: [["dune", 1, 44]] },
     cendres:  { C: 19,   p: 0.5,  marge: 0.15, choix: [["basalte", 0.6, 20], ["mort", 0.4, 24]] },
     toundra:  { C: 15,   p: 0.5,  marge: 0.1,  choix: [["rocher", 0.35, 15], ["seche", 0.65, 14]] },
     // Une ville qui s'étale : des maisons serrées, quelques grandes bâtisses et clochers.
@@ -905,7 +842,7 @@
     { id: "arbre", nom: "Feuillu" }, { id: "conifere", nom: "Sapin" }, { id: "automne", nom: "Arbre d'automne" },
     { id: "tropical", nom: "Arbre tropical" }, { id: "palmier", nom: "Palmier" }, { id: "acacia", nom: "Acacia" },
     { id: "mort", nom: "Arbre mort" }, { id: "montagne", nom: "Montagne", max: 230 }, { id: "cime", nom: "Pic enneigé", max: 230 },
-    { id: "cratere", nom: "Volcan", max: 230 }, { id: "aiguilles", nom: "Aiguilles noires", max: 170 }, { id: "colline", nom: "Colline", max: 170 }, { id: "dune", nom: "Dune", max: 170 },
+    { id: "cratere", nom: "Volcan", max: 230 }, { id: "aiguilles", nom: "Aiguilles noires", max: 170 },
     { id: "rocher", nom: "Rochers" }, { id: "basalte", nom: "Roche sombre" }, { id: "glacon", nom: "Glace" },
     { id: "champ", nom: "Champ" }, { id: "maison", nom: "Maison" }, { id: "batisse", nom: "Bâtisse" }, { id: "clocher", nom: "Église" }, { id: "place", nom: "Place" }, { id: "marais", nom: "Roseaux" }, { id: "herbe", nom: "Herbes" }, { id: "seche", nom: "Herbes sèches" }
   ];
@@ -1385,15 +1322,22 @@
         var s = ch[2] / dd.C * D * 0.72 * ECHELLES[rg.ech] * (0.82 + 0.36 * pt.r3);
         var grand = ch[2] >= 40;
         if (distVoie(ctx, pt.x, pt.y) < (grand ? 0.45 : 0.22) * s) continue;       // pas sur une voie
-        // Bien à l'intérieur de son terrain : tout autour, le même terrain.
-        var e = dd.marge * s, ok = true, sondes = [[-e, 0], [e, 0], [0, -e], [0, e * 0.5]];
-        for (n = 0; n < 4 && ok; n++) {
-          var qq = sonde(ctx, carte, pt.x + sondes[n][0], pt.y + sondes[n][1]);
-          if (qq.eau || qq.m !== q.m) ok = false;
-          else if (grand && distVoie(ctx, pt.x + sondes[n][0], pt.y + sondes[n][1]) < 0) ok = false;
+        // Un décor se fond dans la lisière de son terrain au lieu de s'arrêter net : on sonde
+        // huit directions ; à l'intérieur, il est plein ; près du bord, il s'éclaircit et
+        // rapetisse (arbres clairsemés, plus petits) jusqu'à disparaître.
+        var R = Math.max(dd.marge * s, s * 3.5), dans = 0, NS = 12;
+        for (n = 0; n < NS; n++) {
+          var an = (n + pt.r3) * Math.PI / 6, px2 = pt.x + Math.cos(an) * R, py2 = pt.y + Math.sin(an) * R * 0.6;
+          var qq = sonde(ctx, carte, px2, py2);
+          if (qq.eau || qq.m !== q.m) continue;
+          if (grand && distVoie(ctx, px2, py2) < 0) continue;
+          dans++;
         }
-        if (!ok) continue;
-        tu.entrees.push({ x: pt.x, y: pt.y, s: s, sprite: ch[0], r: pt.r3 });
+        var f = dans / NS;
+        if (f < 0.25) continue;                                         // trop près du bord : rien
+        var fond = Math.min(1, (f - 0.25) / 0.6);
+        if (fond < 1 && pt.r2 > fond + 0.1) continue;                     // au bord, seuls quelques sujets restent
+        tu.entrees.push({ x: pt.x, y: pt.y, s: s * (0.45 + 0.55 * fond), sprite: ch[0], r: pt.r3, alpha: fond < 1 ? 0.25 + 0.75 * fond : null });
       }
     }
     return tu;
@@ -1458,7 +1402,7 @@
                 if (!libre) continue;
               }
             }
-            liste.push({ x: en.x, y: en.y, s: s, sprite: en.sprite, r: en.r });
+            liste.push({ x: en.x, y: en.y, s: s, sprite: en.sprite, r: en.r, alpha: en.alpha });
           }
         }
       }
@@ -1582,6 +1526,23 @@
     return Math.hypot(px - ax - dx * t, py - ay - dy * t);
   }
 
+  // Une maison de village mesure environ 9 m de long (et 6,5 m de large) : c'est sa taille
+  // réelle, en kilomètres du monde, à tous les zooms — l'échelle graphique la montre en mètres.
+  var MAISON_KM = 0.009;
+  // Deux maisons (rectangles orientés de longueur w, largeur h, angle a) se recouvrent-elles
+  // (à `marge` près) ? Test des axes séparateurs : exact, contrairement à un simple cercle.
+  function maisonsSeChevauchent(p, q, marge) {
+    var cp = Math.cos(p.a), sp = Math.sin(p.a), cq = Math.cos(q.a), sq = Math.sin(q.a);
+    var dx = q.x - p.x, dy = q.y - p.y, axes = [[cp, sp], [-sp, cp], [cq, sq], [-sq, cq]];
+    for (var i = 0; i < 4; i++) {
+      var ax = axes[i][0], ay = axes[i][1];
+      var rp = p.w / 2 * Math.abs(ax * cp + ay * sp) + p.h / 2 * Math.abs(-ax * sp + ay * cp);
+      var rq = q.w / 2 * Math.abs(ax * cq + ay * sq) + q.h / 2 * Math.abs(-ax * sq + ay * cq);
+      if (Math.abs(dx * ax + dy * ay) > rp + rq + marge) return false;
+    }
+    return true;
+  }
+
   // Toutes les maisons des rues sont d'abord PROPOSÉES (tout le long de chaque rue, quelle que
   // soit la vue : leur place ne dépend pas de ce qu'on regarde), puis triées : une maison qui
   // mordrait sur une voie (la sienne dans un virage, ou une autre à un carrefour), sur une
@@ -1600,7 +1561,7 @@
     var ctxH = contexteZone(carte, X0 - 1e9, Y0 - 1e9, X1 + 1e9, Y1 + 1e9);
     var cand = [], Wmax = 0;
     rues.forEach(function (vo) {
-      var l = vo.l, d = vo.d, m = d.length / 2, W = l.maison || (l.taille || 1) * 6;
+      var l = vo.l, d = vo.d, m = d.length / 2, W = l.maison || MAISON_KM;
       if (W * vue.zoom < 0.7) return;
       Wmax = Math.max(Wmax, W);
       // Hors vue (avec une grande marge) : inutile de calculer cette rue.
@@ -1642,7 +1603,7 @@
       var gx = Math.floor(c.x / cell), gy = Math.floor(c.y / cell);
       for (var ax = gx - 1; ax <= gx + 1; ax++) for (var ay = gy - 1; ay <= gy + 1; ay++) {
         var vs = grille[ax + "," + ay];
-        if (vs) for (q = 0; q < vs.length; q++) if (Math.hypot(vs[q].x - c.x, vs[q].y - c.y) < (vs[q].r + r) * 0.9) return;
+        if (vs) for (q = 0; q < vs.length; q++) if (maisonsSeChevauchent(vs[q], c, Wmax * 0.04)) return;
       }
       c.r = r;
       (grille[gx + "," + gy] || (grille[gx + "," + gy] = [])).push(c);
@@ -1666,6 +1627,9 @@
     for (var i = 0; i < liste.length; i++) {
       var o = liste[i];
       if (o.maison) { maisonDessus(lc, o.x, o.y, o.maison.w, o.maison.h, o.maison.a, o.maison.v); continue; }
+      // Un décor en fondu (près de la lisière de son terrain) est d'autant transparent.
+      var fondu = o.alpha != null && o.alpha < 1;
+      if (fondu) { lc.save(); lc.globalAlpha = o.alpha; }
       if (o.rot) {
         // Un décor tourné : on le colle autour de son centre (le dessin est centré à 0,31 s au-dessus de son pied).
         lc.save();
@@ -1673,9 +1637,10 @@
         lc.rotate(o.rot);
         colle(lc, o.sprite, o.v != null ? o.v % VARIANTES[o.sprite] : variante(o.sprite, o.r), 0, o.s * 0.31, o.s);
         lc.restore();
-        continue;
+      } else {
+        colle(lc, o.sprite, o.v != null ? o.v % VARIANTES[o.sprite] : variante(o.sprite, o.r), o.x, o.y, o.s);
       }
-      colle(lc, o.sprite, o.v != null ? o.v % VARIANTES[o.sprite] : variante(o.sprite, o.r), o.x, o.y, o.s);
+      if (fondu) lc.restore();
     }
   }
 
@@ -4040,13 +4005,20 @@
         ctx.fillRect(x0 + d * c / 4, y0, d / 4, h);
       }
       ctx.strokeRect(x0, y0, d, h);
-      ctx.font = "600 " + (m * 0.024) + "px " + POLICE;
-      ctx.textBaseline = "alphabetic"; ctx.lineJoin = "round";
-      [[0, "0", "center"], [d / 2, String(nombreFr(d / 2)), "center"], [d, nombreFr(d) + " km", "center"]].forEach(function (g) {
-        ctx.textAlign = g[2];
-        ctx.lineWidth = m * 0.006; ctx.strokeStyle = th.halo; ctx.strokeText(g[1], x0 + g[0], y0 - m * 0.008);
-        ctx.fillStyle = th.cadre; ctx.fillText(g[1], x0 + g[0], y0 - m * 0.008);
+      // Les libellés sont écrits en pixels d'écran (une police ne suit pas la transformation
+      // du monde) : on calcule leur place à l'écran, puis on rend la transformation.
+      var T = ctx.getTransform(), fs = m * 0.024 * T.a, enM = d < 1;
+      var nb = function (v) { return enM ? String(Math.round(v * 1000)) : String(nombreFr(v)); };
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.font = "600 " + fs + "px " + POLICE;
+      ctx.textBaseline = "alphabetic"; ctx.lineJoin = "round"; ctx.textAlign = "center";
+      [[0, "0"], [d / 2, nb(d / 2)], [d, enM ? Math.round(d * 1000) + " m" : nb(d) + " km"]].forEach(function (g) {
+        var wx = x0 + g[0], wy = y0 - m * 0.008;
+        var px = T.a * wx + T.c * wy + T.e, py = T.b * wx + T.d * wy + T.f;
+        ctx.lineWidth = fs * 0.28; ctx.strokeStyle = th.halo; ctx.strokeText(g[1], px, py);
+        ctx.fillStyle = th.cadre; ctx.fillText(g[1], px, py);
       });
+      ctx.setTransform(T.a, T.b, T.c, T.d, T.e, T.f);
     }
     if (o.titre && carte.nom) {
       // Le cartouche : un ruban de parchemin en haut de la carte, au nom de celle-ci.
@@ -4192,7 +4164,7 @@
           // Vu du dessus, une maison posée à la main est un toit, orientable (`a`, en degrés).
           var kb = BATIMENTS[tp.type];
           decors.push({ x: tp.x, y: tp.y - tp.s * 0.3, maison: { w: s * 0.62 * kb, h: s * 0.4 * kb, a: (tp.a || 0) * Math.PI / 180, v: tp.v || 0 } });
-        } else decors.push({ x: tp.x, y: y, s: s, sprite: tp.type, v: tp.v || 0, rot: tp.a ? tp.a * Math.PI / 180 : 0 });
+        } else decors.push({ x: tp.x, y: y, s: s, sprite: tp.type, v: tp.v || 0, rot: tp.a ? tp.a * Math.PI / 180 : 0, alpha: tp.alpha });
       });
       // Les maisons des rues : les arbres leur laissent la place.
       maisonsDesRues(carte, vue, masque, X0, Y0, X1, Y1).forEach(function (mz) {
@@ -4425,7 +4397,7 @@
       if (o.maison) {
         var sm = o.maison.w / 0.62;
         out.push({ type: "maison", v: o.maison.v, x: o.x, y: o.y + sm * 0.3, s: sm, a: Math.round(o.maison.a * 180 / Math.PI * 10) / 10 });
-      } else out.push({ type: o.sprite, v: o.v != null ? o.v : variante(o.sprite, o.r), x: o.x, y: o.y, s: o.s });
+      } else out.push({ type: o.sprite, v: o.v != null ? o.v : variante(o.sprite, o.r), x: o.x, y: o.y, s: o.s, alpha: o.alpha });
     });
     return { objets: out, rect: [X0, Y0, X1, Y1] };
   }

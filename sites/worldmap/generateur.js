@@ -80,7 +80,7 @@
       listes.plaine.push(px2, py2);
       var biome = null;
       if (alt > 0.74) biome = alt > 0.93 ? "cime" : "montagne";
-      else if (alt > 0.58) biome = "colline";
+      else if (alt > 0.58) biome = "steppe";
       else if (temp < 0.22) biome = "glace";
       else if (m > 0.56) biome = temp > 0.5 ? (alt < 0.2 && m > 0.62 ? "marais" : "foret") : "taiga";
       else if (m < 0.4 && temp > 0.5) biome = "desert";

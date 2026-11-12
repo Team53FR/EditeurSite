@@ -1797,10 +1797,10 @@ tracés comme des polygones irréguliers (rayon de 78 à 112 %, graine du trait)
 gagnent des anses et des caps au lieu d'une suite de cercles. Le monde aléatoire pose aussi
 quelques îlots et des navires en pleine mer (loin du cadre, des côtes et les uns des autres).
 
-**Décors peints.** Arbres, conifères, palmiers, acacias, arbres morts ou d'automne, pics, collines,
-dunes, rochers, parcelles de champs, blocs de glace, roseaux et herbes sont peints **une seule
+**Décors peints.** Arbres, conifères, palmiers, acacias, arbres morts ou d'automne, pics, rochers,
+parcelles de champs, blocs de glace, roseaux et herbes sont peints **une seule
 fois** dans de petits canvas (`peintArbre`, `peintMontagne`…) : dégradés, ombre au sol, touches de
-lumière, pas de contour de dessin animé. On les colle ensuite par milliers (`colle`), avec cinq
+lumière, pas de contour de dessin animé. Près de la lisière de son terrain, un décor se **fond** : il s'éclaircit et rapetisse (`calculerTuile`, sondes à 3,5 tailles, opacité `alpha`), comme une lisière de forêt. On les colle ensuite par milliers (`colle`), avec cinq
 définitions (64 à 1 024 px) choisies d'après le zoom (`ZPX`). Seules les terres volcaniques restent
 en vectoriel.
 
@@ -1854,7 +1854,7 @@ de rivière (`traceRiviereEau`) sert au creusement, à l'eau douce et au masque.
 **Rien n'est ajouté tout seul.** Les biomes ne posent plus ni chemins, ni cabanes, ni grottes : le
 système de « détails qui apparaissent en zoomant » (`preparerDetails`, `poiCase`, `cheminDe`) a été
 retiré, avec `terrainEn` qui ne servait qu'à lui. Un terrain ne produit que ses décors naturels
-(arbres, pics, dunes…). Tout le reste se pose à la main : les anciens petits lieux sont devenus des
+(arbres, pics, rochers…). Tout le reste se pose à la main : les anciens petits lieux sont devenus des
 **types de lieux** ordinaires (cabane, campement, ferme, menhirs, grotte, vestiges, oasis, pilotis)
 et les chemins se tracent avec l'outil Tracés (sentier).
 
@@ -2034,8 +2034,8 @@ toits vus du dessus, **orientés**, dessinés en vectoriel (`maisonDessus`).
 
 **Maisons : à la main ou le long d'une ligne.** Tracé « Rue bordée de maisons » (`maisons`, une voie
 comme les autres : ponts, accroche) : `maisonsDesRues` range les maisons de part et d'autre du fil de
-la rue (ou d'un seul côté, `cote`), tournées vers elle, pignon sur rue le plus souvent ; taille
-(`maison`) et espacement (`espace`) réglables, et déplacer un point de la rue déplace ses maisons. À
+la rue (ou d'un seul côté, `cote`), tournées vers elle, pignon sur rue le plus souvent ; longueur
+(`maison`, en km : 9 m par défaut, réglable de 4 à 20 m) et espacement (`espace`) réglables, et déplacer un point de la rue déplace ses maisons. Deux maisons ne se recouvrent jamais : le test est exact (rectangles orientés, `maisonsSeChevauchent`). L'échelle graphique affiche les mètres sous le kilomètre. À
 la main : les tampons Maison, Bâtisse et Église, avec une orientation (`a`, en degrés). Les arbres du
 terrain s'écartent des unes comme des autres. Dans les autres styles, ces maisons sont dessinées de
 profil.
