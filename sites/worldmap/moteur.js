@@ -614,7 +614,7 @@
       // v >= 100 : un massif de la lisière (4 : sans cerne propre ; 5 : sa silhouette cernée seule) ou
       // de la bordure intérieure d'une masse (1-2 : fondu dans le fond uni, arcs en tirets).
       var prof = Math.floor(v / 100); v = v % 100;
-      var fondu = prof === 1 || prof === 2, mult = prof === 1 ? 0.45 : prof === 2 ? 0.18 : 1;
+      var fondu = prof === 1 || prof === 2, mult = fondu ? 0 : 1;
       var R = function (i) { return alea(2300 + v + (neige ? 40 : 0), i); };
       var n = 9, pts = [], i;
       for (i = 0; i < n; i++) { var a = i / n * TAU + R(i) * 0.5, r = 30 + R(10 + i) * 14; pts.push([Math.cos(a) * r, Math.sin(a) * r * 0.92]); }
@@ -622,7 +622,7 @@
       var trace = function (dx, dy, k) { g.beginPath(); pts.forEach(function (q, j) { var X = c[0] + (q[0] - c[0]) * (k || 1) + dx, Y = c[1] + (q[1] - c[1]) * (k || 1) + dy; if (j) g.lineTo(X, Y); else g.moveTo(X, Y); }); g.closePath(); };
       if (prof === 0 || prof === 5) { trace(6, 8); g.fillStyle = "rgba(16,30,28,0.3)"; g.fill(); }
       if (prof === 5) { trace(0, 0); g.lineJoin = "round"; g.lineWidth = 6.5; g.fillStyle = g.strokeStyle = "#1c2622"; g.fill(); g.stroke(); return; }
-      trace(0, 0); g.fillStyle = fondu ? melange("#8d8a7c", INTERIEUR_DESSUS[neige ? "cime" : "montagne"], prof === 1 ? 0.6 : 1) : "#8d8a7c"; g.fill();
+      trace(0, 0); g.fillStyle = fondu ? melange("#8d8a7c", INTERIEUR_DESSUS[neige ? "cime" : "montagne"], prof === 1 ? 0.88 : 1) : "#8d8a7c"; g.fill();
       var facettes = function (k, clair, sombre) {
         for (var j = 0; j < n; j++) {
           var p0 = pts[j], p1 = pts[(j + 1) % n], mx = (p0[0] + p1[0]) / 2 - c[0], my = (p0[1] + p1[1]) / 2 - c[1];
@@ -636,8 +636,8 @@
         }
       };
       facettes(1, "rgba(255,252,236,", "rgba(26,22,16,");
-      g.strokeStyle = "rgba(40,34,26," + (fondu ? (prof === 1 ? 0.22 : 0.08) : 0.45) + ")"; g.lineWidth = 1;
-      g.beginPath(); pts.forEach(function (q) { g.moveTo(c[0], c[1]); g.lineTo(q[0], q[1]); }); g.stroke();
+      g.strokeStyle = "rgba(40,34,26,0.45)"; g.lineWidth = 1;
+      if (!fondu) { g.beginPath(); pts.forEach(function (q) { g.moveTo(c[0], c[1]); g.lineTo(q[0], q[1]); }); g.stroke(); }
       g.setLineDash([]);
       if (neige && prof !== 2) {
         g.save(); g.globalAlpha = fondu ? mult : 1; trace(0, 0, 0.55); g.fillStyle = "rgba(248,251,252,0.94)"; g.fill(); g.clip();
