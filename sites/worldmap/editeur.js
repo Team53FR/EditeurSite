@@ -474,7 +474,7 @@
     var base = c.tampons.length;
     var actions = res.objets.map(function (o, i) { o.id = nouvelId("d"); return { t: "ajout", coll: "tampons", obj: o, idx: base + i }; });
     routes.forEach(function (r, i) {
-      actions.push({ t: "ajout", coll: "lignes", obj: { id: nouvelId("l"), type: "route", pts: r.pts, taille: r.taille }, idx: c.lignes.length + i });
+      actions.push({ t: "ajout", coll: "lignes", obj: { id: nouvelId("l"), type: "route", pts: r.pts, taille: r.taille, lisse: false }, idx: c.lignes.length + i });
     });
     var zone = { id: nouvelId("f"), rect: res.rect, dens: 0, bb: res.rect.slice() };
     actions.push({ t: "ajout", coll: "finesses", obj: zone, idx: c.finesses.length });
@@ -486,8 +486,15 @@
   // Assemble les segments de rue en tracés : une route qui se prolonge d'un carrefour à l'autre
   // devient une seule ligne, dont les points se déplacent. Un carrefour à trois branches
   // coupe la chaîne : chaque branche devient alors son propre tracé.
-  function chainerRues(rues) {
-    var cle = function (x, y) { return x + "," + y; }, bouts = {}, pris = rues.map(function () { return false; });
+  function chainerRues(rues0) {
+    var cle = function (x, y) { return x + "," + y; };
+    // Deux îlots voisins posent chacun le même côté : on ne garde qu'un segment par paire de bouts.
+    var vus = {}, rues = rues0.filter(function (r) {
+      var a = cle(r[0], r[1]), b = cle(r[2], r[3]), k = a < b ? a + "|" + b : b + "|" + a;
+      if (a === b || vus[k]) return false;
+      vus[k] = true; return true;
+    });
+    var bouts = {}, pris = rues.map(function () { return false; });
     rues.forEach(function (r, i) {
       [cle(r[0], r[1]), cle(r[2], r[3])].forEach(function (k) { (bouts[k] || (bouts[k] = [])).push(i); });
     });

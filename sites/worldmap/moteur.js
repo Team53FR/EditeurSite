@@ -1996,7 +1996,7 @@
   function styleLigne(l, th) {
     if (l.type === "riviere") return { c: l.couleur || th.riviere, tiret: null, lisse: l.lisse !== false, min: 1.4, halo: false };
     if (l.type === "maisons") return { c: l.couleur || th.voie || "#d2bb86", tiret: null, lisse: true, min: 2, halo: false };
-    if (l.type === "route") return { c: l.couleur || th.voie || "#d6bd84", tiret: null, lisse: true, min: 3, halo: false };
+    if (l.type === "route") return { c: l.couleur || th.voie || "#d6bd84", tiret: null, lisse: l.lisse !== false, min: 3, halo: false };
     if (l.type === "pavee") return { c: l.couleur || "#bdb6a6", tiret: null, lisse: true, min: 2.6, halo: false };
     if (l.type === "sentier") return { c: l.couleur || th.voie || "#c2a56c", tiret: null, lisse: true, min: 2, halo: false };
     if (l.type === "falaise") return { c: l.couleur || "#4a3620", tiret: null, lisse: true, min: 1.2, halo: false };
