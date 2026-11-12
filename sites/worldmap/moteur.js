@@ -1324,6 +1324,16 @@
 
   // Comme distVoie, mais pour tous les tracés qui dégagent la végétation (rivières, murailles et
   // falaises compris) : distance au plus proche, moins sa demi-largeur.
+  // Distance à la rivière la plus proche (moins sa demi-largeur) : un massif ne recouvre pas l'eau.
+  function distRiviere(ctx, x, y) {
+    var best = Infinity;
+    for (var i = 0; i < ctx.rivieres.length; i++) {
+      var v = ctx.rivieres[i], b = v.bb, demi = (v.l.taille || 0) * (v.l.delta ? 0.65 : 0.5);
+      if (best < Infinity && (x < b[0] - best - demi || x > b[2] + best + demi || y < b[1] - best - demi || y > b[3] + best + demi)) continue;
+      for (var q = 0; q + 3 < v.d.length; q += 2) { var d = distSeg(x, y, v.d[q], v.d[q + 1], v.d[q + 2], v.d[q + 3]) - demi; if (d < best) best = d; }
+    }
+    return best;
+  }
   function distTrace(ctx, x, y) {
     var best = Infinity;
     for (var i = 0; i < ctx.traces.length; i++) {
@@ -1451,27 +1461,27 @@
         var grand = ch[2] >= 40;
         // Rien sur un tracé (route, rivière, muraille…) ni contre lui : un couloir reste dégagé,
         // pour qu'on le voie à travers une forêt ; ses bords se comportent comme une lisière.
-        var gaine = (dd.masse === "eboulis" ? 0.3 : dd.masse ? 0.45 : grand ? 0.45 : 0.22) * s;
+        var gaine = (dd.masse === "relief" ? 0 : dd.masse === "eboulis" ? 0.3 : dd.masse ? 0.45 : grand ? 0.45 : 0.22) * s;     // (un massif n'est pas entaillé : le chemin le gravit)
         if (distTrace(ctx, pt.x, pt.y) < gaine) continue;
         if (dd.masse === "relief") {
           // Un massif est une seule forme : l'union de grands disques (contour peint d'abord, côté
           // extérieur seulement, puis remplissage uni), avec quelques sommets isolés au milieu.
-          var fam = FAMILLE_CANOPEE[ch[0]], dedans = fractionDedans(ctx, carte, q, pt, s * 0.3, 8, grand, s * 0.3);
-          if (dedans < 0.75) continue;
+          var fam = FAMILLE_CANOPEE[ch[0]], dedans = fractionDedans(ctx, carte, q, pt, s * 0.3, 8, grand);
+          if (dedans < 0.75 || distRiviere(ctx, pt.x, pt.y) < s * 0.3) continue;
           if (fractionDedans(ctx, carte, q, pt, dd.marge * s, 8, grand) >= 1) tu.entrees.push({ x: pt.x, y: pt.y, s: s, sprite: ch[0], r: pt.r3, cl: 1 });
           // Un massif se lit comme une carte en courbes de niveau : un bord de falaise en gradins
           // (cerne, puis des bandes de plus en plus claires cernées d'un trait fin), un intérieur
           // uni, et quelques îlots en anneaux concentriques. Les disques sont de rayon variable : bord ondulé.
           var sd = s * (0.8 + 0.4 * pt.r3);
-          var niv1 = fractionDedans(ctx, carte, q, pt, s * 0.55, 8, grand, s * 0.3) >= 1, niv2 = niv1 && fractionDedans(ctx, carte, q, pt, s * 0.85, 8, grand, s * 0.3) >= 1;
+          var niv1 = fractionDedans(ctx, carte, q, pt, s * 0.55, 8, grand) >= 1, niv2 = niv1 && fractionDedans(ctx, carte, q, pt, s * 0.85, 8, grand) >= 1;
           tu.entrees.push({ x: pt.x, y: pt.y, s: sd, sprite: "canopee", r: pt.r3, v: fam, prof: 5, rel: 1 });
           tu.entrees.push({ x: pt.x, y: pt.y, s: sd, sprite: "canopee", r: pt.r3, v: fam, prof: 9, rel: 1 });
           // (chaque niveau : d'abord tous les traits, puis tous les remplissages, pour que le trait ne reste qu'au bord de la forme)
           if (niv1) { tu.entrees.push({ x: pt.x, y: pt.y, s: sd, sprite: "canopee", r: pt.r3, v: fam, prof: 12, rel: 1 }); tu.entrees.push({ x: pt.x, y: pt.y, s: sd, sprite: "canopee", r: pt.r3, v: fam, prof: 10, rel: 1 }); }
-          var niv3 = niv2 && fractionDedans(ctx, carte, q, pt, s * 1.5, 8, grand, s * 0.3) >= 1;
+          var niv3 = niv2 && fractionDedans(ctx, carte, q, pt, s * 1.5, 8, grand) >= 1;
           if (niv3) { tu.entrees.push({ x: pt.x, y: pt.y, s: sd, sprite: "canopee", r: pt.r3, v: fam, prof: 14, rel: 1 }); tu.entrees.push({ x: pt.x, y: pt.y, s: sd, sprite: "canopee", r: pt.r3, v: fam, prof: 15, rel: 1 }); }
           if (niv2) { tu.entrees.push({ x: pt.x, y: pt.y, s: sd, sprite: "canopee", r: pt.r3, v: fam, prof: 13, rel: 1 }); tu.entrees.push({ x: pt.x, y: pt.y, s: sd, sprite: "canopee", r: pt.r3, v: fam, prof: 4, rel: 1 }); }
-          if (pt.r2 < 0.04 && fractionDedans(ctx, carte, q, pt, s * 0.9, 8, grand, s * 0.3) >= 1) tu.entrees.push({ x: pt.x, y: pt.y, s: s * 0.9, sprite: "canopee", r: pt.r3, v: fam, prof: 11, rel: 1 });
+          if (pt.r2 < 0.04 && fractionDedans(ctx, carte, q, pt, s * 0.9, 8, grand) >= 1) tu.entrees.push({ x: pt.x, y: pt.y, s: s * 0.9, sprite: "canopee", r: pt.r3, v: fam, prof: 11, rel: 1 });
           continue;
         }
         var relief = dd.masse === "eboulis";
@@ -4417,6 +4427,9 @@
       // Routes et sentiers sont peints DANS la terre, avant les décors : les arbres qui les
       // bordent passent devant, au lieu d'un ruban posé par-dessus la forêt. « source-atop » :
       // jamais sur l'eau — là, c'est le pont qui prend le relais.
+      // Les massifs d'abord : le chemin les gravit (il passe par-dessus), alors que les arbres le bordent.
+      var massifs = decors.filter(function (d) { return d.rel; });
+      if (massifs.length) { decors = decors.filter(function (d) { return !d.rel; }); peindreDecors(lc, massifs); }
       lc.globalCompositeOperation = "source-atop";
       tracerVoies(lc, voiesVisibles(carte, vue, th, X0, Y0, X1, Y1), vue);
       lc.globalCompositeOperation = "source-over";
