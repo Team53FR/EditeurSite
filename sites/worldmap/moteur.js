@@ -2622,19 +2622,29 @@
   // creusé en travers du chemin. Le niveau d'un point se déduit de sa profondeur dans le massif (mêmes
   // seuils que le dessin des gradins) ; le chemin lui-même suit exactement son tracé.
   // Renvoie { d, marches } où chaque marche = [x, y, nx, ny, tx, ty] (point, normale, tangente).
+  var GRADINS = [];                                  // les disques de massif de la vue (voir dessiner)
   function cheminDeMontagne(d, l, carte) {
     var U = l.taille || 0, m = d.length / 2, i;
     if (!(U > 0) || m < 2) return { d: d, marches: [] };
-    var bb = boiteTrait(d, 0), M = U * 60, ctxZ = contexteZone(carte, bb[0] - M, bb[1] - M, bb[2] + M, bb[3] + M);
-    // La taille moyenne d'un sujet de massif (cf. calculerTuile) : elle fixe l'épaisseur des gradins.
-    var dd = DECORS.montagne, k = niveauDecor(zoomBase(carte), dd.C, 0), D = CASE0 / Math.pow(2, k);
-    var s0 = (0.4 * dd.choix[0][2] + 0.6 * dd.choix[1][2]) / dd.C * D * 0.72 * ECH_THEME;
+    if (!GRADINS.length) return { d: d, marches: [] };
+    // Le niveau d'un point = le plus haut gradin dont un DISQUE réellement peint le couvre (les mêmes
+    // disques que le dessin : prof 9, 10, 4, 15 = niveaux 0 à 3), donc les escaliers tombent
+    // exactement sur les bords dessinés.
+    var NIV = { 9: 0, 10: 1, 4: 2, 15: 3 }, disques = [], cell = 1e-9, grille = {};
+    GRADINS.forEach(function (o) {
+      var lv = NIV[profDe(o)]; if (lv == null) return;
+      var R = o.s * 0.3 - 1.2 * o.s / 100, cy = o.y - o.s * 0.31;
+      disques.push([o.x, cy, R, lv]); cell = Math.max(cell, R * 2);
+    });
+    disques.forEach(function (dk) { var c = Math.floor(dk[0] / cell) + "," + Math.floor(dk[1] / cell); (grille[c] || (grille[c] = [])).push(dk); });
+    var s0 = cell / 0.6 * 0.5;
     var niveau = function (x, y) {
-      var q = sonde(ctxZ, carte, x, y);
-      if (q.eau || (q.m.id !== "montagne" && q.m.id !== "cime")) return -1;
-      var pt = { x: x, y: y, r3: 0.37 }, n = 0, R = [0.55, 0.85, 1.5];
-      for (var r = 0; r < 3; r++) { if (fractionDedans(ctxZ, carte, q, pt, s0 * R[r], 8, false) >= 1) n++; else break; }
-      return n;
+      var gx = Math.floor(x / cell), gy = Math.floor(y / cell), best = -1;
+      for (var a = gx - 1; a <= gx + 1; a++) for (var b = gy - 1; b <= gy + 1; b++) {
+        var g = grille[a + "," + b]; if (!g) continue;
+        for (var q = 0; q < g.length; q++) { var dk = g[q]; if (dk[3] > best && Math.hypot(x - dk[0], y - dk[1]) <= dk[2]) best = dk[3]; }
+      }
+      return best;
     };
     var pas = Math.max(U * 0.6, s0 * 0.05), total = 0;
     for (i = 0; i + 1 < m; i++) total += Math.hypot(d[2 * i + 2] - d[2 * i], d[2 * i + 3] - d[2 * i + 1]);
@@ -2960,7 +2970,8 @@
             var p = sousChemin(d, cum, sc, sc), q = sonde(ctxP, carte, p[0], p[1]);
             return !q.eau && (q.m.id === "montagne" || q.m.id === "cime");
           };
-          if (surMassif(Math.max(0, s0 - lw * 4)) || surMassif(Math.min(total, s1 + lw * 4))) {
+          var portee = r.relief === "grotte" ? 15 : 4;
+          if (surMassif(Math.max(0, s0 - lw * portee)) || surMassif(Math.min(total, s1 + lw * portee))) {
             // Sur la roche, la gorge se franchit par un PONT SUSPENDU : des planches, deux câbles tendus
             // d'un poteau à l'autre et des suspentes. On le dessine ici, après la rivière.
             if (r.relief === "grotte") return;                  // une grotte est sous terre : pas de pont
@@ -4568,6 +4579,7 @@
       // jamais sur l'eau — là, c'est le pont qui prend le relais.
       // Les massifs d'abord : le chemin les gravit (il passe par-dessus), alors que les arbres le bordent.
       var massifs = decors.filter(function (d) { return d.rel; });
+      GRADINS = massifs.filter(function (d) { return d.sprite === "canopee"; });
       var toutesVoies = voiesVisibles(carte, vue, th, X0, Y0, X1, Y1);
       var grottes = toutesVoies.filter(function (v) { return v.l.relief === "grotte"; });
       lc.globalCompositeOperation = "source-atop";
