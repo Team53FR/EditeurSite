@@ -2892,6 +2892,15 @@
       fusion.forEach(function (t) {
         var s0 = Math.max(0, t[0] - lw * 0.9), s1 = Math.min(total, t[1] + lw * 0.9);
         if (s1 - s0 < lw) return;
+        // Un chemin qui gravit un massif (rives sur montagne ou cime, vu du dessus) n'a pas de pont : il
+        // ne passe sous la montagne, avec un pont, que s'il est hors du massif.
+        if (th.dessus) {
+          var surMassif = function (sc) {
+            var p = sousChemin(d, cum, sc, sc), q = sonde(ctxP, carte, p[0], p[1]);
+            return !q.eau && (q.m.id === "montagne" || q.m.id === "cime");
+          };
+          if (surMassif(Math.max(0, s0 - lw * 4)) || surMassif(Math.min(total, s1 + lw * 4))) return;
+        }
         pontLe(ctx, sousChemin(d, cum, s0, s1), W, vue, couleurVoie, r.type === "sentier");
       });
     });
