@@ -1467,7 +1467,7 @@
           // Un massif est une seule forme : l'union de grands disques (contour peint d'abord, côté
           // extérieur seulement, puis remplissage uni), avec quelques sommets isolés au milieu.
           var fam = FAMILLE_CANOPEE[ch[0]], dedans = fractionDedans(ctx, carte, q, pt, s * 0.3, 8, grand);
-          if (dedans < 0.75 || distRiviere(ctx, pt.x, pt.y) < s * 0.3) continue;
+          if (dedans < 0.75 || distRiviere(ctx, pt.x, pt.y) < s * 0.05) continue;
           if (fractionDedans(ctx, carte, q, pt, dd.marge * s, 8, grand) >= 1) tu.entrees.push({ x: pt.x, y: pt.y, s: s, sprite: ch[0], r: pt.r3, cl: 1 });
           // Un massif se lit comme une carte en courbes de niveau : un bord de falaise en gradins
           // (cerne, puis des bandes de plus en plus claires cernées d'un trait fin), un intérieur
@@ -2642,7 +2642,7 @@
     for (i = 0; i < pts.length; i++) {
       var p = pts[i], f = lisse[i] * Math.min(1, i / 8, (pts.length - 1 - i) / 8);        // (aux deux bouts, le chemin retrouve son tracé)
       if (f > 0.01) phase += 1 / longueur;
-      var tri = 2 / Math.PI * Math.asin(Math.sin(Math.PI * phase)), off = f * f * 16 * U * tri;      // triangle arrondi : des virages en épingle
+      var tri = 0, off = 0;                                   // (plus de zigzag : le chemin suit exactement le tracé)      // triangle arrondi : des virages en épingle
       var nx = -p[3], ny = p[2], x = p[0] + nx * off, y = p[1] + ny * off;
       out.push(x, y);
       if (f > 0.5 && i % 2 === 0) marches.push([x, y, nx, ny]);
@@ -2899,7 +2899,10 @@
             var p = sousChemin(d, cum, sc, sc), q = sonde(ctxP, carte, p[0], p[1]);
             return !q.eau && (q.m.id === "montagne" || q.m.id === "cime");
           };
-          if (surMassif(Math.max(0, s0 - lw * 4)) || surMassif(Math.min(total, s1 + lw * 4))) return;
+          if (surMassif(Math.max(0, s0 - lw * 4)) || surMassif(Math.min(total, s1 + lw * 4))) {
+            // Pas de pont ni de gué : le chemin traverse simplement la roche (le vallon est resserré).
+            return;
+          }
         }
         pontLe(ctx, sousChemin(d, cum, s0, s1), W, vue, couleurVoie, r.type === "sentier");
       });
