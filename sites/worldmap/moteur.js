@@ -2900,16 +2900,7 @@
             return !q.eau && (q.m.id === "montagne" || q.m.id === "cime");
           };
           if (surMassif(Math.max(0, s0 - lw * 4)) || surMassif(Math.min(total, s1 + lw * 4))) {
-            // Un gué : des pierres plates posées en travers de l'eau, au lieu d'un pont.
-            var nb = Math.max(4, Math.round((s1 - s0) / (lw * 0.9)));
-            for (var g = 0; g <= nb; g++) {
-              var pg = sousChemin(d, cum, s0 + (s1 - s0) * g / nb, s0 + (s1 - s0) * g / nb), jit = ((g * 7919) % 5 - 2) * lw * 0.08;
-              ctx.save(); ctx.translate(pg[0] + jit, pg[1] - jit);
-              ctx.fillStyle = "rgba(20,24,24,0.3)"; ctx.beginPath(); ctx.ellipse(lw * 0.1, lw * 0.14, lw * 0.5, lw * 0.36, 0.4, 0, TAU); ctx.fill();
-              ctx.fillStyle = "#b9b6a6"; ctx.strokeStyle = "#1c2622"; ctx.lineWidth = Math.max(1.2 / vue.zoom, lw * 0.1);
-              ctx.beginPath(); ctx.ellipse(0, 0, lw * 0.75, lw * 0.55, 0.4, 0, TAU); ctx.fill(); ctx.stroke();
-              ctx.restore();
-            }
+            // Pas de pont ni de gué : le chemin traverse simplement la roche (le vallon est resserré).
             return;
           }
         }
