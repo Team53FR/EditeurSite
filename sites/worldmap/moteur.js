@@ -100,6 +100,19 @@
     }
   };
 
+  // Le plan d'un bâtiment, vu du dessus (carte fille d'un bâtiment nommé) : papier clair, sols
+  // peints en aplat, murs épais, meubles dessinés au trait. Aucun effet de côte (halo, vagues…).
+  THEMES.interieur = {
+    nom: "Plan d'intérieur", mer: "#ece6d6", mer2: "#e4ddc9",
+    glow: "rgba(0,0,0,0)", glowPx: 1, glowMin: 1,
+    encre: "#2a2420", hors: "#bdb6a3", halo: "rgba(255,252,240,0.92)", teinte: null,
+    riviere: "#4f93a3", route: "#e6dfc4", texteMer: "#5a5143", lacClair: "#74b3bf", lacFonce: "#3f7f92",
+    grille: "rgba(70,56,40,0.2)", cadre: "#2a2420",
+    lieuxIllustres: true, encreDecors: true, dessus: true, echDecors: 1, sansTexture: true,
+    voie: "#e6dfc4", rive: null, vagues: null, sansDecor: {},
+    couleurs: { parquet: "#c9a26a", dalles: "#bdb8aa", tapis: "#a8473f", terrebattue: "#a98c63", pierre: "#8e8c88", carrelage: "#d6cdb6" }
+  };
+
   // ----- Matériaux : ce qu'on peut peindre -----
   // « terre » colore ; « eau » creuse la terre déjà peinte (mers, lacs, gomme).
   // `groupe` range la palette de l'éditeur ; `decor` renvoie à la table DECORS.
@@ -127,11 +140,18 @@
     { id: "plage",    nom: "Sable",           couleur: "#ecdcab", decor: null,       type: "terre", groupe: "Terres arides" },
     { id: "toundra",  nom: "Toundra",         couleur: "#a9ad8c", decor: "toundra",  type: "terre", groupe: "Eaux et froid" },
     { id: "ville",    nom: "Ville (quartiers)", couleur: "#c4b08a", decor: "ville",  type: "terre", groupe: "Bâti" },
-    { id: "faubourg", nom: "Faubourg",        couleur: "#b3b077", decor: "faubourg", type: "terre", groupe: "Bâti" }
+    { id: "faubourg", nom: "Faubourg",        couleur: "#b3b077", decor: "faubourg", type: "terre", groupe: "Bâti" },
+    // Les sols d'un plan d'intérieur (carte d'un bâtiment) : aplats, sans décor.
+    { id: "parquet",  nom: "Parquet",         couleur: "#c9a26a", decor: null, type: "terre", groupe: "Sols" },
+    { id: "dalles",   nom: "Dalles",          couleur: "#bdb8aa", decor: null, type: "terre", groupe: "Sols" },
+    { id: "carrelage", nom: "Carrelage",      couleur: "#d6cdb6", decor: null, type: "terre", groupe: "Sols" },
+    { id: "terrebattue", nom: "Terre battue", couleur: "#a98c63", decor: null, type: "terre", groupe: "Sols" },
+    { id: "pierre",   nom: "Pierre",          couleur: "#8e8c88", decor: null, type: "terre", groupe: "Sols" },
+    { id: "tapis",    nom: "Tapis",           couleur: "#a8473f", decor: null, type: "terre", groupe: "Sols" }
   ];
   var MAT = {};
   MATERIAUX.forEach(function (m, i) { MAT[m.id] = m; m.code = i + 1; });
-  var GROUPES_MATERIAUX = ["Plaines", "Forêts", "Reliefs", "Terres arides", "Eaux et froid", "Bâti"];
+  var GROUPES_MATERIAUX = ["Plaines", "Forêts", "Reliefs", "Terres arides", "Eaux et froid", "Bâti", "Sols"];
 
   // ----- Décors : peints une fois, semés ensuite -----
   //
@@ -654,6 +674,96 @@
       if (prof === 0) { trace(0, 0); g.strokeStyle = "#1c2622"; g.lineWidth = 2.2; g.stroke(); }
     };
   }
+  // ----- Plan d'intérieur : portes, fenêtres, meubles -----
+  //
+  // Dessinés au trait, vus du dessus, dans la boîte de 100 × 100 des décors (l'objet occupe
+  // environ 80 % de la boîte). `m` (dans TAMPONS) donne la taille réelle de la boîte, en mètres.
+  var TRAIT_INT = "#2a2420";
+  function blocInt(g, x, y, w, h, fill, r) {
+    g.beginPath();
+    if (g.roundRect && r) g.roundRect(x, y, w, h, r); else g.rect(x, y, w, h);
+    g.fillStyle = fill; g.fill(); g.strokeStyle = TRAIT_INT; g.lineWidth = 2.2; g.lineJoin = "round"; g.stroke();
+  }
+  var MEUBLES = {
+    // Une porte : le seuil (qui interrompt le mur), le battant ouvert à 90° et l'arc de son débattement.
+    porte: function (g) {
+      blocInt(g, -25, -12, 50, 24, "#d9c9a0", 0);
+      g.strokeStyle = "rgba(42,36,32,0.55)"; g.lineWidth = 1.4; g.setLineDash([3, 3]);
+      g.beginPath(); g.arc(-25, 0, 48, -Math.PI / 2, 0); g.stroke(); g.setLineDash([]);
+      g.strokeStyle = TRAIT_INT; g.lineWidth = 5; g.lineCap = "butt"; g.beginPath(); g.moveTo(-25, 0); g.lineTo(-25, -48); g.stroke();
+      g.strokeStyle = "#8a6a3e"; g.lineWidth = 2.6; g.beginPath(); g.moveTo(-25, -1); g.lineTo(-25, -47); g.stroke();
+    },
+    // Une fenêtre : un cadre dans l'épaisseur du mur, une vitre claire et sa traverse.
+    fenetre: function (g) {
+      blocInt(g, -32, -12, 64, 24, "#2a2420", 0);
+      g.fillStyle = "#bfe0ec"; g.fillRect(-29, -6, 58, 12);
+      g.strokeStyle = TRAIT_INT; g.lineWidth = 1.6; g.beginPath(); g.moveTo(0, -12); g.lineTo(0, 12); g.stroke();
+    },
+    lit: function (g) {
+      blocInt(g, -22, -38, 44, 76, "#e4d8c2", 4);
+      blocInt(g, -18, -34, 36, 16, "#f6f1e6", 5);
+      blocInt(g, -22, -8, 44, 46, "#a14d4d", 3);
+      g.strokeStyle = "rgba(42,36,32,0.45)"; g.lineWidth = 1.2; g.beginPath(); g.moveTo(-22, 6); g.lineTo(22, 6); g.stroke();
+    },
+    table: function (g, v) {
+      if (v % 2) { g.beginPath(); g.arc(0, 0, 32, 0, TAU); g.fillStyle = "#a47c4c"; g.fill(); g.strokeStyle = TRAIT_INT; g.lineWidth = 2.2; g.stroke(); }
+      else blocInt(g, -40, -24, 80, 48, "#a47c4c", 3);
+      g.strokeStyle = "rgba(42,36,32,0.3)"; g.lineWidth = 1; g.beginPath(); g.moveTo(-26, -8); g.lineTo(26, -8); g.moveTo(-26, 8); g.lineTo(26, 8); g.stroke();
+    },
+    chaise: function (g) {
+      blocInt(g, -17, -17, 34, 34, "#b98b57", 3);
+      g.strokeStyle = TRAIT_INT; g.lineWidth = 5; g.lineCap = "round"; g.beginPath(); g.moveTo(-17, -20); g.lineTo(17, -20); g.stroke();
+    },
+    coffre: function (g) {
+      blocInt(g, -30, -19, 60, 38, "#8a5a32", 3);
+      g.fillStyle = "#6d6a60"; g.fillRect(-20, -19, 6, 38); g.fillRect(14, -19, 6, 38);
+      g.strokeStyle = TRAIT_INT; g.lineWidth = 1.6; g.strokeRect(-20, -19, 6, 38); g.strokeRect(14, -19, 6, 38);
+      g.fillStyle = "#d8b84a"; g.beginPath(); g.arc(0, 0, 3.2, 0, TAU); g.fill();
+    },
+    etagere: function (g) {
+      blocInt(g, -42, -11, 84, 22, "#a98456", 2);
+      g.strokeStyle = "rgba(42,36,32,0.6)"; g.lineWidth = 1.4;
+      for (var i = -2; i <= 2; i++) { g.beginPath(); g.moveTo(i * 14 + 7, -11); g.lineTo(i * 14 + 7, 11); g.stroke(); }
+    },
+    cheminee: function (g) {
+      blocInt(g, -38, -16, 76, 32, "#8e8c88", 2);
+      blocInt(g, -24, -8, 48, 22, "#241a14", 1);
+      g.fillStyle = "#f08a24"; g.beginPath(); g.moveTo(-14, 12); g.quadraticCurveTo(-6, -2, 0, 2); g.quadraticCurveTo(6, -4, 14, 12); g.closePath(); g.fill();
+      g.fillStyle = "#ffd24a"; g.beginPath(); g.moveTo(-6, 12); g.quadraticCurveTo(0, 2, 6, 12); g.closePath(); g.fill();
+    },
+    escalier: function (g) {
+      blocInt(g, -28, -46, 56, 92, "#cfc4aa", 0);
+      g.strokeStyle = "rgba(42,36,32,0.75)"; g.lineWidth = 1.6;
+      for (var i = 1; i < 9; i++) { g.beginPath(); g.moveTo(-28, -46 + i * 10.2); g.lineTo(28, -46 + i * 10.2); g.stroke(); }
+      g.strokeStyle = TRAIT_INT; g.lineWidth = 2.4; g.beginPath(); g.moveTo(0, 34); g.lineTo(0, -34); g.moveTo(-9, -24); g.lineTo(0, -35); g.lineTo(9, -24); g.stroke();
+    },
+    autel: function (g) {
+      blocInt(g, -38, -22, 76, 44, "#bdb8aa", 2);
+      blocInt(g, -30, -14, 60, 28, "#f2ece0", 1);
+      g.fillStyle = "#d8b84a"; g.beginPath(); g.arc(0, 0, 5, 0, TAU); g.fill(); g.strokeStyle = TRAIT_INT; g.lineWidth = 1.4; g.stroke();
+    },
+    banc: function (g) {
+      blocInt(g, -42, -10, 84, 20, "#b98b57", 2);
+      g.strokeStyle = "rgba(42,36,32,0.4)"; g.lineWidth = 1; g.beginPath(); g.moveTo(-42, 0); g.lineTo(42, 0); g.stroke();
+    },
+    bureau: function (g) {
+      blocInt(g, -40, -22, 80, 44, "#9a7248", 2);
+      blocInt(g, -22, -14, 30, 22, "#efe7d2", 1);
+      g.strokeStyle = "rgba(42,36,32,0.5)"; g.lineWidth = 1; for (var i = 0; i < 3; i++) { g.beginPath(); g.moveTo(-18, -9 + i * 6); g.lineTo(4, -9 + i * 6); g.stroke(); }
+      g.fillStyle = "#2a2420"; g.beginPath(); g.arc(24, 2, 3, 0, TAU); g.fill();
+    },
+    tonneau: function (g) {
+      g.beginPath(); g.arc(0, 0, 26, 0, TAU); g.fillStyle = "#a47c4c"; g.fill(); g.strokeStyle = TRAIT_INT; g.lineWidth = 2.2; g.stroke();
+      g.strokeStyle = "rgba(42,36,32,0.55)"; g.lineWidth = 1.6; g.beginPath(); g.arc(0, 0, 18, 0, TAU); g.stroke();
+      g.beginPath(); g.arc(0, 0, 9, 0, TAU); g.stroke();
+    },
+    tapis: function (g) {
+      blocInt(g, -42, -30, 84, 60, "#a8473f", 4);
+      g.strokeStyle = "#e0c070"; g.lineWidth = 2; g.strokeRect(-35, -23, 70, 46);
+      g.strokeStyle = "rgba(224,192,112,0.7)"; g.lineWidth = 1.4; g.beginPath(); g.moveTo(-35, 0); g.lineTo(0, -23); g.lineTo(35, 0); g.lineTo(0, 23); g.closePath(); g.stroke();
+    }
+  };
+
   // Une place : un disque (ou un carré) de terre battue, son pavage en pointillé et, au
   // milieu, une fontaine ou un monument. Posée sous les maisons et les arbres.
   function peintPlace(g, v) {
@@ -791,6 +901,9 @@
         });
       }
     },
+    porte: MEUBLES.porte, fenetre: MEUBLES.fenetre, lit: MEUBLES.lit, table: MEUBLES.table, chaise: MEUBLES.chaise, coffre: MEUBLES.coffre,
+    etagere: MEUBLES.etagere, cheminee: MEUBLES.cheminee, escalier: MEUBLES.escalier, autel: MEUBLES.autel, banc: MEUBLES.banc,
+    bureau: MEUBLES.bureau, tonneau: MEUBLES.tonneau, tapis: MEUBLES.tapis,
     arbre: arbreDessus("arbre"), tropical: arbreDessus("tropical"), conifere: arbreDessus("conifere"),
     automne: arbreDessus("automne"), palmier: arbreDessus("palmier"), acacia: arbreDessus("acacia"), rocher: function (g, v) { rocherDessus(g, v, false); }
   };
@@ -847,6 +960,9 @@
 
   var PEINTRES = {
     canopee: function () {},                       // (rien : le fond uni n'a de sens que vu du dessus)
+    porte: MEUBLES.porte, fenetre: MEUBLES.fenetre, lit: MEUBLES.lit, table: MEUBLES.table, chaise: MEUBLES.chaise, coffre: MEUBLES.coffre,
+    etagere: MEUBLES.etagere, cheminee: MEUBLES.cheminee, escalier: MEUBLES.escalier, autel: MEUBLES.autel, banc: MEUBLES.banc,
+    bureau: MEUBLES.bureau, tonneau: MEUBLES.tonneau, tapis: MEUBLES.tapis,
     arbre: peintArbre, conifere: peintConifere,
     automne: function (g, v) { peintArbre(g, v, "automne"); },
     tropical: function (g, v) { peintArbre(g, v, "jungle"); },
@@ -863,7 +979,7 @@
     clocher: function (g, v) { peintMaisonVille(g, v, "clocher"); },
     place: peintPlace
   };
-  var VARIANTES = { canopee: 7, arbre: 6, conifere: 4, automne: 6, tropical: 6, palmier: 4, acacia: 4, mort: 4, montagne: 6, cime: 6,
+  var VARIANTES = { porte: 1, fenetre: 1, lit: 1, table: 2, chaise: 1, coffre: 1, etagere: 1, cheminee: 1, escalier: 1, autel: 1, banc: 1, bureau: 1, tonneau: 1, tapis: 1, canopee: 7, arbre: 6, conifere: 4, automne: 6, tropical: 6, palmier: 4, acacia: 4, mort: 4, montagne: 6, cime: 6,
     marais: 3, herbe: 3, seche: 3, rocher: 6, basalte: 6, champ: 6, glacon: 4, cratere: 2, aiguilles: 6, maison: 12, batisse: 6, clocher: 4, place: 2 };
 
   // Colle un décor peint : (x, y) est le point où il touche le sol, s la taille de sa boîte.
@@ -936,7 +1052,15 @@
     { id: "cratere", nom: "Volcan", max: 230 }, { id: "aiguilles", nom: "Aiguilles noires", max: 170 },
     { id: "rocher", nom: "Rochers" }, { id: "basalte", nom: "Roche sombre" }, { id: "glacon", nom: "Glace" },
     { id: "champ", nom: "Champ" }, { id: "maison", nom: "Maison" }, { id: "batisse", nom: "Bâtisse" }, { id: "clocher", nom: "Église" }, { id: "place", nom: "Place" }, { id: "marais", nom: "Roseaux" }, { id: "herbe", nom: "Herbes" }, { id: "seche", nom: "Herbes sèches" },
-    { id: "canopee", nom: "Fond de forêt", cache: true }
+    { id: "canopee", nom: "Fond de forêt", cache: true },
+    // Plan d'intérieur (cartes de bâtiments) : `m` = taille réelle de la boîte du dessin, en mètres.
+    { id: "porte", nom: "Porte", int: true, m: 1.8, max: 1e6 }, { id: "fenetre", nom: "Fenêtre", int: true, m: 1.6, max: 1e6 },
+    { id: "lit", nom: "Lit", int: true, m: 2.6, max: 1e6 }, { id: "table", nom: "Table", int: true, m: 2.4, max: 1e6 },
+    { id: "chaise", nom: "Chaise", int: true, m: 1.6, max: 1e6 }, { id: "coffre", nom: "Coffre", int: true, m: 1.6, max: 1e6 },
+    { id: "etagere", nom: "Étagère", int: true, m: 1.8, max: 1e6 }, { id: "cheminee", nom: "Cheminée", int: true, m: 2.2, max: 1e6 },
+    { id: "escalier", nom: "Escalier", int: true, m: 3, max: 1e6 }, { id: "autel", nom: "Autel", int: true, m: 2.2, max: 1e6 },
+    { id: "banc", nom: "Banc", int: true, m: 2.4, max: 1e6 }, { id: "bureau", nom: "Bureau", int: true, m: 2.2, max: 1e6 },
+    { id: "tonneau", nom: "Tonneau", int: true, m: 1.2, max: 1e6 }, { id: "tapis", nom: "Tapis", int: true, m: 3, max: 1e6 }
   ];
 
   var BATIMENTS = { maison: 1, batisse: 1.5, clocher: 1.8 };      // tampons orientables en vue du dessus
@@ -954,6 +1078,7 @@
     maisons:   { nom: "Rue bordée de maisons", px: 2.4 },
     falaise:   { nom: "Falaise",        px: 1.6 },
     muraille:  { nom: "Muraille",       px: 5 },
+    mur:       { nom: "Mur (intérieur)", px: 5 },
     frontiere: { nom: "Frontière",      px: 2.4 },
     maritime:  { nom: "Route maritime", px: 1.6 },
     ponton:    { nom: "Ponton",         px: 4 }
@@ -1864,7 +1989,7 @@
   }
 
   // Peint les décors (semés et tampons), du fond vers l'avant.
-  var FONDS = { place: true, canopee: true };         // décors posés AU SOL : peints avant tout le reste
+  var FONDS = { place: true, canopee: true, tapis: true };         // décors posés AU SOL : peints avant tout le reste
   function peindreDecors(lc, liste) {
     // Trois couches : les silhouettes cernées des lisières de forêt, puis les décors posés au sol
     // (fond de forêt, places), puis tout le reste du fond vers l'avant.
@@ -2007,6 +2132,22 @@
   // Un lac de lave (`lac.lave`) : il ne creuse pas la terre. Un halo de chaleur, une croûte de roche
   // noire sur le pourtour, un cœur incandescent (rouge sombre → orange → jaune), des plaques de
   // croûte flottantes et des fissures lumineuses. Tout est fixé par le lac (graine = son id).
+  // Les murs d'un plan d'intérieur : un trait épais sombre aux angles vifs, avec un cœur un peu plus
+  // clair (le « poché » des plans d'architecte). Un tracé `ferme` se referme sur lui-même.
+  function tracerMurs(lc, carte, vue, X0, Y0, X1, Y1) {
+    (carte.lignes || []).forEach(function (l) {
+      if (l.type !== "mur" || !l.pts || l.pts.length < 4) return;
+      var bb = boiteTrait(l.pts, 0), m = (l.taille || 0) * 2;
+      if (!chevauche([bb[0] - m, bb[1] - m, bb[2] + m, bb[3] + m], X0, Y0, X1, Y1)) return;
+      var lw = Math.max(l.taille || 0, 3 / vue.zoom);
+      lc.save(); lc.lineCap = "square"; lc.lineJoin = "miter"; lc.miterLimit = 4; lc.setLineDash([]);
+      var tracer = function () { cheminLigne(lc, l.pts, false); if (l.ferme && l.pts.length >= 6) lc.closePath(); };
+      tracer(); lc.strokeStyle = l.couleur || "#2a2420"; lc.lineWidth = lw; lc.stroke();
+      if (lw * vue.zoom >= 5) { tracer(); lc.strokeStyle = "#4a4036"; lc.lineWidth = lw * 0.5; lc.stroke(); }
+      lc.restore();
+    });
+  }
+
   function lacsDeLave(lc, carte, vue, X0, Y0, X1, Y1) {
     var u = 1 / vue.zoom;
     (carte.lacs || []).forEach(function (lac) {
@@ -2259,6 +2400,7 @@
     if (l.type === "falaise") return { c: l.couleur || "#4a3620", tiret: null, lisse: true, min: 1.2, halo: false };
     if (l.type === "ponton") return { c: l.couleur || "#a98558", tiret: null, lisse: false, min: 3, halo: false };
     if (l.type === "maritime") return { c: l.couleur || th.texteMer, tiret: [3.2, 3.2], lisse: true, min: 1.3, halo: false };
+    if (l.type === "mur") return { c: l.couleur || "#2a2420", tiret: null, lisse: false, min: 3, halo: false };
     if (l.type === "muraille") return { c: l.couleur || "#c9c2b0", tiret: null, lisse: false, min: 3, halo: false };
     return { c: l.couleur || "#8a2b2b", tiret: [5, 2.2, 1.2, 2.2], lisse: !!l.lisse, min: 1.6, halo: true };
   }
@@ -3139,6 +3281,7 @@
         if (type === "falaise") { tracerFalaise(ctx, l, st, lw, vue); continue; }
         if (type === "ponton") { tracerPonton(ctx, l, st, lw, vue); continue; }
         if (type === "voies") continue;       // peintes dans la terre, sous les arbres (voir dessiner)
+        if (type === "mur") continue;          // peints dans la terre, sous les portes et les meubles (voir tracerMurs)
         var pts = type === "maritime" ? pointsAffiches(l) : l.pts;
         var tracer = function () {
           if (l.ferme && pts.length >= 6) {
@@ -4619,7 +4762,7 @@
     if (!opts.rapide) {
       // 3) Le grain du sol, accroché au monde, puis les décors : ceux du terrain (semés
       //    selon le zoom) et ceux posés à la main (tampons), du fond vers l'avant.
-      textureSol(lc, tx, ty, z, pw, ph);
+      if (!th.sansTexture) textureSol(lc, tx, ty, z, pw, ph);
       var decors = [], visibles = [], mT = 0;
       (carte.tampons || []).forEach(function (tp) {
         if (!PEINTRES[tp.type]) return;
@@ -4662,6 +4805,7 @@
       peindreRues(lc, decors.rues, vue.zoom);
       fissuresLave(lc, carte, vue, masque, X0, Y0, X1, Y1);
       lacsDeLave(lc, carte, vue, X0, Y0, X1, Y1);
+      tracerMurs(lc, carte, vue, X0, Y0, X1, Y1);
       // Routes et sentiers sont peints DANS la terre, avant les décors : les arbres qui les
       // bordent passent devant, au lieu d'un ruban posé par-dessus la forêt. « source-atop » :
       // jamais sur l'eau — là, c'est le pont qui prend le relais.
@@ -4823,7 +4967,28 @@
     // Textes et icônes, en pixels écran : nets à toute échelle.
     dessinerEtiquettes(ctx, carte, vue, th, tx, ty, z, pw, ph, dpr);
     dessinerLieux(ctx, carte, vue, th, tx, ty, z, pw, ph, dpr);
+    dessinerNomsBatiments(ctx, carte, vue, th, tx, ty, z, dpr);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
+  }
+
+  // Le nom d'un bâtiment posé à la main (`tampon.nom`), écrit sous son toit, en pixels écran. Un
+  // bâtiment sans nom n'a pas d'étiquette ; un bâtiment nommé peut s'ouvrir sur son plan d'intérieur.
+  function dessinerNomsBatiments(ctx, carte, vue, th, tx, ty, z, dpr) {
+    var liste = (carte.tampons || []).filter(function (t) { return t.nom && BATIMENTS[t.type]; });
+    if (!liste.length) return;
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.lineJoin = "round";
+    liste.forEach(function (tp) {
+      var s = tailleTampon(tp, vue.zoom), px = s * z;
+      if (px < 26 * dpr) return;
+      var kb = BATIMENTS[tp.type], cx = tx + tp.x * z, cy = ty + (tp.y - tp.s * 0.3) * z;
+      var fs = Math.max(11, Math.min(17, px * 0.15 / dpr)) * dpr, oy = cy + Math.max(s * 0.4 * kb, s * 0.62 * kb) * 0.5 * z + 3 * dpr;
+      ctx.font = "600 " + fs + "px " + POLICE;
+      ctx.lineWidth = fs * 0.3; ctx.strokeStyle = th.halo; ctx.strokeText(tp.nom, cx, oy);
+      ctx.fillStyle = th.encre; ctx.fillText(tp.nom, cx, oy);
+    });
+    ctx.restore();
   }
 
   // La carte entière dans un canvas de `largeurPx` de large. Elle est dessinée comme sur un
