@@ -1425,6 +1425,9 @@
   // Les maisons vont dans `liste` (triées et peintes avec les autres décors) ; les rues dans
   // `liste.rues`, peintes dans la terre avant les décors. Une route tracée par l'auteur
   // reste prioritaire : les maisons s'en écartent.
+  // Les carrefours d'une ville sont moins déplacés que ceux des champs : des rues qui se
+  // rejoignent sous un angle très aigu feraient deux routes presque confondues.
+  var VILLE_GIGUE = 0.4;
   function semerVille(carte, zb, zoom, k, X0, Y0, X1, Y1, liste) {
     var debut = liste.length;
     // Un îlot fait huit cases de côté : quatre maisons le long de chaque rue.
@@ -1448,7 +1451,7 @@
     };
     for (var cj = j0; cj <= j1; cj++) {
       for (var ci = i0; ci <= i1; ci++) {
-        var c = [coinChamp(kb, ci, cj, kb, 1), coinChamp(kb, ci + 1, cj, kb, 1), coinChamp(kb, ci + 1, cj + 1, kb, 1), coinChamp(kb, ci, cj + 1, kb, 1)];
+        var c = [coinChamp(kb, ci, cj, kb, VILLE_GIGUE), coinChamp(kb, ci + 1, cj, kb, VILLE_GIGUE), coinChamp(kb, ci + 1, cj + 1, kb, VILLE_GIGUE), coinChamp(kb, ci, cj + 1, kb, VILLE_GIGUE)];
         var cx = (c[0][0] + c[1][0] + c[2][0] + c[3][0]) / 4, cy = (c[0][1] + c[1][1] + c[2][1] + c[3][1]) / 4;
         var ici = enVille(cx, cy);
         var h = (ci * 73856093) ^ (cj * 19349663), g = kb * 41 + 3;
