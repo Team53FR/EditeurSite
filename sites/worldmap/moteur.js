@@ -614,7 +614,8 @@
       // v >= 100 : un massif de la lisière (4 : sans cerne propre ; 5 : sa silhouette cernée seule) ou
       // de la bordure intérieure d'une masse (1-2 : fondu dans le fond uni, arcs en tirets).
       var prof = Math.floor(v / 100); v = v % 100;
-      var fondu = prof === 1 || prof === 2, mult = fondu ? 0 : 1;
+      var fondu = prof === 1 || prof === 2 || prof >= 6, mult = fondu ? 0 : 1;
+      var tier = { 1: 0, 2: 1, 6: 2, 7: 3, 8: 4 }[prof];
       var R = function (i) { return alea(2300 + v + (neige ? 40 : 0), i); };
       var n = 9, pts = [], i;
       for (i = 0; i < n; i++) { var a = i / n * TAU + R(i) * 0.5, r = 30 + R(10 + i) * 14; pts.push([Math.cos(a) * r, Math.sin(a) * r * 0.92]); }
@@ -622,7 +623,7 @@
       var trace = function (dx, dy, k) { g.beginPath(); pts.forEach(function (q, j) { var X = c[0] + (q[0] - c[0]) * (k || 1) + dx, Y = c[1] + (q[1] - c[1]) * (k || 1) + dy; if (j) g.lineTo(X, Y); else g.moveTo(X, Y); }); g.closePath(); };
       if (prof === 0 || prof === 5) { trace(6, 8); g.fillStyle = "rgba(16,30,28,0.3)"; g.fill(); }
       if (prof === 5) { trace(0, 0); g.lineJoin = "round"; g.lineWidth = 6.5; g.fillStyle = g.strokeStyle = "#1c2622"; g.fill(); g.stroke(); return; }
-      trace(0, 0); g.fillStyle = fondu ? melange("#8d8a7c", INTERIEUR_DESSUS[neige ? "cime" : "montagne"], prof === 1 ? 0.88 : 1) : "#8d8a7c"; g.fill();
+      trace(0, 0); g.fillStyle = fondu ? melange(neige ? "#b8bec2" : "#a9a698", INTERIEUR_DESSUS[neige ? "cime" : "montagne"], [0.18, 0.4, 0.62, 0.82, 1][tier]) : "#8d8a7c"; g.fill();
       var facettes = function (k, clair, sombre) {
         for (var j = 0; j < n; j++) {
           var p0 = pts[j], p1 = pts[(j + 1) % n], mx = (p0[0] + p1[0]) / 2 - c[0], my = (p0[1] + p1[1]) / 2 - c[1];
@@ -1428,7 +1429,7 @@
         // entrées de la masse (`rel`) ne servent que vu du dessus.
         var rel = relief ? 1 : 0;
         if (relief && fractionDedans(ctx, carte, q, pt, dd.marge * s, 8, grand) >= 1) tu.entrees.push({ x: pt.x, y: pt.y, s: s, sprite: ch[0], r: pt.r3, cl: 1 });
-        var ray = dd.masse === "relief" ? [0.6, 0.85, 1.15] : dd.masse === "eboulis" ? (ch[2] >= 60 ? [1, 1.4, 1.8] : [2.6, 3.6, 4.6]) : [1.4, 2, 2.6];            // rayons (en tailles du décor) : lisière, puis deux paliers de fondu
+        var ray = dd.masse === "relief" ? [0.55, 0.7, 0.85] : dd.masse === "eboulis" ? (ch[2] >= 60 ? [1, 1.4, 1.8] : [2.6, 3.6, 4.6]) : [1.4, 2, 2.6];            // rayons (en tailles du décor) : lisière, puis deux paliers de fondu
         var f = fractionDedans(ctx, carte, q, pt, Math.max(dd.marge * s, s * ray[0]), 8, grand, gaine);
         if (f < 0.25) continue;                                         // sur le bord même : rien
         // (les éboulis — rochers, glace — n'ont pas de disque de fond : leur fond uni est le sol du terrain)
@@ -1436,7 +1437,12 @@
         // Les sujets sont pleins sur le bord extérieur ; vers l'intérieur ils perdent cerne et ombre,
         // se rapprochent de la couleur du fond et se réduisent à des arcs en tirets.
         var prof = 0;                                                    // 0 : lisière ; 1, 2 : de plus en plus fondu ; 3 : le cœur
-        if (f >= 1) prof = fractionDedans(ctx, carte, q, pt, s * ray[1], 8, grand, gaine) < 1 ? 1 : fractionDedans(ctx, carte, q, pt, s * ray[2], 8, grand, gaine) < 1 ? 2 : 3;
+        if (f >= 1 && dd.masse === "relief") {
+          // Un massif : cinq paliers plats, de plus en plus proches du fond (prof 1, 2, 6, 7, 8 = du plus clair au fond lui-même).
+          var rr = [0.7, 0.9, 1.1, 1.35, 1.6], pal = [1, 2, 6, 7, 8], dp = 9;
+          for (var z = 0; z < rr.length; z++) if (fractionDedans(ctx, carte, q, pt, s * rr[z], 8, grand, gaine) < 1) { dp = z; break; }
+          prof = dp === 9 ? 3 : pal[dp];
+        } else if (f >= 1) prof = fractionDedans(ctx, carte, q, pt, s * ray[1], 8, grand, gaine) < 1 ? 1 : fractionDedans(ctx, carte, q, pt, s * ray[2], 8, grand, gaine) < 1 ? 2 : 3;
         if (prof === 3) {
           // Au cœur d'une forêt : fond uni, et de rares arcs en tirets. Un éboulis garde tous ses rochers (atténués).
           if (dd.masse === "eboulis" || pt.r2 < 0.05) prof = 2; else continue;
@@ -1778,8 +1784,11 @@
   function peindreDecors(lc, liste) {
     // Trois couches : les silhouettes cernées des lisières de forêt, puis les décors posés au sol
     // (fond de forêt, places), puis tout le reste du fond vers l'avant.
-    var couche = function (o) { return profDe(o) === 5 ? 0 : FONDS[o.sprite] ? 1 : 2; };
-    liste.sort(function (a, b) { return couche(a) - couche(b) || a.y - b.y; });
+    var PAL = { 1: 1, 2: 2, 6: 3, 7: 4, 8: 5 };
+    var massif = function (o) { return (o.sprite === "montagne" || o.sprite === "cime") && PAL[profDe(o)]; };
+    var couche = function (o) { return profDe(o) === 5 && !massif(o) ? 0 : FONDS[o.sprite] ? 1 : massif(o) ? 2 : 3; };
+    // Les paliers d'un massif se peignent du plus clair au plus profond : chacun recouvre le précédent (dégradé sans coupure).
+    liste.sort(function (a, b) { return couche(a) - couche(b) || (massif(a) ? PAL[profDe(a)] - PAL[profDe(b)] : 0) || a.y - b.y; });
     for (var i = 0; i < liste.length; i++) {
       var o = liste[i];
       if (o.maison) { maisonDessus(lc, o.x, o.y, o.maison.w, o.maison.h, o.maison.a, o.maison.v); continue; }
