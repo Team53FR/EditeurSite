@@ -2681,10 +2681,25 @@
   // Les petites ruptures du terrain (un lac, un trou entre deux gradins) ne coupent pas le pointillé.
   function entreesGrottes(ctx, grottes, carte, vue) {
     var u = 1 / vue.zoom;
+    if (!GRADINS.length) return;
     grottes.forEach(function (v) {
-      var d = pointsAffiches(v.l), m = d.length / 2, U = v.lw, bb = boiteTrait(d, 0), M = U * 20;
-      var cz = contexteZone(carte, bb[0] - M, bb[1] - M, bb[2] + M, bb[3] + M);
-      var enMont = function (x, y) { var q = sonde(cz, carte, x, y); return !q.eau && (q.m.id === "montagne" || q.m.id === "cime"); };
+      var d = pointsAffiches(v.l), m = d.length / 2, U = v.lw;
+      // « Sous la montagne » = sous la silhouette RÉELLEMENT peinte du massif (disques de bord, cerne compris) :
+      // les entrées tombent donc exactement sur son contour extérieur.
+      var cercles = [], cell = 1e-9, grille = {};
+      GRADINS.forEach(function (o) {
+        var pr = profDe(o); if (pr !== 5 && pr !== 9 && pr !== 10 && pr !== 4 && pr !== 15) return;
+        var R = o.s * 0.3 + (pr === 5 ? 0.04 * o.s : 0); cercles.push([o.x, o.y - o.s * 0.31, R]); cell = Math.max(cell, R * 2);
+      });
+      cercles.forEach(function (c) { var k = Math.floor(c[0] / cell) + "," + Math.floor(c[1] / cell); (grille[k] || (grille[k] = [])).push(c); });
+      var enMont = function (x, y) {
+        var gx = Math.floor(x / cell), gy = Math.floor(y / cell);
+        for (var a = gx - 1; a <= gx + 1; a++) for (var b = gy - 1; b <= gy + 1; b++) {
+          var g = grille[a + "," + b]; if (!g) continue;
+          for (var q = 0; q < g.length; q++) if (Math.hypot(x - g[q][0], y - g[q][1]) <= g[q][2]) return true;
+        }
+        return false;
+      };
       var pas = Math.max(U * 0.6, 1.2 * u), pts = [], i;
       for (i = 0; i + 1 < m; i++) {
         var ax = d[2 * i], ay = d[2 * i + 1], bx = d[2 * i + 2], by = d[2 * i + 3], L = Math.hypot(bx - ax, by - ay);
