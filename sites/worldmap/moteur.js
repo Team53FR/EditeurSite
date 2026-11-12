@@ -2617,38 +2617,47 @@
   // là où un embranchement rejoint une route, les deux chaussées se fondent en une seule
   // au lieu que le bord sombre de l'une passe en travers de l'autre.
   // `voies` : [{ l, st, lw }].
-  // Un chemin en montagne : au lieu de monter en ligne droite il fait des LACETS (un zigzag qui
-  // s'amplifie avec l'altitude), et des MARCHES (petits traits en travers) le long de la pente.
-  // Tout est fixé par le tracé et son épaisseur (`taille`), pas par le zoom. Renvoie { d, marches }.
+  // Un chemin en montagne : là où il passe d'un gradin du massif à un autre (un changement de
+  // niveau, tel que le dessinent les courbes de niveau), la roche est TAILLÉE : un petit escalier
+  // creusé en travers du chemin. Le niveau d'un point se déduit de sa profondeur dans le massif (mêmes
+  // seuils que le dessin des gradins) ; le chemin lui-même suit exactement son tracé.
+  // Renvoie { d, marches } où chaque marche = [x, y, nx, ny, tx, ty] (point, normale, tangente).
   function cheminDeMontagne(d, l, carte) {
     var U = l.taille || 0, m = d.length / 2, i;
     if (!(U > 0) || m < 2) return { d: d, marches: [] };
     var bb = boiteTrait(d, 0), M = U * 60, ctxZ = contexteZone(carte, bb[0] - M, bb[1] - M, bb[2] + M, bb[3] + M);
-    var enMont = function (x, y) { if (distRiviere(ctxZ, x, y) < U * 12) return 0;       // près d'une rivière, le chemin retrouve son pont
-      var q = sonde(ctxZ, carte, x, y); return !q.eau && (q.m.id === "montagne" || q.m.id === "cime") ? 1 : 0; };
-    // Un échantillonnage régulier le long du chemin.
-    var pas = U * 1.5, pts = [], cum = 0, k = 0;
+    // La taille moyenne d'un sujet de massif (cf. calculerTuile) : elle fixe l'épaisseur des gradins.
+    var dd = DECORS.montagne, k = niveauDecor(zoomBase(carte), dd.C, 0), D = CASE0 / Math.pow(2, k);
+    var s0 = (0.4 * dd.choix[0][2] + 0.6 * dd.choix[1][2]) / dd.C * D * 0.72 * ECH_THEME;
+    var niveau = function (x, y) {
+      var q = sonde(ctxZ, carte, x, y);
+      if (q.eau || (q.m.id !== "montagne" && q.m.id !== "cime")) return -1;
+      var pt = { x: x, y: y, r3: 0.37 }, n = 0, R = [0.55, 0.85, 1.5];
+      for (var r = 0; r < 3; r++) { if (fractionDedans(ctxZ, carte, q, pt, s0 * R[r], 8, false) >= 1) n++; else break; }
+      return n;
+    };
+    var pas = Math.max(U * 0.6, s0 * 0.05), total = 0;
+    for (i = 0; i + 1 < m; i++) total += Math.hypot(d[2 * i + 2] - d[2 * i], d[2 * i + 3] - d[2 * i + 1]);
+    pas = Math.max(pas, total / 1500);                                  // (au plus 1500 échantillons)
+    var pts = [];
     for (i = 0; i + 1 < m; i++) {
       var ax = d[2 * i], ay = d[2 * i + 1], bx = d[2 * i + 2], by = d[2 * i + 3], L = Math.hypot(bx - ax, by - ay);
-      if (!L) continue;
-      for (var t = (k === 0 ? 0 : pas - (cum % pas)); t < L; t += pas) pts.push([ax + (bx - ax) * t / L, ay + (by - ay) * t / L, (bx - ax) / L, (by - ay) / L]);
-      cum += L; k++;
+      for (var t = 0; t < L; t += pas) pts.push([ax + (bx - ax) * t / L, ay + (by - ay) * t / L, (bx - ax) / (L || 1), (by - ay) / (L || 1)]);
     }
-    pts.push([d[2 * m - 2], d[2 * m - 1], pts.length ? pts[pts.length - 1][2] : 1, pts.length ? pts[pts.length - 1][3] : 0]);
-    if (pts.length < 6 || !pts.some(function (p) { return enMont(p[0], p[1]); })) return { d: d, marches: [] };
-    var mont = pts.map(function (p) { return enMont(p[0], p[1]); }), lisse = mont.map(function (_, j) {
-      var a = 0, n = 0; for (var w = -6; w <= 6; w++) { var q = mont[j + w]; if (q != null) { a += q; n++; } } return a / n;
-    });
-    var out = [], marches = [], phase = 0, longueur = 34 * U / pas;       // une demi-oscillation = 34 épaisseurs de chemin
-    for (i = 0; i < pts.length; i++) {
-      var p = pts[i], f = lisse[i] * Math.min(1, i / 8, (pts.length - 1 - i) / 8);        // (aux deux bouts, le chemin retrouve son tracé)
-      if (f > 0.01) phase += 1 / longueur;
-      var tri = 0, off = 0;                                   // (plus de zigzag : le chemin suit exactement le tracé)      // triangle arrondi : des virages en épingle
-      var nx = -p[3], ny = p[2], x = p[0] + nx * off, y = p[1] + ny * off;
-      out.push(x, y);
-      if (f > 0.5 && i % 2 === 0) marches.push([x, y, nx, ny]);
+    if (pts.length < 6) return { d: d, marches: [] };
+    var niv = pts.map(function (p) { return niveau(p[0], p[1]); });
+    if (!niv.some(function (v) { return v >= 0; })) return { d: d, marches: [] };
+    // Médiane glissante (le bruit des sondes ne crée pas de fausses marches), puis chaque changement de niveau.
+    var lis = niv.map(function (_, j) {
+      var f = []; for (var w = -3; w <= 3; w++) if (niv[j + w] != null) f.push(niv[j + w]);
+      return f.sort(function (a, b) { return a - b; })[f.length >> 1];
+    }), marches = [], dernier = -99;
+    for (i = 1; i < pts.length; i++) {
+      if (lis[i] >= 0 && lis[i - 1] >= 0 && lis[i] !== lis[i - 1] && i - dernier > 6) {
+        var p = pts[i]; marches.push([p[0], p[1], -p[3], p[2], p[2], p[3]]); dernier = i;
+      }
     }
-    return { d: out, marches: marches };
+    return { d: d, marches: marches };
   }
 
   // Une grotte : sous le massif, le chemin est un POINTILLÉ régulier (la convention des plans pour
@@ -2732,17 +2741,23 @@
     // 3) Le milieu, usé et plus clair.
     passe(toutes, function (v) { return v.pavee ? "rgba(255,255,250,0.2)" : "rgba(255,244,208,0.34)"; }, function (v) { return v.lw * (v.sentier ? 0.42 : 0.52); });
     // 4) Les détails, quand la voie est assez large à l'écran pour qu'on les lise.
-    //    En montagne : des marches (petits traits en travers), qui marquent la montée.
-    ctx.lineCap = "round";
+    //    En montagne : un escalier taillé dans la roche à chaque changement de gradin.
+    ctx.lineCap = "butt";
     voies.forEach(function (v) {
       if (!v.marches || !v.marches.length) return;
-      var h = v.lw * 0.5;
-      ctx.strokeStyle = "rgba(60,40,18,0.75)"; ctx.lineWidth = Math.max(1.1 * u, v.lw * 0.2);
-      ctx.beginPath();
-      v.marches.forEach(function (q) { ctx.moveTo(q[0] - q[2] * h, q[1] - q[3] * h); ctx.lineTo(q[0] + q[2] * h, q[1] + q[3] * h); });
-      ctx.stroke();
+      var W = Math.max(v.lw * 1.05, 3 * u), pas = Math.max(v.lw * 0.9, 1.6 * u);
+      v.marches.forEach(function (q) {
+        for (var n = -2; n <= 2; n++) {
+          var cx = q[0] + q[4] * n * pas, cy = q[1] + q[5] * n * pas;
+          ctx.strokeStyle = "rgba(255,244,208,0.5)"; ctx.lineWidth = Math.max(0.8 * u, pas * 0.34);       // le dessus de la marche
+          ctx.beginPath(); ctx.moveTo(cx - q[2] * W, cy - q[3] * W); ctx.lineTo(cx + q[2] * W, cy + q[3] * W); ctx.stroke();
+          ctx.strokeStyle = "rgba(40,26,12,0.9)"; ctx.lineWidth = Math.max(0.7 * u, pas * 0.2);            // sa contremarche
+          ctx.beginPath(); ctx.moveTo(cx - q[2] * W + q[4] * pas * 0.4, cy - q[3] * W + q[5] * pas * 0.4); ctx.lineTo(cx + q[2] * W + q[4] * pas * 0.4, cy + q[3] * W + q[5] * pas * 0.4); ctx.stroke();
+        }
+        ctx.strokeStyle = "rgba(24,18,10,0.85)"; ctx.lineWidth = Math.max(1 * u, pas * 0.25);               // les parois taillées, de chaque côté
+        [-1, 1].forEach(function (c) { ctx.beginPath(); ctx.moveTo(q[0] + q[2] * W * c - q[4] * pas * 2.4, q[1] + q[3] * W * c - q[5] * pas * 2.4); ctx.lineTo(q[0] + q[2] * W * c + q[4] * pas * 2.4, q[1] + q[3] * W * c + q[5] * pas * 2.4); ctx.stroke(); });
+      });
     });
-    ctx.lineCap = "butt";
     //    Pavés : des joints en travers.
     passe(function (v) { return v.pavee && v.lw * vue.zoom >= 4; }, "rgba(60,54,46,0.42)", function (v) { return v.lw * 0.86; },
       function (v) { return [Math.max(0.5 * u, v.lw * 0.07), v.lw * 0.5]; });
@@ -2948,6 +2963,7 @@
           if (surMassif(Math.max(0, s0 - lw * 4)) || surMassif(Math.min(total, s1 + lw * 4))) {
             // Sur la roche, la gorge se franchit par un PONT SUSPENDU : des planches, deux câbles tendus
             // d'un poteau à l'autre et des suspentes. On le dessine ici, après la rivière.
+            if (r.relief === "grotte") return;                  // une grotte est sous terre : pas de pont
             var uu = 1 / vue.zoom, e0 = Math.max(0, s0 - lw * 3), e1 = Math.min(total, s1 + lw * 3);
             var tr = sousChemin(d, cum, e0, e1), Wp = Math.max(lw * 1.9, 5.5 * uu);
             var trace = function (pts) { ctx.beginPath(); ctx.moveTo(pts[0], pts[1]); for (var kk = 2; kk < pts.length; kk += 2) ctx.lineTo(pts[kk], pts[kk + 1]); };
