@@ -27,7 +27,7 @@
     tampon: "arbre",         // outil Décors : le décor posé à la main
     taillePxTampon: 36,
     angleTampon: "alea",     // outil Décors : orientation d'une maison posée (degrés, ou au hasard)
-    maisonM: 9,              // tracé « rue bordée de maisons » : longueur réelle d'une maison, en mètres
+    maisonM: 18,              // tracé « rue bordée de maisons » : longueur réelle d'une maison, en mètres
     coteMaisons: "deux",     // … de quel côté de la rue
     variation: 0.3,          // outil Décors : écart de taille d'un décor à l'autre
     typeLigne: "riviere",
@@ -463,20 +463,65 @@
   // Les décors des terrains (arbres, pics…) se placent d'eux-mêmes : pratique pour un continent,
   // moins pour régler un détail. « Figer » transforme ceux de la vue en décors posés, que l'on
   // peut chacun déplacer, tourner, agrandir ou supprimer ; la zone est retirée de la
-  // génération automatique pour qu'ils ne s'affichent pas en double.
+  // génération automatique pour qu'ils ne s'affichent pas en double. Les rues d'une ville
+  // deviennent des tracés de route, dont on déplace les points.
   function figerVue() {
     var c = E.carte;
     var res = Moteur.figerDecors(c, { cx: E.vue.cx, cy: E.vue.cy, zoom: E.vue.zoom, largeur: W, hauteur: H, dpr: 1 }, c.tampons);
-    var n = res.objets.length;
-    if (!n) { etat("Aucun décor automatique dans cette vue."); return; }
+    var n = res.objets.length, routes = chainerRues(res.rues || []);
+    if (!n && !routes.length) { etat("Aucun décor automatique dans cette vue."); return; }
     if (n > 6000) { etat(nb(n) + " décors dans cette vue : zoomez davantage pour en figer moins à la fois."); return; }
     var base = c.tampons.length;
     var actions = res.objets.map(function (o, i) { o.id = nouvelId("d"); return { t: "ajout", coll: "tampons", obj: o, idx: base + i }; });
+    routes.forEach(function (r, i) {
+      actions.push({ t: "ajout", coll: "lignes", obj: { id: nouvelId("l"), type: "route", pts: r.pts, taille: r.taille, lisse: false }, idx: c.lignes.length + i });
+    });
     var zone = { id: nouvelId("f"), rect: res.rect, dens: 0, bb: res.rect.slice() };
     actions.push({ t: "ajout", coll: "finesses", obj: zone, idx: c.finesses.length });
     executer({ t: "lot", actions: actions });
-    etat(nb(n) + " décors convertis en objets modifiables.");
+    etat(nb(n) + " décors et " + routes.length + " route(s) convertis en objets modifiables.");
     panneauOutil();
+  }
+
+  // Assemble les segments de rue en tracés : une route qui se prolonge d'un carrefour à l'autre
+  // devient une seule ligne, dont les points se déplacent. Un carrefour à trois branches
+  // coupe la chaîne : chaque branche devient alors son propre tracé.
+  function chainerRues(rues0) {
+    var cle = function (x, y) { return x + "," + y; };
+    // Deux îlots voisins posent chacun le même côté : on ne garde qu'un segment par paire de bouts.
+    var vus = {}, rues = rues0.filter(function (r) {
+      var a = cle(r[0], r[1]), b = cle(r[2], r[3]), k = a < b ? a + "|" + b : b + "|" + a;
+      if (a === b || vus[k]) return false;
+      vus[k] = true; return true;
+    });
+    var bouts = {}, pris = rues.map(function () { return false; });
+    rues.forEach(function (r, i) {
+      [cle(r[0], r[1]), cle(r[2], r[3])].forEach(function (k) { (bouts[k] || (bouts[k] = [])).push(i); });
+    });
+    // Le prochain segment libre au bout `k`, s'il est seul à s'y poser.
+    var suite = function (x, y) {
+      var libres = (bouts[cle(x, y)] || []).filter(function (i) { return !pris[i]; });
+      return libres.length === 1 ? libres[0] : -1;
+    };
+    var sorties = [];
+    rues.forEach(function (r0, i0) {
+      if (pris[i0]) return;
+      pris[i0] = true;
+      var pts = [r0[0], r0[1], r0[2], r0[3]], j;
+      // Vers la fin, puis vers le début.
+      for (j = suite(pts[pts.length - 2], pts[pts.length - 1]); j >= 0; j = suite(pts[pts.length - 2], pts[pts.length - 1])) {
+        pris[j] = true;
+        var rj = rues[j];
+        if (cle(rj[0], rj[1]) === cle(pts[pts.length - 2], pts[pts.length - 1])) pts.push(rj[2], rj[3]); else pts.push(rj[0], rj[1]);
+      }
+      for (j = suite(pts[0], pts[1]); j >= 0; j = suite(pts[0], pts[1])) {
+        pris[j] = true;
+        var rj2 = rues[j];
+        if (cle(rj2[0], rj2[1]) === cle(pts[0], pts[1])) pts.unshift(rj2[2], rj2[3]); else pts.unshift(rj2[0], rj2[1]);
+      }
+      sorties.push({ pts: pts, taille: r0[4] });
+    });
+    return sorties;
   }
 
   // Le repère d'un objet sélectionné. `groupe` : dans une sélection multiple, un tracé ou un
@@ -1772,6 +1817,7 @@
     if (E.outil === "tampon") {
       var palT = el("div", { classe: "palette palette-3" });
       Moteur.TAMPONS.forEach(function (t) {
+        if (t.cache) return;                                // (le fond de forêt n'est pas un décor à poser)
         var cv = el("canvas", { width: "88", height: "88" });
         cv.style.width = cv.style.height = "44px";
         var c2 = cv.getContext("2d");
@@ -1821,7 +1867,7 @@
         maritime: "Un pointillé pour les routes des navires."
       };
       if (E.typeLigne === "maisons") {
-        zone.appendChild(champCurseur("Longueur d'une maison", 4, 20, 1, E.maisonM, function (v) { return Math.round(v) + " m"; }, function (v) { E.maisonM = v; }));
+        zone.appendChild(champCurseur("Longueur d'une maison", 4, 40, 1, E.maisonM, function (v) { return Math.round(v) + " m"; }, function (v) { E.maisonM = v; }));
         zone.appendChild(champSegments("Maisons", [["deux", "Des deux côtés"], ["gauche", "À gauche"], ["droite", "À droite"]], E.coteMaisons, function (v) { E.coteMaisons = v; }));
         zone.appendChild(el("p", { classe: "aide", texte: "Tracez la rue : les maisons se rangent le long, tournées vers elle. Déplacez ensuite un point de la rue, les maisons suivent. Pour une maison isolée, utilisez l'outil Décors." }));
       }
@@ -2006,7 +2052,7 @@
         zone.appendChild(champCase("S'élargit vers l'embouchure", o.delta, function (v) { editer(function (x) { x.delta = v; }); }));
       }
       if (o.type === "maisons") {
-        zone.appendChild(champCurseur("Longueur d'une maison", 4, 20, 1, borne(Math.round((o.maison || 0.009) * 1000), 4, 20), function (v) { return Math.round(v) + " m"; },
+        zone.appendChild(champCurseur("Longueur d'une maison", 4, 40, 1, borne(Math.round((o.maison || 0.018) * 1000), 4, 40), function (v) { return Math.round(v) + " m"; },
           function (v) { editer(function (x) { x.maison = v / 1000; }); }));
         zone.appendChild(champCurseur("Espacement", 0.8, 3, 0.05, o.espace || 1, function (v) { return "×" + nb(v, 2); },
           function (v) { editer(function (x) { x.espace = v; }); }));

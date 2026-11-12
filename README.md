@@ -1800,7 +1800,7 @@ quelques îlots et des navires en pleine mer (loin du cadre, des côtes et les u
 **Décors peints.** Arbres, conifères, palmiers, acacias, arbres morts ou d'automne, pics, rochers,
 parcelles de champs, blocs de glace, roseaux et herbes sont peints **une seule
 fois** dans de petits canvas (`peintArbre`, `peintMontagne`…) : dégradés, ombre au sol, touches de
-lumière, pas de contour de dessin animé. Près de la lisière de son terrain, un décor se **fond** : il s'éclaircit et rapetisse (`calculerTuile`, sondes à 3,5 tailles, opacité `alpha`), comme une lisière de forêt. On les colle ensuite par milliers (`colle`), avec cinq
+lumière, pas de contour de dessin animé. Une forêt (`masse: true`) se lit comme une masse : au cœur, un fond uni de la couleur du feuillage (le sprite `canopee`, vu du dessus ; sinon le sol de la forêt), et seule la lisière porte des arbres, qui en dessinent le contour (`calculerTuile`) ; le cerne n'est tracé que sur le bord extérieur de la masse : on peint d'abord la silhouette cernée de chaque arbre de lisière (`prof` 5), puis le fond uni, puis les remplissages (`prof` 4), si bien que seul le contour de l'ensemble reste visible : pleins à moins d'une taille et demie du bord, puis, vers l'intérieur, sans cerne ni ombre, de la couleur du fond et réduits à des arcs en tirets (`prof` 1 et 2, variante +100 dans `arbreDessus`), jusqu'à se confondre avec le fond uni ; au cœur, quelques arcs en tirets seulement. Un bosquet, trop petit pour avoir un cœur, garde tous ses arbres. On les colle ensuite par milliers (`colle`), avec cinq
 définitions (64 à 1 024 px) choisies d'après le zoom (`ZPX`). Seules les terres volcaniques restent
 en vectoriel.
 
@@ -2032,10 +2032,18 @@ décors qui ont un dessin vu d'en haut l'utilisent (`PEINTRES_DESSUS` : arbres e
 d'encre avec ombre portée, rochers) ; les autres gardent leur dessin de profil. Les maisons sont des
 toits vus du dessus, **orientés**, dessinés en vectoriel (`maisonDessus`).
 
+**Village prêt à l'emploi.** Au départ d'une nouvelle carte, « Village (vue du dessus) » crée un plan de
+900 m sur 450 m en style Plan (`Generateur.village`) : une côte à droite avec trois pontons, de grands
+champs à gauche (`champsPx` du thème : parcelles de ~75 px, séparées par des bandes d'herbe), des bosquets
+posés à des endroits prévus, une place ronde avec son arbre, des ruelles courbes qui en rayonnent, bordées
+de maisons (`maisons`), un demi-anneau de maisons autour de la place et des chemins de liaison. Ce sont des
+objets ordinaires (terrains, tracés, tampons) : tout se déplace ensuite à la main. L'échelle des décors est
+fixée pour un village (`zbFixe`). Un bosquet garde tous ses arbres ; le cœur d'une grande forêt est un fond uni.
+
 **Maisons : à la main ou le long d'une ligne.** Tracé « Rue bordée de maisons » (`maisons`, une voie
 comme les autres : ponts, accroche) : `maisonsDesRues` range les maisons de part et d'autre du fil de
 la rue (ou d'un seul côté, `cote`), tournées vers elle, pignon sur rue le plus souvent ; longueur
-(`maison`, en km : 9 m par défaut, réglable de 4 à 20 m) et espacement (`espace`) réglables, et déplacer un point de la rue déplace ses maisons. Deux maisons ne se recouvrent jamais : le test est exact (rectangles orientés, `maisonsSeChevauchent`). L'échelle graphique affiche les mètres sous le kilomètre. À
+(`maison`, en km : 18 m par défaut, réglable de 4 à 40 m) et espacement (`espace`) réglables, et déplacer un point de la rue déplace ses maisons. Deux maisons ne se recouvrent jamais : le test est exact (rectangles orientés, `maisonsSeChevauchent`). Dans les villes générées, `purgerMaisons` écarte toute maison qui toucherait une rue ou une autre maison. « Figer les décors de la vue » convertit aussi les rues d'une ville en tracés de route (`chainerRues` : une route qui se prolonge d'un carrefour à l'autre devient une seule ligne, dont les points se déplacent ; les côtés communs à deux îlots ne sont comptés qu'une fois, et les tracés figés ne sont pas lissés — `lisse: false`, désormais respecté pour la route ; les carrefours d'une ville sont moins déplacés (`VILLE_GIGUE`, 0,4), ce qui réduit les pointes très aiguës) ; la zone figée passe à « Aucun », donc la ville automatique ne s'affiche plus en double. L'échelle graphique affiche les mètres sous le kilomètre. À
 la main : les tampons Maison, Bâtisse et Église, avec une orientation (`a`, en degrés). Les arbres du
 terrain s'écartent des unes comme des autres. Dans les autres styles, ces maisons sont dessinées de
 profil.

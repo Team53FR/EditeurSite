@@ -217,7 +217,9 @@
   $("formNouvelle").addEventListener("submit", function (ev) {
     ev.preventDefault();
     var largeur = parseFloat($("nLarg").value), hauteur = parseFloat($("nHaut").value);
-    if (!(largeur >= 50 && largeur <= 40000 && hauteur >= 50 && hauteur <= 40000)) {
+    var village = actif($("nDepart"), "data-depart") === "village";
+    if (village) { largeur = 0.9; hauteur = 0.45; }          // un village : 900 m sur 450 m
+    if (!village && !(largeur >= 50 && largeur <= 40000 && hauteur >= 50 && hauteur <= 40000)) {
       $("nMessage").textContent = "La largeur et la hauteur doivent être comprises entre 50 et 40 000 km.";
       return;
     }
@@ -226,7 +228,7 @@
       nom: $("nNom").value.trim().slice(0, 80) || "Nouvelle carte",
       largeur: largeur,
       hauteur: hauteur,
-      theme: actif($("nThemes"), "data-theme") || "atlas",
+      theme: village ? "plan" : actif($("nThemes"), "data-theme") || "atlas",
       traits: [], lignes: [], etiquettes: [], lieux: [], lacs: [], tampons: [],
       vue: null,
       creeLe: Date.now(),
@@ -234,7 +236,8 @@
       version: 1
     };
     Moteur.fixerEchelleDecors(carte);       // les décors automatiques gardent leur place, quelle que soit la taille ensuite
-    if (actif($("nDepart"), "data-depart") === "aleatoire") {
+    if (village) Generateur.village(carte, Math.floor(Math.random() * 1e9));
+    else if (actif($("nDepart"), "data-depart") === "aleatoire") {
       Generateur.monde(carte, Math.floor(Math.random() * 1e9));
     }
     $("nCreer").disabled = true;

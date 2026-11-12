@@ -222,5 +222,95 @@
     }
   }
 
-  window.Generateur = { monde: monde };
+  // ----- Village -----
+  //
+  // Un plan de village vu du dessus, posé en objets ordinaires (terrains, tracés, tampons) : une
+  // côte à droite avec ses pontons, des champs à gauche, des bosquets, une place ronde au
+  // centre d'où partent des ruelles courbes bordées de maisons. Tout se retouche ensuite à la
+  // main (déplacer un point d'une ruelle déplace ses maisons). Pour le style « Plan ».
+  function village(carte, graine) {
+    var L = carte.largeur, H = carte.hauteur, g = graine | 0, A = Moteur.alea;
+    carte.zbFixe = 1000 * 0.9 / Math.max(L, H);      // décors à la taille d'un village (cf. fixerEchelleDecors)
+    carte.traits = []; carte.lignes = []; carte.tampons = []; carte.lieux = []; carte.etiquettes = []; carte.lacs = [];
+    var id = function (p, i) { return p + i + Math.floor(A(g, i + 77) * 1e6).toString(36); };
+    var echelle = L / 0.9, mai = 0.0125 * echelle;     // une maison : ~12 m sur une carte de 0,9 km
+    // La terre : une bande dont le bord droit est la côte (le reste de la carte est la mer).
+    var ys = [-0.1, 0.12, 0.3, 0.52, 0.75, 1.1], coteX = [], terre = [];
+    ys.forEach(function (fy, i) {
+      var cx = (0.7 + (A(g + 1, i) - 0.5) * 0.07) * L;
+      coteX.push([fy * H, cx]);
+      terre.push(cx - 0.55 * L, fy * H);
+    });
+    carte.traits.push({ id: id("vt", 0), mat: "plaine", pts: terre, taille: 1.1 * L });
+    var cote = function (y) {                          // l'abscisse de la côte à une hauteur donnée
+      for (var i = 0; i + 1 < coteX.length; i++) if (y <= coteX[i + 1][0]) {
+        var t = (y - coteX[i][0]) / (coteX[i + 1][0] - coteX[i][0]);
+        return coteX[i][1] + (coteX[i + 1][1] - coteX[i][1]) * Math.max(0, Math.min(1, t));
+      }
+      return coteX[coteX.length - 1][1];
+    };
+    // Les champs, le long du bord gauche.
+    carte.traits.push({ id: id("vc", 1), mat: "champs", pts: [0.11 * L, -0.05 * H, 0.14 * L, 0.4 * H, 0.11 * L, 1.05 * H], taille: 0.3 * L });
+    // La place et les ruelles.
+    var px = 0.45 * L, py = 0.47 * H, r0 = 0.05 * L, ruelles = [];
+    var n = 7 + Math.floor(A(g + 2, 0) * 3);
+    for (var i = 0; i < n; i++) {
+      var ang = (i + (A(g + 3, i) - 0.5) * 0.45) * Math.PI * 2 / n + 0.25, dx = Math.cos(ang), dy = Math.sin(ang);
+      // Jusqu'où va-t-on : jusqu'au bord du monde bâti (champs, côte, haut et bas de la carte).
+      var rmax = 1e9;
+      if (dx > 1e-3) rmax = Math.min(rmax, (cote(py + dy * 0.2 * L) - 0.025 * L - px) / dx);
+      if (dx < -1e-3) rmax = Math.min(rmax, (px - 0.32 * L) / -dx);
+      if (dy > 1e-3) rmax = Math.min(rmax, (0.93 * H - py) / dy);
+      if (dy < -1e-3) rmax = Math.min(rmax, (py - 0.07 * H) / -dy);
+      var len = dx > 0.5 ? rmax * 0.97 : Math.min((0.17 + 0.17 * A(g + 4, i)) * L, rmax * 0.97);   // vers la mer : jusqu'à la côte
+      if (len < r0 + 0.06 * L) continue;
+      var courbe = (A(g + 5, i) - 0.5) * 0.9, pts = [];
+      for (var t = 0; t <= 1.001; t += 1 / 3) {
+        var a = ang + courbe * t * t, r = r0 + (len - r0) * t;
+        pts.push(px + Math.cos(a) * r, py + Math.sin(a) * r);
+      }
+      carte.lignes.push({ id: id("vr", i), type: "maisons", pts: pts, taille: 0.0035 * echelle, maison: mai, cote: "deux", espace: 0.95 + 0.3 * A(g + 11, i) });
+      ruelles.push(pts);
+    }
+    // Des liaisons entre ruelles voisines : de simples chemins, qui font des îlots.
+    for (var c = 0; c + 1 < ruelles.length; c++) {
+      if (A(g + 12, c) < 0.3) continue;
+      var u = ruelles[c], v = ruelles[c + 1], tt0 = 0.55 + 0.25 * A(g + 13, c) , k0 = Math.round(tt0 * 3) * 2;
+      carte.lignes.push({ id: id("vl", c), type: "sentier", pts: [u[k0], u[k0 + 1], v[k0], v[k0 + 1]], taille: 0.0025 * echelle });
+    }
+    // Un demi-anneau de maisons autour de la place, côté des champs.
+    var arc = [], a0 = Math.PI * 0.55 + A(g + 14, 0) * 0.5;
+    for (var q = 0; q <= 6; q++) { var aq = a0 + q * 0.34; arc.push(px + Math.cos(aq) * 0.1 * L, py + Math.sin(aq) * 0.1 * L); }
+    carte.lignes.push({ id: id("va", 0), type: "maisons", pts: arc, taille: 0.003 * echelle, maison: mai, cote: "gauche" });
+    // Trois pontons, répartis le long de la côte.
+    [0.2, 0.5, 0.8].forEach(function (fy, i2) {
+      var yy = (fy + (A(g + 15, i2) - 0.5) * 0.1) * H, ap = (A(g + 16, i2) - 0.5) * 0.5;
+      carte.lignes.push({ id: id("vp", i2), type: "ponton", pts: [cote(yy) - 0.012 * L, yy, cote(yy) + Math.cos(ap) * 0.1 * L, yy + Math.sin(ap) * 0.1 * L], taille: 0.0035 * echelle });
+    });
+    // La place ronde, et son arbre.
+    var sp = 0.06 * L;
+    carte.tampons.push({ id: id("vq", 0), type: "place", v: 0, x: px, y: py + sp * 0.3, s: sp, a: 0 });
+    carte.tampons.push({ id: id("vq", 1), type: "arbre", v: 1, x: px, y: py, s: 0.022 * L, a: 0 });
+    // Des bosquets, à l'écart des ruelles et de la place.
+    var proche = function (x, y) {
+      var m = Math.hypot(x - px, y - py) - 0.13 * L;
+      ruelles.forEach(function (rp) {
+        for (var q = 0; q + 3 < rp.length; q += 2) m = Math.min(m, Moteur.distSeg(x, y, rp[q], rp[q + 1], rp[q + 2], rp[q + 3]) - 0.035 * L);
+      });
+      return m;
+    };
+    // Les bosquets viennent à des endroits prévus (entre les champs et le village, aux coins) ;
+    // chacun se réduit s'il serait trop près d'une ruelle, et disparaît s'il ne tient nulle part.
+    var zones = [[0.25, 0.12], [0.23, 0.5], [0.26, 0.88], [0.36, 0.04], [0.58, 0.07], [0.6, 0.93], [0.45, 0.97], [0.3, 0.3], [0.31, 0.72]];
+    zones.forEach(function (z, tt) {
+      var bx = (z[0] + (A(g + 6, tt) - 0.5) * 0.06) * L, by = (z[1] + (A(g + 7, tt) - 0.5) * 0.1) * H;
+      var rb = (0.045 + 0.06 * A(g + 8, tt)) * L;
+      for (var essai = 0; essai < 5 && (proche(bx, by) < rb || bx > cote(by) - 0.04 * L); essai++) rb *= 0.78;
+      if (proche(bx, by) < rb || bx > cote(by) - 0.04 * L || rb < 0.02 * L) return;
+      carte.traits.push({ id: id("vb", tt + 10), mat: "foret", pts: [bx, by, bx + (A(g + 9, tt) - 0.5) * 0.08 * L, by + (A(g + 10, tt) - 0.5) * 0.08 * L], taille: rb * 2 });
+    });
+    return carte;
+  }
+
+  window.Generateur = { monde: monde, village: village };
 })();
