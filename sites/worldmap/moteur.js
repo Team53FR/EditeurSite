@@ -1469,7 +1469,6 @@
           // extérieur seulement, puis remplissage uni), avec quelques sommets isolés au milieu.
           var fam = FAMILLE_CANOPEE[ch[0]], dedans = fractionDedans(ctx, carte, q, pt, s * 0.3, 8, grand);
           if (dedans < 0.75 || distRiviere(ctx, pt.x, pt.y) < s * 0.05) continue;
-          if (distTrace(ctx, pt.x, pt.y, true) < s * 0.35) continue;       // un « col » : le massif s'ouvre pour laisser passer le chemin
           if (fractionDedans(ctx, carte, q, pt, dd.marge * s, 8, grand) >= 1) tu.entrees.push({ x: pt.x, y: pt.y, s: s, sprite: ch[0], r: pt.r3, cl: 1 });
           // Un massif se lit comme une carte en courbes de niveau : un bord de falaise en gradins
           // (cerne, puis des bandes de plus en plus claires cernées d'un trait fin), un intérieur
@@ -2652,28 +2651,48 @@
     return { d: out, marches: marches };
   }
 
-  // Les entrées d'une grotte : un arc sombre là où le chemin entre sous le massif et là où il en sort.
+  // Une grotte : sous le massif, le chemin est un POINTILLÉ régulier (la convention des plans pour
+  // un passage souterrain), avec un arc sombre à chaque endroit où il entre ou sort du massif.
+  // Les petites ruptures du terrain (un lac, un trou entre deux gradins) ne coupent pas le pointillé.
   function entreesGrottes(ctx, grottes, carte, vue) {
+    var u = 1 / vue.zoom;
     grottes.forEach(function (v) {
       var d = pointsAffiches(v.l), m = d.length / 2, U = v.lw, bb = boiteTrait(d, 0), M = U * 20;
       var cz = contexteZone(carte, bb[0] - M, bb[1] - M, bb[2] + M, bb[3] + M);
       var enMont = function (x, y) { var q = sonde(cz, carte, x, y); return !q.eau && (q.m.id === "montagne" || q.m.id === "cime"); };
-      var pas = Math.max(U * 0.5, 1 / vue.zoom), prev = null;
-      for (var i = 0; i + 1 < m; i++) {
-        var ax = d[2 * i], ay = d[2 * i + 1], bx = d[2 * i + 2], by = d[2 * i + 3], L = Math.hypot(bx - ax, by - ay), dx = (bx - ax) / (L || 1), dy = (by - ay) / (L || 1);
-        for (var t = 0; t < L; t += pas) {
-          var x = ax + dx * t, y = ay + dy * t, mo = enMont(x, y);
-          if (prev !== null && mo !== prev) {
-            var sens = mo ? 1 : -1, a = Math.atan2(dy, dx);
-            ctx.save(); ctx.translate(x, y); ctx.rotate(a);
-            ctx.fillStyle = "rgba(16,30,28,0.35)"; ctx.beginPath(); ctx.ellipse(U * 0.2, U * 0.4, U * 1.5, U * 1.9, 0, 0, TAU); ctx.fill();
-            ctx.fillStyle = "#14191a"; ctx.strokeStyle = "#1c2622"; ctx.lineWidth = Math.max(1.5 / vue.zoom, U * 0.25);
-            ctx.beginPath(); ctx.ellipse(0, 0, U * 1.2 * (sens > 0 ? 1 : 1), U * 1.6, 0, 0, TAU); ctx.fill(); ctx.stroke();
-            ctx.restore();
-          }
-          prev = mo;
-        }
+      var pas = Math.max(U * 0.6, 1.2 * u), pts = [], i;
+      for (i = 0; i + 1 < m; i++) {
+        var ax = d[2 * i], ay = d[2 * i + 1], bx = d[2 * i + 2], by = d[2 * i + 3], L = Math.hypot(bx - ax, by - ay);
+        for (var t = 0; t < L; t += pas) pts.push([ax + (bx - ax) * t / L, ay + (by - ay) * t / L, (bx - ax) / (L || 1), (by - ay) / (L || 1)]);
       }
+      pts.push([d[2 * m - 2], d[2 * m - 1], pts.length ? pts[pts.length - 1][2] : 1, pts.length ? pts[pts.length - 1][3] : 0]);
+      var dans = pts.map(function (p) { return enMont(p[0], p[1]); }), n = pts.length;
+      // Rebouche les trous courts, puis écarte les tronçons trop courts.
+      var trou = Math.max(2, Math.round(25 * U / pas)), mini = Math.max(3, Math.round(8 * U / pas)), runs = [], deb = -1;
+      for (i = 0; i <= n; i++) {
+        if (i < n && dans[i]) { if (deb < 0) deb = i; continue; }
+        if (deb >= 0) { runs.push([deb, i - 1]); deb = -1; }
+      }
+      var fus = [];
+      runs.forEach(function (r) { var der = fus[fus.length - 1]; if (der && r[0] - der[1] <= trou) der[1] = r[1]; else fus.push(r.slice()); });
+      fus.filter(function (r) { return r[1] - r[0] >= mini; }).forEach(function (r) {
+        ctx.save(); ctx.lineCap = "butt"; ctx.lineJoin = "round";
+        var dash = Math.max(U * 2.4, 5 * u);
+        ctx.strokeStyle = "rgba(20,14,8,0.78)"; ctx.lineWidth = Math.max(U * 0.8, 1.6 * u); ctx.setLineDash([dash, dash * 0.9]);
+        ctx.beginPath(); ctx.moveTo(pts[r[0]][0], pts[r[0]][1]);
+        for (var k = r[0] + 1; k <= r[1]; k++) ctx.lineTo(pts[k][0], pts[k][1]);
+        ctx.stroke(); ctx.setLineDash([]);
+        [[r[0], r[0] > 0], [r[1], r[1] < n - 1]].forEach(function (e) {
+          if (!e[1]) return;
+          var p = pts[e[0]], a = Math.atan2(p[3], p[2]), R = Math.max(U * 1.5, 3.5 * u);
+          ctx.save(); ctx.translate(p[0], p[1]); ctx.rotate(a);
+          ctx.fillStyle = "rgba(16,30,28,0.35)"; ctx.beginPath(); ctx.ellipse(R * 0.2, R * 0.3, R * 0.9, R * 1.15, 0, 0, TAU); ctx.fill();
+          ctx.fillStyle = "#14191a"; ctx.strokeStyle = "#1c2622"; ctx.lineWidth = Math.max(1.4 * u, R * 0.18);
+          ctx.beginPath(); ctx.ellipse(0, 0, R * 0.85, R * 1.1, 0, 0, TAU); ctx.fill(); ctx.stroke();
+          ctx.restore();
+        });
+        ctx.restore();
+      });
     });
   }
 
@@ -4518,7 +4537,25 @@
       lc.globalCompositeOperation = "source-atop";
       // Une grotte : le chemin est peint AVANT le massif, qui le recouvre (il passe sous la montagne).
       if (grottes.length && th.dessus) tracerVoies(lc, grottes, vue, carte, false);
-      if (massifs.length) { decors = decors.filter(function (d) { return !d.rel; }); peindreDecors(lc, massifs); }
+      var cols = th.dessus ? toutesVoies.filter(function (v) { return v.l.relief === "col"; }) : [];
+      if (massifs.length) {
+        decors = decors.filter(function (d) { return !d.rel; });
+        if (cols.length) {
+          // Un « col » : le massif est peint à part, puis la ligne du tracé y est découpée exactement,
+          // avec un liseré sombre sur ses deux bords (la lèvre du passage).
+          var tm = couche("massif", pw, ph), mc = tm.getContext("2d"), uu = 1 / z;
+          mc.setTransform(1, 0, 0, 1, 0, 0); mc.clearRect(0, 0, pw, ph);
+          mc.setTransform(z, 0, 0, z, tx, ty); mc.lineCap = mc.lineJoin = "round";
+          peindreDecors(mc, massifs);
+          var chemin = function (v) { var dd = pointsAffiches(v.l); mc.beginPath(); mc.moveTo(dd[0], dd[1]); for (var k = 2; k < dd.length; k += 2) mc.lineTo(dd[k], dd[k + 1]); };
+          mc.globalCompositeOperation = "source-atop"; mc.strokeStyle = "#1c2622";
+          cols.forEach(function (v) { chemin(v); mc.lineWidth = Math.max(v.lw * 3, 7 * uu) + Math.max(v.lw * 1.2, 3.2 * uu); mc.stroke(); });
+          mc.globalCompositeOperation = "destination-out";
+          cols.forEach(function (v) { chemin(v); mc.lineWidth = Math.max(v.lw * 3, 7 * uu); mc.stroke(); });
+          mc.globalCompositeOperation = "source-over";
+          lc.save(); lc.setTransform(1, 0, 0, 1, 0, 0); lc.drawImage(tm, 0, 0); lc.restore();
+        } else peindreDecors(lc, massifs);
+      }
       if (grottes.length && th.dessus) { entreesGrottes(lc, grottes, carte, vue); toutesVoies = toutesVoies.filter(function (v) { return v.l.relief !== "grotte"; }); }
       tracerVoies(lc, toutesVoies, vue, carte, !!th.dessus);
       lc.globalCompositeOperation = "source-over";
