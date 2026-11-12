@@ -1817,6 +1817,7 @@
     if (E.outil === "tampon") {
       var palT = el("div", { classe: "palette palette-3" });
       Moteur.TAMPONS.forEach(function (t) {
+        if (t.cache) return;                                // (le fond de forêt n'est pas un décor à poser)
         var cv = el("canvas", { width: "88", height: "88" });
         cv.style.width = cv.style.height = "44px";
         var c2 = cv.getContext("2d");

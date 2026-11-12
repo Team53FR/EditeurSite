@@ -1800,7 +1800,7 @@ quelques îlots et des navires en pleine mer (loin du cadre, des côtes et les u
 **Décors peints.** Arbres, conifères, palmiers, acacias, arbres morts ou d'automne, pics, rochers,
 parcelles de champs, blocs de glace, roseaux et herbes sont peints **une seule
 fois** dans de petits canvas (`peintArbre`, `peintMontagne`…) : dégradés, ombre au sol, touches de
-lumière, pas de contour de dessin animé. Près de la lisière de son terrain, un décor se **fond** : il s'éclaircit et rapetisse (`calculerTuile`, sondes à 3,5 tailles, opacité `alpha`), comme une lisière de forêt. Au cœur d'une forêt, il n'y a plus d'arbre : le sol reste uni (`FORET_PROFONDE`). On les colle ensuite par milliers (`colle`), avec cinq
+lumière, pas de contour de dessin animé. Une forêt (`masse: true`) se lit comme une masse : au cœur, un fond uni de la couleur du feuillage (le sprite `canopee`, vu du dessus ; sinon le sol de la forêt), et seule la lisière — à moins d'une taille et demie du bord — porte des arbres cernés, qui en dessinent le contour (`calculerTuile`). Un bosquet, trop petit pour avoir un cœur, garde tous ses arbres. On les colle ensuite par milliers (`colle`), avec cinq
 définitions (64 à 1 024 px) choisies d'après le zoom (`ZPX`). Seules les terres volcaniques restent
 en vectoriel.
 
@@ -2038,7 +2038,7 @@ champs à gauche (`champsPx` du thème : parcelles de ~75 px, séparées par des
 posés à des endroits prévus, une place ronde avec son arbre, des ruelles courbes qui en rayonnent, bordées
 de maisons (`maisons`), un demi-anneau de maisons autour de la place et des chemins de liaison. Ce sont des
 objets ordinaires (terrains, tracés, tampons) : tout se déplace ensuite à la main. L'échelle des décors est
-fixée pour un village (`zbFixe`). Un bosquet garde tous ses arbres ; seul le cœur d'une grande forêt reste uni.
+fixée pour un village (`zbFixe`). Un bosquet garde tous ses arbres ; le cœur d'une grande forêt est un fond uni.
 
 **Maisons : à la main ou le long d'une ligne.** Tracé « Rue bordée de maisons » (`maisons`, une voie
 comme les autres : ponts, accroche) : `maisonsDesRues` range les maisons de part et d'autre du fil de

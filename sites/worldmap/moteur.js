@@ -709,6 +709,8 @@
     // gardent la même emprise sur la carte.
     montagne: reduit(montagneDessus(false), 0.62), cime: reduit(montagneDessus(true), 0.62),
     basalte: function (g, v) { rocherDessus(g, v, true); }, aiguilles: function (g, v) { rocherDessus(g, v + 1, true); },
+    // Le fond uni d'une forêt : un disque de la couleur du feuillage, sans cerne (les disques voisins fusionnent).
+    canopee: function (g, v) { g.fillStyle = FEUILLES_DESSUS[["arbre", "conifere", "tropical", "automne", "palmier"][v % 5]][1]; g.beginPath(); g.arc(0, 0, 37, 0, TAU); g.fill(); },
     arbre: arbreDessus("arbre"), tropical: arbreDessus("tropical"), conifere: arbreDessus("conifere"),
     automne: arbreDessus("automne"), palmier: arbreDessus("palmier"), acacia: arbreDessus("acacia"), rocher: function (g, v) { rocherDessus(g, v, false); }
   };
@@ -764,6 +766,7 @@
   }
 
   var PEINTRES = {
+    canopee: function () {},                       // (rien : le fond uni n'a de sens que vu du dessus)
     arbre: peintArbre, conifere: peintConifere,
     automne: function (g, v) { peintArbre(g, v, "automne"); },
     tropical: function (g, v) { peintArbre(g, v, "jungle"); },
@@ -780,7 +783,7 @@
     clocher: function (g, v) { peintMaisonVille(g, v, "clocher"); },
     place: peintPlace
   };
-  var VARIANTES = { arbre: 6, conifere: 4, automne: 6, tropical: 6, palmier: 4, acacia: 4, mort: 4, montagne: 6, cime: 6,
+  var VARIANTES = { canopee: 5, arbre: 6, conifere: 4, automne: 6, tropical: 6, palmier: 4, acacia: 4, mort: 4, montagne: 6, cime: 6,
     marais: 3, herbe: 3, seche: 3, rocher: 6, basalte: 6, champ: 6, glacon: 4, cratere: 2, aiguilles: 6, maison: 12, batisse: 6, clocher: 4, place: 2 };
 
   // Colle un décor peint : (x, y) est le point où il touche le sol, s la taille de sa boîte.
@@ -807,10 +810,10 @@
     // Les parcelles sont dessinées à part (voir « Champs ») ; ici, les arbres isolés entre elles.
     champs:   { C: 17,   p: 0.05, marge: 0.1,  choix: [["arbre", 1, 24]], apercu: "champ" },
     savane:   { C: 17,   p: 0.8,  marge: 0.15, choix: [["acacia", 0.3, 36], ["seche", 0.7, 15]] },
-    foret:    { C: 8.5, p: 1,    marge: 0.12, choix: [["arbre", 0.68, 28], ["tropical", 0.2, 31], ["conifere", 0.12, 28]] },
-    automne:  { C: 8.5, p: 1,    marge: 0.12, choix: [["automne", 1, 28]] },
-    taiga:    { C: 8.5, p: 1,    marge: 0.12, choix: [["conifere", 1, 28]] },
-    jungle:   { C: 8.5,   p: 1,    marge: 0.12, choix: [["tropical", 0.72, 29], ["palmier", 0.28, 33]] },
+    foret:    { masse: true, C: 8.5, p: 1,    marge: 0.12, choix: [["arbre", 0.68, 28], ["tropical", 0.2, 31], ["conifere", 0.12, 28]] },
+    automne:  { masse: true, C: 8.5, p: 1,    marge: 0.12, choix: [["automne", 1, 28]] },
+    taiga:    { masse: true, C: 8.5, p: 1,    marge: 0.12, choix: [["conifere", 1, 28]] },
+    jungle:   { masse: true, C: 8.5,   p: 1,    marge: 0.12, choix: [["tropical", 0.72, 29], ["palmier", 0.28, 33]] },
     morte:    { C: 12,   p: 0.8,  marge: 0.12, choix: [["mort", 1, 27]] },
     // Une chaîne : de grands massifs et, serrés entre eux, des pics plus petits. La marge
     // est faible pour qu'une crête étroite, vue de loin, porte déjà sa rangée de sommets.
@@ -845,7 +848,8 @@
     { id: "mort", nom: "Arbre mort" }, { id: "montagne", nom: "Montagne", max: 230 }, { id: "cime", nom: "Pic enneigé", max: 230 },
     { id: "cratere", nom: "Volcan", max: 230 }, { id: "aiguilles", nom: "Aiguilles noires", max: 170 },
     { id: "rocher", nom: "Rochers" }, { id: "basalte", nom: "Roche sombre" }, { id: "glacon", nom: "Glace" },
-    { id: "champ", nom: "Champ" }, { id: "maison", nom: "Maison" }, { id: "batisse", nom: "Bâtisse" }, { id: "clocher", nom: "Église" }, { id: "place", nom: "Place" }, { id: "marais", nom: "Roseaux" }, { id: "herbe", nom: "Herbes" }, { id: "seche", nom: "Herbes sèches" }
+    { id: "champ", nom: "Champ" }, { id: "maison", nom: "Maison" }, { id: "batisse", nom: "Bâtisse" }, { id: "clocher", nom: "Église" }, { id: "place", nom: "Place" }, { id: "marais", nom: "Roseaux" }, { id: "herbe", nom: "Herbes" }, { id: "seche", nom: "Herbes sèches" },
+    { id: "canopee", nom: "Fond de forêt", cache: true }
   ];
 
   var BATIMENTS = { maison: 1, batisse: 1.5, clocher: 1.8 };      // tampons orientables en vue du dessus
@@ -1301,6 +1305,7 @@
   }
 
   // Les arbres qui ne touchent jamais la lisière : au cœur d'une forêt, le sol reste uni.
+  var FAMILLE_CANOPEE = { arbre: 0, conifere: 1, tropical: 2, automne: 3, palmier: 4 };       // la couleur du fond uni : celle des arbres
   var FORET_PROFONDE = { arbre: 1, conifere: 1, automne: 1, tropical: 1, palmier: 1, acacia: 1, mort: 1 };
   // La part des NS directions, à la distance R, où le terrain est le même que celui de `q`.
   function fractionDedans(ctx, carte, q, pt, R, NS, grand) {
@@ -1337,16 +1342,20 @@
         var s = ch[2] / dd.C * D * 0.72 * ECHELLES[rg.ech] * (0.82 + 0.36 * pt.r3);
         var grand = ch[2] >= 40;
         if (distVoie(ctx, pt.x, pt.y) < (grand ? 0.45 : 0.22) * s) continue;       // pas sur une voie
-        // Un décor se fond dans la lisière de son terrain au lieu de s'arrêter net : à l'intérieur
-        // il est plein ; près du bord il s'éclaircit et rapetisse (sujets clairsemés, plus petits).
-        var f = fractionDedans(ctx, carte, q, pt, Math.max(dd.marge * s, s * 1.2), 8, grand);
-        if (f < 0.25) continue;                                         // sur le bord : rien
-        var fond = Math.min(1, (f - 0.25) / 0.6);
-        // Au cœur d'une grande forêt (tout autour, à trois tailles d'arbre, le même terrain) :
-        // fond uni, sans arbre. Un bosquet, lui, garde tous ses arbres.
-        if (fond >= 1 && FORET_PROFONDE[ch[0]] && fractionDedans(ctx, carte, q, pt, s * 3.5, 12, grand) >= 1) continue;
-        if (fond < 1 && pt.r2 > fond + 0.1) continue;                     // au bord, seuls quelques sujets restent
-        tu.entrees.push({ x: pt.x, y: pt.y, s: s * (0.45 + 0.55 * fond), sprite: ch[0], r: pt.r3, alpha: fond < 1 ? 0.25 + 0.75 * fond : null });
+        if (!dd.masse || !FORET_PROFONDE[ch[0]]) {
+          // Les autres décors (pics, rochers, arbres isolés…) restent bien à l'intérieur de leur terrain.
+          if (fractionDedans(ctx, carte, q, pt, dd.marge * s, 8, grand) < 1) continue;
+          tu.entrees.push({ x: pt.x, y: pt.y, s: s, sprite: ch[0], r: pt.r3 });
+          continue;
+        }
+        // Une forêt se lit comme une masse : au cœur, un fond uni (la « canopée ») ; seule la
+        // lisière — à moins d'une taille et demie du bord — a des arbres, qui en dessinent le
+        // contour. Un bosquet, trop petit pour avoir un cœur, est tout en lisière.
+        var f = fractionDedans(ctx, carte, q, pt, Math.max(dd.marge * s, s * 1.4), 8, grand);
+        if (f < 0.25) continue;                                         // sur le bord même : rien
+        tu.entrees.push({ x: pt.x, y: pt.y, s: s, sprite: "canopee", r: pt.r3, v: FAMILLE_CANOPEE[ch[0]] || 0 });     // le fond uni, sous les arbres
+        if (f >= 1) continue;                                           // au cœur : pas d'arbre
+        tu.entrees.push({ x: pt.x, y: pt.y, s: s, sprite: ch[0], r: pt.r3 });
       }
     }
     return tu;
@@ -1401,6 +1410,7 @@
             if (s * zoom < 0.7) continue;                                   // plus petit qu'un pixel : invisible
             if (en.x < X0 - s || en.x > X1 + s || en.y < Y0 - s * 0.2 || en.y > Y1 + s) continue;
             if (SANS_DECOR && SANS_DECOR[en.sprite]) continue;
+            if (en.sprite === "canopee" && !DESSUS) continue;                 // le fond uni n'existe que vu du dessus
             if (gt) {
               var voisins = gt[Math.floor(en.x / gc) + "," + Math.floor(en.y / gc)], libre = true;
               if (voisins) {
@@ -1411,7 +1421,7 @@
                 if (!libre) continue;
               }
             }
-            liste.push({ x: en.x, y: en.y, s: s, sprite: en.sprite, r: en.r, alpha: en.alpha });
+            liste.push({ x: en.x, y: en.y, s: s, sprite: en.sprite, r: en.r, v: en.v });
           }
         }
       }
@@ -1665,15 +1675,12 @@
   }
 
   // Peint les décors (semés et tampons), du fond vers l'avant.
-  var FONDS = { place: true };         // décors posés AU SOL : peints avant tout le reste
+  var FONDS = { place: true, canopee: true };         // décors posés AU SOL : peints avant tout le reste
   function peindreDecors(lc, liste) {
     liste.sort(function (a, b) { return (FONDS[b.sprite] ? 1 : 0) - (FONDS[a.sprite] ? 1 : 0) || a.y - b.y; });
     for (var i = 0; i < liste.length; i++) {
       var o = liste[i];
       if (o.maison) { maisonDessus(lc, o.x, o.y, o.maison.w, o.maison.h, o.maison.a, o.maison.v); continue; }
-      // Un décor en fondu (près de la lisière de son terrain) est d'autant transparent.
-      var fondu = o.alpha != null && o.alpha < 1;
-      if (fondu) { lc.save(); lc.globalAlpha = o.alpha; }
       if (o.rot) {
         // Un décor tourné : on le colle autour de son centre (le dessin est centré à 0,31 s au-dessus de son pied).
         lc.save();
@@ -1681,10 +1688,9 @@
         lc.rotate(o.rot);
         colle(lc, o.sprite, o.v != null ? o.v % VARIANTES[o.sprite] : variante(o.sprite, o.r), 0, o.s * 0.31, o.s);
         lc.restore();
-      } else {
-        colle(lc, o.sprite, o.v != null ? o.v % VARIANTES[o.sprite] : variante(o.sprite, o.r), o.x, o.y, o.s);
+        continue;
       }
-      if (fondu) lc.restore();
+      colle(lc, o.sprite, o.v != null ? o.v % VARIANTES[o.sprite] : variante(o.sprite, o.r), o.x, o.y, o.s);
     }
   }
 
@@ -4208,7 +4214,7 @@
           // Vu du dessus, une maison posée à la main est un toit, orientable (`a`, en degrés).
           var kb = BATIMENTS[tp.type];
           decors.push({ x: tp.x, y: tp.y - tp.s * 0.3, maison: { w: s * 0.62 * kb, h: s * 0.4 * kb, a: (tp.a || 0) * Math.PI / 180, v: tp.v || 0 } });
-        } else decors.push({ x: tp.x, y: y, s: s, sprite: tp.type, v: tp.v || 0, rot: tp.a ? tp.a * Math.PI / 180 : 0, alpha: tp.alpha });
+        } else decors.push({ x: tp.x, y: y, s: s, sprite: tp.type, v: tp.v || 0, rot: tp.a ? tp.a * Math.PI / 180 : 0 });
       });
       // Les maisons des rues : les arbres leur laissent la place.
       maisonsDesRues(carte, vue, masque, X0, Y0, X1, Y1).forEach(function (mz) {
@@ -4441,7 +4447,7 @@
       if (o.maison) {
         var sm = o.maison.w / 0.62;
         out.push({ type: "maison", v: o.maison.v, x: o.x, y: o.y + sm * 0.3, s: sm, a: Math.round(o.maison.a * 180 / Math.PI * 10) / 10 });
-      } else out.push({ type: o.sprite, v: o.v != null ? o.v : variante(o.sprite, o.r), x: o.x, y: o.y, s: o.s, alpha: o.alpha });
+      } else out.push({ type: o.sprite, v: o.v != null ? o.v : variante(o.sprite, o.r), x: o.x, y: o.y, s: o.s });
     });
     var rues = (liste.rues || []).filter(function (r) {
       return Math.max(r[0], r[2]) >= X0 && Math.min(r[0], r[2]) <= X1 && Math.max(r[1], r[3]) >= Y0 && Math.min(r[1], r[3]) <= Y1;
