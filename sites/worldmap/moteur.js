@@ -539,7 +539,7 @@
     automne: ["#c98a3e", "#b5722f", "#9a5a28"], palmier: ["#5a9460", "#4a8452", "#3c7346"], acacia: ["#8fa35a", "#7d924e", "#6b8043"]
   };
   // Le fond uni d'une forêt, par famille d'arbres : un teal sombre, plus gris que le feuillage.
-  var INTERIEUR_DESSUS = { arbre: "#34564f", tropical: "#2f5546", conifere: "#2b4b48", automne: "#86582a", palmier: "#3d6648", acacia: "#6b8043", montagne: "#8a877a", cime: "#c9d2d6" };
+  var INTERIEUR_DESSUS = { arbre: "#34564f", tropical: "#2f5546", conifere: "#2b4b48", automne: "#86582a", palmier: "#3d6648", acacia: "#6b8043", montagne: "#8f8c7e", cime: "#c9d2d6" };
   function melange(a, b, t) {
     var pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16), out = 0;
     for (var sh = 16; sh >= 0; sh -= 8) out |= Math.round(((pa >> sh) & 255) * (1 - t) + ((pb >> sh) & 255) * t) << sh;
@@ -614,7 +614,7 @@
       // v >= 100 : un massif de la lisière (4 : sans cerne propre ; 5 : sa silhouette cernée seule) ou
       // de la bordure intérieure d'une masse (1-2 : fondu dans le fond uni, arcs en tirets).
       var prof = Math.floor(v / 100); v = v % 100;
-      var fondu = prof === 1 || prof === 2, mult = prof === 1 ? 0.3 : prof === 2 ? 0.1 : 1;
+      var fondu = prof === 1 || prof === 2, mult = prof === 1 ? 0.45 : prof === 2 ? 0.18 : 1;
       var R = function (i) { return alea(2300 + v + (neige ? 40 : 0), i); };
       var n = 9, pts = [], i;
       for (i = 0; i < n; i++) { var a = i / n * TAU + R(i) * 0.5, r = 30 + R(10 + i) * 14; pts.push([Math.cos(a) * r, Math.sin(a) * r * 0.92]); }
@@ -622,7 +622,7 @@
       var trace = function (dx, dy, k) { g.beginPath(); pts.forEach(function (q, j) { var X = c[0] + (q[0] - c[0]) * (k || 1) + dx, Y = c[1] + (q[1] - c[1]) * (k || 1) + dy; if (j) g.lineTo(X, Y); else g.moveTo(X, Y); }); g.closePath(); };
       if (prof === 0 || prof === 5) { trace(6, 8); g.fillStyle = "rgba(16,30,28,0.3)"; g.fill(); }
       if (prof === 5) { trace(0, 0); g.lineJoin = "round"; g.lineWidth = 6.5; g.fillStyle = g.strokeStyle = "#1c2622"; g.fill(); g.stroke(); return; }
-      trace(0, 0); g.fillStyle = fondu ? INTERIEUR_DESSUS[neige ? "cime" : "montagne"] : "#8d8a7c"; g.fill();
+      trace(0, 0); g.fillStyle = fondu ? melange("#8d8a7c", INTERIEUR_DESSUS[neige ? "cime" : "montagne"], prof === 1 ? 0.6 : 1) : "#8d8a7c"; g.fill();
       var facettes = function (k, clair, sombre) {
         for (var j = 0; j < n; j++) {
           var p0 = pts[j], p1 = pts[(j + 1) % n], mx = (p0[0] + p1[0]) / 2 - c[0], my = (p0[1] + p1[1]) / 2 - c[1];
@@ -636,8 +636,7 @@
         }
       };
       facettes(1, "rgba(255,252,236,", "rgba(26,22,16,");
-      g.strokeStyle = "rgba(40,34,26," + (fondu ? (prof === 1 ? 0.6 : 0.45) : 0.45) + ")"; g.lineWidth = fondu ? 1.4 : 1;
-      if (fondu) g.setLineDash([3.5, 4.5]);
+      g.strokeStyle = "rgba(40,34,26," + (fondu ? (prof === 1 ? 0.22 : 0.08) : 0.45) + ")"; g.lineWidth = 1;
       g.beginPath(); pts.forEach(function (q) { g.moveTo(c[0], c[1]); g.lineTo(q[0], q[1]); }); g.stroke();
       g.setLineDash([]);
       if (neige && prof !== 2) {
@@ -866,8 +865,8 @@
     morte:    { C: 12,   p: 0.8,  marge: 0.12, choix: [["mort", 1, 27]] },
     // Une chaîne : de grands massifs et, serrés entre eux, des pics plus petits. La marge
     // est faible pour qu'une crête étroite, vue de loin, porte déjà sa rangée de sommets.
-    montagne: { C: 24,   p: 0.94, marge: 0.05, choix: [["montagne", 0.4, 170], ["montagne", 0.6, 104]] },
-    cime:     { C: 24,   p: 0.94, marge: 0.05, choix: [["cime", 0.4, 170], ["cime", 0.6, 104]] },
+    montagne: { masse: "relief", C: 24,   p: 0.94, marge: 0.05, choix: [["montagne", 0.4, 170], ["montagne", 0.6, 104]] },
+    cime:     { masse: "relief", C: 24,   p: 0.94, marge: 0.05, choix: [["cime", 0.4, 170], ["cime", 0.6, 104]] },
     volcan:   { masse: "eboulis", C: 21,   p: 0.62, marge: 0.2,  choix: [["aiguilles", 0.5, 84], ["basalte", 0.5, 24]] },
     rocaille: { masse: "eboulis", C: 13,   p: 0.8,  marge: 0.15, choix: [["rocher", 1, 24]] },
     cendres:  { C: 19,   p: 0.5,  marge: 0.15, choix: [["basalte", 0.6, 20], ["mort", 0.4, 24]] },
