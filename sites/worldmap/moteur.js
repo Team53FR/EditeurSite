@@ -2663,7 +2663,13 @@
       return f.sort(function (a, b) { return a - b; })[f.length >> 1];
     }), marches = [], dernier = -99;
     for (i = 1; i < pts.length; i++) {
-      if (lis[i] >= 0 && lis[i - 1] >= 0 && lis[i] !== lis[i - 1] && i - dernier > 6) {
+      // Entre deux gradins, ou entre le sol et le massif (entrée ou sortie : les 10 échantillons de
+      // l'autre côté sont tous hors massif, ce qui écarte les petits trous entre deux disques).
+      var horsAvant = true, horsApres = true;
+      for (var w = 1; w <= 10; w++) { if (lis[i - w] != null && lis[i - w] >= 0) horsAvant = false; if (lis[i + w - 1] != null && lis[i + w - 1] >= 0) horsApres = false; }
+      var passage = lis[i] >= 0 && lis[i - 1] >= 0 ? lis[i] !== lis[i - 1]
+        : (lis[i] >= 0 && lis[i - 1] < 0 && horsAvant) || (lis[i] < 0 && lis[i - 1] >= 0 && horsApres);
+      if (passage && i - dernier > 6) {
         var p = pts[i]; marches.push([p[0], p[1], -p[3], p[2], p[2], p[3]]); dernier = i;
       }
     }
