@@ -1468,7 +1468,7 @@
           // Un massif est une seule forme : l'union de grands disques (contour peint d'abord, côté
           // extérieur seulement, puis remplissage uni), avec quelques sommets isolés au milieu.
           var fam = FAMILLE_CANOPEE[ch[0]], dedans = fractionDedans(ctx, carte, q, pt, s * 0.3, 8, grand);
-          if (dedans < 0.75 || distRiviere(ctx, pt.x, pt.y) < s * 0.05) continue;
+          if (dedans < 0.75) continue;
           if (fractionDedans(ctx, carte, q, pt, dd.marge * s, 8, grand) >= 1) tu.entrees.push({ x: pt.x, y: pt.y, s: s, sprite: ch[0], r: pt.r3, cl: 1 });
           // Un massif se lit comme une carte en courbes de niveau : un bord de falaise en gradins
           // (cerne, puis des bandes de plus en plus claires cernées d'un trait fin), un intérieur
@@ -4540,7 +4540,8 @@
       var cols = th.dessus ? toutesVoies.filter(function (v) { return v.l.relief === "col"; }) : [];
       if (massifs.length) {
         decors = decors.filter(function (d) { return !d.rel; });
-        if (cols.length) {
+        var rivs = th.dessus ? (carte.lignes || []).filter(function (l) { return l.type === "riviere" && l.pts && l.pts.length >= 4; }) : [];
+        if (cols.length || rivs.length) {
           // Un « col » : le massif est peint à part, puis la ligne du tracé y est découpée exactement,
           // avec un liseré sombre sur ses deux bords (la lèvre du passage).
           var tm = couche("massif", pw, ph), mc = tm.getContext("2d"), uu = 1 / z;
@@ -4549,8 +4550,11 @@
           peindreDecors(mc, massifs);
           var chemin = function (v) { var dd = pointsAffiches(v.l); mc.beginPath(); mc.moveTo(dd[0], dd[1]); for (var k = 2; k < dd.length; k += 2) mc.lineTo(dd[k], dd[k + 1]); };
           mc.globalCompositeOperation = "source-atop"; mc.strokeStyle = "#1c2622";
+          // Une rivière qui traverse un massif coule dans une GORGE : une paroi sombre sur chaque rive.
+          rivs.forEach(function (l) { chemin({ l: l }); mc.lineWidth = Math.max(l.taille || 0, 2.4 * uu) * 1.25 + Math.max((l.taille || 0) * 0.5, 4 * uu); mc.stroke(); });
           cols.forEach(function (v) { chemin(v); mc.lineWidth = Math.max(v.lw * 3, 7 * uu) + Math.max(v.lw * 1.2, 3.2 * uu); mc.stroke(); });
           mc.globalCompositeOperation = "destination-out";
+          rivs.forEach(function (l) { chemin({ l: l }); mc.lineWidth = Math.max(l.taille || 0, 2.4 * uu) * 1.25; mc.stroke(); });
           cols.forEach(function (v) { chemin(v); mc.lineWidth = Math.max(v.lw * 3, 7 * uu); mc.stroke(); });
           mc.globalCompositeOperation = "source-over";
           lc.save(); lc.setTransform(1, 0, 0, 1, 0, 0); lc.drawImage(tm, 0, 0); lc.restore();
