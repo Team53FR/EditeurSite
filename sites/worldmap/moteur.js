@@ -2946,7 +2946,15 @@
             return !q.eau && (q.m.id === "montagne" || q.m.id === "cime");
           };
           if (surMassif(Math.max(0, s0 - lw * 4)) || surMassif(Math.min(total, s1 + lw * 4))) {
-            // Pas de pont ni de gué : le chemin traverse simplement la roche (le vallon est resserré).
+            // Pas de pont : le chemin passe SUR la roche, donc par-dessus l'eau (qui coule dessous, dans sa gorge).
+            // On le redessine ici, après la rivière, sur le tronçon où il la franchit.
+            var tr = sousChemin(d, cum, s0, s1), uu = 1 / vue.zoom;
+            ctx.save(); ctx.lineCap = ctx.lineJoin = "round";
+            ctx.beginPath(); ctx.moveTo(tr[0], tr[1]); for (var kk = 2; kk < tr.length; kk += 2) ctx.lineTo(tr[kk], tr[kk + 1]);
+            ctx.strokeStyle = r.type === "pavee" ? "rgba(46,42,36,0.8)" : "rgba(74,50,22,0.72)"; ctx.lineWidth = lw + 1.4 * uu; ctx.stroke();
+            ctx.strokeStyle = couleurVoie; ctx.lineWidth = lw; ctx.stroke();
+            ctx.strokeStyle = "rgba(255,244,208,0.34)"; ctx.lineWidth = lw * 0.42; ctx.stroke();
+            ctx.restore();
             return;
           }
         }
