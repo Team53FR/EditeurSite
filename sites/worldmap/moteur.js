@@ -89,6 +89,7 @@
     lieuxIllustres: true, encreDecors: true, dessus: true, echDecors: 1.15,
     voie: "#e6dfc4", rive: { c: "#d9d1a8", px: 4.5 },
     vagues: [{ r: 10, a: 0.62 }, { r: 21, a: 0.34 }], vagueCouleur: "rgb(228,246,246)",
+    champsPx: 75,                         // parcelles de champ larges, comme sur un plan de village
     cultures: [[146, 117, 106], [156, 124, 110], [136, 110, 102], [150, 126, 116]],
     sansDecor: { herbe: true, seche: true },
     couleurs: {
@@ -142,7 +143,7 @@
   var SPRITES = {};
   // Réglages du thème pendant le rendu en cours : couleurs des terrains, décors cernés d'encre,
   // taille des décors.
-  var COULEURS = null, ENCRE_DECORS = false, ECH_THEME = 1, SANS_OMBRE = false, DESSUS = false, SANS_DECOR = null, CULTURES_THEME = null;
+  var COULEURS = null, ENCRE_DECORS = false, ECH_THEME = 1, SANS_OMBRE = false, DESSUS = false, SANS_DECOR = null, CULTURES_THEME = null, CHAMPS_PX = 0;
   var ZPX = 1;   // pixels de l'appareil par unité du monde, pendant le rendu en cours
 
   function tailleSprite(px) { return px <= 64 ? 64 : px <= 128 ? 128 : px <= 256 ? 256 : px <= 512 ? 512 : 1024; }
@@ -1301,6 +1302,18 @@
 
   // Les arbres qui ne touchent jamais la lisière : au cœur d'une forêt, le sol reste uni.
   var FORET_PROFONDE = { arbre: 1, conifere: 1, automne: 1, tropical: 1, palmier: 1, acacia: 1, mort: 1 };
+  // La part des NS directions, à la distance R, où le terrain est le même que celui de `q`.
+  function fractionDedans(ctx, carte, q, pt, R, NS, grand) {
+    var dans = 0;
+    for (var w = 0; w < NS; w++) {
+      var an = (w + pt.r3) * 2 * Math.PI / NS, px = pt.x + Math.cos(an) * R, py = pt.y + Math.sin(an) * R * 0.6;
+      var qq = sonde(ctx, carte, px, py);
+      if (qq.eau || qq.m !== q.m) continue;
+      if (grand && distVoie(ctx, px, py) < 0) continue;
+      dans++;
+    }
+    return dans / NS;
+  }
   function calculerTuile(carte, k, ti, tj, zb) {
     var D = CASE0 / Math.pow(2, k), x0 = ti * TUILE * D, y0 = tj * TUILE * D, x1 = x0 + TUILE * D, y1 = y0 + TUILE * D, pad = 10 * D;
     var tu = { entrees: [], bbm: [x0 - pad, y0 - pad, x1 + pad, y1 + pad] };
@@ -1324,21 +1337,14 @@
         var s = ch[2] / dd.C * D * 0.72 * ECHELLES[rg.ech] * (0.82 + 0.36 * pt.r3);
         var grand = ch[2] >= 40;
         if (distVoie(ctx, pt.x, pt.y) < (grand ? 0.45 : 0.22) * s) continue;       // pas sur une voie
-        // Un décor se fond dans la lisière de son terrain au lieu de s'arrêter net : on sonde
-        // huit directions ; à l'intérieur, il est plein ; près du bord, il s'éclaircit et
-        // rapetisse (arbres clairsemés, plus petits) jusqu'à disparaître.
-        var R = Math.max(dd.marge * s, s * 3.5), dans = 0, NS = 12;
-        for (n = 0; n < NS; n++) {
-          var an = (n + pt.r3) * Math.PI / 6, px2 = pt.x + Math.cos(an) * R, py2 = pt.y + Math.sin(an) * R * 0.6;
-          var qq = sonde(ctx, carte, px2, py2);
-          if (qq.eau || qq.m !== q.m) continue;
-          if (grand && distVoie(ctx, px2, py2) < 0) continue;
-          dans++;
-        }
-        var f = dans / NS;
-        if (f >= 1 && FORET_PROFONDE[ch[0]]) continue;                 // au cœur de la forêt : fond uni, pas d'arbre
-        if (f < 0.25) continue;                                         // trop près du bord : rien
+        // Un décor se fond dans la lisière de son terrain au lieu de s'arrêter net : à l'intérieur
+        // il est plein ; près du bord il s'éclaircit et rapetisse (sujets clairsemés, plus petits).
+        var f = fractionDedans(ctx, carte, q, pt, Math.max(dd.marge * s, s * 1.2), 8, grand);
+        if (f < 0.25) continue;                                         // sur le bord : rien
         var fond = Math.min(1, (f - 0.25) / 0.6);
+        // Au cœur d'une grande forêt (tout autour, à trois tailles d'arbre, le même terrain) :
+        // fond uni, sans arbre. Un bosquet, lui, garde tous ses arbres.
+        if (fond >= 1 && FORET_PROFONDE[ch[0]] && fractionDedans(ctx, carte, q, pt, s * 3.5, 12, grand) >= 1) continue;
         if (fond < 1 && pt.r2 > fond + 0.1) continue;                     // au bord, seuls quelques sujets restent
         tu.entrees.push({ x: pt.x, y: pt.y, s: s * (0.45 + 0.55 * fond), sprite: ch[0], r: pt.r3, alpha: fond < 1 ? 0.25 + 0.75 * fond : null });
       }
@@ -1708,7 +1714,7 @@
     var zoom = vue.zoom, u = 1 / zoom;
     // Le découpage est fixé par la carte (parcelles d'une quinzaine de pixels à la vue
     // d'ensemble), pas par le zoom : zoomer agrandit les mêmes parcelles.
-    var kFin = Math.floor(Math.log(CASE0 * zoomBase(carte) * 2 / 30) / Math.LN2), f = 1;
+    var kFin = Math.floor(Math.log(CASE0 * zoomBase(carte) * 2 / (CHAMPS_PX || 30)) / Math.LN2), f = 1;
     if (CASE0 / Math.pow(2, kFin) * zoom < 1.5) return;                  // des parcelles de moins d'un pixel et demi : à peine un grain
     var DC = CASE0 / Math.pow(2, kFin), ctxC = contexteZone(carte, X0 - 3 * DC, Y0 - 3 * DC, X1 + 3 * DC, Y1 + 3 * DC);
     var enChamp = function (x, y) { var q = sonde(ctxC, carte, x, y); return !q.eau && q.m.id === "champs"; };
@@ -4108,7 +4114,7 @@
     }
     var th = THEMES[carte.theme] || THEMES.atlas;
     COULEURS = th.couleurs || null; ENCRE_DECORS = !!th.encreDecors; ECH_THEME = th.echDecors || 1;
-    DESSUS = !!th.dessus; SANS_DECOR = th.sansDecor || null; CULTURES_THEME = th.cultures || null;
+    DESSUS = !!th.dessus; SANS_DECOR = th.sansDecor || null; CULTURES_THEME = th.cultures || null; CHAMPS_PX = th.champsPx || 0;
     var dpr = vue.dpr || 1;
     var pw = Math.max(1, Math.round(vue.largeur * dpr));
     var ph = Math.max(1, Math.round(vue.hauteur * dpr));
@@ -4419,7 +4425,7 @@
   function figerDecors(carte, vue, tampons) {
     var th = THEMES[carte.theme] || THEMES.atlas;
     COULEURS = th.couleurs || null; ENCRE_DECORS = !!th.encreDecors; ECH_THEME = th.echDecors || 1;
-    DESSUS = !!th.dessus; SANS_DECOR = th.sansDecor || null; CULTURES_THEME = th.cultures || null;
+    DESSUS = !!th.dessus; SANS_DECOR = th.sansDecor || null; CULTURES_THEME = th.cultures || null; CHAMPS_PX = th.champsPx || 0;
     var pw = Math.max(1, Math.round(vue.largeur)), ph = Math.max(1, Math.round(vue.hauteur)), z = vue.zoom;
     ZPX = z;
     var tx = pw / 2 - vue.cx * z, ty = ph / 2 - vue.cy * z;
@@ -4449,7 +4455,7 @@
     DECORS: DECORS, TAMPONS: TAMPONS, VOIES: VOIES,
     TYPES_LIGNES: TYPES_LIGNES, TYPES_LIEUX: TYPES_LIEUX, CATEGORIES_LIEUX: CATEGORIES_LIEUX, STYLES_ETIQ: STYLES_ETIQ,
     POLICE: POLICE,
-    alea: alea, joli: joli,
+    alea: alea, joli: joli, distSeg: distSeg,
     niveau: niveau, zoomAjuste: zoomAjuste,
     boiteTrait: boiteTrait, nouveauTrait: nouveauTrait,
     boiteEtiquette: boiteEtiquette, poseEtiquette: poseEtiquette, positionSurLigne: positionSurLigne, visibleLieu: visibleLieu, tailleIcone: tailleIcone,

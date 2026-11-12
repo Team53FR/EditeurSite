@@ -2032,6 +2032,14 @@ décors qui ont un dessin vu d'en haut l'utilisent (`PEINTRES_DESSUS` : arbres e
 d'encre avec ombre portée, rochers) ; les autres gardent leur dessin de profil. Les maisons sont des
 toits vus du dessus, **orientés**, dessinés en vectoriel (`maisonDessus`).
 
+**Village prêt à l'emploi.** Au départ d'une nouvelle carte, « Village (vue du dessus) » crée un plan de
+900 m sur 450 m en style Plan (`Generateur.village`) : une côte à droite avec trois pontons, de grands
+champs à gauche (`champsPx` du thème : parcelles de ~75 px, séparées par des bandes d'herbe), des bosquets
+posés à des endroits prévus, une place ronde avec son arbre, des ruelles courbes qui en rayonnent, bordées
+de maisons (`maisons`), un demi-anneau de maisons autour de la place et des chemins de liaison. Ce sont des
+objets ordinaires (terrains, tracés, tampons) : tout se déplace ensuite à la main. L'échelle des décors est
+fixée pour un village (`zbFixe`). Un bosquet garde tous ses arbres ; seul le cœur d'une grande forêt reste uni.
+
 **Maisons : à la main ou le long d'une ligne.** Tracé « Rue bordée de maisons » (`maisons`, une voie
 comme les autres : ponts, accroche) : `maisonsDesRues` range les maisons de part et d'autre du fil de
 la rue (ou d'un seul côté, `cote`), tournées vers elle, pignon sur rue le plus souvent ; longueur
