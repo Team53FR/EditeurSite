@@ -2642,7 +2642,7 @@
     for (i = 0; i < pts.length; i++) {
       var p = pts[i], f = lisse[i] * Math.min(1, i / 8, (pts.length - 1 - i) / 8);        // (aux deux bouts, le chemin retrouve son tracé)
       if (f > 0.01) phase += 1 / longueur;
-      var tri = 2 / Math.PI * Math.asin(Math.sin(Math.PI * phase)), off = f * f * 16 * U * tri;      // triangle arrondi : des virages en épingle
+      var tri = 0, off = 0;                                   // (plus de zigzag : le chemin suit exactement le tracé)      // triangle arrondi : des virages en épingle
       var nx = -p[3], ny = p[2], x = p[0] + nx * off, y = p[1] + ny * off;
       out.push(x, y);
       if (f > 0.5 && i % 2 === 0) marches.push([x, y, nx, ny]);
