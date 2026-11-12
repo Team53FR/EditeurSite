@@ -908,6 +908,9 @@
   };
   // Les voies : elles se rejoignent, portent des ponts, et les décors s'en écartent.
   var VOIES = { route: true, pavee: true, sentier: true, maisons: true };
+  // Les tracés qui dégagent la végétation : arbres et massifs s'écartent d'eux, pour qu'on les voie
+  // à travers une forêt (une frontière, une route maritime ou un ponton ne dégagent rien).
+  var CLAIRIERES = { route: true, pavee: true, sentier: true, maisons: true, riviere: true, muraille: true, falaise: true };
 
   // `niv` : niveau de zoom à partir duquel le lieu apparaît (0 = toujours).
   // 1 correspond à la carte entière tenant dans l'écran.
@@ -1206,7 +1209,7 @@
 
   // Les objets qui touchent le rectangle (x0, y0, x1, y1), réduits à ce qui compte pour les décors.
   function contexteZone(carte, x0, y0, x1, y1) {
-    var ctx = { traits: [], lacs: [], rivieres: [], voies: [], zones: [] };
+    var ctx = { traits: [], lacs: [], rivieres: [], voies: [], traces: [], zones: [] };
     (carte.traits || []).forEach(function (t) {
       if (!t.bb) t.bb = boiteTrait(t.pts, t.taille);
       if (chevauche(t.bb, x0, y0, x1, y1)) ctx.traits.push(t);
@@ -1217,10 +1220,12 @@
       if (chevauche(bb, x0, y0, x1, y1)) ctx.lacs.push({ l: l, bb: bb });
     });
     (carte.lignes || []).forEach(function (l) {
-      if (!l.pts || l.pts.length < 4 || (l.type !== "riviere" && !VOIES[l.type])) return;
+      if (!l.pts || l.pts.length < 4 || !CLAIRIERES[l.type]) return;
       var d = pointsAffiches(l), m = (l.taille || 0) * 1.5, bb = boiteTrait(d, 0);
       if (!chevauche([bb[0] - m, bb[1] - m, bb[2] + m, bb[3] + m], x0, y0, x1, y1)) return;
-      (l.type === "riviere" ? ctx.rivieres : ctx.voies).push({ l: l, d: d, bb: bb, m: m });
+      var vo = { l: l, d: d, bb: bb, m: m };
+      if (l.type === "riviere") ctx.rivieres.push(vo); else if (VOIES[l.type]) ctx.voies.push(vo);
+      ctx.traces.push({ l: l, d: d, bb: bb, m: m, demi: (l.taille || 0) * (l.type === "riviere" ? (l.delta ? 0.65 : 0.5) : 0.6) });
     });
     (carte.finesses || []).forEach(function (f) { if (f.bb && chevauche(f.bb, x0, y0, x1, y1)) ctx.zones.push(f); });
     return ctx;
@@ -1259,6 +1264,21 @@
       var demi = (v.l.taille || 0) * 0.6;
       for (var q = 0; q + 3 < v.d.length; q += 2) {
         var d = distSeg(x, y, v.d[q], v.d[q + 1], v.d[q + 2], v.d[q + 3]) - demi;
+        if (d < best) best = d;
+      }
+    }
+    return best;
+  }
+
+  // Comme distVoie, mais pour tous les tracés qui dégagent la végétation (rivières, murailles et
+  // falaises compris) : distance au plus proche, moins sa demi-largeur.
+  function distTrace(ctx, x, y) {
+    var best = Infinity;
+    for (var i = 0; i < ctx.traces.length; i++) {
+      var v = ctx.traces[i], b = v.bb, m = v.m + best;
+      if (best < Infinity && (x < b[0] - m || x > b[2] + m || y < b[1] - m || y > b[3] + m)) continue;
+      for (var q = 0; q + 3 < v.d.length; q += 2) {
+        var d = distSeg(x, y, v.d[q], v.d[q + 1], v.d[q + 2], v.d[q + 3]) - v.demi;
         if (d < best) best = d;
       }
     }
@@ -1328,7 +1348,7 @@
       if (l.pts && l.pts.length >= 6) voir("w" + (l.id || i), somme(l.pts, 0), boiteTrait(l.pts, 0));
     });
     (carte.lignes || []).forEach(function (l, i) {
-      if (!l.pts || l.pts.length < 4 || (l.type !== "riviere" && !VOIES[l.type])) return;
+      if (!l.pts || l.pts.length < 4 || !CLAIRIERES[l.type]) return;
       var m = (l.taille || 0) * 2;
       voir("l" + (l.id || i), somme(l.pts, (l.taille || 0) * 11 + (l.meandre || 0) * 5 + (l.delta ? 3 : 0) + (l.lisse === false ? 7 : 0) + (l.type === "riviere" ? 1 : 2)),
         (function (bb) { return [bb[0] - m, bb[1] - m, bb[2] + m, bb[3] + m]; })(boiteTrait(l.pts, 0)));
@@ -1343,13 +1363,14 @@
   var FAMILLE_CANOPEE = { arbre: 0, conifere: 1, tropical: 2, automne: 3, palmier: 4, montagne: 5, cime: 6 };       // la couleur du fond uni : celle des arbres
   var FORET_PROFONDE = { arbre: 1, conifere: 1, automne: 1, tropical: 1, palmier: 1, acacia: 1, mort: 1 };
   // La part des NS directions, à la distance R, où le terrain est le même que celui de `q`.
-  function fractionDedans(ctx, carte, q, pt, R, NS, grand) {
+  function fractionDedans(ctx, carte, q, pt, R, NS, grand, degage) {
     var dans = 0;
     for (var w = 0; w < NS; w++) {
       var an = (w + pt.r3) * 2 * Math.PI / NS, px = pt.x + Math.cos(an) * R, py = pt.y + Math.sin(an) * R * 0.6;
       var qq = sonde(ctx, carte, px, py);
       if (qq.eau || qq.m !== q.m) continue;
       if (grand && distVoie(ctx, px, py) < 0) continue;
+      if (degage && distTrace(ctx, px, py) < degage) continue;      // dans le couloir d'un tracé : comme hors du terrain
       dans++;
     }
     return dans / NS;
@@ -1376,7 +1397,10 @@
         // Sa taille dans le monde : proportionnelle à la case, donc fixe.
         var s = ch[2] / dd.C * D * 0.72 * ECHELLES[rg.ech] * (0.82 + 0.36 * pt.r3);
         var grand = ch[2] >= 40;
-        if (distVoie(ctx, pt.x, pt.y) < (grand ? 0.45 : 0.22) * s) continue;       // pas sur une voie
+        // Rien sur un tracé (route, rivière, muraille…) ni contre lui : un couloir reste dégagé,
+        // pour qu'on le voie à travers une forêt ; ses bords se comportent comme une lisière.
+        var gaine = (dd.masse === "relief" ? 0.3 : dd.masse ? 0.45 : grand ? 0.45 : 0.22) * s;
+        if (distTrace(ctx, pt.x, pt.y) < gaine) continue;
         var relief = dd.masse === "relief";
         if (!dd.masse || (!relief && !FORET_PROFONDE[ch[0]])) {
           // Les autres décors (rochers, arbres isolés…) restent bien à l'intérieur de leur terrain.
@@ -1392,13 +1416,13 @@
         var rel = relief ? 1 : 0;
         if (relief && fractionDedans(ctx, carte, q, pt, dd.marge * s, 8, grand) >= 1) tu.entrees.push({ x: pt.x, y: pt.y, s: s, sprite: ch[0], r: pt.r3, cl: 1 });
         var ray = relief ? [0.6, 0.85, 1.15] : [1.4, 2, 2.6];            // rayons (en tailles du décor) : lisière, puis deux paliers de fondu
-        var f = fractionDedans(ctx, carte, q, pt, Math.max(dd.marge * s, s * ray[0]), 8, grand);
+        var f = fractionDedans(ctx, carte, q, pt, Math.max(dd.marge * s, s * ray[0]), 8, grand, gaine);
         if (f < 0.25) continue;                                         // sur le bord même : rien
         tu.entrees.push({ x: pt.x, y: pt.y, s: s, sprite: "canopee", r: pt.r3, v: FAMILLE_CANOPEE[ch[0]] || 0, rel: rel });     // le fond uni, sous les sujets
         // Les sujets sont pleins sur le bord extérieur ; vers l'intérieur ils perdent cerne et ombre,
         // se rapprochent de la couleur du fond et se réduisent à des arcs en tirets.
         var prof = 0;                                                    // 0 : lisière ; 1, 2 : de plus en plus fondu ; 3 : le cœur
-        if (f >= 1) prof = fractionDedans(ctx, carte, q, pt, s * ray[1], 8, grand) < 1 ? 1 : fractionDedans(ctx, carte, q, pt, s * ray[2], 8, grand) < 1 ? 2 : 3;
+        if (f >= 1) prof = fractionDedans(ctx, carte, q, pt, s * ray[1], 8, grand, gaine) < 1 ? 1 : fractionDedans(ctx, carte, q, pt, s * ray[2], 8, grand, gaine) < 1 ? 2 : 3;
         if (prof === 3) { if (pt.r2 < 0.05) prof = 2; else continue; }  // au cœur : fond uni, et de rares arcs en tirets
         if (prof === 0) {
           // Un sujet de lisière : sa silhouette cernée (peinte avant tout le reste) puis son
