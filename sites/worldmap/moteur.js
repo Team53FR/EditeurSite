@@ -2683,7 +2683,9 @@
     var u = 1 / vue.zoom;
     if (!GRADINS.length) return;
     grottes.forEach(function (v) {
-      var d = pointsAffiches(v.l), m = d.length / 2, U = v.lw;
+      var d = pointsAffiches(v.l), m = d.length / 2, U = v.lw, bbv = boiteTrait(d, 0), Mv = U * 30;
+      var czr = v.l.sousSol ? null : contexteZone(carte, bbv[0] - Mv, bbv[1] - Mv, bbv[2] + Mv, bbv[3] + Mv);
+      var surEau = function (x, y) { return !!czr && czr.rivieres.length > 0 && distRiviere(czr, x, y) < Math.max(U * 1.2, 3 * u); };
       // « Sous la montagne » = sous la silhouette RÉELLEMENT peinte du massif (disques de bord, cerne compris) :
       // les entrées tombent donc exactement sur son contour extérieur.
       var cercles = [], cell = 1e-9, grille = {};
@@ -2706,7 +2708,8 @@
         for (var t = 0; t < L; t += pas) pts.push([ax + (bx - ax) * t / L, ay + (by - ay) * t / L, (bx - ax) / (L || 1), (by - ay) / (L || 1)]);
       }
       pts.push([d[2 * m - 2], d[2 * m - 1], pts.length ? pts[pts.length - 1][2] : 1, pts.length ? pts[pts.length - 1][3] : 0]);
-      var dans = pts.map(function (p) { return enMont(p[0], p[1]); }), n = pts.length;
+      var eau = pts.map(function (p) { return surEau(p[0], p[1]); });
+      var dans = pts.map(function (p, j) { return !eau[j] && enMont(p[0], p[1]); }), n = pts.length;
       // Rebouche les trous courts, puis écarte les tronçons trop courts.
       var trou = Math.max(2, Math.round(25 * U / pas)), mini = Math.max(3, Math.round(8 * U / pas)), runs = [], deb = -1;
       for (i = 0; i <= n; i++) {
@@ -2714,7 +2717,11 @@
         if (deb >= 0) { runs.push([deb, i - 1]); deb = -1; }
       }
       var fus = [];
-      runs.forEach(function (r) { var der = fus[fus.length - 1]; if (der && r[0] - der[1] <= trou) der[1] = r[1]; else fus.push(r.slice()); });
+      runs.forEach(function (r) {
+        var der = fus[fus.length - 1], riv = false;
+        if (der) for (var z = der[1]; z <= r[0]; z++) if (eau[z]) { riv = true; break; }      // une rivière coupe toujours la grotte
+        if (der && !riv && r[0] - der[1] <= trou) der[1] = r[1]; else fus.push(r.slice());
+      });
       fus.filter(function (r) { return r[1] - r[0] >= mini; }).forEach(function (r) {
         ctx.save(); ctx.lineCap = "butt"; ctx.lineJoin = "round";
         var dash = Math.max(U * 2.4, 5 * u);
@@ -2986,7 +2993,8 @@
         if (s1 - s0 < lw) return;
         // Un chemin qui gravit un massif (rives sur montagne ou cime, vu du dessus) n'a pas de pont : il
         // ne passe sous la montagne, avec un pont, que s'il est hors du massif.
-        if (th.dessus && r.relief !== "col") {       // (un col est au niveau du sol : son pont reste)
+        if (r.relief === "grotte") { if (r.sousSol) return; }       // grotte : sous l'eau (sous-sol) = pas de pont ; sinon un pont normal, elle ressort
+        else if (th.dessus && r.relief !== "col") {       // (un col est au niveau du sol : son pont reste)
           var surMassif = function (sc) {
             var p = sousChemin(d, cum, sc, sc), q = sonde(ctxP, carte, p[0], p[1]);
             return !q.eau && (q.m.id === "montagne" || q.m.id === "cime");
@@ -2995,7 +3003,6 @@
           if (surMassif(Math.max(0, s0 - lw * portee)) || surMassif(Math.min(total, s1 + lw * portee))) {
             // Sur la roche, la gorge se franchit par un PONT SUSPENDU : des planches, deux câbles tendus
             // d'un poteau à l'autre et des suspentes. On le dessine ici, après la rivière.
-            if (r.relief === "grotte") return;                  // une grotte est sous terre : pas de pont
             var uu = 1 / vue.zoom, e0 = Math.max(0, s0 - lw * 3), e1 = Math.min(total, s1 + lw * 3);
             var tr = sousChemin(d, cum, e0, e1), Wp = Math.max(lw * 1.9, 5.5 * uu);
             var trace = function (pts) { ctx.beginPath(); ctx.moveTo(pts[0], pts[1]); for (var kk = 2; kk < pts.length; kk += 2) ctx.lineTo(pts[kk], pts[kk + 1]); };
