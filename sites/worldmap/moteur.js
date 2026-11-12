@@ -1354,8 +1354,12 @@
         var f = fractionDedans(ctx, carte, q, pt, Math.max(dd.marge * s, s * 1.4), 8, grand);
         if (f < 0.25) continue;                                         // sur le bord même : rien
         tu.entrees.push({ x: pt.x, y: pt.y, s: s, sprite: "canopee", r: pt.r3, v: FAMILLE_CANOPEE[ch[0]] || 0 });     // le fond uni, sous les arbres
-        if (f >= 1) continue;                                           // au cœur : pas d'arbre
-        tu.entrees.push({ x: pt.x, y: pt.y, s: s, sprite: ch[0], r: pt.r3 });
+        // Les arbres sont pleins sur le bord extérieur ; vers l'intérieur ils s'effacent peu à
+        // peu (de 1,4 à 2,6 tailles du bord) : leur bord intérieur se fond dans le fond uni.
+        var opacite = 1;
+        if (f >= 1) opacite = fractionDedans(ctx, carte, q, pt, s * 2, 8, grand) < 1 ? 0.6 : fractionDedans(ctx, carte, q, pt, s * 2.6, 8, grand) < 1 ? 0.28 : 0;
+        if (opacite < 0.05) continue;                                   // au cœur : pas d'arbre
+        tu.entrees.push({ x: pt.x, y: pt.y, s: s, sprite: ch[0], r: pt.r3, alpha: opacite < 1 ? opacite : null });
       }
     }
     return tu;
@@ -1421,7 +1425,7 @@
                 if (!libre) continue;
               }
             }
-            liste.push({ x: en.x, y: en.y, s: s, sprite: en.sprite, r: en.r, v: en.v });
+            liste.push({ x: en.x, y: en.y, s: s, sprite: en.sprite, r: en.r, v: en.v, alpha: en.alpha });
           }
         }
       }
@@ -1681,6 +1685,9 @@
     for (var i = 0; i < liste.length; i++) {
       var o = liste[i];
       if (o.maison) { maisonDessus(lc, o.x, o.y, o.maison.w, o.maison.h, o.maison.a, o.maison.v); continue; }
+      // Un arbre de la bordure intérieure d'une forêt est d'autant transparent : il se fond dans le fond uni.
+      var fondu = o.alpha != null && o.alpha < 1;
+      if (fondu) { lc.save(); lc.globalAlpha = o.alpha; }
       if (o.rot) {
         // Un décor tourné : on le colle autour de son centre (le dessin est centré à 0,31 s au-dessus de son pied).
         lc.save();
@@ -1688,9 +1695,10 @@
         lc.rotate(o.rot);
         colle(lc, o.sprite, o.v != null ? o.v % VARIANTES[o.sprite] : variante(o.sprite, o.r), 0, o.s * 0.31, o.s);
         lc.restore();
-        continue;
+      } else {
+        colle(lc, o.sprite, o.v != null ? o.v % VARIANTES[o.sprite] : variante(o.sprite, o.r), o.x, o.y, o.s);
       }
-      colle(lc, o.sprite, o.v != null ? o.v % VARIANTES[o.sprite] : variante(o.sprite, o.r), o.x, o.y, o.s);
+      if (fondu) lc.restore();
     }
   }
 
@@ -4214,7 +4222,7 @@
           // Vu du dessus, une maison posée à la main est un toit, orientable (`a`, en degrés).
           var kb = BATIMENTS[tp.type];
           decors.push({ x: tp.x, y: tp.y - tp.s * 0.3, maison: { w: s * 0.62 * kb, h: s * 0.4 * kb, a: (tp.a || 0) * Math.PI / 180, v: tp.v || 0 } });
-        } else decors.push({ x: tp.x, y: y, s: s, sprite: tp.type, v: tp.v || 0, rot: tp.a ? tp.a * Math.PI / 180 : 0 });
+        } else decors.push({ x: tp.x, y: y, s: s, sprite: tp.type, v: tp.v || 0, rot: tp.a ? tp.a * Math.PI / 180 : 0, alpha: tp.alpha });
       });
       // Les maisons des rues : les arbres leur laissent la place.
       maisonsDesRues(carte, vue, masque, X0, Y0, X1, Y1).forEach(function (mz) {
@@ -4447,7 +4455,7 @@
       if (o.maison) {
         var sm = o.maison.w / 0.62;
         out.push({ type: "maison", v: o.maison.v, x: o.x, y: o.y + sm * 0.3, s: sm, a: Math.round(o.maison.a * 180 / Math.PI * 10) / 10 });
-      } else out.push({ type: o.sprite, v: o.v != null ? o.v : variante(o.sprite, o.r), x: o.x, y: o.y, s: o.s });
+      } else out.push({ type: o.sprite, v: o.v != null ? o.v : variante(o.sprite, o.r), x: o.x, y: o.y, s: o.s, alpha: o.alpha });
     });
     var rues = (liste.rues || []).filter(function (r) {
       return Math.max(r[0], r[2]) >= X0 && Math.min(r[0], r[2]) <= X1 && Math.max(r[1], r[3]) >= Y0 && Math.min(r[1], r[3]) <= Y1;

@@ -1800,7 +1800,7 @@ quelques îlots et des navires en pleine mer (loin du cadre, des côtes et les u
 **Décors peints.** Arbres, conifères, palmiers, acacias, arbres morts ou d'automne, pics, rochers,
 parcelles de champs, blocs de glace, roseaux et herbes sont peints **une seule
 fois** dans de petits canvas (`peintArbre`, `peintMontagne`…) : dégradés, ombre au sol, touches de
-lumière, pas de contour de dessin animé. Une forêt (`masse: true`) se lit comme une masse : au cœur, un fond uni de la couleur du feuillage (le sprite `canopee`, vu du dessus ; sinon le sol de la forêt), et seule la lisière — à moins d'une taille et demie du bord — porte des arbres cernés, qui en dessinent le contour (`calculerTuile`). Un bosquet, trop petit pour avoir un cœur, garde tous ses arbres. On les colle ensuite par milliers (`colle`), avec cinq
+lumière, pas de contour de dessin animé. Une forêt (`masse: true`) se lit comme une masse : au cœur, un fond uni de la couleur du feuillage (le sprite `canopee`, vu du dessus ; sinon le sol de la forêt), et seule la lisière porte des arbres cernés, qui en dessinent le contour (`calculerTuile`) : pleins à moins d'une taille et demie du bord, puis de plus en plus transparents (`alpha`, trois paliers jusqu'à deux tailles et demie) pour que leur bord intérieur se fonde dans le fond uni. Un bosquet, trop petit pour avoir un cœur, garde tous ses arbres. On les colle ensuite par milliers (`colle`), avec cinq
 définitions (64 à 1 024 px) choisies d'après le zoom (`ZPX`). Seules les terres volcaniques restent
 en vectoriel.
 
