@@ -27,7 +27,7 @@
     tampon: "arbre",         // outil Décors : le décor posé à la main
     taillePxTampon: 36,
     angleTampon: "alea",     // outil Décors : orientation d'une maison posée (degrés, ou au hasard)
-    maisonPx: 18,            // tracé « rue bordée de maisons » : taille d'une maison
+    maisonM: 9,              // tracé « rue bordée de maisons » : longueur réelle d'une maison, en mètres
     coteMaisons: "deux",     // … de quel côté de la rue
     variation: 0.3,          // outil Décors : écart de taille d'un décor à l'autre
     typeLigne: "riviere",
@@ -1095,7 +1095,7 @@
       };
       if (th === "riviere") { E.ligneEnCours.meandre = E.meandre; E.ligneEnCours.delta = E.delta; }
       if (th === "frontiere" && E.fermer) E.ligneEnCours.ferme = true;
-      if (th === "maisons") { E.ligneEnCours.maison = E.maisonPx / E.vue.zoom; if (E.coteMaisons !== "deux") E.ligneEnCours.cote = E.coteMaisons; }
+      if (th === "maisons") { E.ligneEnCours.maison = E.maisonM / 1000; if (E.coteMaisons !== "deux") E.ligneEnCours.cote = E.coteMaisons; }
     }
     var pts = E.ligneEnCours.pts;
     if (pts.length >= 2) {
@@ -1704,7 +1704,7 @@
         zone.appendChild(sousTitre(groupe));
         var pal = el("div", { classe: "palette" });
         Moteur.MATERIAUX.forEach(function (m) {
-          if (m.groupe !== groupe) return;
+          if (m.groupe !== groupe || m.retire) return;
           var b = el("button", { type: "button", classe: "mat" + (m.id === E.materiau ? " actif" : ""), title: m.nom }, [pastilleTerrain(m), el("span", { texte: m.nom })]);
           b.addEventListener("click", function () { E.materiau = m.id; panneauOutil(); });
           pal.appendChild(b);
@@ -1821,7 +1821,7 @@
         maritime: "Un pointillé pour les routes des navires."
       };
       if (E.typeLigne === "maisons") {
-        zone.appendChild(champCurseur("Taille des maisons", 6, 70, 1, E.maisonPx, function (v) { return Math.round(v) + " px"; }, function (v) { E.maisonPx = v; }));
+        zone.appendChild(champCurseur("Longueur d'une maison", 4, 20, 1, E.maisonM, function (v) { return Math.round(v) + " m"; }, function (v) { E.maisonM = v; }));
         zone.appendChild(champSegments("Maisons", [["deux", "Des deux côtés"], ["gauche", "À gauche"], ["droite", "À droite"]], E.coteMaisons, function (v) { E.coteMaisons = v; }));
         zone.appendChild(el("p", { classe: "aide", texte: "Tracez la rue : les maisons se rangent le long, tournées vers elle. Déplacez ensuite un point de la rue, les maisons suivent. Pour une maison isolée, utilisez l'outil Décors." }));
       }
@@ -2006,8 +2006,8 @@
         zone.appendChild(champCase("S'élargit vers l'embouchure", o.delta, function (v) { editer(function (x) { x.delta = v; }); }));
       }
       if (o.type === "maisons") {
-        zone.appendChild(champCurseur("Taille des maisons", 6, 70, 1, borne((o.maison || o.taille * 6) * E.vue.zoom, 6, 70), function (v) { return Math.round(v) + " px"; },
-          function (v) { editer(function (x) { x.maison = v / E.vue.zoom; }); }));
+        zone.appendChild(champCurseur("Longueur d'une maison", 4, 20, 1, borne(Math.round((o.maison || 0.009) * 1000), 4, 20), function (v) { return Math.round(v) + " m"; },
+          function (v) { editer(function (x) { x.maison = v / 1000; }); }));
         zone.appendChild(champCurseur("Espacement", 0.8, 3, 0.05, o.espace || 1, function (v) { return "×" + nb(v, 2); },
           function (v) { editer(function (x) { x.espace = v; }); }));
         zone.appendChild(champSegments("Maisons", [["deux", "Deux côtés"], ["gauche", "Gauche"], ["droite", "Droite"]], o.cote || "deux",
