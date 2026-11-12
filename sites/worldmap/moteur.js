@@ -616,6 +616,8 @@
       var prof = Math.floor(v / 100); v = v % 100;
       var fondu = prof === 1 || prof === 2 || prof >= 6, mult = fondu ? 0 : 1;
       var tier = { 1: 0, 2: 1, 6: 2, 7: 3, 8: 4 }[prof];
+      // Les paliers de fondu ont un bord flou (de plus en plus) : les formes se dissolvent les unes dans les autres.
+      if (fondu && "filter" in g) g.filter = "blur(" + ([2.5, 4, 5.5, 7, 8.5][tier] * g.getTransform().a).toFixed(2) + "px)";
       var R = function (i) { return alea(2300 + v + (neige ? 40 : 0), i); };
       var n = 9, pts = [], i;
       for (i = 0; i < n; i++) { var a = i / n * TAU + R(i) * 0.5, r = 30 + R(10 + i) * 14; pts.push([Math.cos(a) * r, Math.sin(a) * r * 0.92]); }
