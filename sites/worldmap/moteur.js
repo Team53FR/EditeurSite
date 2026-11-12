@@ -1277,7 +1277,7 @@
       if (!chevauche([bb[0] - m, bb[1] - m, bb[2] + m, bb[3] + m], x0, y0, x1, y1)) return;
       var vo = { l: l, d: d, bb: bb, m: m };
       if (l.type === "riviere") ctx.rivieres.push(vo); else if (VOIES[l.type]) ctx.voies.push(vo);
-      ctx.traces.push({ l: l, d: d, bb: bb, m: m, demi: (l.taille || 0) * (l.type === "riviere" ? (l.delta ? 0.65 : 0.5) : l.type === "muraille" ? 1.3 : 0.6) });     // (une muraille : ses tours, plus larges que le mur)
+      ctx.traces.push({ l: l, d: d, bb: bb, m: m, col: l.relief === "col", demi: (l.taille || 0) * (l.type === "riviere" ? (l.delta ? 0.65 : 0.5) : l.type === "muraille" ? 1.3 : 0.6) });     // (une muraille : ses tours, plus larges que le mur)
     });
     (carte.finesses || []).forEach(function (f) { if (f.bb && chevauche(f.bb, x0, y0, x1, y1)) ctx.zones.push(f); });
     return ctx;
@@ -1334,10 +1334,11 @@
     }
     return best;
   }
-  function distTrace(ctx, x, y) {
+  function distTrace(ctx, x, y, colSeul) {
     var best = Infinity;
     for (var i = 0; i < ctx.traces.length; i++) {
       var v = ctx.traces[i], b = v.bb, m = v.m + best;
+      if (colSeul && !v.col) continue;
       if (best < Infinity && (x < b[0] - m || x > b[2] + m || y < b[1] - m || y > b[3] + m)) continue;
       for (var q = 0; q + 3 < v.d.length; q += 2) {
         var d = distSeg(x, y, v.d[q], v.d[q + 1], v.d[q + 2], v.d[q + 3]) - v.demi;
@@ -1412,7 +1413,7 @@
     (carte.lignes || []).forEach(function (l, i) {
       if (!l.pts || l.pts.length < 4 || !CLAIRIERES[l.type]) return;
       var m = (l.taille || 0) * 2;
-      voir("l" + (l.id || i), somme(l.pts, (l.taille || 0) * 11 + (l.meandre || 0) * 5 + (l.delta ? 3 : 0) + (l.lisse === false ? 7 : 0) + (l.type === "riviere" ? 1 : 2)),
+      voir("l" + (l.id || i), somme(l.pts, (l.taille || 0) * 11 + (l.meandre || 0) * 5 + (l.delta ? 3 : 0) + (l.lisse === false ? 7 : 0) + (l.relief === "col" ? 11 : 0) + (l.type === "riviere" ? 1 : 2)),
         (function (bb) { return [bb[0] - m, bb[1] - m, bb[2] + m, bb[3] + m]; })(boiteTrait(l.pts, 0)));
     });
     (carte.finesses || []).forEach(function (f, i) {
@@ -1468,6 +1469,7 @@
           // extérieur seulement, puis remplissage uni), avec quelques sommets isolés au milieu.
           var fam = FAMILLE_CANOPEE[ch[0]], dedans = fractionDedans(ctx, carte, q, pt, s * 0.3, 8, grand);
           if (dedans < 0.75 || distRiviere(ctx, pt.x, pt.y) < s * 0.05) continue;
+          if (distTrace(ctx, pt.x, pt.y, true) < s * 0.35) continue;       // un « col » : le massif s'ouvre pour laisser passer le chemin
           if (fractionDedans(ctx, carte, q, pt, dd.marge * s, 8, grand) >= 1) tu.entrees.push({ x: pt.x, y: pt.y, s: s, sprite: ch[0], r: pt.r3, cl: 1 });
           // Un massif se lit comme une carte en courbes de niveau : un bord de falaise en gradins
           // (cerne, puis des bandes de plus en plus claires cernées d'un trait fin), un intérieur
@@ -2650,11 +2652,36 @@
     return { d: out, marches: marches };
   }
 
+  // Les entrées d'une grotte : un arc sombre là où le chemin entre sous le massif et là où il en sort.
+  function entreesGrottes(ctx, grottes, carte, vue) {
+    grottes.forEach(function (v) {
+      var d = pointsAffiches(v.l), m = d.length / 2, U = v.lw, bb = boiteTrait(d, 0), M = U * 20;
+      var cz = contexteZone(carte, bb[0] - M, bb[1] - M, bb[2] + M, bb[3] + M);
+      var enMont = function (x, y) { var q = sonde(cz, carte, x, y); return !q.eau && (q.m.id === "montagne" || q.m.id === "cime"); };
+      var pas = Math.max(U * 0.5, 1 / vue.zoom), prev = null;
+      for (var i = 0; i + 1 < m; i++) {
+        var ax = d[2 * i], ay = d[2 * i + 1], bx = d[2 * i + 2], by = d[2 * i + 3], L = Math.hypot(bx - ax, by - ay), dx = (bx - ax) / (L || 1), dy = (by - ay) / (L || 1);
+        for (var t = 0; t < L; t += pas) {
+          var x = ax + dx * t, y = ay + dy * t, mo = enMont(x, y);
+          if (prev !== null && mo !== prev) {
+            var sens = mo ? 1 : -1, a = Math.atan2(dy, dx);
+            ctx.save(); ctx.translate(x, y); ctx.rotate(a);
+            ctx.fillStyle = "rgba(16,30,28,0.35)"; ctx.beginPath(); ctx.ellipse(U * 0.2, U * 0.4, U * 1.5, U * 1.9, 0, 0, TAU); ctx.fill();
+            ctx.fillStyle = "#14191a"; ctx.strokeStyle = "#1c2622"; ctx.lineWidth = Math.max(1.5 / vue.zoom, U * 0.25);
+            ctx.beginPath(); ctx.ellipse(0, 0, U * 1.2 * (sens > 0 ? 1 : 1), U * 1.6, 0, 0, TAU); ctx.fill(); ctx.stroke();
+            ctx.restore();
+          }
+          prev = mo;
+        }
+      }
+    });
+  }
+
   function tracerVoies(ctx, voies, vue, carte, dessus) {
     if (!voies.length) return;
     var u = 1 / vue.zoom;
     voies.forEach(function (v) { v.d = pointsAffiches(v.l); v.marches = null;
-      if (dessus && carte && v.l.type !== "maisons") { var cm = cheminDeMontagne(v.d, v.l, carte); v.d = cm.d; v.marches = cm.marches; } v.sentier = v.l.type === "sentier" || v.l.type === "maisons"; v.pavee = v.l.type === "pavee"; });
+      if (dessus && carte && v.l.type !== "maisons" && (!v.l.relief || v.l.relief === "dessus")) { var cm = cheminDeMontagne(v.d, v.l, carte); v.d = cm.d; v.marches = cm.marches; } v.sentier = v.l.type === "sentier" || v.l.type === "maisons"; v.pavee = v.l.type === "pavee"; });
     var chemin = function (d) {
       ctx.beginPath();
       ctx.moveTo(d[0], d[1]);
@@ -4486,9 +4513,14 @@
       // jamais sur l'eau — là, c'est le pont qui prend le relais.
       // Les massifs d'abord : le chemin les gravit (il passe par-dessus), alors que les arbres le bordent.
       var massifs = decors.filter(function (d) { return d.rel; });
-      if (massifs.length) { decors = decors.filter(function (d) { return !d.rel; }); peindreDecors(lc, massifs); }
+      var toutesVoies = voiesVisibles(carte, vue, th, X0, Y0, X1, Y1);
+      var grottes = toutesVoies.filter(function (v) { return v.l.relief === "grotte"; });
       lc.globalCompositeOperation = "source-atop";
-      tracerVoies(lc, voiesVisibles(carte, vue, th, X0, Y0, X1, Y1), vue, carte, !!th.dessus);
+      // Une grotte : le chemin est peint AVANT le massif, qui le recouvre (il passe sous la montagne).
+      if (grottes.length && th.dessus) tracerVoies(lc, grottes, vue, carte, false);
+      if (massifs.length) { decors = decors.filter(function (d) { return !d.rel; }); peindreDecors(lc, massifs); }
+      if (grottes.length && th.dessus) { entreesGrottes(lc, grottes, carte, vue); toutesVoies = toutesVoies.filter(function (v) { return v.l.relief !== "grotte"; }); }
+      tracerVoies(lc, toutesVoies, vue, carte, !!th.dessus);
       lc.globalCompositeOperation = "source-over";
       peindreDecors(lc, decors);
       lc.restore();
