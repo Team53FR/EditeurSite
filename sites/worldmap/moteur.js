@@ -551,7 +551,9 @@
       // épais ni d'ombre, sa couleur se rapproche du fond uni et il ne garde que des arcs en tirets.
       var prof = Math.floor(v / 100); v = v % 100;
       var R = function (i) { return alea(2100 + v, i); }, T = FEUILLES_DESSUS[famille];
-      if (prof) { var mel = prof === 1 ? 0.55 : 0.88, I = INTERIEUR_DESSUS[famille]; T = T.map(function (c) { return melange(c, I, mel); }); }
+      // 4 : l'arbre de lisière, sans cerne propre ; 5 : sa silhouette cernée seule ; 1-2 : fondu.
+      var fondu = prof === 1 || prof === 2;
+      if (fondu) { var mel = prof === 1 ? 0.55 : 0.88, I = INTERIEUR_DESSUS[famille]; T = T.map(function (c) { return melange(c, I, mel); }); }
       var boules = [[0, 0, 21]], n = 6 + (v % 2), i;
       for (i = 0; i < n; i++) {
         var a = i / n * TAU + R(i) * 0.6, d = 17 + R(10 + i) * 6;
@@ -563,21 +565,22 @@
         boules.forEach(function (b) { g.moveTo(b[0] + dx + b[2] + extra, b[1] + dy); g.arc(b[0] + dx, b[1] + dy, b[2] + extra, 0, TAU); });
         g.fill();
       };
-      if (!prof) {
+      if (prof === 0 || prof === 5) {
         passe(7, 9, 0, "rgba(16,30,28,0.3)");        // l'ombre
-        passe(0, 0, 2.6, "#1c2622");                  // le cerne
+        passe(0, 0, prof === 5 ? 3.6 : 2.6, "#1c2622");   // le cerne (plus épais pour la silhouette d'une lisière)
       }
+      if (prof === 5) return;
       passe(0, 0, 0, T[1]);
       boules.forEach(function (b, q) {               // le volume : un côté clair, des arcs sombres
         g.fillStyle = q % 2 ? T[0] : T[2];
-        g.globalAlpha = prof ? 0.35 : 0.55;
+        g.globalAlpha = fondu ? 0.35 : 0.55;
         g.beginPath(); g.arc(b[0] - b[2] * 0.2, b[1] - b[2] * 0.22, b[2] * 0.62, 0, TAU); g.fill();
         g.globalAlpha = 1;
-        if (prof) {
+        if (fondu) {
           g.strokeStyle = "rgba(14,30,30," + (prof === 1 ? 0.8 : 0.6) + ")"; g.lineWidth = 1.7; g.setLineDash([4, 5]);
           g.beginPath(); g.arc(b[0], b[1], b[2] * 0.95, -0.5, 2.3); g.stroke(); g.setLineDash([]);
         } else {
-          g.strokeStyle = "rgba(20,40,32,0.5)"; g.lineWidth = 1.4;
+          g.strokeStyle = prof === 4 ? "rgba(16,34,28,0.75)" : "rgba(20,40,32,0.5)"; g.lineWidth = prof === 4 ? 1.8 : 1.4;
           g.beginPath(); g.arc(b[0], b[1], b[2] * 0.82, 0.2, 1.7); g.stroke();
         }
       });
@@ -811,6 +814,7 @@
   }
   // La variante à peindre d'un décor : son dessin (modulo le nombre de variantes) et, pour un arbre
   // de forêt vu du dessus, sa profondeur (+100 par palier : 0 lisière, 1-2 fondu, voir arbreDessus).
+  function profDe(o) { return o.prof != null ? o.prof : o.v != null ? Math.floor(o.v / 100) : 0; }
   function variantePeinte(o) {
     var base = o.v != null ? (o.v % 100) % VARIANTES[o.sprite] : variante(o.sprite, o.r);
     return base + 100 * (o.v != null ? Math.floor(o.v / 100) : (o.prof || 0));
@@ -1383,6 +1387,12 @@
         var prof = 0;                                                    // 0 : lisière ; 1, 2 : de plus en plus fondu ; 3 : le cœur
         if (f >= 1) prof = fractionDedans(ctx, carte, q, pt, s * 2, 8, grand) < 1 ? 1 : fractionDedans(ctx, carte, q, pt, s * 2.6, 8, grand) < 1 ? 2 : 3;
         if (prof === 3) { if (pt.r2 < 0.05) prof = 2; else continue; }  // au cœur : fond uni, et de rares arcs en tirets
+        if (prof === 0) {
+          // Un arbre de lisière : sa silhouette cernée (peinte avant tout le reste) puis son
+          // remplissage. Seule la silhouette de l'ensemble reste cernée, côté extérieur.
+          tu.entrees.push({ x: pt.x, y: pt.y, s: s, sprite: ch[0], r: pt.r3, prof: 5 });
+          prof = 4;
+        }
         tu.entrees.push({ x: pt.x, y: pt.y, s: s, sprite: ch[0], r: pt.r3, prof: prof });
       }
     }
@@ -1439,7 +1449,6 @@
             if (en.x < X0 - s || en.x > X1 + s || en.y < Y0 - s * 0.2 || en.y > Y1 + s) continue;
             if (SANS_DECOR && SANS_DECOR[en.sprite]) continue;
             if (en.sprite === "canopee" && !DESSUS) continue;                 // le fond uni n'existe que vu du dessus
-            if (en.prof && !DESSUS) continue;                                 // (de même que les arbres qui s'y fondent)
             if (gt) {
               var voisins = gt[Math.floor(en.x / gc) + "," + Math.floor(en.y / gc)], libre = true;
               if (voisins) {
@@ -1450,7 +1459,12 @@
                 if (!libre) continue;
               }
             }
-            liste.push({ x: en.x, y: en.y, s: s, sprite: en.sprite, r: en.r, v: en.v, prof: en.prof });
+            var pr = en.prof || 0;
+            if (!DESSUS) {                                                    // de profil : des arbres entiers, seulement en lisière
+              if (pr === 5 || pr === 1 || pr === 2) continue;
+              if (pr === 4) pr = 0;
+            }
+            liste.push({ x: en.x, y: en.y, s: s, sprite: en.sprite, r: en.r, v: en.v, prof: pr });
           }
         }
       }
@@ -1706,7 +1720,10 @@
   // Peint les décors (semés et tampons), du fond vers l'avant.
   var FONDS = { place: true, canopee: true };         // décors posés AU SOL : peints avant tout le reste
   function peindreDecors(lc, liste) {
-    liste.sort(function (a, b) { return (FONDS[b.sprite] ? 1 : 0) - (FONDS[a.sprite] ? 1 : 0) || a.y - b.y; });
+    // Trois couches : les silhouettes cernées des lisières de forêt, puis les décors posés au sol
+    // (fond de forêt, places), puis tout le reste du fond vers l'avant.
+    var couche = function (o) { return profDe(o) === 5 ? 0 : FONDS[o.sprite] ? 1 : 2; };
+    liste.sort(function (a, b) { return couche(a) - couche(b) || a.y - b.y; });
     for (var i = 0; i < liste.length; i++) {
       var o = liste[i];
       if (o.maison) { maisonDessus(lc, o.x, o.y, o.maison.w, o.maison.h, o.maison.a, o.maison.v); continue; }
