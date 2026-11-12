@@ -2946,14 +2946,26 @@
             return !q.eau && (q.m.id === "montagne" || q.m.id === "cime");
           };
           if (surMassif(Math.max(0, s0 - lw * 4)) || surMassif(Math.min(total, s1 + lw * 4))) {
-            // Pas de pont : le chemin passe SUR la roche, donc par-dessus l'eau (qui coule dessous, dans sa gorge).
-            // On le redessine ici, après la rivière, sur le tronçon où il la franchit.
-            var tr = sousChemin(d, cum, s0, s1), uu = 1 / vue.zoom;
-            ctx.save(); ctx.lineCap = ctx.lineJoin = "round";
-            ctx.beginPath(); ctx.moveTo(tr[0], tr[1]); for (var kk = 2; kk < tr.length; kk += 2) ctx.lineTo(tr[kk], tr[kk + 1]);
-            ctx.strokeStyle = r.type === "pavee" ? "rgba(46,42,36,0.8)" : "rgba(74,50,22,0.72)"; ctx.lineWidth = lw + 1.4 * uu; ctx.stroke();
-            ctx.strokeStyle = couleurVoie; ctx.lineWidth = lw; ctx.stroke();
-            ctx.strokeStyle = "rgba(255,244,208,0.34)"; ctx.lineWidth = lw * 0.42; ctx.stroke();
+            // Sur la roche, la gorge se franchit par un PONT SUSPENDU : des planches, deux câbles tendus
+            // d'un poteau à l'autre et des suspentes. On le dessine ici, après la rivière.
+            var uu = 1 / vue.zoom, e0 = Math.max(0, s0 - lw * 3), e1 = Math.min(total, s1 + lw * 3);
+            var tr = sousChemin(d, cum, e0, e1), Wp = Math.max(lw * 1.9, 5.5 * uu);
+            var trace = function (pts) { ctx.beginPath(); ctx.moveTo(pts[0], pts[1]); for (var kk = 2; kk < pts.length; kk += 2) ctx.lineTo(pts[kk], pts[kk + 1]); };
+            ctx.save(); ctx.lineCap = "butt"; ctx.lineJoin = "round";
+            var ombre = decaler(tr, -Wp * 0.5); trace(ombre.map(function (v, q) { return v + (q % 2 ? Wp * 0.5 : Wp * 0.3); }));       // son ombre sur l'eau
+            ctx.strokeStyle = "rgba(10,24,30,0.3)"; ctx.lineWidth = Wp; ctx.stroke();
+            trace(tr); ctx.strokeStyle = "#2e2112"; ctx.lineWidth = Wp + 1.6 * uu; ctx.stroke();           // les longerons
+            ctx.strokeStyle = "#a98558"; ctx.lineWidth = Wp; ctx.stroke();                                   // les planches
+            ctx.strokeStyle = "rgba(46,33,18,0.8)"; ctx.lineWidth = Wp; ctx.setLineDash([Math.max(0.7 * uu, Wp * 0.07), Wp * 0.34]); ctx.stroke(); ctx.setLineDash([]);
+            [-0.62, 0.62].forEach(function (k) {                                                              // les câbles
+              var cb = decaler(tr, Wp * k); trace(cb); ctx.strokeStyle = "#2a1c0e"; ctx.lineWidth = Math.max(0.9 * uu, Wp * 0.09); ctx.stroke();
+              ctx.beginPath();                                                                                // les suspentes
+              for (var q = 1; q < cb.length / 2 - 1; q += 2) { var hx = cb[2 * q], hy = cb[2 * q + 1], ix = tr[2 * q], iy = tr[2 * q + 1]; ctx.moveTo(hx, hy); ctx.lineTo(ix + (hx - ix) * 0.55, iy + (hy - iy) * 0.55); }
+              ctx.lineWidth = Math.max(0.6 * uu, Wp * 0.05); ctx.stroke();
+              [0, cb.length - 2].forEach(function (b) {                                                       // les poteaux
+                ctx.fillStyle = "#14100a"; ctx.beginPath(); ctx.arc(cb[b], cb[b + 1], Math.max(1.4 * uu, Wp * 0.17), 0, TAU); ctx.fill();
+              });
+            });
             ctx.restore();
             return;
           }
