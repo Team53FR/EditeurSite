@@ -1348,6 +1348,19 @@
     return best;
   }
 
+  // Distance d'un point au lac de lave le plus proche (négative dedans) : arbres et rochers s'en tiennent à l'écart.
+  function distLave(ctx, x, y) {
+    var best = Infinity;
+    for (var i = 0; i < ctx.lacs.length; i++) {
+      var lac = ctx.lacs[i]; if (!lac.l.lave) continue;
+      var p = lac.l.pts, b = lac.bb, m = best === Infinity ? 1e18 : best;
+      if (x < b[0] - m || x > b[2] + m || y < b[1] - m || y > b[3] + m) continue;
+      if (dansPolygone(x, y, p)) return -1;
+      for (var q = 0; q < p.length; q += 2) { var d = distSeg(x, y, p[q], p[q + 1], p[(q + 2) % p.length], p[(q + 3) % p.length]); if (d < best) best = d; }
+    }
+    return best;
+  }
+
   // La zone « Affiner / Gomme à décors » qui couvre ce point (la plus récente), ou null.
   function zoneEn(ctx, x, y) {
     var res = null;
@@ -1464,6 +1477,7 @@
         // pour qu'on le voie à travers une forêt ; ses bords se comportent comme une lisière.
         var gaine = (dd.masse === "relief" ? 0 : dd.masse === "eboulis" ? 0.3 : dd.masse ? 0.45 : grand ? 0.45 : 0.22) * s;     // (un massif n'est pas entaillé : le chemin le gravit)
         if (distTrace(ctx, pt.x, pt.y) < gaine) continue;
+        if (distLave(ctx, pt.x, pt.y) < s * 0.5) continue;                  // pas sur un lac de lave, ni contre lui
         if (dd.masse === "relief") {
           // Un massif est une seule forme : l'union de grands disques (contour peint d'abord, côté
           // extérieur seulement, puis remplissage uni), avec quelques sommets isolés au milieu.
@@ -1990,6 +2004,51 @@
   // contient, au niveau au-dessus — d'où un réseau en ARBRE, de grosses coulées qui se
   // ramifient en fissures de plus en plus fines. En zoomant, les coulées restent en place,
   // s'épaississent doucement, et de nouvelles ramifications apparaissent en fondu.
+  // Un lac de lave (`lac.lave`) : il ne creuse pas la terre. Un halo de chaleur, une croûte de roche
+  // noire sur le pourtour, un cœur incandescent (rouge sombre → orange → jaune), des plaques de
+  // croûte flottantes et des fissures lumineuses. Tout est fixé par le lac (graine = son id).
+  function lacsDeLave(lc, carte, vue, X0, Y0, X1, Y1) {
+    var u = 1 / vue.zoom;
+    (carte.lacs || []).forEach(function (lac) {
+      if (!lac.lave || !lac.pts || lac.pts.length < 6) return;
+      var bb = boiteTrait(lac.pts, 0), ray = Math.max(bb[2] - bb[0], bb[3] - bb[1]) / 2;
+      if (!chevauche([bb[0] - ray, bb[1] - ray, bb[2] + ray, bb[3] + ray], X0, Y0, X1, Y1)) return;
+      var cx = (bb[0] + bb[2]) / 2, cy = (bb[1] + bb[3]) / 2, h = hashTexte(String(lac.id || "lave")), i;
+      lc.save();
+      lc.globalCompositeOperation = "source-atop";
+      lc.lineJoin = lc.lineCap = "round";
+      var chemin = function () { cheminFerme(lc, lac.pts); };
+      // La chaleur : la terre alentour rougeoie et noircit.
+      chemin(); lc.strokeStyle = "rgba(190,70,12,0.22)"; lc.lineWidth = Math.max(ray * 0.34, 14 * u); lc.stroke();
+      chemin(); lc.strokeStyle = "rgba(60,22,8,0.45)"; lc.lineWidth = Math.max(ray * 0.16, 7 * u); lc.stroke();
+      // Le cœur incandescent.
+      chemin();
+      var gr = lc.createRadialGradient(cx - ray * 0.15, cy - ray * 0.2, ray * 0.04, cx, cy, ray * 1.05);
+      gr.addColorStop(0, "#ffd24a"); gr.addColorStop(0.35, "#f59a1c"); gr.addColorStop(0.75, "#d84a0c"); gr.addColorStop(1, "#7a1e08");
+      lc.fillStyle = gr; lc.fill();
+      // Plaques de croûte et fissures, à l'intérieur du lac seulement.
+      lc.save(); chemin(); lc.clip();
+      for (i = 0; i < 9; i++) {
+        var a = alea(h + 11, i) * TAU, d = Math.sqrt(alea(h + 12, i)) * ray * 0.8, px = cx + Math.cos(a) * d, py = cy + Math.sin(a) * d, r = ray * (0.07 + 0.12 * alea(h + 13, i));
+        lc.beginPath();
+        for (var k = 0; k < 7; k++) { var ak = k / 7 * TAU + alea(h + 14, i * 9 + k) * 0.5, rk = r * (0.7 + 0.5 * alea(h + 15, i * 9 + k)); lc.lineTo(px + Math.cos(ak) * rk, py + Math.sin(ak) * rk); }
+        lc.closePath(); lc.fillStyle = "rgba(38,16,8,0.82)"; lc.fill(); lc.strokeStyle = "rgba(255,170,40,0.7)"; lc.lineWidth = Math.max(0.8 * u, r * 0.08); lc.stroke();
+      }
+      lc.strokeStyle = "rgba(255,230,120,0.75)"; lc.lineWidth = Math.max(0.8 * u, ray * 0.012);
+      for (i = 0; i < 6; i++) {
+        var a0 = alea(h + 21, i) * TAU, r0 = ray * (0.2 + 0.5 * alea(h + 22, i));
+        lc.beginPath(); lc.moveTo(cx + Math.cos(a0) * r0, cy + Math.sin(a0) * r0);
+        for (var j = 1; j <= 3; j++) lc.lineTo(cx + Math.cos(a0 + j * 0.35 + alea(h + 23, i * 4 + j) * 0.3) * r0 * (1 + j * 0.16), cy + Math.sin(a0 + j * 0.35 + alea(h + 24, i * 4 + j) * 0.3) * r0 * (1 + j * 0.16));
+        lc.stroke();
+      }
+      lc.restore();
+      // La croûte de roche noire sur le pourtour, puis un liseré incandescent juste dedans.
+      chemin(); lc.strokeStyle = "#1c1410"; lc.lineWidth = Math.max(2.4 * u, ray * 0.05); lc.stroke();
+      lc.save(); chemin(); lc.clip(); chemin(); lc.strokeStyle = "rgba(255,150,30,0.8)"; lc.lineWidth = Math.max(2.6 * u, ray * 0.055); lc.stroke(); lc.restore();
+      lc.restore();
+    });
+  }
+
   function fissuresLave(lc, carte, vue, masque, X0, Y0, X1, Y1) {
     if (!masque) return;
     var volcan = MAT.volcan, visible = false, traits = carte.traits || [];
@@ -2351,7 +2410,7 @@
     lc.globalCompositeOperation = "destination-out";
     lc.fillStyle = lc.strokeStyle = "#000";
     (carte.lacs || []).forEach(function (lac) {
-      if (lac.pts && lac.pts.length >= 6 && cheminFerme(lc, lac.pts)) lc.fill();
+      if (!lac.lave && lac.pts && lac.pts.length >= 6 && cheminFerme(lc, lac.pts)) lc.fill();       // (un lac de lave reste sur la terre)
     });
     (carte.lignes || []).forEach(function (l) {
       if (l.type !== "riviere" || !l.pts || l.pts.length < 4) return;
@@ -2366,7 +2425,7 @@
   function eauxDouces(ctx, carte, vue, th, X0, Y0, X1, Y1) {
     if (!th.eauDouce) return;
     (carte.lacs || []).forEach(function (lac) {
-      if (!lac.pts || lac.pts.length < 6) return;
+      if (!lac.pts || lac.pts.length < 6 || lac.lave) return;
       var bb = boiteTrait(lac.pts, 0);
       if (!chevauche(bb, X0, Y0, X1, Y1)) return;
       var cx = (bb[0] + bb[2]) / 2, cy = (bb[1] + bb[3]) / 2, ray = Math.max(bb[2] - bb[0], bb[3] - bb[1]) / 2;
@@ -4602,6 +4661,7 @@
       dessinerChamps(lc, carte, vue, masque, X0, Y0, X1, Y1, !!th.encreDecors);
       peindreRues(lc, decors.rues, vue.zoom);
       fissuresLave(lc, carte, vue, masque, X0, Y0, X1, Y1);
+      lacsDeLave(lc, carte, vue, X0, Y0, X1, Y1);
       // Routes et sentiers sont peints DANS la terre, avant les décors : les arbres qui les
       // bordent passent devant, au lieu d'un ruban posé par-dessus la forêt. « source-atop » :
       // jamais sur l'eau — là, c'est le pont qui prend le relais.

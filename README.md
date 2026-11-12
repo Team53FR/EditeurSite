@@ -2040,6 +2040,8 @@ de maisons (`maisons`), un demi-anneau de maisons autour de la place et des chem
 objets ordinaires (terrains, tracés, tampons) : tout se déplace ensuite à la main. L'échelle des décors est
 fixée pour un village (`zbFixe`). Un bosquet garde tous ses arbres ; le cœur d'une grande forêt est un fond uni.
 
+**Lacs de lave.** L'outil Lacs a un type « Eau » ou « Lave » (`lac.lave`, aussi réglable dans le panneau d'un lac sélectionné). Un lac de lave ne creuse pas la terre (pas de côte ni de halo d'eau : `creuserEaux` et `eauxDouces` l'ignorent) ; `lacsDeLave` le peint sur la terre, dans tous les styles : halo de chaleur, croûte de roche noire sur le pourtour, cœur incandescent en dégradé, plaques de croûte et fissures lumineuses (graine = id du lac). Arbres et rochers s'en tiennent à l'écart (`distLave`).
+
 **Maisons : à la main ou le long d'une ligne.** Tracé « Rue bordée de maisons » (`maisons`, une voie
 comme les autres : ponts, accroche) : `maisonsDesRues` range les maisons de part et d'autre du fil de
 la rue (ou d'un seul côté, `cote`), tournées vers elle, pignon sur rue le plus souvent ; longueur

@@ -30,6 +30,7 @@
     maisonM: 18,              // tracé « rue bordée de maisons » : longueur réelle d'une maison, en mètres
     coteMaisons: "deux",     // … de quel côté de la rue
     variation: 0.3,          // outil Décors : écart de taille d'un décor à l'autre
+    typeLac: "eau",           // outil Lacs : "eau" ou "lave"
     typeLigne: "riviere",
     sousSol: false,           // grotte : passe sous l'eau (sinon elle ressort pour franchir une rivière par un pont)
     reliefTrace: "dessus",   // route, chemin : par-dessus la montagne, "col" (passage dégagé) ou "grotte" (sous la montagne)
@@ -1304,6 +1305,7 @@
       case "lac":
         if (g.pts.length >= 6) {
           var lac = { id: nouvelId("w"), pts: simplifierContour(g.pts) };
+          if (E.typeLac === "lave") lac.lave = true;
           ajouter("lacs", lac);
           selectionner("lacs", lac);
           choisirOutil("selection");
@@ -1921,6 +1923,7 @@
         : "Cliquez sur la carte pour poser le lieu. Les capitales se voient de loin, les cabanes seulement en zoomant : chaque lieu a son niveau d'apparition, réglable une fois posé, comme son nom, sa taille et ses couleurs." }));
     }
 
+    if (E.outil === "lac") zone.appendChild(champSegments("Type de lac", [["eau", "Eau"], ["lave", "Lave"]], E.typeLac, function (v) { E.typeLac = v; }));
     if (E.outil === "lac") zone.appendChild(el("p", { classe: "aide", texte: "Dessinez le contour du lac à main levée, en maintenant le bouton : il se referme tout seul au relâchement. On peut ensuite le déplacer, le remodeler, l'agrandir. Les rivières et les routes qui le traversent s'y raccordent." }));
     if (E.outil === "main") zone.appendChild(el("p", { classe: "aide", texte: "Faites glisser pour déplacer la carte. La molette zoome, Espace + glisser déplace avec n'importe quel outil." }));
     if (E.outil === "selection") zone.appendChild(el("p", { classe: "aide", texte: "Cliquez un lieu, un nom, un décor ou un tracé pour le régler, le déplacer ou le supprimer. Double-clic pour renommer ; sur un tracé, double-clic ajoute un point. Clic droit : dupliquer, supprimer. Poignées : coins pour agrandir, rond pour tourner (Maj : par 15°), glisser pour déplacer. Plusieurs objets : Maj + clic, ou Maj + glisser pour tracer un cadre ; Ctrl+A prend tout." }));
@@ -2112,6 +2115,7 @@
         function (v) { editer(function (x) { if (v) x.a = v; else delete x.a; }); }));
       zone.appendChild(el("p", { classe: "aide", texte: "Glissez le décor pour le déplacer. « Autre forme » en change le dessin." }));
     } else if (sel.coll === "lacs") {
+      zone.appendChild(champSegments("Type de lac", [["eau", "Eau"], ["lave", "Lave"]], o.lave ? "lave" : "eau", function (v) { editer(function (x) { if (v === "lave") x.lave = true; else delete x.lave; }); }));
       zone.appendChild(el("div", { classe: "rangee" }, [
         el("button", { type: "button", classe: "btn", texte: "Plus petit", onclick: function () { echelleLac(o, 1 / 1.15); } }),
         el("button", { type: "button", classe: "btn", texte: "Plus grand", onclick: function () { echelleLac(o, 1.15); } })
