@@ -754,7 +754,12 @@
     montagne: reduit(montagneDessus(false), 0.62), cime: reduit(montagneDessus(true), 0.62),
     basalte: function (g, v) { rocherDessus(g, v, true); }, aiguilles: function (g, v) { rocherDessus(g, v + 1, true); },
     // Le fond uni d'une forêt : un disque de la couleur du feuillage, sans cerne (les disques voisins fusionnent).
-    canopee: function (g, v) { var k = v % 7; g.fillStyle = INTERIEUR_DESSUS[["arbre", "conifere", "tropical", "automne", "palmier", "montagne", "cime"][k]]; g.beginPath(); g.arc(0, 0, k >= 5 ? 21 : 37, 0, TAU); g.fill(); },
+    canopee: function (g, v) {
+      var prof = Math.floor(v / 100), k = (v % 100) % 7, R = k >= 5 ? 30 : 37;
+      if (prof === 5) { g.fillStyle = "rgba(16,30,28,0.3)"; g.beginPath(); g.arc(5, 7, R, 0, TAU); g.fill(); g.fillStyle = "#1c2622"; g.beginPath(); g.arc(0, 0, R + 3.2, 0, TAU); g.fill(); return; }
+      g.fillStyle = k >= 5 ? (k === 6 ? "#c4ccd0" : "#9a978a") : INTERIEUR_DESSUS[["arbre", "conifere", "tropical", "automne", "palmier"][k]];
+      g.beginPath(); g.arc(0, 0, R, 0, TAU); g.fill();
+    },
     arbre: arbreDessus("arbre"), tropical: arbreDessus("tropical"), conifere: arbreDessus("conifere"),
     automne: arbreDessus("automne"), palmier: arbreDessus("palmier"), acacia: arbreDessus("acacia"), rocher: function (g, v) { rocherDessus(g, v, false); }
   };
@@ -840,7 +845,7 @@
   function profDe(o) { return o.prof != null ? o.prof : o.v != null ? Math.floor(o.v / 100) : 0; }
   function variantePeinte(o) {
     var base = o.v != null ? (o.v % 100) % VARIANTES[o.sprite] : variante(o.sprite, o.r);
-    return base + 100 * (o.v != null ? Math.floor(o.v / 100) : (o.prof || 0));
+    return base + 100 * (o.prof != null ? o.prof : o.v != null ? Math.floor(o.v / 100) : 0);
   }
   function variante(type, r) {
     var n = VARIANTES[type];
@@ -1417,7 +1422,18 @@
         // pour qu'on le voie à travers une forêt ; ses bords se comportent comme une lisière.
         var gaine = (dd.masse === "eboulis" ? 0.3 : dd.masse ? 0.45 : grand ? 0.45 : 0.22) * s;
         if (distTrace(ctx, pt.x, pt.y) < gaine) continue;
-        var relief = dd.masse === "relief" || dd.masse === "eboulis";
+        if (dd.masse === "relief") {
+          // Un massif est une seule forme : l'union de grands disques (contour peint d'abord, côté
+          // extérieur seulement, puis remplissage uni), avec quelques sommets isolés au milieu.
+          if (fractionDedans(ctx, carte, q, pt, s * 0.3, 8, grand, s * 0.3) < 0.75) continue;
+          if (fractionDedans(ctx, carte, q, pt, dd.marge * s, 8, grand) >= 1) tu.entrees.push({ x: pt.x, y: pt.y, s: s, sprite: ch[0], r: pt.r3, cl: 1 });
+          var fam = FAMILLE_CANOPEE[ch[0]];
+          tu.entrees.push({ x: pt.x, y: pt.y, s: s, sprite: "canopee", r: pt.r3, v: fam, prof: 5, rel: 1 });
+          tu.entrees.push({ x: pt.x, y: pt.y, s: s, sprite: "canopee", r: pt.r3, v: fam, rel: 1 });
+          if (pt.r2 < 0.15 && fractionDedans(ctx, carte, q, pt, s * 0.9, 8, grand, s * 0.3) >= 1) tu.entrees.push({ x: pt.x, y: pt.y, s: s * 0.7, sprite: ch[0], r: pt.r3, prof: 0, rel: 1 });
+          continue;
+        }
+        var relief = dd.masse === "eboulis";
         if (!dd.masse || (!relief && !FORET_PROFONDE[ch[0]])) {
           // Les autres décors (rochers, arbres isolés…) restent bien à l'intérieur de leur terrain.
           if (fractionDedans(ctx, carte, q, pt, dd.marge * s, 8, grand) < 1) continue;
