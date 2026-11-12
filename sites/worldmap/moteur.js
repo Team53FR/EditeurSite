@@ -586,14 +586,24 @@
       });
     };
   }
+  // Le contour d'un rocher ou d'un bloc selon sa profondeur (v >= 100, comme pour arbres et
+  // massifs) : 0 entier ; 5 sa silhouette cernée seule ; 4 son remplissage seul ; 1-2 fondu dans le sol.
+  function formeMasse(g, trace, prof, o) {
+    var fondu = prof === 1 || prof === 2;
+    if (prof === 0 || prof === 5) { trace(o.dx, o.dy); g.fillStyle = o.ombre; g.fill(); }
+    if (prof === 5) { trace(0, 0); g.lineJoin = "round"; g.lineWidth = (o.epais || 2.2) * 2.4; g.fillStyle = g.strokeStyle = o.trait; g.fill(); g.stroke(); return; }
+    trace(0, 0); g.fillStyle = fondu ? melange(o.couleur, o.interieur, prof === 1 ? 0.55 : 0.88) : o.couleur; g.fill();
+    if (prof === 0) { g.strokeStyle = o.trait; g.lineWidth = o.epais || 2.2; g.stroke(); }
+    else if (fondu) { g.strokeStyle = "rgba(14,30,30," + (prof === 1 ? 0.7 : 0.5) + ")"; g.lineWidth = 1.4; g.setLineDash([3.5, 4.5]); g.stroke(); g.setLineDash([]); }
+  }
   function rocherDessus(g, v, sombre) {
+    var prof = Math.floor(v / 100); v = v % 100;
     var R = function (i) { return alea(2200 + v, i); };
     [[-12, 4, 17], [14, -4, 13], [4, 16, 10]].slice(0, 2 + v % 2).forEach(function (b, k) {
       var pts = [];
       for (var j = 0; j < 7; j++) { var a = j / 7 * TAU, r = b[2] * (0.75 + R(k * 9 + j) * 0.4); pts.push([b[0] + Math.cos(a) * r, b[1] + Math.sin(a) * r]); }
       var trace = function (dx, dy) { g.beginPath(); pts.forEach(function (q, j) { if (j) g.lineTo(q[0] + dx, q[1] + dy); else g.moveTo(q[0] + dx, q[1] + dy); }); g.closePath(); };
-      trace(4, 5); g.fillStyle = "rgba(16,30,28,0.28)"; g.fill();
-      trace(0, 0); g.fillStyle = sombre ? "#5a5552" : "#b9b6a6"; g.fill(); g.strokeStyle = "#1c2622"; g.lineWidth = 2.2; g.stroke();
+      formeMasse(g, trace, prof, { couleur: sombre ? "#5a5552" : "#b9b6a6", trait: "#1c2622", ombre: "rgba(16,30,28,0.28)", dx: 4, dy: 5, interieur: sombre ? "#4b4745" : "#aaa798" });
     });
   }
   // Un massif vu du dessus : un polygone irrégulier, découpé en facettes qui partent du sommet
@@ -684,17 +694,21 @@
     }
   }
   function glaconDessus(g, v) {
+    var prof = Math.floor(v / 100); v = v % 100;
+    var fondu = prof === 1 || prof === 2, mult = prof === 1 ? 0.4 : prof === 2 ? 0.12 : 1;
     var R = function (i) { return alea(2800 + v, i); }, n = 8, pts = [], i;
     for (i = 0; i < n; i++) { var a = i / n * TAU + R(i) * 0.4, r = 22 + R(10 + i) * 14; pts.push([Math.cos(a) * r, Math.sin(a) * r * 0.9]); }
     var trace = function (dx, dy) { g.beginPath(); pts.forEach(function (q, j) { if (j) g.lineTo(q[0] + dx, q[1] + dy); else g.moveTo(q[0] + dx, q[1] + dy); }); g.closePath(); };
-    trace(5, 6); g.fillStyle = "rgba(20,60,90,0.28)"; g.fill();
-    trace(0, 0); g.fillStyle = "#e6f0f4"; g.fill();
+    if (prof === 0 || prof === 5) { trace(5, 6); g.fillStyle = "rgba(20,60,90,0.28)"; g.fill(); }
+    if (prof === 5) { trace(0, 0); g.lineJoin = "round"; g.lineWidth = 4.3; g.fillStyle = g.strokeStyle = "#5f87a0"; g.fill(); g.stroke(); return; }
+    trace(0, 0); g.fillStyle = fondu ? melange("#e6f0f4", "#d3e3ea", prof === 1 ? 0.55 : 0.88) : "#e6f0f4"; g.fill();
     for (i = 0; i < n; i++) {
       var p0 = pts[i], p1 = pts[(i + 1) % n], mx = (p0[0] + p1[0]) / 2, my = (p0[1] + p1[1]) / 2, lum = (-mx - my) / ((Math.hypot(mx, my) || 1) * 1.414);
-      g.fillStyle = lum > 0 ? "rgba(255,255,255," + (0.2 + 0.4 * lum) + ")" : "rgba(80,130,170," + (0.1 - 0.3 * lum) + ")";
+      g.fillStyle = lum > 0 ? "rgba(255,255,255," + (0.2 + 0.4 * lum) * mult + ")" : "rgba(80,130,170," + (0.1 - 0.3 * lum) * mult + ")";
       g.beginPath(); g.moveTo(0, 0); g.lineTo(p0[0], p0[1]); g.lineTo(p1[0], p1[1]); g.closePath(); g.fill();
     }
-    trace(0, 0); g.strokeStyle = "#5f87a0"; g.lineWidth = 1.8; g.stroke();
+    if (prof === 0) { trace(0, 0); g.strokeStyle = "#5f87a0"; g.lineWidth = 1.8; g.stroke(); }
+    else if (fondu) { trace(0, 0); g.strokeStyle = "rgba(60,100,130," + (prof === 1 ? 0.7 : 0.5) + ")"; g.lineWidth = 1.4; g.setLineDash([3.5, 4.5]); g.stroke(); g.setLineDash([]); }
   }
   function cratereDessus(g, v) {
     g.fillStyle = "rgba(16,30,28,0.3)"; g.beginPath(); g.arc(6, 8, 42, 0, TAU); g.fill();
@@ -854,8 +868,8 @@
     // est faible pour qu'une crête étroite, vue de loin, porte déjà sa rangée de sommets.
     montagne: { masse: "relief", C: 24,   p: 0.94, marge: 0.05, choix: [["montagne", 0.4, 170], ["montagne", 0.6, 104]] },
     cime:     { masse: "relief", C: 24,   p: 0.94, marge: 0.05, choix: [["cime", 0.4, 170], ["cime", 0.6, 104]] },
-    volcan:   { C: 21,   p: 0.62, marge: 0.2,  choix: [["aiguilles", 0.5, 84], ["basalte", 0.5, 24]] },
-    rocaille: { C: 13,   p: 0.8,  marge: 0.15, choix: [["rocher", 1, 24]] },
+    volcan:   { masse: "eboulis", C: 21,   p: 0.62, marge: 0.2,  choix: [["aiguilles", 0.5, 84], ["basalte", 0.5, 24]] },
+    rocaille: { masse: "eboulis", C: 13,   p: 0.8,  marge: 0.15, choix: [["rocher", 1, 24]] },
     cendres:  { C: 19,   p: 0.5,  marge: 0.15, choix: [["basalte", 0.6, 20], ["mort", 0.4, 24]] },
     toundra:  { C: 15,   p: 0.5,  marge: 0.1,  choix: [["rocher", 0.35, 15], ["seche", 0.65, 14]] },
     // Une ville qui s'étale : des maisons serrées, quelques grandes bâtisses et clochers.
@@ -867,7 +881,7 @@
                 rues: { parCote: 4, vide: 0.04, rue: "#d8c596", coeur: [["clocher", 0.08, 5.2], ["batisse", 0.2, 4.4], ["arbre", 0.45, 2.5]] } },
     faubourg: { C: 10,   p: 1,    marge: 0.1,  choix: [["maison", 1, 27]],
                 rues: { parCote: 3, vide: 0.42, rue: "#cbb98a", coeur: [["champ", 0.45, 4.6], ["arbre", 0.4, 2.6]] } },
-    glace:    { C: 24,   p: 0.45, marge: 0.2,  choix: [["glacon", 1, 24]] },
+    glace:    { masse: "eboulis", C: 24,   p: 0.45, marge: 0.2,  choix: [["glacon", 1, 24]] },
     marais:   { C: 15,   p: 0.75, marge: 0.2,  choix: [["marais", 1, 30]] }
   };
   // Réglages du pinceau : densité (aucun, clairsemé, normal, dense) et taille des décors.
@@ -1401,7 +1415,7 @@
         // pour qu'on le voie à travers une forêt ; ses bords se comportent comme une lisière.
         var gaine = (dd.masse === "relief" ? 0.4 : dd.masse ? 0.6 : grand ? 0.45 : 0.22) * s;
         if (distTrace(ctx, pt.x, pt.y) < gaine) continue;
-        var relief = dd.masse === "relief";
+        var relief = dd.masse === "relief" || dd.masse === "eboulis";
         if (!dd.masse || (!relief && !FORET_PROFONDE[ch[0]])) {
           // Les autres décors (rochers, arbres isolés…) restent bien à l'intérieur de leur terrain.
           if (fractionDedans(ctx, carte, q, pt, dd.marge * s, 8, grand) < 1) continue;
@@ -1415,10 +1429,11 @@
         // entrées de la masse (`rel`) ne servent que vu du dessus.
         var rel = relief ? 1 : 0;
         if (relief && fractionDedans(ctx, carte, q, pt, dd.marge * s, 8, grand) >= 1) tu.entrees.push({ x: pt.x, y: pt.y, s: s, sprite: ch[0], r: pt.r3, cl: 1 });
-        var ray = relief ? [0.6, 0.85, 1.15] : [1.4, 2, 2.6];            // rayons (en tailles du décor) : lisière, puis deux paliers de fondu
+        var ray = dd.masse === "relief" ? [0.6, 0.85, 1.15] : dd.masse === "eboulis" ? (ch[2] >= 60 ? [1, 1.4, 1.8] : [2.6, 3.6, 4.6]) : [1.4, 2, 2.6];            // rayons (en tailles du décor) : lisière, puis deux paliers de fondu
         var f = fractionDedans(ctx, carte, q, pt, Math.max(dd.marge * s, s * ray[0]), 8, grand, gaine);
         if (f < 0.25) continue;                                         // sur le bord même : rien
-        tu.entrees.push({ x: pt.x, y: pt.y, s: s, sprite: "canopee", r: pt.r3, v: FAMILLE_CANOPEE[ch[0]] || 0, rel: rel });     // le fond uni, sous les sujets
+        // (les éboulis — rochers, glace — n'ont pas de disque de fond : leur fond uni est le sol du terrain)
+        if (dd.masse !== "eboulis") tu.entrees.push({ x: pt.x, y: pt.y, s: s, sprite: "canopee", r: pt.r3, v: FAMILLE_CANOPEE[ch[0]] || 0, rel: rel });     // le fond uni, sous les sujets
         // Les sujets sont pleins sur le bord extérieur ; vers l'intérieur ils perdent cerne et ombre,
         // se rapprochent de la couleur du fond et se réduisent à des arcs en tirets.
         var prof = 0;                                                    // 0 : lisière ; 1, 2 : de plus en plus fondu ; 3 : le cœur
