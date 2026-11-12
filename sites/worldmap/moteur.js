@@ -760,7 +760,16 @@
         g.fillStyle = INTERIEUR_DESSUS[["arbre", "conifere", "tropical", "automne", "palmier"][k]]; g.beginPath(); g.arc(0, 0, R, 0, TAU); g.fill(); return;
       }
       // Un massif (courbes de niveau) : bande de falaise sombre, bande intermédiaire, intérieur clair.
-      var P = k === 6 ? { band: "#7d8b97", mid: "#b6c2ca", fond: "#e0e9ed" } : { band: "#6f6c60", mid: "#948f80", fond: "#aaa797" };
+      var P = k === 6 ? { band: "#7d8b97", mid: "#c8d3da", fond: "#eef3f6", neige: "#fbfdfe" } : { band: "#6f6c60", mid: "#948f80", fond: "#aaa797", neige: "#eef2f4" };
+      // Des traits de roche, sur la bande qui entoure un gradin (surtout côté ombre, au sud-est) ; ils sont recouverts par les gradins voisins.
+      var hachures = function (col) {
+        g.strokeStyle = col; g.lineCap = "round"; g.lineWidth = 1.5;
+        for (var h = 0; h < 22; h++) {
+          var a = h / 22 * TAU + 0.3 * Math.sin(h * 2.3), sud = (Math.sin(a) + Math.cos(a)) > -0.4, L = (sud ? 5 : 3) + 2 * Math.abs(Math.sin(h * 1.7));
+          if (!sud && h % 2) continue;
+          g.beginPath(); g.moveTo(Math.cos(a) * (R + 0.5), Math.sin(a) * (R + 0.5)); g.lineTo(Math.cos(a + 0.05) * (R + 0.5 + L), Math.sin(a + 0.05) * (R + 0.5 + L)); g.stroke();
+        }
+      };
       var disque = function (r, col, trait) {
         g.beginPath(); g.arc(0, 0, r, 0, TAU);
         if (trait) { g.strokeStyle = trait; g.lineWidth = 2.2; g.stroke(); g.fillStyle = col; g.beginPath(); g.arc(0, 0, r - 1.1, 0, TAU); g.fill(); }
@@ -768,13 +777,17 @@
       };
       if (prof === 5) { g.fillStyle = "rgba(16,30,28,0.3)"; g.beginPath(); g.arc(5, 7, R + 4, 0, TAU); g.fill(); disque(R + 4, "#1c2622"); }
       else if (prof === 9) disque(R, P.band);
-      else if (prof === 12 || prof === 13) { g.beginPath(); g.arc(0, 0, R, 0, TAU); g.strokeStyle = prof === 12 ? "rgba(28,38,36,0.7)" : "rgba(28,38,36,0.55)"; g.lineWidth = 2.4; g.stroke(); }
+      else if (prof === 12 || prof === 13 || prof === 14) {
+        g.beginPath(); g.arc(0, 0, R, 0, TAU); g.strokeStyle = prof === 12 ? "rgba(28,38,36,0.7)" : "rgba(28,38,36,0.55)"; g.lineWidth = 2.4; g.stroke();
+        hachures(prof === 14 ? "rgba(60,84,110,0.7)" : "rgba(28,38,36,0.5)");
+      }
       else if (prof === 10) disque(R - 1.2, P.mid);
       else if (prof === 4) disque(R - 1.2, P.fond);
+      else if (prof === 15) disque(R - 1.2, P.neige);
       else if (prof === 11) {                                          // un îlot : anneaux concentriques
         [[1, 0.9], [0.72, 0.9], [0.46, 0.9], [0.22, 0.9]].forEach(function (a, n) {
           g.beginPath(); g.ellipse(0, 0, R * 1.2 * a[0], R * 0.9 * a[0], 0.3, 0, TAU);
-          g.fillStyle = n % 2 ? P.fond : P.mid; g.fill(); g.strokeStyle = "rgba(28,38,36,0.75)"; g.lineWidth = 1.6; g.stroke();
+          g.fillStyle = n % 2 ? P.neige : P.fond; g.fill(); g.strokeStyle = "rgba(40,56,76,0.7)"; g.lineWidth = 1.6; g.stroke();
         });
       }
     },
@@ -1455,6 +1468,8 @@
           tu.entrees.push({ x: pt.x, y: pt.y, s: sd, sprite: "canopee", r: pt.r3, v: fam, prof: 9, rel: 1 });
           // (chaque niveau : d'abord tous les traits, puis tous les remplissages, pour que le trait ne reste qu'au bord de la forme)
           if (niv1) { tu.entrees.push({ x: pt.x, y: pt.y, s: sd, sprite: "canopee", r: pt.r3, v: fam, prof: 12, rel: 1 }); tu.entrees.push({ x: pt.x, y: pt.y, s: sd, sprite: "canopee", r: pt.r3, v: fam, prof: 10, rel: 1 }); }
+          var niv3 = niv2 && fractionDedans(ctx, carte, q, pt, s * 1.5, 8, grand, s * 0.3) >= 1;
+          if (niv3) { tu.entrees.push({ x: pt.x, y: pt.y, s: sd, sprite: "canopee", r: pt.r3, v: fam, prof: 14, rel: 1 }); tu.entrees.push({ x: pt.x, y: pt.y, s: sd, sprite: "canopee", r: pt.r3, v: fam, prof: 15, rel: 1 }); }
           if (niv2) { tu.entrees.push({ x: pt.x, y: pt.y, s: sd, sprite: "canopee", r: pt.r3, v: fam, prof: 13, rel: 1 }); tu.entrees.push({ x: pt.x, y: pt.y, s: sd, sprite: "canopee", r: pt.r3, v: fam, prof: 4, rel: 1 }); }
           if (pt.r2 < 0.04 && fractionDedans(ctx, carte, q, pt, s * 0.9, 8, grand, s * 0.3) >= 1) tu.entrees.push({ x: pt.x, y: pt.y, s: s * 0.9, sprite: "canopee", r: pt.r3, v: fam, prof: 11, rel: 1 });
           continue;
@@ -1832,7 +1847,7 @@
     var massif = function (o) { return (o.sprite === "montagne" || o.sprite === "cime") && PAL[profDe(o)]; };
     var couche = function (o) { return profDe(o) === 5 && !massif(o) ? 0 : FONDS[o.sprite] ? 1 : massif(o) ? 2 : 3; };
     // Les paliers d'un massif se peignent du plus clair au plus profond : chacun recouvre le précédent (dégradé sans coupure).
-    var RANG = { 9: 1, 12: 2, 10: 3, 13: 4, 4: 5, 11: 6 }, rang = function (o) { return o.sprite === "canopee" && o.rel ? RANG[profDe(o)] || 0 : 0; };
+    var RANG = { 9: 1, 12: 2, 10: 3, 13: 4, 4: 5, 14: 6, 15: 7, 11: 8 }, rang = function (o) { return o.sprite === "canopee" && o.rel ? RANG[profDe(o)] || 0 : 0; };
     liste.sort(function (a, b) { return couche(a) - couche(b) || rang(a) - rang(b) || (massif(a) ? PAL[profDe(a)] - PAL[profDe(b)] : 0) || a.y - b.y; });
     for (var i = 0; i < liste.length; i++) {
       var o = liste[i];
