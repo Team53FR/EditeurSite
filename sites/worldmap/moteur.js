@@ -2940,7 +2940,7 @@
         if (s1 - s0 < lw) return;
         // Un chemin qui gravit un massif (rives sur montagne ou cime, vu du dessus) n'a pas de pont : il
         // ne passe sous la montagne, avec un pont, que s'il est hors du massif.
-        if (th.dessus) {
+        if (th.dessus && r.relief !== "col") {       // (un col est au niveau du sol : son pont reste)
           var surMassif = function (sc) {
             var p = sousChemin(d, cum, sc, sc), q = sonde(ctxP, carte, p[0], p[1]);
             return !q.eau && (q.m.id === "montagne" || q.m.id === "cime");
