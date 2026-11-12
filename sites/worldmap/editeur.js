@@ -30,6 +30,7 @@
     maisonM: 18,              // tracé « rue bordée de maisons » : longueur réelle d'une maison, en mètres
     coteMaisons: "deux",     // … de quel côté de la rue
     variation: 0.3,          // outil Décors : écart de taille d'un décor à l'autre
+    typeLac: "eau",           // outil Lacs : "eau" ou "lave"
     typeLigne: "riviere",
     sousSol: false,           // grotte : passe sous l'eau (sinon elle ressort pour franchir une rivière par un pont)
     reliefTrace: "dessus",   // route, chemin : par-dessus la montagne, "col" (passage dégagé) ou "grotte" (sous la montagne)
@@ -979,6 +980,8 @@
   // appartient au monde (il grandit quand on s'approche, comme un vrai relief).
   function nouveauTampon(w) {
     var s = E.taillePxTampon / E.vue.zoom * (1 + (Math.random() - 0.5) * 2 * E.variation * 0.6);
+    var def = Moteur.TAMPONS.filter(function (x) { return x.id === E.tampon; })[0];
+    if (def && def.m) s = def.m / 1000;                // un meuble, une porte : sa taille réelle (en km)
     var t = { id: nouvelId("d"), type: E.tampon, v: Math.floor(Math.random() * 12), x: w[0], y: w[1] + s * 0.3, s: s };
     if (Moteur.BATIMENTS[E.tampon]) t.a = E.angleTampon === "alea" ? Math.round(Math.random() * 180) : E.angleTampon;
     return t;
@@ -1304,6 +1307,7 @@
       case "lac":
         if (g.pts.length >= 6) {
           var lac = { id: nouvelId("w"), pts: simplifierContour(g.pts) };
+          if (E.typeLac === "lave") lac.lave = true;
           ajouter("lacs", lac);
           selectionner("lacs", lac);
           choisirOutil("selection");
@@ -1492,6 +1496,53 @@
     enfant.traits.push(fond);
     enfant.vignette = Moteur.vignette(enfant);
     return enfant;
+  }
+
+  // ----- Intérieur d'un bâtiment nommé -----
+  //
+  // Un bâtiment posé à la main (maison, bâtisse, église) qui porte un nom s'ouvre sur son plan
+  // d'étage : une carte fille au style « Plan d'intérieur », à l'échelle du bâtiment (en mètres).
+  // Elle part d'une pièce rectangulaire (sol, quatre murs, une porte) qu'on remodèle et meuble.
+  var TAILLES_BATIMENTS = { maison: [12, 9], batisse: [22, 15], clocher: [14, 20] };      // largeur × hauteur, en mètres
+
+  function carteDuBatiment(mere, tp) {
+    var t = TAILLES_BATIMENTS[tp.type] || [14, 10], L = t[0] / 1000, H = t[1] / 1000, mg = 1.2 / 1000, ep = 0.3 / 1000;
+    var enfant = {
+      id: Stockage.nouvelId(), nom: tp.nom, largeur: L, hauteur: H, theme: "interieur", interieur: true,
+      traits: [], lignes: [], etiquettes: [], lieux: [], lacs: [], tampons: [],
+      vue: null, parent: { carteId: mere.id, lieuId: tp.id, nom: mere.nom },
+      creeLe: Date.now(), majLe: Date.now(), version: 1
+    };
+    Moteur.fixerEchelleDecors(enfant);
+    var x0 = mg, y0 = mg, x1 = L - mg, y1 = H - mg, r = 0.25 / 1000, pts = [], ligne = 0;
+    // Le sol : un balayage en serpentin (le pinceau est rond ; ses bords arrondis passent sous les murs).
+    for (var y = y0 + r; y <= y1 - r + 1e-9; y += r * 1.2) {
+      if (ligne % 2) pts.push(x1 - r, y, x0 + r, y); else pts.push(x0 + r, y, x1 - r, y);
+      ligne++;
+    }
+    var sol = Moteur.nouveauTrait("parquet", r * 2.4, pts, false);
+    sol.sansDecor = true;
+    enfant.traits.push(sol);
+    enfant.lignes.push({ id: nouvelId("l"), type: "mur", pts: [x0, y0, x1, y0, x1, y1, x0, y1], ferme: true, taille: ep });
+    enfant.tampons.push({ id: nouvelId("d"), type: "porte", v: 0, x: L / 2, y: y1 + 1.8 / 1000 * 0.3, s: 1.8 / 1000, a: 0 });
+    enfant.vignette = Moteur.vignette(enfant);
+    return enfant;
+  }
+
+  function ouvrirInterieur(tp) {
+    cloreEdition();
+    function creer() {
+      var enfant = carteDuBatiment(E.carte, tp);
+      tp.carteId = enfant.id;
+      marquer();
+      Stockage.ecrire(enfant).then(function () { allerVers("editeur.html?id=" + encodeURIComponent(enfant.id)); })
+        .catch(function (er) { etat("Création impossible : " + (er && er.message ? er.message : "erreur")); });
+    }
+    if (!tp.carteId) { creer(); return; }
+    Stockage.lire(tp.carteId).then(function (c) {
+      if (c) { c.nom = tp.nom || c.nom; allerVers("editeur.html?id=" + encodeURIComponent(tp.carteId)); }
+      else creer();                                   // l'intérieur a été supprimé : on en recrée un
+    }).catch(creer);
   }
 
   function ouvrirCarteDuLieu(lieu) {
@@ -1749,6 +1800,7 @@
 
     if (E.outil === "pinceau") {
       Moteur.GROUPES_MATERIAUX.forEach(function (groupe) {
+        if ((groupe === "Sols") !== !!E.carte.interieur) return;          // les sols sont réservés aux plans d'intérieur
         zone.appendChild(sousTitre(groupe));
         var pal = el("div", { classe: "palette" });
         Moteur.MATERIAUX.forEach(function (m) {
@@ -1820,7 +1872,7 @@
     if (E.outil === "tampon") {
       var palT = el("div", { classe: "palette palette-3" });
       Moteur.TAMPONS.forEach(function (t) {
-        if (t.cache) return;                                // (le fond de forêt n'est pas un décor à poser)
+        if (t.cache || !!t.int !== !!E.carte.interieur) return;          // meubles et portes : plans d'intérieur seulement                                // (le fond de forêt n'est pas un décor à poser)
         var cv = el("canvas", { width: "88", height: "88" });
         cv.style.width = cv.style.height = "44px";
         var c2 = cv.getContext("2d");
@@ -1848,7 +1900,7 @@
     }
 
     if (E.outil === "ligne") {
-      var types = Object.keys(Moteur.TYPES_LIGNES).map(function (k) { return [k, Moteur.TYPES_LIGNES[k].nom]; });
+      var types = Object.keys(Moteur.TYPES_LIGNES).filter(function (k) { return (k === "mur") === !!E.carte.interieur; }).map(function (k) { return [k, Moteur.TYPES_LIGNES[k].nom]; });
       zone.appendChild(champChoix("Type de tracé", types, E.typeLigne, function (v) {
         E.typeLigne = v;
         E.epaisseurPx = Moteur.TYPES_LIGNES[v].px;
@@ -1921,6 +1973,7 @@
         : "Cliquez sur la carte pour poser le lieu. Les capitales se voient de loin, les cabanes seulement en zoomant : chaque lieu a son niveau d'apparition, réglable une fois posé, comme son nom, sa taille et ses couleurs." }));
     }
 
+    if (E.outil === "lac") zone.appendChild(champSegments("Type de lac", [["eau", "Eau"], ["lave", "Lave"]], E.typeLac, function (v) { E.typeLac = v; }));
     if (E.outil === "lac") zone.appendChild(el("p", { classe: "aide", texte: "Dessinez le contour du lac à main levée, en maintenant le bouton : il se referme tout seul au relâchement. On peut ensuite le déplacer, le remodeler, l'agrandir. Les rivières et les routes qui le traversent s'y raccordent." }));
     if (E.outil === "main") zone.appendChild(el("p", { classe: "aide", texte: "Faites glisser pour déplacer la carte. La molette zoome, Espace + glisser déplace avec n'importe quel outil." }));
     if (E.outil === "selection") zone.appendChild(el("p", { classe: "aide", texte: "Cliquez un lieu, un nom, un décor ou un tracé pour le régler, le déplacer ou le supprimer. Double-clic pour renommer ; sur un tracé, double-clic ajoute un point. Clic droit : dupliquer, supprimer. Poignées : coins pour agrandir, rond pour tourner (Maj : par 15°), glisser pour déplacer. Plusieurs objets : Maj + clic, ou Maj + glisser pour tracer un cadre ; Ctrl+A prend tout." }));
@@ -2101,10 +2154,15 @@
       ]));
       zone.appendChild(el("p", { classe: "aide", texte: "Glissez un carré pour déplacer un point. Double-clic sur le tracé pour en ajouter un." }));
     } else if (sel.coll === "tampons") {
-      zone.appendChild(champChoix("Décor", Moteur.TAMPONS.map(function (t) { return [t.id, t.nom]; }), o.type,
+      zone.appendChild(champChoix("Décor", Moteur.TAMPONS.filter(function (t) { return !t.cache && !!t.int === !!E.carte.interieur; }).map(function (t) { return [t.id, t.nom]; }), o.type,
         function (v) { editer(function (x) { x.type = v; }); }));
       zone.appendChild(champCurseur("Taille", 8, 600, 1, borne(o.s * E.vue.zoom, 8, 600), function (v) { return Math.round(v) + " px"; },
         function (v) { editer(function (x) { var pied = x.y - x.s * 0.3; x.s = v / E.vue.zoom; x.y = pied + x.s * 0.3; }); }));
+      if (Moteur.BATIMENTS[o.type] && !E.carte.interieur) {
+        zone.appendChild(champTexte("Nom du bâtiment (facultatif)", o.nom || "", function (v) { editer(function (x) { if (v.trim()) x.nom = v.trim(); else delete x.nom; }); panneauSelection(); }, "Auberge du Cerf, Académie…"));
+        if (o.nom) zone.appendChild(el("div", { classe: "rangee" }, [el("button", { type: "button", classe: "btn btn-primaire", texte: o.carteId ? "Ouvrir l'intérieur" : "Éditer l'intérieur", onclick: function () { ouvrirInterieur(o); } })]));
+        else zone.appendChild(el("p", { classe: "aide", texte: "Donnez un nom à ce bâtiment pour dessiner son intérieur (plan d'étage)." }));
+      }
       zone.appendChild(el("div", { classe: "rangee" }, [
         el("button", { type: "button", classe: "btn", texte: "Autre forme", onclick: function () { editer(function (x) { x.v = (x.v || 0) + 1; }); } })
       ]));
@@ -2112,6 +2170,7 @@
         function (v) { editer(function (x) { if (v) x.a = v; else delete x.a; }); }));
       zone.appendChild(el("p", { classe: "aide", texte: "Glissez le décor pour le déplacer. « Autre forme » en change le dessin." }));
     } else if (sel.coll === "lacs") {
+      zone.appendChild(champSegments("Type de lac", [["eau", "Eau"], ["lave", "Lave"]], o.lave ? "lave" : "eau", function (v) { editer(function (x) { if (v === "lave") x.lave = true; else delete x.lave; }); }));
       zone.appendChild(el("div", { classe: "rangee" }, [
         el("button", { type: "button", classe: "btn", texte: "Plus petit", onclick: function () { echelleLac(o, 1 / 1.15); } }),
         el("button", { type: "button", classe: "btn", texte: "Plus grand", onclick: function () { echelleLac(o, 1.15); } })
@@ -2292,6 +2351,7 @@
     var th = $("rgTheme");
     th.innerHTML = "";
     Object.keys(Moteur.THEMES).forEach(function (k) {
+      if (k === "interieur" && !E.carte.interieur) return;
       var op = document.createElement("option");
       op.value = k; op.textContent = Moteur.THEMES[k].nom;
       if (k === E.carte.theme) op.selected = true;
@@ -2558,6 +2618,7 @@
       lp.href = "editeur.html?id=" + encodeURIComponent(carte.parent.carteId);
       lp.addEventListener("click", function (ev) { ev.preventDefault(); allerVers(lp.href); });
     }
+    if (carte.interieur) { E.materiau = "parquet"; E.typeLigne = "mur"; E.epaisseurPx = 6; E.tampon = "porte"; }
     tailleScene();
     if (carte.vue && carte.vue.zoom > 0) { E.vue.cx = carte.vue.cx; E.vue.cy = carte.vue.cy; E.vue.zoom = borne(carte.vue.zoom, zoomMin(), zoomMax()); }
     else ajusterVue();
