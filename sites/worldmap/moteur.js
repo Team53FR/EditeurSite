@@ -1467,7 +1467,7 @@
           // Un massif est une seule forme : l'union de grands disques (contour peint d'abord, côté
           // extérieur seulement, puis remplissage uni), avec quelques sommets isolés au milieu.
           var fam = FAMILLE_CANOPEE[ch[0]], dedans = fractionDedans(ctx, carte, q, pt, s * 0.3, 8, grand);
-          if (dedans < 0.75 || distRiviere(ctx, pt.x, pt.y) < s * 0.3) continue;
+          if (dedans < 0.75 || distRiviere(ctx, pt.x, pt.y) < s * 0.05) continue;
           if (fractionDedans(ctx, carte, q, pt, dd.marge * s, 8, grand) >= 1) tu.entrees.push({ x: pt.x, y: pt.y, s: s, sprite: ch[0], r: pt.r3, cl: 1 });
           // Un massif se lit comme une carte en courbes de niveau : un bord de falaise en gradins
           // (cerne, puis des bandes de plus en plus claires cernées d'un trait fin), un intérieur
@@ -2899,7 +2899,19 @@
             var p = sousChemin(d, cum, sc, sc), q = sonde(ctxP, carte, p[0], p[1]);
             return !q.eau && (q.m.id === "montagne" || q.m.id === "cime");
           };
-          if (surMassif(Math.max(0, s0 - lw * 4)) || surMassif(Math.min(total, s1 + lw * 4))) return;
+          if (surMassif(Math.max(0, s0 - lw * 4)) || surMassif(Math.min(total, s1 + lw * 4))) {
+            // Un gué : des pierres plates posées en travers de l'eau, au lieu d'un pont.
+            var nb = Math.max(4, Math.round((s1 - s0) / (lw * 0.9)));
+            for (var g = 0; g <= nb; g++) {
+              var pg = sousChemin(d, cum, s0 + (s1 - s0) * g / nb, s0 + (s1 - s0) * g / nb), jit = ((g * 7919) % 5 - 2) * lw * 0.08;
+              ctx.save(); ctx.translate(pg[0] + jit, pg[1] - jit);
+              ctx.fillStyle = "rgba(20,24,24,0.3)"; ctx.beginPath(); ctx.ellipse(lw * 0.1, lw * 0.14, lw * 0.5, lw * 0.36, 0.4, 0, TAU); ctx.fill();
+              ctx.fillStyle = "#b9b6a6"; ctx.strokeStyle = "#1c2622"; ctx.lineWidth = Math.max(1.2 / vue.zoom, lw * 0.1);
+              ctx.beginPath(); ctx.ellipse(0, 0, lw * 0.75, lw * 0.55, 0.4, 0, TAU); ctx.fill(); ctx.stroke();
+              ctx.restore();
+            }
+            return;
+          }
         }
         pontLe(ctx, sousChemin(d, cum, s0, s1), W, vue, couleurVoie, r.type === "sentier");
       });
