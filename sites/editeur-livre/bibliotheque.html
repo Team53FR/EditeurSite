@@ -81,6 +81,8 @@
                  onkeydown="if(event.key==='Enter'){creerLivre();}">
           <button type="button" id="formatNouveauLivre" class="bouton-format" onclick="ouvrirChoixFormatCreation()">Roman — 14,9 × 21,0 cm</button>
           <button class="btn btn-primaire" onclick="creerLivre()">+ Créer un livre</button>
+          <button type="button" class="btn btn-secondaire" onclick="exporterTout(this)"
+                  title="Télécharger tous vos livres et leurs notes en un fichier Markdown">Exporter</button>
         </div>
       </div>
     </section>
@@ -152,6 +154,7 @@
   <script src="notes.js"></script>
   <script src="tutoriel.js"></script>
   <script src="bibliotheque.js"></script>
+  <script src="export.js"></script>
   <script src="retour-portail.js"></script>
   <script src="../../pied-legal.js"></script>
 </body>
