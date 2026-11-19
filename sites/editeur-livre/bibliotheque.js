@@ -230,6 +230,17 @@ function afficherListeLivres() {
     btnNotes.onclick = (e) => { e.stopPropagation(); ouvrirNotesLivre(livre.id, livre.titre, btnNotes); };
     li.appendChild(btnNotes);
 
+    const btnExporter = document.createElement("button");
+    btnExporter.className = "livre-exporter";
+    btnExporter.innerHTML =
+      '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+      'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      '<path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>';
+    btnExporter.title = "Exporter";
+    btnExporter.setAttribute("aria-label", "Exporter « " + (livre.titre || "") + " »");
+    btnExporter.onclick = (e) => { e.stopPropagation(); exporterLivre(livre.id, btnExporter); };
+    li.appendChild(btnExporter);
+
     const btnDupliquer = document.createElement("button");
     btnDupliquer.className = "livre-dupliquer";
     btnDupliquer.textContent = "⧉";
