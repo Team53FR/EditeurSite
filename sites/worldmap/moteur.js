@@ -2379,7 +2379,7 @@
         for (k = 0; k < paires; k++) {
           j = (k + 1) % n;
           var ddx = M[2 * j] - M[2 * k], ddy = M[2 * j + 1] - M[2 * k + 1], ln = Math.hypot(ddx, ddy), ang = Math.atan2(ddy, ddx);
-          var pf = Math.hypot(ch.O[2 * k] - ch.I[2 * k], ch.O[2 * k + 1] - ch.I[2 * k + 1]), nbL = Math.floor(ln / (an.lw * 38));
+          var pf = Math.abs((ch.I[2 * k] - ch.O[2 * k]) * ch.nrm[2 * k] + (ch.I[2 * k + 1] - ch.O[2 * k + 1]) * ch.nrm[2 * k + 1]), nbL = Math.floor(ln / (an.lw * 38));
           for (var il = 0; il < nbL; il++) {
             if (alea(an.v * 31 + k * 7 + il, 1.7) > 0.6) continue;
             var tl = (il + 0.5) / nbL, sg = alea(an.v * 29 + k * 5 + il, 2.3) < 0.5 ? -1 : 1;
@@ -2470,14 +2470,21 @@
       lc.save(); trace(); lc.clip(); lc.imageSmoothingEnabled = true; lc.drawImage(ro.cv, ro.x0, ro.y0, ro.w, ro.h); lc.restore();
     }
     if (u * ZPX >= 0.9 && alea(c.v + 5, 3.3) < 0.7) {
-      // Une cheminée, au point le plus éloigné des côtés (le cœur du toit).
-      var bx = 0, by = 0, bd = -1;
-      for (var s1 = 0; s1 < 24; s1++) {
-        var qx = P[s1 % n][0] * 0.5 + P[(s1 * 7 + 3) % n][0] * 0.5, qy = P[s1 % n][1] * 0.5 + P[(s1 * 7 + 3) % n][1] * 0.5, mn = Infinity;
-        for (i = 0; i < n; i++) { var p1 = P[i], p2 = P[(i + 1) % n], ddx = p2[0] - p1[0], ddy = p2[1] - p1[1], tt = Math.max(0, Math.min(1, ((qx - p1[0]) * ddx + (qy - p1[1]) * ddy) / (ddx * ddx + ddy * ddy || 1e-18))); mn = Math.min(mn, Math.hypot(qx - p1[0] - ddx * tt, qy - p1[1] - ddy * tt)); }
-        if (mn > bd) { bd = mn; bx = qx; by = qy; }
+      // Une cheminée, au point INTÉRIEUR le plus éloigné des côtés (le cœur du toit, même pour un L ou un U).
+      var bb2 = [Infinity, Infinity, -Infinity, -Infinity];
+      P.forEach(function (p) { bb2[0] = Math.min(bb2[0], p[0]); bb2[1] = Math.min(bb2[1], p[1]); bb2[2] = Math.max(bb2[2], p[0]); bb2[3] = Math.max(bb2[3], p[1]); });
+      var bx = (bb2[0] + bb2[2]) / 2, by = (bb2[1] + bb2[3]) / 2, bd = -1, G = 18;
+      for (var gy = 0; gy < G; gy++) for (var gx = 0; gx < G; gx++) {
+        var qx = bb2[0] + (gx + 0.5) / G * (bb2[2] - bb2[0]), qy = bb2[1] + (gy + 0.5) / G * (bb2[3] - bb2[1]), dans = false, mn = Infinity;
+        for (i = 0; i < n; i++) {
+          var p1 = P[i], p2 = P[(i + 1) % n], ddx = p2[0] - p1[0], ddy = p2[1] - p1[1];
+          if ((p1[1] > qy) !== (p2[1] > qy) && qx < ddx * (qy - p1[1]) / ddy + p1[0]) dans = !dans;
+          var tt = Math.max(0, Math.min(1, ((qx - p1[0]) * ddx + (qy - p1[1]) * ddy) / (ddx * ddx + ddy * ddy || 1e-18)));
+          mn = Math.min(mn, Math.hypot(qx - p1[0] - ddx * tt, qy - p1[1] - ddy * tt));
+        }
+        if (dans && mn > bd) { bd = mn; bx = qx; by = qy; }
       }
-      cheminee(lc, bx, by, u * 1.9, u);
+      if (bd > u * 3) cheminee(lc, bx, by, Math.min(u * 1.9, bd * 0.45), u);
     }
     trace(); lc.strokeStyle = "#1c2622"; lc.lineWidth = u * 2.2; lc.stroke();
     lc.restore();
@@ -4211,7 +4218,7 @@
     // La cheminée, derrière le toit.
     if (Math.round(x * 7 + y * 3) % 2 === 0) {
       c.fillStyle = PIERRE;
-      c.beginPath(); c.rect(x + w * 0.2, y - h - w * 0.5, w * 0.13, w * 0.3); c.fill(); c.stroke();
+      c.beginPath(); c.rect(x + w * 0.2, y - h - w * 0.5, w * 0.13, w * 0.5); c.fill(); c.stroke();      // (descend jusqu'à l'égout : le toit, peint ensuite, la masque)
     }
     c.fillStyle = TOIT;
     c.beginPath();
