@@ -2505,10 +2505,42 @@
       lc.fillStyle = oy > 0.5 ? MURMAISON : "#cfc2a0"; lc.fill();
       lc.strokeStyle = "#2a1c0e"; lc.lineWidth = u * 1.6; lc.stroke();
     }
-    if (sudI >= 0 && sud > 0.4) {                                  // la porte, au milieu du mur le plus au sud
-      var j2 = (sudI + 1) % n, mx = (P[sudI][0] + P[j2][0]) / 2, my = (P[sudI][1] + P[j2][1]) / 2;
-      lc.fillStyle = "#6a4a2a"; lc.fillRect(mx - H * 0.14, my - H * 0.55, H * 0.28, H * 0.55);
-      lc.strokeStyle = "#2a1c0e"; lc.lineWidth = u * 1.2; lc.strokeRect(mx - H * 0.14, my - H * 0.55, H * 0.28, H * 0.55);
+    // La porte : un parallélogramme qui SUIT l'arête du mur (pied sur l'arête, montants verticaux), posé sur le
+    // meilleur mur — tourné vers le sud, assez long, et dont la porte n'est cachée ni par le toit ni par un
+    // autre mur plus au sud.
+    var dedansPoly = function (Q, x, y) {
+      var r = false, m = Q.length, q;
+      for (q = 0; q < m; q++) { var a1 = Q[q], b1 = Q[(q + 1) % m]; if ((a1[1] > y) !== (b1[1] > y) && x < (b1[0] - a1[0]) * (y - a1[1]) / (b1[1] - a1[1]) + a1[0]) r = !r; }
+      return r;
+    };
+    var cand = [];
+    for (i = 0; i < n; i++) {
+      var j2 = (i + 1) % n, ex = P[j2][0] - P[i][0], ey = P[j2][1] - P[i][1], El = Math.hypot(ex, ey) || 1, oyy = -ex / El * sg;
+      if (oyy > 0.35) cand.push({ i: i, j: j2, L: El, sc: oyy * El });
+    }
+    cand.sort(function (a, b) { return b.sc - a.sc; });
+    for (var ci = 0; ci < cand.length; ci++) {
+      var cd = cand[ci], dw = Math.min(H * 0.3, cd.L * 0.4), dh = Math.min(H * 0.6, H - u * 2);
+      if (dw < u * 3) continue;
+      var tx = (P[cd.j][0] - P[cd.i][0]) / cd.L, ty = (P[cd.j][1] - P[cd.i][1]) / cd.L, mx = (P[cd.i][0] + P[cd.j][0]) / 2, my = (P[cd.i][1] + P[cd.j][1]) / 2;
+      var b1 = [mx - tx * dw / 2, my - ty * dw / 2], b2 = [mx + tx * dw / 2, my + ty * dw / 2], t1 = [b1[0], b1[1] - dh], t2 = [b2[0], b2[1] - dh];
+      // Cachée par le toit, ou par un autre mur plus au sud (son pied est devant le nôtre) ?
+      var cache = dedansPoly(T, t1[0], t1[1]) || dedansPoly(T, t2[0], t2[1]) || dedansPoly(T, (t1[0] + t2[0]) / 2, (t1[1] + t2[1]) / 2);
+      for (var k = 0; k < n && !cache; k++) {
+        if (k === cd.i) continue;
+        var k2 = (k + 1) % n, wx = P[k2][0] - P[k][0], wy = P[k2][1] - P[k][1], oy2 = -wx / (Math.hypot(wx, wy) || 1) * sg;
+        if (oy2 < -0.05) continue;
+        var wall = [P[k], P[k2], T[k2], T[k]];
+        if (dedansPoly(wall, t1[0], t1[1] + dh * 0.5) || dedansPoly(wall, t2[0], t2[1] + dh * 0.5)) {
+          // Ce mur recouvre la porte seulement s'il est plus au sud (son pied plus bas à l'écran).
+          if (Math.max(P[k][1], P[k2][1]) > Math.max(b1[1], b2[1]) + 1e-9) cache = true;
+        }
+      }
+      if (cache) continue;
+      lc.beginPath(); lc.moveTo(b1[0], b1[1]); lc.lineTo(b2[0], b2[1]); lc.lineTo(t2[0], t2[1]); lc.lineTo(t1[0], t1[1]); lc.closePath();
+      lc.fillStyle = "#6a4a2a"; lc.fill(); lc.strokeStyle = "#2a1c0e"; lc.lineWidth = u * 1.2; lc.stroke();
+      lc.fillStyle = "#d8b84a"; lc.beginPath(); lc.arc(b2[0] - tx * dw * 0.18, b2[1] - ty * dw * 0.18 - dh * 0.45, Math.max(u * 0.7, dw * 0.05), 0, TAU); lc.fill();
+      break;
     }
     peintContour(lc, { pts: [].concat.apply([], T), v: c.v, sansOmbre: true, palette: TOITS_VILLE });
     lc.restore();
