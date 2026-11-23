@@ -2064,14 +2064,28 @@
     var L = Math.hypot(dx, dy) || 1, ux = dx / L, uy = dy / L, nx = -uy, ny = ux, a = Math.atan2(uy, ux), i;
     var r = function (n) { return alea(g + 600 + n, h); }, u = Dk * ech * (ardoise ? 1.35 : 1);        // (un monument : plus grand)
     var w0 = u * (4 + 2 * r(0)), h0 = u * (2 + 0.7 * r(1)), tint = Math.floor(r(2) * 40), corps = [{ x: cx, y: cy, w: w0, h: h0, a: a }], cote = {};
-    var nW = 2 + Math.floor(r(3) * 2);
+    // Les ailes se posent BORD À BORD contre le corps principal (aucun recouvrement), et deux ailes du même côté
+    // ont chacune sa place le long du corps : on essaie quatre positions et on garde la première qui est libre.
+    var nW = 2 + Math.floor(r(3) * 2), occupe = { "1": [], "-1": [] };
     for (i = 0; i < nW; i++) {
       var side = i === 0 ? 1 : (r(10 + i) < 0.5 ? -1 : 1);
-      if (cote[side] && i > 1) side = -side;
-      var w1 = u * (1.8 + 1.4 * r(20 + i)), h1 = Math.min(u * (2.2 + 1.6 * r(30 + i)), u * 3.5 - h0 / 2 + Dk * 0.3 * ech);
-      var t = [-1, -0.35, 0.4, 1][Math.floor(r(40 + i) * 4)], along = t * (w0 / 2 - w1 / 2), perp = side * (h0 / 2 + h1 / 2 - Dk * 0.3 * ech);
+      var w1 = u * (1.8 + 1.4 * r(20 + i)), h1 = Math.min(u * (2.2 + 1.6 * r(30 + i)), u * 3.5);
+      var ts = [-1, -0.35, 0.4, 1], t0 = Math.floor(r(40 + i) * 4), along = null;
+      for (var tt = 0; tt < 4 && along === null; tt++) {
+        var al = ts[(t0 + tt) % 4] * Math.max(0, w0 / 2 - w1 / 2);
+        if (occupe[side].every(function (iv) { return al + w1 / 2 <= iv[0] - u * 0.05 || al - w1 / 2 >= iv[1] + u * 0.05; })) along = al;
+      }
+      if (along === null) {                                          // ce côté est plein : on essaie l'autre
+        side = -side;
+        for (tt = 0; tt < 4 && along === null; tt++) {
+          var al2 = ts[(t0 + tt) % 4] * Math.max(0, w0 / 2 - w1 / 2);
+          if (occupe[side].every(function (iv) { return al2 + w1 / 2 <= iv[0] - u * 0.05 || al2 - w1 / 2 >= iv[1] + u * 0.05; })) along = al2;
+        }
+      }
+      if (along === null) continue;                                  // plus de place : pas d'aile de plus
+      var perp = side * (h0 / 2 + h1 / 2);
       corps.push({ x: cx + ux * along + nx * perp, y: cy + uy * along + ny * perp, w: h1, h: w1, a: a + Math.PI / 2 });
-      cote[side] = 1;
+      occupe[side].push([along - w1 / 2, along + w1 / 2]);
     }
     // Il doit tenir dans le rectangle disponible (`lim` : longueur le long de u, largeur le long de n) : on
     // mesure l'emprise de tous les corps dans ce repère, puis on réduit l'ensemble autour du centre.
@@ -2164,17 +2178,26 @@
         joints.push([O[2 * j] + (O[2 * j2] - O[2 * j]) * tj, O[2 * j + 1] + (O[2 * j2 + 1] - O[2 * j + 1]) * tj, I[2 * j] + (I[2 * j2] - I[2 * j]) * tj, I[2 * j + 1] + (I[2 * j2 + 1] - I[2 * j + 1]) * tj]);
       }
       var sdj = chaine.cotes[j], Sj = S[sdj], Lj = Math.hypot(O[2 * j2] - O[2 * j], O[2 * j2 + 1] - O[2 * j + 1]);
-      // L'emprise de l'aile : les ailes de rang pair prennent les angles ; celles de rang impair s'arrêtent contre
-      // les ailes voisines (qui les prolongent de leur profondeur), si bien que deux ailes ne se recouvrent pas.
-      var sa = 0, sb = Lj;
+      // L'emprise de l'aile : les ailes de rang pair prennent les angles ; celles de rang impair s'arrêtent EXACTEMENT
+      // sur l'arête intérieure de l'aile voisine (intersection de droites : juste même sur un îlot de travers), si bien
+      // que deux ailes ne se recouvrent jamais. Une coupe en biais est faite au plus près de l'aile qui s'arrête.
+      var sa = 0, sb = Lj, aile = true;
       if (j % 2 === 1) {
-        if (chaine.ferme || j > 0) sa = d[chaine.cotes[(j + nCot - 1) % nCot]];
-        if (chaine.ferme || j < nCot - 1) sb = Lj - d[chaine.cotes[(j + 1) % nCot]];
-        if (sb - sa < Dk * 0.8) { sa = 0; sb = Lj; }
+        var proj = function (pt) { return (pt[0] - O[2 * j]) * Sj.ux + (pt[1] - O[2 * j + 1]) * Sj.uy; };
+        var coupe = function (sv) {                                // où l'aile j rencontre l'arête intérieure de la voisine `sv`
+          var A1 = interDroites(Lo[sdj][0], Lo[sdj][1], Sj.ux, Sj.uy, Li[sv][0], Li[sv][1], S[sv].ux, S[sv].uy);
+          var A2 = interDroites(Li[sdj][0], Li[sdj][1], Sj.ux, Sj.uy, Li[sv][0], Li[sv][1], S[sv].ux, S[sv].uy);
+          return A1 && A2 ? [proj(A1), proj(A2)] : null;
+        };
+        if (chaine.ferme || j > 0) { var ca = coupe(chaine.cotes[(j + nCot - 1) % nCot]); if (ca) sa = Math.max(0, Math.max(ca[0], ca[1])); }
+        if (chaine.ferme || j < nCot - 1) { var cb = coupe(chaine.cotes[(j + 1) % nCot]); if (cb) sb = Math.min(Lj, Math.min(cb[0], cb[1])); }
+        if (sb - sa < Dk * 0.3) aile = false;                      // pris en entier par les angles voisins : pas d'aile à part
       }
-      var sm2 = (sa + sb) / 2;
-      rect.push({ tuile: true, x: O[2 * j] + Sj.ux * sm2 + Sj.nx * d[sdj] / 2, y: O[2 * j + 1] + Sj.uy * sm2 + Sj.ny * d[sdj] / 2,
-        w: (sb - sa) * 1.02, h: d[sdj], a: Math.atan2(Sj.uy, Sj.ux), v: Math.floor(alea(g + 520, h) * 64) });
+      if (aile) {
+        var sm2 = (sa + sb) / 2;
+        rect.push({ tuile: true, x: O[2 * j] + Sj.ux * sm2 + Sj.nx * d[sdj] / 2, y: O[2 * j + 1] + Sj.uy * sm2 + Sj.ny * d[sdj] / 2,
+          w: sb - sa, h: d[sdj], a: Math.atan2(Sj.uy, Sj.ux), v: Math.floor(alea(g + 520, h) * 64) });
+      }
     }
     // La cour, sous le bâtiment : jardin ou cour pavée (le U et le L la laissent ouverte sur la rue).
     var genre = alea(g + 400, h) < 0.7 ? 0 : 1;
@@ -2285,26 +2308,50 @@
   // Les maisons de ville ne s'écrasent ni sur une rue ni les unes sur les autres : celles qui
   // mordraient sont écartées (test exact, par rectangles orientés ; une grille pour aller vite).
   function purgerMaisons(liste, debut) {
-    var rues = liste.rues || [], mais = [], cs = 1e-9;
-    for (var i = debut; i < liste.length; i++) if (liste[i].maison) {
-      mais.push(liste[i]); cs = Math.max(cs, Math.hypot(liste[i].maison.w, liste[i].maison.h));
-    }
+    var rues = liste.rues || [], mais = [], i, q;
+    for (i = debut; i < liste.length; i++) if (liste[i].maison) mais.push(liste[i]);
     if (!mais.length) return;
+    // Un rectangle prêt à tester : sinus et cosinus calculés une fois, et son cercle englobant.
+    var prepare = function (x, y, w, h, a, anneau) { return { x: x, y: y, w: w, h: h, c: Math.cos(a), s: Math.sin(a), r: Math.hypot(w, h) / 2, anneau: anneau }; };
     var rectRues = rues.map(function (r) {
       var dx = r[2] - r[0], dy = r[3] - r[1];
-      return { x: (r[0] + r[2]) / 2, y: (r[1] + r[3]) / 2, w: Math.hypot(dx, dy), h: r[4], a: Math.atan2(dy, dx) };
+      return prepare((r[0] + r[2]) / 2, (r[1] + r[3]) / 2, Math.hypot(dx, dy), r[4], Math.atan2(dy, dx), false);
     });
-    var grille = {}, ok = new Set();
-    mais.forEach(function (o) {
-      var p = { x: o.x, y: o.y, w: o.maison.w, h: o.maison.h, a: o.maison.a, anneau: !!(o.maison.tuile || o.maison.ardoise) }, q;
-      for (q = 0; q < rectRues.length; q++) if (maisonsSeChevauchent(rectRues[q], p, 0)) return;
-      var gx = Math.floor(p.x / cs), gy = Math.floor(p.y / cs);
-      for (var ax = gx - 1; ax <= gx + 1; ax++) for (var ay = gy - 1; ay <= gy + 1; ay++) {
-        var vs = grille[ax + "," + ay];
-        if (vs) for (q = 0; q < vs.length; q++) if (!(p.anneau && vs[q].anneau) && maisonsSeChevauchent(vs[q], p, 0)) return;       // (les bâtiments d'un îlot se touchent aux angles : seules les rues les écartent)
-      }
-      (grille[gx + "," + gy] || (grille[gx + "," + gy] = [])).push(p);
-      ok.add(o);
+    var ps = mais.map(function (o) { return prepare(o.x, o.y, o.maison.w, o.maison.h, o.maison.a, !!(o.maison.tuile || o.maison.ardoise)); });
+    // Une grille dont la case vaut deux fois le rayon moyen : un monument énorme ne la gonfle plus (il s'inscrit
+    // dans toutes les cases qu'il recouvre). Les rues et les maisons ont chacune la leur.
+    var rm = 0; ps.forEach(function (p) { rm += p.r; });
+    var cs = Math.max(2 * rm / ps.length, 1e-9), grilleR = {}, grille = {};
+    var cles = function (p, fn) {
+      var x0 = Math.floor((p.x - p.r) / cs), x1 = Math.floor((p.x + p.r) / cs), y0 = Math.floor((p.y - p.r) / cs), y1 = Math.floor((p.y + p.r) / cs);
+      if ((x1 - x0 + 1) * (y1 - y0 + 1) > 400) { x1 = x0 + 19; y1 = y0 + 19; }          // (une rue immense : ses 400 premières cases)
+      for (var gx = x0; gx <= x1; gx++) for (var gy = y0; gy <= y1; gy++) fn(gx * 100003 + gy);
+    };
+    rectRues.forEach(function (r) { cles(r, function (k) { (grilleR[k] || (grilleR[k] = [])).push(r); }); });
+    // Deux rectangles orientés se recouvrent-ils ? Rejet rapide par les cercles, puis test des axes séparateurs.
+    var touche = function (a, b) {
+      var dx = b.x - a.x, dy = b.y - a.y, rr = a.r + b.r;
+      if (dx * dx + dy * dy > rr * rr) return false;
+      var ax = a.c, ay = a.s, bx = b.c, by = b.s;
+      if (Math.abs(dx * ax + dy * ay) > a.w / 2 + b.w / 2 * Math.abs(bx * ax + by * ay) + b.h / 2 * Math.abs(-by * ax + bx * ay)) return false;
+      if (Math.abs(-dx * ay + dy * ax) > a.h / 2 + b.w / 2 * Math.abs(-bx * ay + by * ax) + b.h / 2 * Math.abs(by * ay + bx * ax)) return false;
+      if (Math.abs(dx * bx + dy * by) > b.w / 2 + a.w / 2 * Math.abs(ax * bx + ay * by) + a.h / 2 * Math.abs(-ay * bx + ax * by)) return false;
+      if (Math.abs(-dx * by + dy * bx) > b.h / 2 + a.w / 2 * Math.abs(-ax * by + ay * bx) + a.h / 2 * Math.abs(ay * by + ax * bx)) return false;
+      return true;
+    };
+    var ok = new Set();
+    ps.forEach(function (p, ip) {
+      var rejete = false;
+      cles(p, function (k) {
+        if (rejete) return;
+        var rs = grilleR[k], vs = grille[k];
+        if (rs) for (q = 0; q < rs.length && !rejete; q++) if (touche(rs[q], p)) rejete = true;
+        // (les bâtiments d'un îlot se touchent aux angles : seules les rues les écartent)
+        if (!rejete && vs) for (q = 0; q < vs.length && !rejete; q++) if (!(p.anneau && vs[q].anneau) && touche(vs[q], p)) rejete = true;
+      });
+      if (rejete) return;
+      cles(p, function (k) { (grille[k] || (grille[k] = [])).push(p); });
+      ok.add(mais[ip]);
     });
     var garde = liste.slice(debut).filter(function (o) { return !o.maison || ok.has(o); });
     liste.length = debut;
@@ -2645,29 +2692,31 @@
   function mursProfil(lc, P, H, sg, u, fl) {
     var n = P.length, i, et = Math.max(1, Math.round((fl && fl.et) || 2)), porte = fl && fl.porte, hEt = H / et;
     var fen = hEt * ZPX >= 6;                                  // trop petit à l'écran : ni ceintures ni fenêtres
+    var ceint = new Path2D(), fene = new Path2D();
     for (i = 0; i < n; i++) {
       var j = (i + 1) % n, dx = P[j][0] - P[i][0], dy = P[j][1] - P[i][1], L = Math.hypot(dx, dy) || 1, oy = -dx / L * sg;
       if (oy < -0.05) continue;                                   // un mur tourné vers le nord est caché par le toit
       lc.beginPath(); lc.moveTo(P[i][0], P[i][1]); lc.lineTo(P[j][0], P[j][1]); lc.lineTo(P[j][0], P[j][1] - H); lc.lineTo(P[i][0], P[i][1] - H); lc.closePath();
       lc.fillStyle = oy > 0.5 ? MURMAISON : "#cfc2a0"; lc.fill();
       if (fen) {
-        // Les ceintures entre les étages.
-        lc.strokeStyle = "rgba(92,62,30,0.5)"; lc.lineWidth = u * 0.9; lc.beginPath();
-        for (var f = 1; f < et; f++) { lc.moveTo(P[i][0], P[i][1] - hEt * f); lc.lineTo(P[j][0], P[j][1] - hEt * f); }
-        lc.stroke();
-        // Les fenêtres : une rangée par étage, sur un mur assez long.
+        // Les ceintures entre les étages et les fenêtres sont COLLECTÉES : un seul tracé pour tous les murs du polygone
+        // (des milliers de petits remplissages coûtaient plus cher que le reste de la ville).
+        for (var f = 1; f < et; f++) { ceint.moveTo(P[i][0], P[i][1] - hEt * f); ceint.lineTo(P[j][0], P[j][1] - hEt * f); }
         var nW = Math.floor(L / (hEt * 1.15)), ww = Math.min(hEt * 0.36 / L, 0.5 / Math.max(1, nW)), wh = hEt * 0.42;
-        lc.fillStyle = "#3a2a1c";
         for (var k = 0; k < nW; k++) {
           var t = (k + 0.5) / nW;
           for (f = 0; f < et; f++) {
             if (f === 0 && porte && porte.i === i && t + ww / 2 > porte.s0 - 0.03 && t - ww / 2 < porte.s1 + 0.03) continue;
             var yc = hEt * (f + 0.58), ax = P[i][0] + dx * (t - ww / 2), ay = P[i][1] + dy * (t - ww / 2), bx = P[i][0] + dx * (t + ww / 2), by = P[i][1] + dy * (t + ww / 2);
-            lc.beginPath(); lc.moveTo(ax, ay - yc + wh / 2); lc.lineTo(bx, by - yc + wh / 2); lc.lineTo(bx, by - yc - wh / 2); lc.lineTo(ax, ay - yc - wh / 2); lc.closePath(); lc.fill();
+            fene.moveTo(ax, ay - yc + wh / 2); fene.lineTo(bx, by - yc + wh / 2); fene.lineTo(bx, by - yc - wh / 2); fene.lineTo(ax, ay - yc - wh / 2); fene.closePath();
           }
         }
       }
       lc.strokeStyle = "#2a1c0e"; lc.lineWidth = u * 1.6; lc.beginPath(); lc.moveTo(P[i][0], P[i][1]); lc.lineTo(P[j][0], P[j][1]); lc.lineTo(P[j][0], P[j][1] - H); lc.lineTo(P[i][0], P[i][1] - H); lc.closePath(); lc.stroke();
+    }
+    if (fen) {
+      lc.strokeStyle = "rgba(92,62,30,0.5)"; lc.lineWidth = u * 0.9; lc.stroke(ceint);
+      lc.fillStyle = "#3a2a1c"; lc.fill(fene);
     }
   }
 
@@ -2693,8 +2742,8 @@
       if (-exp / Lp * sg > 0.15) cand.unshift({ i: pref, j: jp, L: Lp, sc: 1e9 });
     }
     for (var ci = 0; ci < cand.length; ci++) {
-      var cd = cand[ci], hr = hEt || H, dw = Math.min(hr * 0.6, H * 0.3, cd.L * 0.4), dh = Math.min(hr * 0.78, H - u * 2, dw * 2);
-      if (dw < u * 3) continue;
+      var cd = cand[ci], hr = hEt || H / 2, dw = hr * 0.5, dh = hr * 0.78;       // une porte a TOUJOURS la même taille (d'après la hauteur d'étage)
+      if (cd.L < dw * 2.2 || dh > H - u || dw < u * 2.5) continue;               // mur trop court ou trop bas : on en prend un autre, on ne la rétrécit pas
       var tx = (P[cd.j][0] - P[cd.i][0]) / cd.L, ty = (P[cd.j][1] - P[cd.i][1]) / cd.L, mx = (P[cd.i][0] + P[cd.j][0]) / 2, my = (P[cd.i][1] + P[cd.j][1]) / 2;
       var b1 = [mx - tx * dw / 2, my - ty * dw / 2], b2 = [mx + tx * dw / 2, my + ty * dw / 2], t1 = [b1[0], b1[1] - dh], t2 = [b2[0], b2[1] - dh];
       var cache = dedansPoly(T, t1[0], t1[1]) || dedansPoly(T, t2[0], t2[1]) || dedansPoly(T, (t1[0] + t2[0]) / 2, (t1[1] + t2[1]) / 2);
@@ -5888,21 +5937,22 @@
     semerDecors(carte, vue, masque, X0, Y0, X1, Y1, evite, liste);
     X0 = Math.max(0, X0); Y0 = Math.max(0, Y0); X1 = Math.min(carte.largeur, X1); Y1 = Math.min(carte.hauteur, Y1);
     var out = [];
+    var bids = [], pousse = function (bid, obj) { out.push(obj); bids.push(bid); };
     liste.forEach(function (o) {
       if (o.x < X0 || o.x > X1 || o.y < Y0 || o.y > Y1 || o.cour) return;
       if (o.anneau) {
-        o.anneau.rect.forEach(function (rc) { var sm = rc.w / 0.62; out.push({ type: "maison", v: rc.v, x: rc.x, y: rc.y + sm * 0.3, s: sm, a: Math.round(rc.a * 180 / Math.PI * 10) / 10, ar: rc.h / rc.w, tuile: true, et: o.anneau.et, hf: o.anneau.hf }); });
+        o.anneau.rect.forEach(function (rc) { var sm = rc.w / 0.62; pousse(o.bid, { type: "maison", v: rc.v, x: rc.x, y: rc.y + sm * 0.3, s: sm, a: Math.round(rc.a * 180 / Math.PI * 10) / 10, ar: rc.h / rc.w, tuile: true, et: o.anneau.et, hf: o.anneau.hf }); });
         return;
       }
       if (o.maison) {
         var sm = o.maison.w / 0.62;
-        out.push({ type: "maison", v: o.maison.v, x: o.x, y: o.y + sm * 0.3, s: sm, a: Math.round(o.maison.a * 180 / Math.PI * 10) / 10, ar: o.maison.h / o.maison.w, tuile: !!o.maison.tuile, ardoise: !!o.maison.ardoise, et: o.maison.et, hf: o.maison.hf });
-      } else out.push({ type: o.sprite, v: variantePeinte(o), x: o.x, y: o.y, s: o.s });
+        pousse(o.bid, { type: "maison", v: o.maison.v, x: o.x, y: o.y + sm * 0.3, s: sm, a: Math.round(o.maison.a * 180 / Math.PI * 10) / 10, ar: o.maison.h / o.maison.w, tuile: !!o.maison.tuile, ardoise: !!o.maison.ardoise, et: o.maison.et, hf: o.maison.hf });
+      } else pousse(o.bid, { type: o.sprite, v: variantePeinte(o), x: o.x, y: o.y, s: o.s });
     });
     var rues = (liste.rues || []).filter(function (r) {
       return Math.max(r[0], r[2]) >= X0 && Math.min(r[0], r[2]) <= X1 && Math.max(r[1], r[3]) >= Y0 && Math.min(r[1], r[3]) <= Y1;
     });
-    return { objets: out, rect: [X0, Y0, X1, Y1], rues: rues, acces: liste.filter(function (o) { return o.acc; }).map(function (o) { return o.acc; }), batiments: liste.filter(function (o) { return o.bid; }).map(function (o) { return o.bid; }) };
+    return { objets: out, rect: [X0, Y0, X1, Y1], rues: rues, bids: bids, acces: liste.filter(function (o) { return o.acc; }).map(function (o) { return o.acc; }), batiments: liste.filter(function (o) { return o.bid; }).map(function (o) { return o.bid; }) };
   }
 
   window.Moteur = {
