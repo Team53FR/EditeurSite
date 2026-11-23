@@ -96,7 +96,7 @@
       plaine: "#9cc584", foret: "#8fbd7c", taiga: "#86b07c", colline: "#a8c784", montagne: "#a9a898", cime: "#d6dcd8",
       volcan: "#9a8672", desert: "#dccf9c", steppe: "#bccb8a", marais: "#7fa98c", cendres: "#8f8478", champs: "#9cc584",
       savane: "#c3cc8c", automne: "#a9bd7c", jungle: "#7fb074", morte: "#a3ad8c", rocaille: "#b3b3a0", plage: "#e2d9b0", toundra: "#b0bfa0",
-      ville: "#a4cb8c", faubourg: "#a0c888", glace: "#e9f1f0"
+      ville: "#cdbf98", faubourg: "#a0c888", glace: "#e9f1f0"
     }
   };
 
@@ -911,6 +911,8 @@
   // Une maison vue du dessus : un toit rectangulaire (long côté `w`, tourné de `a`), ses
   // deux pans séparés par le faîte, les rangs de bardeaux, et son ombre. Dessinée en
   // vectoriel (et non collée) : chaque maison a sa propre orientation.
+  // Les toits de tuiles d'une ville de plan : des orangés et des bruns chauds, comme sur un plan de cité.
+  var TOITS_TUILE = ["#d9762f", "#c9662a", "#b85a2b", "#e08a3f", "#a8502a", "#cf7a3a", "#bd5e2e", "#d98a4e", "#c0702f", "#aa5a35"];
   var TOITS_DESSUS = ["#b98a68", "#a97c5e", "#c29472", "#b08064", "#9c7458", "#6f8496", "#bd8e6c", "#7b8ea0"];
   function maisonDessus(lc, x, y, w, h, a, v, fin, couleur) {
     var u = Math.max(Math.max(w, h) / 60, fin || 0);
@@ -924,15 +926,33 @@
     lc.lineJoin = "round";
     lc.fillStyle = couleur || TOITS_DESSUS[v % TOITS_DESSUS.length];
     lc.fillRect(-w / 2, -h / 2, w, h);
-    lc.fillStyle = "rgba(20,14,8,0.16)"; lc.fillRect(-w / 2, 0, w, h / 2);       // le pan à l'ombre
-    lc.strokeStyle = "rgba(40,26,16,0.45)"; lc.lineWidth = u * 0.9;
+    // Les pans du toit, éclairés du nord-ouest (dans le repère du MONDE, pas celui du bâtiment) : un toit
+    // à deux pans (long) ou à quatre pans, avec croupes (presque carré), séparés par le faîtage.
+    var ca = Math.cos(a), sa = Math.sin(a), hanche = w / h < 1.7, rl = hanche ? Math.max(0, w - h) / 2 : w / 2;
+    var pan = function (pts, nx, ny) {
+      var wx = nx * ca - ny * sa, wy = nx * sa + ny * ca, lum = -(wx + wy) / 1.414;
+      lc.beginPath(); pts.forEach(function (p, k) { if (k) lc.lineTo(p[0], p[1]); else lc.moveTo(p[0], p[1]); }); lc.closePath();
+      lc.fillStyle = lum > 0 ? "rgba(255,232,190," + (0.1 + 0.3 * lum) + ")" : "rgba(40,16,6," + (0.08 - 0.34 * lum) + ")";
+      lc.fill();
+    };
+    var A = [-w / 2, -h / 2], B = [w / 2, -h / 2], C = [w / 2, h / 2], D = [-w / 2, h / 2], R1 = [-rl, 0], R2 = [rl, 0];
+    pan([A, B, R2, R1], 0, -1); pan([D, C, R2, R1], 0, 1);
+    if (hanche) { pan([A, D, R1], -1, 0); pan([B, C, R2], 1, 0); }
+    // Les rangs de tuiles, parallèles à la pente, et le faîtage.
+    lc.strokeStyle = "rgba(40,18,8,0.26)"; lc.lineWidth = u * 0.8;
     lc.beginPath();
-    for (var q = 1, n = Math.max(3, Math.round(w / h * 4)); q < n; q++) { lc.moveTo(-w / 2 + w * q / n, -h / 2); lc.lineTo(-w / 2 + w * q / n, h / 2); }
+    for (var q = 1, n = Math.max(3, Math.round(w / Math.max(h, 1e-9) * 3)); q < n; q++) {
+      var tx = -w / 2 + w * q / n;
+      if (!hanche || Math.abs(tx) <= rl) { lc.moveTo(tx, -h / 2); lc.lineTo(tx, h / 2); }
+    }
     lc.stroke();
+    lc.strokeStyle = "rgba(40,18,8,0.55)"; lc.lineWidth = u * 1.3;
+    lc.beginPath();
+    if (hanche) { lc.moveTo(A[0], A[1]); lc.lineTo(R1[0], R1[1]); lc.moveTo(D[0], D[1]); lc.lineTo(R1[0], R1[1]); lc.moveTo(B[0], B[1]); lc.lineTo(R2[0], R2[1]); lc.moveTo(C[0], C[1]); lc.lineTo(R2[0], R2[1]); }
+    lc.moveTo(R1[0], R1[1]); lc.lineTo(R2[0], R2[1]); lc.stroke();
+    lc.strokeStyle = "rgba(255,236,200,0.45)"; lc.lineWidth = u * 0.7; lc.beginPath(); lc.moveTo(R1[0], R1[1] - u); lc.lineTo(R2[0], R2[1] - u); lc.stroke();
     lc.strokeStyle = "#1c2622"; lc.lineWidth = u * 2.2;
     lc.strokeRect(-w / 2, -h / 2, w, h);
-    lc.lineWidth = u * 1.4;
-    lc.beginPath(); lc.moveTo(-w / 2, 0); lc.lineTo(w / 2, 0); lc.stroke();
     lc.restore();
   }
 
@@ -1790,7 +1810,7 @@
           var va = enVille(a[0], a[1]), vb = enVille(b[0], b[1]);
           // La rue : seulement si ses deux bouts sont en ville (elle ne part pas dans les champs).
           if (va && vb && ici) liste.rues.push([a[0], a[1], b[0], b[1], Dk * 0.95, ici.dd.rues.rue]);
-          if (!ici) continue;
+          if (!ici || DESSUS) continue;                                // (vu du dessus, l'îlot est bâti d'un bloc : voir batirIlot)
           // Le rang de maisons de ce côté, en retrait de la rue, vers l'intérieur de l'îlot.
           var nx = -dy / L, ny = dx / L;
           if ((cx - a[0]) * nx + (cy - a[1]) * ny < 0) { nx = -nx; ny = -ny; }
@@ -1817,6 +1837,11 @@
         if (!ici) continue;
         // Le cœur de l'îlot.
         var tirage = alea(g + 200, h), cumul = 0, coeur = ici.dd.rues.coeur;
+        if (DESSUS) {
+          var monu = false, cu = 0;
+          for (var nn = 0; nn < coeur.length; nn++) { cu += coeur[nn][1]; if (tirage < cu) { monu = coeur[nn][0] === "clocher" || coeur[nn][0] === "batisse"; break; } }
+          batirIlot(liste, c, cx, cy, Dk, ici, enVille, g, h, zoom, monu);
+        }
         for (var n = 0; n < coeur.length; n++) {
           cumul += coeur[n][1];
           if (tirage < cumul) {
@@ -1826,6 +1851,7 @@
               break;
             }
             if (DESSUS && coeur[n][0] === "champ") break;
+            if (DESSUS) break;                                      // (le cœur est déjà une cour plantée : voir batirIlot)
             if (sc * zoom >= 0.7 && !ici.route && tirage / cumul < ici.dens + 0.01) liste.push({ x: cx, y: cy + sc * 0.25, s: sc, sprite: coeur[n][0], r: alea(g + 201, h) });
             break;
           }
@@ -1833,6 +1859,55 @@
       }
     }
     purgerMaisons(liste, debut);
+  }
+
+  // Un îlot vu du dessus (style Plan) est bâti sur tout son pourtour : des bâtiments collés les uns aux autres,
+  // tous alignés sur LEUR rue (leur faîtage est parallèle au trottoir), de largeurs variées ; deux côtés
+  // prennent les angles, les deux autres s'arrêtent contre eux. Au milieu, une cour : un jardin planté
+  // d'arbres, une cour pavée, parfois un corps de logis ; un monument occupe le cœur à la place de la cour.
+  function batirIlot(liste, c, cx, cy, Dk, ici, enVille, g, h, zoom, monument) {
+    var rueW = Dk * 0.95, gap = Dk * 0.06, R = ici.dd.rues, ech = ici.ech, prof = [], q, k;
+    for (q = 0; q < 4; q++) prof[q] = Dk * ech * (1.9 + 0.9 * alea(g + 300 + q, h));
+    for (q = 0; q < 4; q++) {
+      var a = c[q], b = c[(q + 1) % 4], dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy) || 1, ux = dx / L, uy = dy / L;
+      var nx = -uy, ny = ux;
+      if ((cx - a[0]) * nx + (cy - a[1]) * ny < 0) { nx = -nx; ny = -ny; }
+      var impair = q % 2, start = rueW / 2 + (impair ? prof[(q + 3) % 4] + gap : 0), end = L - rueW / 2 - (impair ? prof[(q + 1) % 4] + gap : 0);
+      var s0 = start; k = 0;
+      while (end - s0 > Dk * ech * 1.2) {
+        var w = Dk * ech * (1.9 + 1.5 * alea(g + 310 + q * 13 + k, h));
+        if (end - (s0 + w) < Dk * ech * 1.6) w = end - s0;                         // le dernier lot prend le reste
+        var dd = prof[q] * (0.9 + 0.2 * alea(g + 330 + q * 13 + k, h)), sm = s0 + w / 2, ok = true;
+        s0 += w; k++;
+        if (alea(g + 350 + q * 13 + k, h) < R.vide * 0.5) continue;                // une dent creuse : un jardin sur rue
+        var px = a[0] + ux * sm + nx * (rueW / 2 + gap / 2 + dd / 2), py = a[1] + uy * sm + ny * (rueW / 2 + gap / 2 + dd / 2);
+        var v = enVille(px, py);
+        if (!v || v.route || v.mat !== ici.mat || alea(g + 370 + q * 13 + k, h) >= Math.min(1, v.dens)) ok = false;
+        if (!ok || w * zoom < 1.5) continue;
+        liste.push({ x: px, y: py, maison: { w: w * 0.97, h: dd, a: Math.atan2(uy, ux), v: Math.floor(alea(g + 390 + q * 13 + k, h) * 64), tuile: true } });
+      }
+    }
+    if (monument) return;
+    // La cour : le quadrilatère de l'îlot, réduit de l'épaisseur du bâti (rue, trottoir et profondeur des lots).
+    var rIn = 0, ms = prof[0] + prof[1] + prof[2] + prof[3];
+    for (q = 0; q < 4; q++) { var m0 = c[q], m1 = c[(q + 1) % 4]; rIn += Math.hypot((m0[0] + m1[0]) / 2 - cx, (m0[1] + m1[1]) / 2 - cy) / 4; }
+    var f = 1 - (rueW / 2 + gap + ms / 4) / Math.max(rIn, 1e-9);
+    if (f < 0.22) return;
+    var P = c.map(function (p) { return [cx + (p[0] - cx) * f, cy + (p[1] - cy) * f]; }), tp = alea(g + 400, h);
+    var genre = tp < 0.6 ? 0 : tp < 0.8 ? 1 : (f > 0.45 ? 2 : 0);                  // jardin, cour pavée, corps de logis
+    if (!ici.route) liste.push({ x: cx, y: cy, sprite: "cour", cour: { pts: [P[0][0], P[0][1], P[1][0], P[1][1], P[2][0], P[2][1], P[3][0], P[3][1]], v: genre === 1 ? 1 : 0, lw: Dk * 0.07 } });
+    if (genre === 2) {
+      var ang = Math.atan2(P[1][1] - P[0][1], P[1][0] - P[0][0]);
+      liste.push({ x: cx, y: cy, maison: { w: Math.hypot(P[1][0] - P[0][0], P[1][1] - P[0][1]) * 0.72, h: Math.hypot(P[2][0] - P[1][0], P[2][1] - P[1][1]) * 0.66, a: ang, v: Math.floor(alea(g + 410, h) * 64), tuile: true } });
+      return;
+    }
+    if (genre === 1) return;
+    for (var t = 0, nT = 2 + Math.floor(alea(g + 420, h) * 4); t < nT; t++) {
+      var i0 = Math.floor(alea(g + 430 + t, h) * 4), tt = alea(g + 440 + t, h), rr = 0.1 + 0.6 * alea(g + 450 + t, h);
+      var qx = cx + ((1 - tt) * c[i0][0] + tt * c[(i0 + 1) % 4][0] - cx) * f * rr, qy = cy + ((1 - tt) * c[i0][1] + tt * c[(i0 + 1) % 4][1] - cy) * f * rr;
+      var st = Dk * ech * 1.9 * (0.8 + 0.4 * alea(g + 460 + t, h));
+      if (st * zoom >= 0.7) liste.push({ x: qx, y: qy + st * 0.31, s: st, sprite: "arbre", r: alea(g + 470 + t, h) });
+    }
   }
 
   // Les maisons de ville ne s'écrasent ni sur une rue ni les unes sur les autres : celles qui
@@ -1849,12 +1924,12 @@
     });
     var grille = {}, ok = new Set();
     mais.forEach(function (o) {
-      var p = { x: o.x, y: o.y, w: o.maison.w, h: o.maison.h, a: o.maison.a }, q;
+      var p = { x: o.x, y: o.y, w: o.maison.w, h: o.maison.h, a: o.maison.a, anneau: !!o.maison.tuile }, q;
       for (q = 0; q < rectRues.length; q++) if (maisonsSeChevauchent(rectRues[q], p, 0)) return;
       var gx = Math.floor(p.x / cs), gy = Math.floor(p.y / cs);
       for (var ax = gx - 1; ax <= gx + 1; ax++) for (var ay = gy - 1; ay <= gy + 1; ay++) {
         var vs = grille[ax + "," + ay];
-        if (vs) for (q = 0; q < vs.length; q++) if (maisonsSeChevauchent(vs[q], p, 0)) return;
+        if (vs) for (q = 0; q < vs.length; q++) if (!(p.anneau && vs[q].anneau) && maisonsSeChevauchent(vs[q], p, 0)) return;       // (les bâtiments d'un îlot se touchent aux angles : seules les rues les écartent)
       }
       (grille[gx + "," + gy] || (grille[gx + "," + gy] = [])).push(p);
       ok.add(o);
@@ -1988,8 +2063,18 @@
     return out;
   }
 
+  // La cour intérieure d'un îlot : un jardin (herbe, avec ses arbres, semés à part), une cour pavée.
+  function peintCour(lc, c) {
+    lc.save(); lc.lineJoin = "round";
+    lc.beginPath(); c.pts.forEach(function (p, k) { if (k % 2 === 0) { if (k) lc.lineTo(p, c.pts[k + 1]); else lc.moveTo(p, c.pts[k + 1]); } });
+    lc.closePath();
+    lc.fillStyle = c.v === 1 ? "#dccfae" : "#8fbf68"; lc.fill();
+    lc.strokeStyle = c.v === 1 ? "rgba(110,90,56,0.55)" : "rgba(46,78,30,0.6)"; lc.lineWidth = c.lw; lc.stroke();
+    lc.restore();
+  }
+
   // Peint les décors (semés et tampons), du fond vers l'avant.
-  var FONDS = { place: true, canopee: true, tapis: true };         // décors posés AU SOL : peints avant tout le reste
+  var FONDS = { place: true, canopee: true, tapis: true, cour: true };         // décors posés AU SOL : peints avant tout le reste
   function peindreDecors(lc, liste) {
     // Trois couches : les silhouettes cernées des lisières de forêt, puis les décors posés au sol
     // (fond de forêt, places), puis tout le reste du fond vers l'avant.
@@ -2001,7 +2086,8 @@
     liste.sort(function (a, b) { return couche(a) - couche(b) || rang(a) - rang(b) || (massif(a) ? PAL[profDe(a)] - PAL[profDe(b)] : 0) || a.y - b.y; });
     for (var i = 0; i < liste.length; i++) {
       var o = liste[i];
-      if (o.maison) { maisonDessus(lc, o.x, o.y, o.maison.w, o.maison.h, o.maison.a, o.maison.v); continue; }
+      if (o.cour) { peintCour(lc, o.cour); continue; }
+      if (o.maison) { maisonDessus(lc, o.x, o.y, o.maison.w, o.maison.h, o.maison.a, o.maison.v, 0, o.maison.tuile ? TOITS_TUILE[o.maison.v % TOITS_TUILE.length] : null); continue; }
       var vp = variantePeinte(o);
       if (o.rot) {
         // Un décor tourné : on le colle autour de son centre (le dessin est centré à 0,31 s au-dessus de son pied).
@@ -5059,7 +5145,7 @@
     X0 = Math.max(0, X0); Y0 = Math.max(0, Y0); X1 = Math.min(carte.largeur, X1); Y1 = Math.min(carte.hauteur, Y1);
     var out = [];
     liste.forEach(function (o) {
-      if (o.x < X0 || o.x > X1 || o.y < Y0 || o.y > Y1) return;
+      if (o.x < X0 || o.x > X1 || o.y < Y0 || o.y > Y1 || o.cour) return;
       if (o.maison) {
         var sm = o.maison.w / 0.62;
         out.push({ type: "maison", v: o.maison.v, x: o.x, y: o.y + sm * 0.3, s: sm, a: Math.round(o.maison.a * 180 / Math.PI * 10) / 10 });
