@@ -935,13 +935,14 @@
   }
 
   var OMBRE_TOIT = true;                              // faux quand le toit repose sur des murs (l'ombre est celle du bâtiment)
-  function maisonDessus(lc, x, y, w, h, a, v, fin, couleur) {
+  function maisonDessus(lc, x, y, w, h, a, v, fin, couleur, haut) {
     var u = Math.max(Math.max(w, h) / 60, fin || 0);
     lc.save();
     lc.translate(x, y);
     if (OMBRE_TOIT) {
       lc.save();
-      lc.translate(h * 0.16, h * 0.2); lc.rotate(a);
+      if (haut) lc.translate(haut * 0.24, haut * 0.3); else lc.translate(h * 0.16, h * 0.2);        // (l'ombre s'allonge avec la hauteur)
+      lc.rotate(a);
       lc.fillStyle = "rgba(16,30,28,0.32)"; lc.fillRect(-w / 2, -h / 2, w, h);
       lc.restore();
     }
@@ -2040,6 +2041,21 @@
     liste.push({ x: cx, y: cy, sprite: "cour", cour: { pts: pts, v: genre, lw: Dk * 0.07 } });
   }
 
+  // Envoie dans la liste les corps d'UN bâtiment (rectangles { x, y, w, h, a, et }) : même identifiant, même teinte.
+  // Le corps dont une arête longe le mieux une rue reçoit la porte et le chemin d'accès. `et` : étages de chaque
+  // corps (un bâtiment peut avoir des ailes de hauteurs différentes) ; `hf` : la hauteur d'un étage.
+  function pousserCorps(liste, bid, corps, tint, ardoise, bloc, Dk, hf) {
+    var meilleur = -1, macc = null;
+    if (bloc) corps.forEach(function (b, ib) {
+      var ac = accesBatiment(bloc, rectPoly(b.x, b.y, b.w, b.h, b.a), Dk);
+      if (ac && (!macc || ac.dist < macc.dist)) { macc = ac; meilleur = ib; }
+    });
+    corps.forEach(function (b, ib) {
+      liste.push({ x: b.x, y: b.y, bid: bid, acc: ib === meilleur ? macc.path : null,
+        maison: { w: b.w, h: b.h, a: b.a, v: tint, ardoise: !!ardoise, tuile: !ardoise, fac: ib === meilleur ? macc.edge : null, et: b.et, hf: hf } });
+    });
+  }
+
   // Un grand bâtiment à plusieurs corps (monument, hôtel, couvent…) : un corps principal et deux ou trois
   // ailes qui s'y accrochent en équerre (T, L, U), de proportions variées. Un bâtiment unique : un seul
   // identifiant (`bid`), toits de même teinte ; en ardoise pour un monument, en tuiles sinon.
@@ -2074,13 +2090,10 @@
       });
       if (k < 0.5) return false;                                  // trop petit pour un bâtiment à plusieurs corps
     }
-    // L'accès : le corps dont une arête longe le mieux une rue reçoit la porte et le chemin.
-    var meilleur = -1, macc = null;
-    if (bloc) corps.forEach(function (b, ib) {
-      var ac = accesBatiment(bloc, rectPoly(b.x, b.y, b.w, b.h, b.a), Dk);
-      if (ac && (!macc || ac.dist < macc.dist)) { macc = ac; meilleur = ib; }
-    });
-    corps.forEach(function (b, ib) { liste.push({ x: b.x, y: b.y, bid: bid, acc: ib === meilleur ? macc.path : null, maison: { w: b.w, h: b.h, a: b.a, v: tint, ardoise: !!ardoise, tuile: !ardoise, fac: ib === meilleur ? macc.edge : null } }); });
+    // Les étages : le corps principal est le plus haut (un monument encore plus), les ailes un ou deux étages de moins.
+    var haut = ardoise ? 3 + Math.floor(r(60) * 2) : 2 + Math.floor(r(61) * 3);
+    corps.forEach(function (b, ib) { b.et = ib === 0 ? haut : Math.max(1, haut - 1 - Math.floor(r(62 + ib) * 2)); });
+    pousserCorps(liste, bid, corps, tint, ardoise, bloc, Dk, Dk * 0.7);
     return true;
   }
 
@@ -2150,19 +2163,37 @@
         var tj = 0.2 + 0.6 * alea(g + 540 + j * 4 + m, h);
         joints.push([O[2 * j] + (O[2 * j2] - O[2 * j]) * tj, O[2 * j + 1] + (O[2 * j2 + 1] - O[2 * j + 1]) * tj, I[2 * j] + (I[2 * j2] - I[2 * j]) * tj, I[2 * j + 1] + (I[2 * j2 + 1] - I[2 * j + 1]) * tj]);
       }
-      var sdj = chaine.cotes[j];
-      rect.push({ tuile: true, x: (O[2 * j] + O[2 * j2] + I[2 * j] + I[2 * j2]) / 4, y: (O[2 * j + 1] + O[2 * j2 + 1] + I[2 * j + 1] + I[2 * j2 + 1]) / 4,
-        w: Math.hypot(O[2 * j2] - O[2 * j], O[2 * j2 + 1] - O[2 * j + 1]) * 0.97, h: d[sdj], a: Math.atan2(S[sdj].uy, S[sdj].ux), v: Math.floor(alea(g + 520, h) * 64) });
+      var sdj = chaine.cotes[j], Sj = S[sdj], Lj = Math.hypot(O[2 * j2] - O[2 * j], O[2 * j2 + 1] - O[2 * j + 1]);
+      // L'emprise de l'aile : les ailes de rang pair prennent les angles ; celles de rang impair s'arrêtent contre
+      // les ailes voisines (qui les prolongent de leur profondeur), si bien que deux ailes ne se recouvrent pas.
+      var sa = 0, sb = Lj;
+      if (j % 2 === 1) {
+        if (chaine.ferme || j > 0) sa = d[chaine.cotes[(j + nCot - 1) % nCot]];
+        if (chaine.ferme || j < nCot - 1) sb = Lj - d[chaine.cotes[(j + 1) % nCot]];
+        if (sb - sa < Dk * 0.8) { sa = 0; sb = Lj; }
+      }
+      var sm2 = (sa + sb) / 2;
+      rect.push({ tuile: true, x: O[2 * j] + Sj.ux * sm2 + Sj.nx * d[sdj] / 2, y: O[2 * j + 1] + Sj.uy * sm2 + Sj.ny * d[sdj] / 2,
+        w: (sb - sa) * 1.02, h: d[sdj], a: Math.atan2(Sj.uy, Sj.ux), v: Math.floor(alea(g + 520, h) * 64) });
     }
     // La cour, sous le bâtiment : jardin ou cour pavée (le U et le L la laissent ouverte sur la rue).
     var genre = alea(g + 400, h) < 0.7 ? 0 : 1;
     liste.push({ x: cx, y: cy, sprite: "cour", cour: { pts: courPts || [Oq[0][0], Oq[0][1], Oq[1][0], Oq[1][1], Oq[2][0], Oq[2][1], Oq[3][0], Oq[3][1]], v: genre, lw: Dk * 0.07 } });
     if (!retire(bk + "a")) {
-      // Le pied du bâtiment : l'anneau lui-même, ou — pour un U ou un L — sa bande (contour extérieur puis intérieur).
-      var pied = [], io; for (io = 0; io < O.length; io += 2) pied.push([O[io], O[io + 1]]);
-      if (!chaine.ferme) for (io = I.length - 2; io >= 0; io -= 2) pied.push([I[io], I[io + 1]]);
-      var acc = accesBatiment(bloc, pied, Dk);
-      liste.push({ x: cx, y: cy, bid: bk + "a", acc: acc ? acc.path : null, anneau: { chaines: [{ O: O, I: I, nrm: nrm, ferme: chaine.ferme, joints: joints }], v: Math.floor(alea(g + 520, h) * 64), lw: Dk * 0.07, sh: Dk * 0.32, rect: rect, porte: acc ? acc.edge : null } });
+      // Les étages : tout le volume d'une même hauteur, ou — une fois sur trois — des ailes de hauteurs différentes
+      // (une aile plus haute que les autres, comme un corps de logis surélevé).
+      var et0 = [1, 2, 2, 3, 3][Math.floor(alea(g + 550, h) * 5)], hfA = Dk * 0.7;
+      if (alea(g + 551, h) < 0.34 && rect.length >= 2) {
+        var ets = rect.map(function (rc, ir) { return Math.max(1, Math.min(4, et0 + [-1, 0, 0, 1][Math.floor(alea(g + 552 + ir, h) * 4)])); });
+        if (ets.every(function (e0) { return e0 === ets[0]; })) ets[Math.floor(alea(g + 556, h) * ets.length)] = ets[0] === 1 ? 2 : ets[0] - 1;
+        pousserCorps(liste, bk + "a", rect.map(function (rc, ir) { return { x: rc.x, y: rc.y, w: rc.w, h: rc.h, a: rc.a, et: ets[ir] }; }), Math.floor(alea(g + 520, h) * 64), false, bloc, Dk, hfA);
+      } else {
+        // Le pied du bâtiment : l'anneau lui-même, ou — pour un U ou un L — sa bande (contour extérieur puis intérieur).
+        var pied = [], io; for (io = 0; io < O.length; io += 2) pied.push([O[io], O[io + 1]]);
+        if (!chaine.ferme) for (io = I.length - 2; io >= 0; io -= 2) pied.push([I[io], I[io + 1]]);
+        var acc = accesBatiment(bloc, pied, Dk);
+        liste.push({ x: cx, y: cy, bid: bk + "a", acc: acc ? acc.path : null, anneau: { chaines: [{ O: O, I: I, nrm: nrm, ferme: chaine.ferme, joints: joints }], v: Math.floor(alea(g + 520, h) * 64), lw: Dk * 0.07, sh: Dk * 0.32, rect: rect, porte: acc ? acc.edge : null, et: et0, hf: hfA } });
+      }
     }
     if (genre === 0) {
       for (var t = 0, nT = 2 + Math.floor(alea(g + 420, h) * 4); t < nT; t++) {
@@ -2201,7 +2232,7 @@
         if (!v || v.route || v.mat !== ici.mat || alea(g + 370 + q * 13 + k, h) >= Math.min(1, v.dens)) ok = false;
         if (!ok || w * zoom < 1.5) continue;
         var ac = accesBatiment(c, rectPoly(px, py, w * 0.97, dd, Math.atan2(uy, ux)), Dk);
-        liste.push({ x: px, y: py, bid: bk + "l" + q + "_" + k, acc: ac ? ac.path : null, maison: { w: w * 0.97, h: dd, a: Math.atan2(uy, ux), v: Math.floor(alea(g + 390 + q * 13 + k, h) * 64), tuile: true, fac: ac ? ac.edge : null } });
+        liste.push({ x: px, y: py, bid: bk + "l" + q + "_" + k, acc: ac ? ac.path : null, maison: { w: w * 0.97, h: dd, a: Math.atan2(uy, ux), v: Math.floor(alea(g + 390 + q * 13 + k, h) * 64), tuile: true, fac: ac ? ac.edge : null, et: [1, 1, 2, 2, 3][Math.floor(alea(g + 395 + q * 13 + k, h) * 5)], hf: Dk * 0.7 } });
       }
     }
     if (monument) return;
@@ -2245,8 +2276,8 @@
     var out = [];
     BAT_VUE.forEach(function (o) {
       if (o.bid !== hit.bid) return;
-      if (o.anneau) o.anneau.rect.forEach(function (r) { out.push({ x: r.x, y: r.y, w: r.w, h: r.h, a: r.a, v: r.v, tuile: true }); });
-      else out.push({ x: o.x, y: o.y, w: o.maison.w, h: o.maison.h, a: o.maison.a, v: o.maison.v, tuile: !!o.maison.tuile, ardoise: !!o.maison.ardoise });
+      if (o.anneau) o.anneau.rect.forEach(function (r) { out.push({ x: r.x, y: r.y, w: r.w, h: r.h, a: r.a, v: r.v, tuile: true, et: o.anneau.et, hf: o.anneau.hf }); });
+      else out.push({ x: o.x, y: o.y, w: o.maison.w, h: o.maison.h, a: o.maison.a, v: o.maison.v, tuile: !!o.maison.tuile, ardoise: !!o.maison.ardoise, et: o.maison.et, hf: o.maison.hf });
     });
     return { bid: hit.bid, rects: out };
   }
@@ -2446,7 +2477,7 @@
           lc.closePath();
         }
       };
-      if (!an.sansOmbre) { lc.save(); lc.translate(an.sh, an.sh * 1.25); contour(); lc.fillStyle = "rgba(16,30,28,0.32)"; lc.fill("evenodd"); lc.restore(); }
+      if (!an.sansOmbre) { lc.save(); var shA = an.et && an.hf ? an.et * an.hf * 0.24 : an.sh; lc.translate(shA, shA * 1.25); contour(); lc.fillStyle = "rgba(16,30,28,0.32)"; lc.fill("evenodd"); lc.restore(); }
       var pal = an.palette || TOITS_TUILE;
       contour(); lc.fillStyle = pal[an.v % pal.length]; lc.fill("evenodd");
       var pan = function (pts, nx, ny) {
@@ -2570,7 +2601,7 @@
     if (!(A > 0)) return;
     var u = Math.sqrt(A) / 30, trace = function () { lc.beginPath(); P.forEach(function (p, k) { if (k) lc.lineTo(p[0], p[1]); else lc.moveTo(p[0], p[1]); }); lc.closePath(); };
     lc.save(); lc.lineJoin = "round";
-    if (!c.sansOmbre) { lc.save(); lc.translate(Math.sqrt(A) * 0.1, Math.sqrt(A) * 0.14); trace(); lc.fillStyle = "rgba(16,30,28,0.32)"; lc.fill(); lc.restore(); }
+    if (!c.sansOmbre) { lc.save(); var shC = Math.sqrt(A) * (c.et ? 0.05 * c.et : 0.1); lc.translate(shC, shC * 1.4); trace(); lc.fillStyle = "rgba(16,30,28,0.32)"; lc.fill(); lc.restore(); }
     var pal = c.palette || (c.ardoise ? TOITS_ARDOISE : c.tuile ? TOITS_TUILE : TOITS_DESSUS);
     trace(); lc.fillStyle = pal[c.v % pal.length]; lc.fill();
     var dim = Math.sqrt(A);
@@ -2608,22 +2639,42 @@
   function airePoly(P) { var A = 0, n = P.length, i; for (i = 0; i < n; i++) A += P[i][0] * P[(i + 1) % n][1] - P[(i + 1) % n][0] * P[i][1]; return A / 2; }
 
   // Les murs d'un polygone : `sg` = +1 si son aire est positive, −1 sinon (inversé pour la cour d'un anneau, dont
-  // c'est la face tournée vers la cour que l'on voit).
-  function mursProfil(lc, P, H, sg, u) {
-    var n = P.length, i;
+  // c'est la face tournée vers la cour que l'on voit). `fl` = { et : nombre d'étages (2 par défaut), porte :
+  // la porte posée sur ce polygone (les fenêtres du rez-de-chaussée l'évitent) } : une ceinture à chaque étage
+  // et une rangée de fenêtres par étage, qui suivent l'arête du mur.
+  function mursProfil(lc, P, H, sg, u, fl) {
+    var n = P.length, i, et = Math.max(1, Math.round((fl && fl.et) || 2)), porte = fl && fl.porte, hEt = H / et;
+    var fen = hEt * ZPX >= 6;                                  // trop petit à l'écran : ni ceintures ni fenêtres
     for (i = 0; i < n; i++) {
       var j = (i + 1) % n, dx = P[j][0] - P[i][0], dy = P[j][1] - P[i][1], L = Math.hypot(dx, dy) || 1, oy = -dx / L * sg;
       if (oy < -0.05) continue;                                   // un mur tourné vers le nord est caché par le toit
       lc.beginPath(); lc.moveTo(P[i][0], P[i][1]); lc.lineTo(P[j][0], P[j][1]); lc.lineTo(P[j][0], P[j][1] - H); lc.lineTo(P[i][0], P[i][1] - H); lc.closePath();
       lc.fillStyle = oy > 0.5 ? MURMAISON : "#cfc2a0"; lc.fill();
-      lc.strokeStyle = "#2a1c0e"; lc.lineWidth = u * 1.6; lc.stroke();
+      if (fen) {
+        // Les ceintures entre les étages.
+        lc.strokeStyle = "rgba(92,62,30,0.5)"; lc.lineWidth = u * 0.9; lc.beginPath();
+        for (var f = 1; f < et; f++) { lc.moveTo(P[i][0], P[i][1] - hEt * f); lc.lineTo(P[j][0], P[j][1] - hEt * f); }
+        lc.stroke();
+        // Les fenêtres : une rangée par étage, sur un mur assez long.
+        var nW = Math.floor(L / (hEt * 1.15)), ww = Math.min(hEt * 0.36 / L, 0.5 / Math.max(1, nW)), wh = hEt * 0.42;
+        lc.fillStyle = "#3a2a1c";
+        for (var k = 0; k < nW; k++) {
+          var t = (k + 0.5) / nW;
+          for (f = 0; f < et; f++) {
+            if (f === 0 && porte && porte.i === i && t + ww / 2 > porte.s0 - 0.03 && t - ww / 2 < porte.s1 + 0.03) continue;
+            var yc = hEt * (f + 0.58), ax = P[i][0] + dx * (t - ww / 2), ay = P[i][1] + dy * (t - ww / 2), bx = P[i][0] + dx * (t + ww / 2), by = P[i][1] + dy * (t + ww / 2);
+            lc.beginPath(); lc.moveTo(ax, ay - yc + wh / 2); lc.lineTo(bx, by - yc + wh / 2); lc.lineTo(bx, by - yc - wh / 2); lc.lineTo(ax, ay - yc - wh / 2); lc.closePath(); lc.fill();
+          }
+        }
+      }
+      lc.strokeStyle = "#2a1c0e"; lc.lineWidth = u * 1.6; lc.beginPath(); lc.moveTo(P[i][0], P[i][1]); lc.lineTo(P[j][0], P[j][1]); lc.lineTo(P[j][0], P[j][1] - H); lc.lineTo(P[i][0], P[i][1] - H); lc.closePath(); lc.stroke();
     }
   }
 
   // La porte : un parallélogramme qui SUIT l'arête du mur (pied sur l'arête, montants verticaux), posé sur le
   // meilleur mur — tourné vers le sud, assez long, et dont la porte n'est cachée ni par le toit ni par un
-  // autre mur plus au sud.
-  function porteProfil(lc, P, sg, H, u, pref) {
+  // autre mur plus au sud. `placerPorte` la choisit (ou null) ; `dessinerPorte` la peint, après les murs.
+  function placerPorte(P, sg, H, u, pref, hEt) {
     var n = P.length, i, T = P.map(function (p) { return [p[0], p[1] - H]; });
     var dedansPoly = function (Q, x, y) {
       var r = false, m = Q.length, q;
@@ -2642,7 +2693,7 @@
       if (-exp / Lp * sg > 0.15) cand.unshift({ i: pref, j: jp, L: Lp, sc: 1e9 });
     }
     for (var ci = 0; ci < cand.length; ci++) {
-      var cd = cand[ci], dw = Math.min(H * 0.3, cd.L * 0.4), dh = Math.min(H * 0.6, H - u * 2);
+      var cd = cand[ci], hr = hEt || H, dw = Math.min(hr * 0.6, H * 0.3, cd.L * 0.4), dh = Math.min(hr * 0.78, H - u * 2, dw * 2);
       if (dw < u * 3) continue;
       var tx = (P[cd.j][0] - P[cd.i][0]) / cd.L, ty = (P[cd.j][1] - P[cd.i][1]) / cd.L, mx = (P[cd.i][0] + P[cd.j][0]) / 2, my = (P[cd.i][1] + P[cd.j][1]) / 2;
       var b1 = [mx - tx * dw / 2, my - ty * dw / 2], b2 = [mx + tx * dw / 2, my + ty * dw / 2], t1 = [b1[0], b1[1] - dh], t2 = [b2[0], b2[1] - dh];
@@ -2657,11 +2708,15 @@
         }
       }
       if (cache) continue;
-      lc.beginPath(); lc.moveTo(b1[0], b1[1]); lc.lineTo(b2[0], b2[1]); lc.lineTo(t2[0], t2[1]); lc.lineTo(t1[0], t1[1]); lc.closePath();
-      lc.fillStyle = "#6a4a2a"; lc.fill(); lc.strokeStyle = "#2a1c0e"; lc.lineWidth = u * 1.2; lc.stroke();
-      lc.fillStyle = "#d8b84a"; lc.beginPath(); lc.arc(b2[0] - tx * dw * 0.18, b2[1] - ty * dw * 0.18 - dh * 0.45, Math.max(u * 0.7, dw * 0.05), 0, TAU); lc.fill();
-      break;
+      return { i: cd.i, s0: 0.5 - dw / cd.L / 2, s1: 0.5 + dw / cd.L / 2, b1: b1, b2: b2, t1: t1, t2: t2, dw: dw, dh: dh, tx: tx, ty: ty };
     }
+    return null;
+  }
+  function dessinerPorte(lc, d, u) {
+    if (!d) return;
+    lc.beginPath(); lc.moveTo(d.b1[0], d.b1[1]); lc.lineTo(d.b2[0], d.b2[1]); lc.lineTo(d.t2[0], d.t2[1]); lc.lineTo(d.t1[0], d.t1[1]); lc.closePath();
+    lc.fillStyle = "#6a4a2a"; lc.fill(); lc.strokeStyle = "#2a1c0e"; lc.lineWidth = u * 1.2; lc.stroke();
+    lc.fillStyle = "#d8b84a"; lc.beginPath(); lc.arc(d.b2[0] - d.tx * d.dw * 0.18, d.b2[1] - d.ty * d.dw * 0.18 - d.dh * 0.45, Math.max(u * 0.7, d.dw * 0.05), 0, TAU); lc.fill();
   }
 
   // Son ombre portée au sol (vers le sud-est).
@@ -2679,23 +2734,30 @@
     var sg = A >= 0 ? 1 : -1; A = Math.abs(A);
     if (!(A > 0)) return;
     var per = P.reduce(function (t, p, k) { var q = P[(k + 1) % n]; return t + Math.hypot(q[0] - p[0], q[1] - p[1]); }, 0);
-    var H = Math.min(Math.sqrt(A) * 0.42, 2 * A / Math.max(1e-12, per) * 1.6), u = Math.sqrt(A) / 30, T = P.map(function (p) { return [p[0], p[1] - H]; });
+    var Hauto = Math.min(Math.sqrt(A) * 0.42, 2 * A / Math.max(1e-12, per) * 1.6), u = Math.sqrt(A) / 30;
+    var H = c.et ? (c.hf || Hauto / 2) * c.et : Hauto, T = P.map(function (p) { return [p[0], p[1] - H]; });
     lc.save(); lc.lineJoin = "round";
     ombreProfil(lc, [P], H);
-    mursProfil(lc, P, H, sg, u);
-    porteProfil(lc, P, sg, H, u);
+    var pd = placerPorte(P, sg, H, u, null, H / (c.et || 2));
+    mursProfil(lc, P, H, sg, u, { et: c.et || 2, porte: pd });
+    dessinerPorte(lc, pd, u);
     peintContour(lc, { pts: [].concat.apply([], T), v: c.v, sansOmbre: true, palette: c.ardoise ? TOITS_ARDOISE : TOITS_VILLE });
     lc.restore();
   }
 
+  // La hauteur des murs d'un bâtiment rectangulaire : `et` étages de `hf` (la hauteur d'un étage, en unités du monde),
+  // ou — sans étages précisés — les deux étages d'une maison ordinaire.
+  function hauteurMaison(m) { return m.et ? (m.hf || Math.min(m.w, m.h) * 0.33) * m.et : Math.min(m.w, m.h) * 0.66; }
+
   // Un bâtiment rectangulaire orienté (une maison de ville), vu de profil : une boîte, et son toit à croupes.
   function peintMaisonBoite(lc, o) {
     var m = o.maison, P = rectPoly(o.x, o.y, m.w, m.h, m.a);
-    var sg = airePoly(P) >= 0 ? 1 : -1, H = Math.min(m.w, m.h) * 0.66, u = Math.max(m.w, m.h) / 60;
+    var sg = airePoly(P) >= 0 ? 1 : -1, H = hauteurMaison(m), u = Math.max(m.w, m.h) / 60;
     lc.save(); lc.lineJoin = "round";
     ombreProfil(lc, [P], H);
-    mursProfil(lc, P, H, sg, u);
-    porteProfil(lc, P, sg, H, u, m.fac);
+    var pd = placerPorte(P, sg, H, u, m.fac, H / (m.et || 2));
+    mursProfil(lc, P, H, sg, u, { et: m.et || 2, porte: pd });
+    dessinerPorte(lc, pd, u);
     OMBRE_TOIT = false;
     maisonDessus(lc, o.x, o.y - H, m.w, m.h, m.a, m.v, 0, m.ardoise ? TOITS_ARDOISE[m.v % TOITS_ARDOISE.length] : TOITS_VILLE[m.v % TOITS_VILLE.length]);
     OMBRE_TOIT = true;
@@ -2708,15 +2770,16 @@
     an.chaines.forEach(function (ch) {
       var n = ch.O.length / 2, i, O = [], I = [], d = Math.abs((ch.I[0] - ch.O[0]) * ch.nrm[0] + (ch.I[1] - ch.O[1]) * ch.nrm[1]);
       for (i = 0; i < n; i++) { O.push([ch.O[2 * i], ch.O[2 * i + 1]]); I.push([ch.I[2 * i], ch.I[2 * i + 1]]); }
-      var H = Math.max(d * 1.0, an.lw * 6), u = an.lw * 0.9;
+      var H = an.et ? (an.hf || d / 2) * an.et : Math.max(d * 1.0, an.lw * 6), u = an.lw * 0.9;
       lc.save(); lc.lineJoin = "round";
-      var corps = ch.ferme ? O : O.concat(I.slice().reverse());
+      var corps = ch.ferme ? O : O.concat(I.slice().reverse()), pied = corps.length === O.length ? O : corps, sgc = airePoly(corps) >= 0 ? 1 : -1;
       ombreProfil(lc, [corps], H);
+      var et = an.et || 2, pd = placerPorte(pied, sgc, H, u, an.porte, H / et);
       if (ch.ferme) {
-        mursProfil(lc, O, H, airePoly(O) >= 0 ? 1 : -1, u);
-        mursProfil(lc, I, H, airePoly(I) >= 0 ? -1 : 1, u);       // la cour : c'est la face intérieure que l'on voit
-      } else mursProfil(lc, corps, H, airePoly(corps) >= 0 ? 1 : -1, u);
-      porteProfil(lc, corps.length === O.length ? O : corps, airePoly(corps) >= 0 ? 1 : -1, H, u, an.porte);
+        mursProfil(lc, O, H, airePoly(O) >= 0 ? 1 : -1, u, { et: et, porte: pd });
+        mursProfil(lc, I, H, airePoly(I) >= 0 ? -1 : 1, u, { et: et });       // la cour : c'est la face intérieure que l'on voit
+      } else mursProfil(lc, corps, H, sgc, u, { et: et, porte: pd });
+      dessinerPorte(lc, pd, u);
       lc.translate(0, -H);
       peindreAnneau(lc, { chaines: [ch], v: an.v, lw: an.lw, sh: 0, sansOmbre: true, palette: TOITS_VILLE });
       lc.restore();
@@ -2757,7 +2820,7 @@
       if (o.anneau) { if (DESSUS) peindreAnneau(lc, o.anneau); else peindreAnneauProfil(lc, o.anneau); continue; }
       if (o.contour) { if (o.contour.profil) peintContourProfil(lc, o.contour); else peintContour(lc, o.contour); continue; }
       if (o.maison && !DESSUS) { peintMaisonBoite(lc, o); continue; }
-      if (o.maison) { maisonDessus(lc, o.x, o.y, o.maison.w, o.maison.h, o.maison.a, o.maison.v, 0, o.maison.ardoise ? TOITS_ARDOISE[o.maison.v % TOITS_ARDOISE.length] : o.maison.tuile ? TOITS_TUILE[o.maison.v % TOITS_TUILE.length] : null); continue; }
+      if (o.maison) { maisonDessus(lc, o.x, o.y, o.maison.w, o.maison.h, o.maison.a, o.maison.v, 0, o.maison.ardoise ? TOITS_ARDOISE[o.maison.v % TOITS_ARDOISE.length] : o.maison.tuile ? TOITS_TUILE[o.maison.v % TOITS_TUILE.length] : null, o.maison.et ? hauteurMaison(o.maison) : 0); continue; }
       var vp = variantePeinte(o);
       if (o.rot) {
         // Un décor tourné : on le colle autour de son centre (le dessin est centré à 0,31 s au-dessus de son pied).
@@ -5528,7 +5591,7 @@
           var bbp = boiteTrait(tp.pts, 0), ccx = (bbp[0] + bbp[2]) / 2, ccy = (bbp[1] + bbp[3]) / 2, dim = Math.max(bbp[2] - bbp[0], bbp[3] - bbp[1]);
           if (!chevauche(bbp, X0, Y0, X1, Y1) || dim * vue.zoom < 0.7) return;
           visibles.push({ x: ccx, y: ccy + dim / 0.62 * 0.3, s: dim / 0.62 });
-          decors.push({ x: ccx, y: DESSUS ? ccy : bbp[3], contour: { pts: tp.pts, v: tp.v || 0, tuile: !!tp.tuile, ardoise: !!tp.ardoise, profil: !DESSUS } });
+          decors.push({ x: ccx, y: DESSUS ? ccy : bbp[3], contour: { pts: tp.pts, v: tp.v || 0, tuile: !!tp.tuile, ardoise: !!tp.ardoise, profil: !DESSUS, et: tp.et, hf: tp.hf } });
           return;
         }
         var s = tailleTampon(tp, vue.zoom), y = tp.y - tp.s * 0.3 + s * 0.3;
@@ -5539,7 +5602,7 @@
         if ((DESSUS || tp.ar) && BATIMENTS[tp.type]) {
           // Vu du dessus, une maison posée à la main est un toit, orientable (`a`, en degrés).
           var kb = BATIMENTS[tp.type];
-          decors.push({ x: tp.x, y: tp.y - tp.s * 0.3, maison: { w: s * 0.62 * kb, h: tp.ar ? s * 0.62 * kb * tp.ar : s * 0.4 * kb, a: (tp.a || 0) * Math.PI / 180, v: tp.v || 0, tuile: !!tp.tuile, ardoise: !!tp.ardoise } });
+          decors.push({ x: tp.x, y: tp.y - tp.s * 0.3, maison: { w: s * 0.62 * kb, h: tp.ar ? s * 0.62 * kb * tp.ar : s * 0.4 * kb, a: (tp.a || 0) * Math.PI / 180, v: tp.v || 0, tuile: !!tp.tuile, ardoise: !!tp.ardoise, et: tp.et, hf: tp.hf } });
         } else decors.push({ x: tp.x, y: y, s: s, sprite: tp.type, v: tp.v || 0, rot: tp.a ? tp.a * Math.PI / 180 : 0 });
       });
       // Les maisons des rues : les arbres leur laissent la place.
@@ -5828,12 +5891,12 @@
     liste.forEach(function (o) {
       if (o.x < X0 || o.x > X1 || o.y < Y0 || o.y > Y1 || o.cour) return;
       if (o.anneau) {
-        o.anneau.rect.forEach(function (rc) { var sm = rc.w / 0.62; out.push({ type: "maison", v: rc.v, x: rc.x, y: rc.y + sm * 0.3, s: sm, a: Math.round(rc.a * 180 / Math.PI * 10) / 10, ar: rc.h / rc.w, tuile: true }); });
+        o.anneau.rect.forEach(function (rc) { var sm = rc.w / 0.62; out.push({ type: "maison", v: rc.v, x: rc.x, y: rc.y + sm * 0.3, s: sm, a: Math.round(rc.a * 180 / Math.PI * 10) / 10, ar: rc.h / rc.w, tuile: true, et: o.anneau.et, hf: o.anneau.hf }); });
         return;
       }
       if (o.maison) {
         var sm = o.maison.w / 0.62;
-        out.push({ type: "maison", v: o.maison.v, x: o.x, y: o.y + sm * 0.3, s: sm, a: Math.round(o.maison.a * 180 / Math.PI * 10) / 10, ar: o.maison.h / o.maison.w, tuile: !!o.maison.tuile, ardoise: !!o.maison.ardoise });
+        out.push({ type: "maison", v: o.maison.v, x: o.x, y: o.y + sm * 0.3, s: sm, a: Math.round(o.maison.a * 180 / Math.PI * 10) / 10, ar: o.maison.h / o.maison.w, tuile: !!o.maison.tuile, ardoise: !!o.maison.ardoise, et: o.maison.et, hf: o.maison.hf });
       } else out.push({ type: o.sprite, v: variantePeinte(o), x: o.x, y: o.y, s: o.s });
     });
     var rues = (liste.rues || []).filter(function (r) {

@@ -1135,6 +1135,31 @@
     }
   }
 
+  // La hauteur d'un étage d'une maison posée à la main, à défaut de réglage : un tiers de sa plus petite dimension
+  // (deux étages donnent alors l'ancienne hauteur).
+  function hauteurEtageDe(t) {
+    var kb = Moteur.BATIMENTS[t.type] || 1, w = t.s * 0.62 * kb, h = t.ar ? w * t.ar : t.s * 0.4 * kb;
+    return Math.min(w, h) * 0.33;
+  }
+  // Donne à toutes les parties voisines d'un bâtiment (même bâtiment généré : celles qui se touchent) le nombre
+  // d'étages et la hauteur d'étage de la partie choisie.
+  function harmoniserEtages(o) {
+    var voisines = E.carte.tampons.filter(function (t) {
+      if (t === o || !Moteur.BATIMENTS[t.type] || t.pts) return false;
+      var d = Math.hypot(t.x - o.x, (t.y - t.s * 0.3) - (o.y - o.s * 0.3)), r = (t.s + o.s) * 0.62;
+      return d < r;
+    });
+    if (!voisines.length) { etat("Aucune partie voisine."); return; }
+    cloreEdition();
+    var modifs = voisines.map(function (t) {
+      var avant = cloner(t);
+      t.et = o.et; t.hf = o.hf || hauteurEtageDe(o);
+      return { t: "modif", coll: "tampons", id: t.id, avant: avant, apres: cloner(t) };
+    });
+    enregistrer({ t: "lot", actions: modifs }); marquer(); rendre();
+    etat(voisines.length + " partie(s) à " + o.et + " étage(s).");
+  }
+
   // Le contour d'une maison posée : ses quatre coins (centre, taille, rotation et proportion du toit).
   function coinsDeMaison(t) {
     var kb = Moteur.BATIMENTS[t.type] || 1, w = t.s * 0.62 * kb, h = t.ar ? w * t.ar : t.s * 0.4 * kb, a = (t.a || 0) * Math.PI / 180;
@@ -1163,6 +1188,7 @@
     bat.rects.forEach(function (r, i) {
       var sm = r.w / 0.62;
       var t = { id: nouvelId("d"), type: "maison", v: r.v, x: r.x, y: r.y + sm * 0.3, s: sm, a: Math.round(r.a * 180 / Math.PI * 10) / 10, ar: r.h / r.w };
+      if (r.et) { t.et = r.et; t.hf = r.hf; }
       if (r.ardoise) t.ardoise = true; else t.tuile = true;
       actions.push({ t: "ajout", coll: "tampons", obj: t, idx: base + i });
       var dx = w[0] - r.x, dy = w[1] - r.y, c = Math.cos(r.a), s = Math.sin(r.a);
@@ -2234,6 +2260,13 @@
       if (!o.pts) zone.appendChild(champCurseur("Taille", 8, 600, 1, borne(o.s * E.vue.zoom, 8, 600), function (v) { return Math.round(v) + " px"; },
         function (v) { editer(function (x) { var pied = x.y - x.s * 0.3; x.s = v / E.vue.zoom; x.y = pied + x.s * 0.3; }); }));
       if (Moteur.BATIMENTS[o.type] && !E.carte.interieur) {
+        // Les étages de CETTE partie : chaque partie d'un bâtiment (aile, corps) a sa hauteur, donc un côté peut
+        // avoir plus d'étages que l'autre. Sans réglage, une maison fait deux étages.
+        zone.appendChild(champCurseur("Étages", 1, 8, 1, o.et || 2, function (v) { return Math.round(v) + (v < 2 ? " étage" : " étages"); },
+          function (v) { editer(function (x) { x.et = Math.round(v); if (!x.hf) x.hf = hauteurEtageDe(x); }); }));
+        zone.appendChild(champCurseur("Hauteur d'un étage", 2, 5, 0.1, (o.hf ? o.hf : hauteurEtageDe(o)) * 1000, function (v) { return nb(v, 1) + " m"; },
+          function (v) { editer(function (x) { x.hf = v / 1000; if (!x.et) x.et = 2; }); }));
+        if (o.et) zone.appendChild(el("div", { classe: "rangee" }, [el("button", { type: "button", classe: "btn", texte: "Même hauteur pour les parties voisines", onclick: function () { harmoniserEtages(o); } })]));
         zone.appendChild(champTexte("Nom du bâtiment (facultatif)", o.nom || "", function (v) { editer(function (x) { if (v.trim()) x.nom = v.trim(); else delete x.nom; }); panneauSelection(); }, "Auberge du Cerf, Académie…"));
         if (o.nom) zone.appendChild(el("div", { classe: "rangee" }, [el("button", { type: "button", classe: "btn btn-primaire", texte: o.carteId ? "Ouvrir l'intérieur" : "Éditer l'intérieur", onclick: function () { ouvrirInterieur(o); } })]));
         else zone.appendChild(el("p", { classe: "aide", texte: "Donnez un nom à ce bâtiment pour dessiner son intérieur (plan d'étage)." }));
