@@ -192,6 +192,7 @@
   }
 
   function zoomerVers(px, py, facteur) {
+    if (E.zoomVerrouille) return;                  // une carte de ville a une vue fixe : on ne fait que la déplacer
     var av = versMonde(px, py);
     E.vue.zoom = borne(E.vue.zoom * facteur, zoomMin(), zoomMax());
     var ap = versMonde(px, py);
@@ -331,11 +332,14 @@
   // par crans de 15°). Glisser l'objet — ou l'intérieur du cadre — le déplace. Tout se fait sur
   // des copies de départ : rien ne dérive, et l'annulation rend l'état exact d'avant le geste.
   var ORIENTES = { tampons: 1, lieux: 1, etiquettes: 1 };
+  // Un objet dont on remodèle le contour point par point : tracé, lac, ou maison au contour libre (`tampon.pts`).
+  function aPoints(sel) { return !!sel && (sel.coll === "lignes" || sel.coll === "lacs" || (sel.coll === "tampons" && !!sel.obj.pts)); }
+  function orienteSel(sel) { return !!sel && !!ORIENTES[sel.coll] && !(sel.coll === "tampons" && sel.obj.pts); }
 
   // La boîte d'un objet, à l'écran : { cx, cy, w, h, ang (rad), oriente } ou null (invisible).
   function boiteObjet(coll, o) {
     var z = E.vue.zoom, c, w, h, ang = 0, pts, i, X0 = Infinity, Y0 = Infinity, X1 = -Infinity, Y1 = -Infinity;
-    if (coll === "tampons") {
+    if (coll === "tampons" && !o.pts) {
       c = versEcran(o.x, o.y - o.s * 0.3);
       w = h = Moteur.tailleTampon(o, z) * z * 0.9;
       ang = (o.a || 0) * Math.PI / 180;
@@ -531,12 +535,12 @@
   // lac est simplement surligné (ses points ne se déplacent qu'un par un, seul).
   function marqueSelection(ctx, sel, groupe) {
     if (!sel) return;
-    if (groupe && (sel.coll === "lignes" || sel.coll === "lacs")) {
+    if (groupe && aPoints(sel)) {
       var pg = sel.coll === "lignes" ? Moteur.pointsAffiches(sel.obj) : sel.obj.pts;
       ctx.strokeStyle = "rgba(255,211,107,0.9)"; ctx.lineWidth = 3; ctx.setLineDash([6, 4]);
       ctx.beginPath();
       for (var g = 0; g < pg.length; g += 2) { var sg = versEcran(pg[g], pg[g + 1]); if (g === 0) ctx.moveTo(sg[0], sg[1]); else ctx.lineTo(sg[0], sg[1]); }
-      if (sel.coll === "lacs") ctx.closePath();
+      if (sel.coll !== "lignes") ctx.closePath();
       ctx.stroke(); ctx.setLineDash([]);
       return;
     }
@@ -563,13 +567,18 @@
       ctx.setLineDash([5, 3]);
       ctx.strokeRect(-w / 2 - 4, -h / 2 - 2 + (b.dy || 0) * E.vue.zoom, w + 8, h + 4);   // `dy` : la flèche d'un nom courbe
       ctx.restore();
-    } else if (sel.coll === "tampons") {
+    } else if (sel.coll === "tampons" && !sel.obj.pts) {
       var t = sel.obj, st = versEcran(t.x, t.y - t.s * 0.3), cote = Moteur.tailleTampon(t, E.vue.zoom) * E.vue.zoom;
       ctx.setLineDash([4, 3]);
       ctx.strokeRect(st[0] - cote * 0.48, st[1] - cote * 0.48, cote * 0.96, cote * 0.96);
       ctx.setLineDash([]);
-    } else if (sel.coll === "lignes" || sel.coll === "lacs") {
+    } else if (aPoints(sel)) {
       var p = sel.obj.pts;
+      if (sel.coll !== "lignes") {                            // un lac, une maison : son contour fermé
+        ctx.strokeStyle = "rgba(255,211,107,0.95)"; ctx.lineWidth = 2; ctx.setLineDash([5, 4]); ctx.beginPath();
+        for (var ic = 0; ic < p.length; ic += 2) { var vc = versEcran(p[ic], p[ic + 1]); if (ic) ctx.lineTo(vc[0], vc[1]); else ctx.moveTo(vc[0], vc[1]); }
+        ctx.closePath(); ctx.stroke(); ctx.setLineDash([]);
+      }
       ctx.strokeStyle = "#1c2a6b";
       for (var i = 0; i < p.length; i += 2) {
         var v = versEcran(p[i], p[i + 1]);
@@ -902,6 +911,16 @@
     for (i = 0; i < tp.length; i++) {
       // (x, yc) : le centre du décor, fixe ; `ts` : sa taille à ce zoom (plafonnée à l'écran).
       var t = tp[i], ts = Moteur.tailleTampon(t, z), yc = t.y - t.s * 0.3;
+      if (t.pts && t.pts.length >= 6) {                 // une maison au contour libre : on la clique dans son polygone
+        // (dans le polygone, ou à moins de 7 px d'un côté : on doit pouvoir cliquer le bord pour y ajouter un point)
+        var proche = Moteur.dansPolygone(w[0], w[1], t.pts);
+        for (var kc = 0; kc < t.pts.length && !proche; kc += 2) {
+          var k2 = (kc + 2) % t.pts.length;
+          proche = distanceSegment(w[0], w[1], t.pts[kc], t.pts[kc + 1], t.pts[k2], t.pts[k2 + 1]).d <= 7 / z;
+        }
+        if (proche) { meilleur = t; break; }
+        continue;
+      }
       if (ts * z < 6) continue;
       if (Math.abs(w[0] - t.x) <= ts * 0.42 && Math.abs(w[1] - yc) <= ts * 0.45 && (!meilleur || t.y > meilleur.y)) meilleur = t;
     }
@@ -1087,26 +1106,99 @@
     }
     // Dans le cadre d'un objet orienté (ou d'un groupe) : glisser le déplace, même à côté du dessin.
     var gz = !touche ? boiteGizmo() : null;
-    if (gz && (E.multi.length || (E.selection && ORIENTES[E.selection.coll])) && dansBoite(p, gz)) { debuterGizmo(p, "move", gz); return; }
+    if (gz && (E.multi.length || orienteSel(E.selection)) && dansBoite(p, gz)) { debuterGizmo(p, "move", gz); return; }
     var sel = E.selection;
-    if (sel && (sel.coll === "lignes" || sel.coll === "lacs")) {
+    if (aPoints(sel)) {
       var i = sommetProche(sel.obj, p.x, p.y);
       if (i >= 0) { geste = { type: "sommet", obj: sel.obj, coll: sel.coll, i: i, avant: JSON.stringify(sel.obj) }; return; }
     }
     var hit = trouver(p.x, p.y);
     if (hit) {
       selectionner(hit.coll, hit.obj);
-      if (hit.coll === "lieux" || hit.coll === "etiquettes" || hit.coll === "tampons") {
+      if (hit.coll === "lacs" || (hit.coll === "tampons" && hit.obj.pts)) {
+        geste = { type: "deplaceLac", coll: hit.coll, obj: hit.obj, avant: JSON.stringify(hit.obj), x0: w[0], y0: w[1], base: hit.obj.pts.slice(), bouge: false };
+      } else if (hit.coll === "lieux" || hit.coll === "etiquettes" || hit.coll === "tampons") {
         geste = { type: "deplace", coll: hit.coll, obj: hit.obj, avant: JSON.stringify(hit.obj), dx: hit.obj.x - w[0], dy: hit.obj.y - w[1], bouge: false };
-      } else if (hit.coll === "lacs") {
-        geste = { type: "deplaceLac", obj: hit.obj, avant: JSON.stringify(hit.obj), x0: w[0], y0: w[1], base: hit.obj.pts.slice(), bouge: false };
       } else {
         // Un tracé : le glisser le déplace en entier (un simple clic le sélectionne seulement).
         debuterGizmo(p, "move", null);
       }
     } else {
+      // Un bâtiment généré par la ville (pas encore un objet) : un clic le rend modifiable, et on peut le glisser.
+      var bat = Moteur.batimentEn(w[0], w[1]), libre = bat ? rendreModifiable(bat, w) : null;
+      if (libre) {
+        selectionner("tampons", libre);
+        geste = { type: "deplace", coll: "tampons", obj: libre, avant: JSON.stringify(libre), dx: libre.x - w[0], dy: libre.y - w[1], bouge: false };
+        return;
+      }
       geste = { type: "clic", x: p.x, y: p.y, vide: true };
     }
+  }
+
+  // La hauteur d'un étage d'une maison posée à la main, à défaut de réglage : un tiers de sa plus petite dimension
+  // (deux étages donnent alors l'ancienne hauteur).
+  function hauteurEtageDe(t) {
+    var kb = Moteur.BATIMENTS[t.type] || 1, w = t.s * 0.62 * kb, h = t.ar ? w * t.ar : t.s * 0.4 * kb;
+    return Math.min(w, h) * 0.33;
+  }
+  // Donne à toutes les parties voisines d'un bâtiment (même bâtiment généré : celles qui se touchent) le nombre
+  // d'étages et la hauteur d'étage de la partie choisie.
+  function harmoniserEtages(o) {
+    var voisines = E.carte.tampons.filter(function (t) {
+      if (t === o || !Moteur.BATIMENTS[t.type] || t.pts) return false;
+      var d = Math.hypot(t.x - o.x, (t.y - t.s * 0.3) - (o.y - o.s * 0.3)), r = (t.s + o.s) * 0.62;
+      return d < r;
+    });
+    if (!voisines.length) { etat("Aucune partie voisine."); return; }
+    cloreEdition();
+    var modifs = voisines.map(function (t) {
+      var avant = cloner(t);
+      t.et = o.et; t.hf = o.hf || hauteurEtageDe(o);
+      return { t: "modif", coll: "tampons", id: t.id, avant: avant, apres: cloner(t) };
+    });
+    enregistrer({ t: "lot", actions: modifs }); marquer(); rendre();
+    etat(voisines.length + " partie(s) à " + o.et + " étage(s).");
+  }
+
+  // Le contour d'une maison posée : ses quatre coins (centre, taille, rotation et proportion du toit).
+  function coinsDeMaison(t) {
+    var kb = Moteur.BATIMENTS[t.type] || 1, w = t.s * 0.62 * kb, h = t.ar ? w * t.ar : t.s * 0.4 * kb, a = (t.a || 0) * Math.PI / 180;
+    var cx = t.x, cy = t.y - t.s * 0.3, c = Math.cos(a), s = Math.sin(a), pts = [];
+    [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(function (k) { var X = k[0] * w / 2, Y = k[1] * h / 2; pts.push(cx + X * c - Y * s, cy + X * s + Y * c); });
+    return pts;
+  }
+  // Le chemin inverse : un rectangle aligné sur le plus long côté du contour, qui l'englobe.
+  function maisonDepuisContour(t) {
+    var p = t.pts, n = p.length / 2, i, best = 0, ang = 0;
+    for (i = 0; i < n; i++) { var j = (i + 1) % n, L = Math.hypot(p[2 * j] - p[2 * i], p[2 * j + 1] - p[2 * i + 1]); if (L > best) { best = L; ang = Math.atan2(p[2 * j + 1] - p[2 * i + 1], p[2 * j] - p[2 * i]); } }
+    var c = Math.cos(-ang), s = Math.sin(-ang), x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    for (i = 0; i < n; i++) { var X = p[2 * i] * c - p[2 * i + 1] * s, Y = p[2 * i] * s + p[2 * i + 1] * c; x0 = Math.min(x0, X); x1 = Math.max(x1, X); y0 = Math.min(y0, Y); y1 = Math.max(y1, Y); }
+    var mx = (x0 + x1) / 2, my = (y0 + y1) / 2, cx = mx * Math.cos(ang) - my * Math.sin(ang), cy = mx * Math.sin(ang) + my * Math.cos(ang);
+    var kb = Moteur.BATIMENTS[t.type] || 1, w = x1 - x0, sm = w / (0.62 * kb);
+    return { x: cx, y: cy + sm * 0.3, s: sm, a: normAngle(ang * 180 / Math.PI), ar: (y1 - y0) / w };
+  }
+
+  // Les bâtiments d'une ville sont générés : on ne peut pas les déplacer un à un. Mais un clic en rend un
+  // modifiable : il est remplacé par des décors « Maison » posés à la main (un par aile pour un volume en
+  // anneau, en U ou en L, un par corps pour un grand bâtiment), que l'on déplace, tourne, redimensionne
+  // ou supprime comme n'importe quel décor. Son identifiant est noté dans `carte.retraits` : la ville ne le
+  // génère plus, à aucun zoom. Un seul pas d'historique : Ctrl+Z le rend à la ville.
+  function rendreModifiable(bat, w) {
+    var base = E.carte.tampons.length, actions = [], choisi = null;
+    bat.rects.forEach(function (r, i) {
+      var sm = r.w / 0.62;
+      var t = { id: nouvelId("d"), type: "maison", v: r.v, x: r.x, y: r.y + sm * 0.3, s: sm, a: Math.round(r.a * 180 / Math.PI * 10) / 10, ar: r.h / r.w };
+      if (r.et) { t.et = r.et; t.hf = r.hf; }
+      if (r.ardoise) t.ardoise = true; else t.tuile = true;
+      actions.push({ t: "ajout", coll: "tampons", obj: t, idx: base + i });
+      var dx = w[0] - r.x, dy = w[1] - r.y, c = Math.cos(r.a), s = Math.sin(r.a);
+      if (!choisi && Math.abs(dx * c + dy * s) <= r.w / 2 && Math.abs(-dx * s + dy * c) <= r.h / 2) choisi = t;
+    });
+    if (!actions.length) return null;
+    actions.push({ t: "ajout", coll: "retraits", obj: { id: nouvelId("r"), bid: bat.bid }, idx: E.carte.retraits.length });
+    executer({ t: "lot", actions: actions });
+    etat(actions.length > 2 ? "Bâtiment rendu modifiable (" + (actions.length - 1) + " parties) : déplacez, tournez ou supprimez-les une à une." : "Bâtiment rendu modifiable : déplacez, tournez ou supprimez-le.");
+    return choisi || E.carte.tampons[base];
   }
 
   // Accroche : un point posé près d'une voie existante (route ou sentier pour une voie,
@@ -1340,7 +1432,7 @@
         break;
       case "deplaceLac":
         if (g.bouge) {
-          enregistrer({ t: "modif", coll: "lacs", id: g.obj.id, avant: JSON.parse(g.avant), apres: cloner(g.obj) });
+          enregistrer({ t: "modif", coll: g.coll || "lacs", id: g.obj.id, avant: JSON.parse(g.avant), apres: cloner(g.obj) });
           marquer();
         }
         break;
@@ -1411,6 +1503,15 @@
       return;
     }
     var p = posEvt(ev);
+    // Clic droit sur un sommet d'un objet à points sélectionné (tracé, lac, contour de maison) : on le supprime.
+    if (aPoints(E.selection)) {
+      var sv = sommetProche(E.selection.obj, p.x, p.y), mini = E.selection.coll === "lignes" ? 2 : 3;
+      if (sv >= 0) {
+        if (E.selection.obj.pts.length / 2 > mini) { editer(function (o) { o.pts.splice(sv, 2); }); surcouche(); etat("Point supprimé."); }
+        else etat("Il faut au moins " + mini + " points.");
+        return;
+      }
+    }
     var hit = trouver(p.x, p.y);
     if (hit) {
       choisirOutil("selection");
@@ -1577,10 +1678,10 @@
     if (E.outil === "ligne" && E.ligneEnCours) { terminerLigne(); return; }
     if (E.outil !== "selection") return;
     var sel = E.selection;
-    if (sel && (sel.coll === "lignes" || sel.coll === "lacs")) {
-      // Double-clic sur un tracé (ou un lac) sélectionné : un sommet de plus à cet endroit.
+    if (aPoints(sel)) {
+      // Double-clic sur un tracé, un lac ou un contour de maison sélectionné : un sommet de plus à cet endroit.
       var w = versMonde(p.x, p.y), pts = sel.obj.pts, seuil = 9 / E.vue.zoom;
-      var nSeg = sel.coll === "lacs" ? pts.length / 2 : pts.length / 2 - 1;
+      var nSeg = sel.coll !== "lignes" ? pts.length / 2 : pts.length / 2 - 1;
       for (var j = 0; j < nSeg; j++) {
         var j2 = ((j + 1) % (pts.length / 2)) * 2;
         var r = distanceSegment(w[0], w[1], pts[2 * j], pts[2 * j + 1], pts[j2], pts[j2 + 1]);
@@ -2155,10 +2256,17 @@
       zone.appendChild(el("p", { classe: "aide", texte: "Glissez un carré pour déplacer un point. Double-clic sur le tracé pour en ajouter un." }));
     } else if (sel.coll === "tampons") {
       zone.appendChild(champChoix("Décor", Moteur.TAMPONS.filter(function (t) { return !t.cache && !!t.int === !!E.carte.interieur; }).map(function (t) { return [t.id, t.nom]; }), o.type,
-        function (v) { editer(function (x) { x.type = v; }); }));
-      zone.appendChild(champCurseur("Taille", 8, 600, 1, borne(o.s * E.vue.zoom, 8, 600), function (v) { return Math.round(v) + " px"; },
+        function (v) { editer(function (x) { x.type = v; if (!Moteur.BATIMENTS[v]) delete x.pts; }); panneauSelection(); }));
+      if (!o.pts) zone.appendChild(champCurseur("Taille", 8, 600, 1, borne(o.s * E.vue.zoom, 8, 600), function (v) { return Math.round(v) + " px"; },
         function (v) { editer(function (x) { var pied = x.y - x.s * 0.3; x.s = v / E.vue.zoom; x.y = pied + x.s * 0.3; }); }));
       if (Moteur.BATIMENTS[o.type] && !E.carte.interieur) {
+        // Les étages de CETTE partie : chaque partie d'un bâtiment (aile, corps) a sa hauteur, donc un côté peut
+        // avoir plus d'étages que l'autre. Sans réglage, une maison fait deux étages.
+        zone.appendChild(champCurseur("Étages", 1, 8, 1, o.et || 2, function (v) { return Math.round(v) + (v < 2 ? " étage" : " étages"); },
+          function (v) { editer(function (x) { x.et = Math.round(v); if (!x.hf) x.hf = hauteurEtageDe(x); }); }));
+        zone.appendChild(champCurseur("Hauteur d'un étage", 2, 5, 0.1, (o.hf ? o.hf : hauteurEtageDe(o)) * 1000, function (v) { return nb(v, 1) + " m"; },
+          function (v) { editer(function (x) { x.hf = v / 1000; if (!x.et) x.et = 2; }); }));
+        if (o.et) zone.appendChild(el("div", { classe: "rangee" }, [el("button", { type: "button", classe: "btn", texte: "Même hauteur pour les parties voisines", onclick: function () { harmoniserEtages(o); } })]));
         zone.appendChild(champTexte("Nom du bâtiment (facultatif)", o.nom || "", function (v) { editer(function (x) { if (v.trim()) x.nom = v.trim(); else delete x.nom; }); panneauSelection(); }, "Auberge du Cerf, Académie…"));
         if (o.nom) zone.appendChild(el("div", { classe: "rangee" }, [el("button", { type: "button", classe: "btn btn-primaire", texte: o.carteId ? "Ouvrir l'intérieur" : "Éditer l'intérieur", onclick: function () { ouvrirInterieur(o); } })]));
         else zone.appendChild(el("p", { classe: "aide", texte: "Donnez un nom à ce bâtiment pour dessiner son intérieur (plan d'étage)." }));
@@ -2166,9 +2274,13 @@
       zone.appendChild(el("div", { classe: "rangee" }, [
         el("button", { type: "button", classe: "btn", texte: "Autre forme", onclick: function () { editer(function (x) { x.v = (x.v || 0) + 1; }); } })
       ]));
-      zone.appendChild(champCurseur("Rotation", -180, 180, 1, o.a || 0, function (v) { return Math.round(v) + "°"; },
+      if (!o.pts) zone.appendChild(champCurseur("Rotation", -180, 180, 1, o.a || 0, function (v) { return Math.round(v) + "°"; },
         function (v) { editer(function (x) { if (v) x.a = v; else delete x.a; }); }));
-      zone.appendChild(el("p", { classe: "aide", texte: "Glissez le décor pour le déplacer. « Autre forme » en change le dessin." }));
+      if (Moteur.BATIMENTS[o.type]) {
+        if (!o.pts) zone.appendChild(el("div", { classe: "rangee" }, [el("button", { type: "button", classe: "btn", texte: "Modifier le contour (points)", onclick: function () { editer(function (x) { x.pts = coinsDeMaison(x); }); panneauSelection(); } })]));
+        else zone.appendChild(el("div", { classe: "rangee" }, [el("button", { type: "button", classe: "btn", texte: "Remettre en rectangle", onclick: function () { editer(function (x) { var r = maisonDepuisContour(x); delete x.pts; x.x = r.x; x.y = r.y; x.s = r.s; x.a = r.a; x.ar = r.ar; }); panneauSelection(); } })]));
+      }
+      zone.appendChild(el("p", { classe: "aide", texte: o.pts ? "Glissez un carré pour déplacer un coin, double-clic sur un côté pour ajouter un point (L, T, U…), clic droit sur un carré pour le supprimer, glissez la maison pour la déplacer." : "Glissez le décor pour le déplacer. « Autre forme » en change le dessin." }));
     } else if (sel.coll === "lacs") {
       zone.appendChild(champSegments("Type de lac", [["eau", "Eau"], ["lave", "Lave"]], o.lave ? "lave" : "eau", function (v) { editer(function (x) { if (v === "lave") x.lave = true; else delete x.lave; }); }));
       zone.appendChild(el("div", { classe: "rangee" }, [
@@ -2599,6 +2711,7 @@
     carte.etiquettes = carte.etiquettes || [];
     carte.lieux = carte.lieux || [];
     carte.lacs = carte.lacs || [];
+    carte.retraits = carte.retraits || [];                 // bâtiments générés repris en main (voir rendreModifiable)
     carte.tampons = carte.tampons || [];
     // L'échelle des décors automatiques est figée une fois pour toutes dans la carte : changer
     // sa taille ne déplace plus aucun décor (voir Moteur.fixerEchelleDecors).
@@ -2618,9 +2731,12 @@
       lp.href = "editeur.html?id=" + encodeURIComponent(carte.parent.carteId);
       lp.addEventListener("click", function (ev) { ev.preventDefault(); allerVers(lp.href); });
     }
+    // La carte d'une ville (carte fille d'un lieu, pas un plan d'intérieur) a une vue fixe : plus de zoom.
+    E.zoomVerrouille = !!(carte.parent && carte.parent.carteId && !carte.interieur);
+    if (E.zoomVerrouille) ["btnZoomMoins", "niveauZoom", "btnZoomPlus"].forEach(function (i) { $(i).hidden = true; });
     if (carte.interieur) { E.materiau = "parquet"; E.typeLigne = "mur"; E.epaisseurPx = 6; E.tampon = "porte"; }
     tailleScene();
-    if (carte.vue && carte.vue.zoom > 0) { E.vue.cx = carte.vue.cx; E.vue.cy = carte.vue.cy; E.vue.zoom = borne(carte.vue.zoom, zoomMin(), zoomMax()); }
+    if (carte.vue && carte.vue.zoom > 0 && !E.zoomVerrouille) { E.vue.cx = carte.vue.cx; E.vue.cy = carte.vue.cy; E.vue.zoom = borne(carte.vue.zoom, zoomMin(), zoomMax()); }
     else ajusterVue();
     panneauOutil();
     panneauSelection();
@@ -2634,7 +2750,7 @@
     majMini();
     var apresRedim = function () {
       tailleScene();
-      if (E.ajusterQuandMesuree && W > 2 && H > 2) ajusterVue();
+      if ((E.ajusterQuandMesuree || E.zoomVerrouille) && W > 2 && H > 2) ajusterVue();
       infosVue();
       rendre();
     };
