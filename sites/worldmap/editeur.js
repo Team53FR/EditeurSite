@@ -332,11 +332,14 @@
   // par crans de 15°). Glisser l'objet — ou l'intérieur du cadre — le déplace. Tout se fait sur
   // des copies de départ : rien ne dérive, et l'annulation rend l'état exact d'avant le geste.
   var ORIENTES = { tampons: 1, lieux: 1, etiquettes: 1 };
+  // Un objet dont on remodèle le contour point par point : tracé, lac, ou maison au contour libre (`tampon.pts`).
+  function aPoints(sel) { return !!sel && (sel.coll === "lignes" || sel.coll === "lacs" || (sel.coll === "tampons" && !!sel.obj.pts)); }
+  function orienteSel(sel) { return !!sel && !!ORIENTES[sel.coll] && !(sel.coll === "tampons" && sel.obj.pts); }
 
   // La boîte d'un objet, à l'écran : { cx, cy, w, h, ang (rad), oriente } ou null (invisible).
   function boiteObjet(coll, o) {
     var z = E.vue.zoom, c, w, h, ang = 0, pts, i, X0 = Infinity, Y0 = Infinity, X1 = -Infinity, Y1 = -Infinity;
-    if (coll === "tampons") {
+    if (coll === "tampons" && !o.pts) {
       c = versEcran(o.x, o.y - o.s * 0.3);
       w = h = Moteur.tailleTampon(o, z) * z * 0.9;
       ang = (o.a || 0) * Math.PI / 180;
@@ -532,12 +535,12 @@
   // lac est simplement surligné (ses points ne se déplacent qu'un par un, seul).
   function marqueSelection(ctx, sel, groupe) {
     if (!sel) return;
-    if (groupe && (sel.coll === "lignes" || sel.coll === "lacs")) {
+    if (groupe && aPoints(sel)) {
       var pg = sel.coll === "lignes" ? Moteur.pointsAffiches(sel.obj) : sel.obj.pts;
       ctx.strokeStyle = "rgba(255,211,107,0.9)"; ctx.lineWidth = 3; ctx.setLineDash([6, 4]);
       ctx.beginPath();
       for (var g = 0; g < pg.length; g += 2) { var sg = versEcran(pg[g], pg[g + 1]); if (g === 0) ctx.moveTo(sg[0], sg[1]); else ctx.lineTo(sg[0], sg[1]); }
-      if (sel.coll === "lacs") ctx.closePath();
+      if (sel.coll !== "lignes") ctx.closePath();
       ctx.stroke(); ctx.setLineDash([]);
       return;
     }
@@ -564,13 +567,18 @@
       ctx.setLineDash([5, 3]);
       ctx.strokeRect(-w / 2 - 4, -h / 2 - 2 + (b.dy || 0) * E.vue.zoom, w + 8, h + 4);   // `dy` : la flèche d'un nom courbe
       ctx.restore();
-    } else if (sel.coll === "tampons") {
+    } else if (sel.coll === "tampons" && !sel.obj.pts) {
       var t = sel.obj, st = versEcran(t.x, t.y - t.s * 0.3), cote = Moteur.tailleTampon(t, E.vue.zoom) * E.vue.zoom;
       ctx.setLineDash([4, 3]);
       ctx.strokeRect(st[0] - cote * 0.48, st[1] - cote * 0.48, cote * 0.96, cote * 0.96);
       ctx.setLineDash([]);
-    } else if (sel.coll === "lignes" || sel.coll === "lacs") {
+    } else if (aPoints(sel)) {
       var p = sel.obj.pts;
+      if (sel.coll !== "lignes") {                            // un lac, une maison : son contour fermé
+        ctx.strokeStyle = "rgba(255,211,107,0.95)"; ctx.lineWidth = 2; ctx.setLineDash([5, 4]); ctx.beginPath();
+        for (var ic = 0; ic < p.length; ic += 2) { var vc = versEcran(p[ic], p[ic + 1]); if (ic) ctx.lineTo(vc[0], vc[1]); else ctx.moveTo(vc[0], vc[1]); }
+        ctx.closePath(); ctx.stroke(); ctx.setLineDash([]);
+      }
       ctx.strokeStyle = "#1c2a6b";
       for (var i = 0; i < p.length; i += 2) {
         var v = versEcran(p[i], p[i + 1]);
@@ -903,6 +911,16 @@
     for (i = 0; i < tp.length; i++) {
       // (x, yc) : le centre du décor, fixe ; `ts` : sa taille à ce zoom (plafonnée à l'écran).
       var t = tp[i], ts = Moteur.tailleTampon(t, z), yc = t.y - t.s * 0.3;
+      if (t.pts && t.pts.length >= 6) {                 // une maison au contour libre : on la clique dans son polygone
+        // (dans le polygone, ou à moins de 7 px d'un côté : on doit pouvoir cliquer le bord pour y ajouter un point)
+        var proche = Moteur.dansPolygone(w[0], w[1], t.pts);
+        for (var kc = 0; kc < t.pts.length && !proche; kc += 2) {
+          var k2 = (kc + 2) % t.pts.length;
+          proche = distanceSegment(w[0], w[1], t.pts[kc], t.pts[kc + 1], t.pts[k2], t.pts[k2 + 1]).d <= 7 / z;
+        }
+        if (proche) { meilleur = t; break; }
+        continue;
+      }
       if (ts * z < 6) continue;
       if (Math.abs(w[0] - t.x) <= ts * 0.42 && Math.abs(w[1] - yc) <= ts * 0.45 && (!meilleur || t.y > meilleur.y)) meilleur = t;
     }
@@ -1088,19 +1106,19 @@
     }
     // Dans le cadre d'un objet orienté (ou d'un groupe) : glisser le déplace, même à côté du dessin.
     var gz = !touche ? boiteGizmo() : null;
-    if (gz && (E.multi.length || (E.selection && ORIENTES[E.selection.coll])) && dansBoite(p, gz)) { debuterGizmo(p, "move", gz); return; }
+    if (gz && (E.multi.length || orienteSel(E.selection)) && dansBoite(p, gz)) { debuterGizmo(p, "move", gz); return; }
     var sel = E.selection;
-    if (sel && (sel.coll === "lignes" || sel.coll === "lacs")) {
+    if (aPoints(sel)) {
       var i = sommetProche(sel.obj, p.x, p.y);
       if (i >= 0) { geste = { type: "sommet", obj: sel.obj, coll: sel.coll, i: i, avant: JSON.stringify(sel.obj) }; return; }
     }
     var hit = trouver(p.x, p.y);
     if (hit) {
       selectionner(hit.coll, hit.obj);
-      if (hit.coll === "lieux" || hit.coll === "etiquettes" || hit.coll === "tampons") {
+      if (hit.coll === "lacs" || (hit.coll === "tampons" && hit.obj.pts)) {
+        geste = { type: "deplaceLac", coll: hit.coll, obj: hit.obj, avant: JSON.stringify(hit.obj), x0: w[0], y0: w[1], base: hit.obj.pts.slice(), bouge: false };
+      } else if (hit.coll === "lieux" || hit.coll === "etiquettes" || hit.coll === "tampons") {
         geste = { type: "deplace", coll: hit.coll, obj: hit.obj, avant: JSON.stringify(hit.obj), dx: hit.obj.x - w[0], dy: hit.obj.y - w[1], bouge: false };
-      } else if (hit.coll === "lacs") {
-        geste = { type: "deplaceLac", obj: hit.obj, avant: JSON.stringify(hit.obj), x0: w[0], y0: w[1], base: hit.obj.pts.slice(), bouge: false };
       } else {
         // Un tracé : le glisser le déplace en entier (un simple clic le sélectionne seulement).
         debuterGizmo(p, "move", null);
@@ -1115,6 +1133,24 @@
       }
       geste = { type: "clic", x: p.x, y: p.y, vide: true };
     }
+  }
+
+  // Le contour d'une maison posée : ses quatre coins (centre, taille, rotation et proportion du toit).
+  function coinsDeMaison(t) {
+    var kb = Moteur.BATIMENTS[t.type] || 1, w = t.s * 0.62 * kb, h = t.ar ? w * t.ar : t.s * 0.4 * kb, a = (t.a || 0) * Math.PI / 180;
+    var cx = t.x, cy = t.y - t.s * 0.3, c = Math.cos(a), s = Math.sin(a), pts = [];
+    [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(function (k) { var X = k[0] * w / 2, Y = k[1] * h / 2; pts.push(cx + X * c - Y * s, cy + X * s + Y * c); });
+    return pts;
+  }
+  // Le chemin inverse : un rectangle aligné sur le plus long côté du contour, qui l'englobe.
+  function maisonDepuisContour(t) {
+    var p = t.pts, n = p.length / 2, i, best = 0, ang = 0;
+    for (i = 0; i < n; i++) { var j = (i + 1) % n, L = Math.hypot(p[2 * j] - p[2 * i], p[2 * j + 1] - p[2 * i + 1]); if (L > best) { best = L; ang = Math.atan2(p[2 * j + 1] - p[2 * i + 1], p[2 * j] - p[2 * i]); } }
+    var c = Math.cos(-ang), s = Math.sin(-ang), x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    for (i = 0; i < n; i++) { var X = p[2 * i] * c - p[2 * i + 1] * s, Y = p[2 * i] * s + p[2 * i + 1] * c; x0 = Math.min(x0, X); x1 = Math.max(x1, X); y0 = Math.min(y0, Y); y1 = Math.max(y1, Y); }
+    var mx = (x0 + x1) / 2, my = (y0 + y1) / 2, cx = mx * Math.cos(ang) - my * Math.sin(ang), cy = mx * Math.sin(ang) + my * Math.cos(ang);
+    var kb = Moteur.BATIMENTS[t.type] || 1, w = x1 - x0, sm = w / (0.62 * kb);
+    return { x: cx, y: cy + sm * 0.3, s: sm, a: normAngle(ang * 180 / Math.PI), ar: (y1 - y0) / w };
   }
 
   // Les bâtiments d'une ville sont générés : on ne peut pas les déplacer un à un. Mais un clic en rend un
@@ -1370,7 +1406,7 @@
         break;
       case "deplaceLac":
         if (g.bouge) {
-          enregistrer({ t: "modif", coll: "lacs", id: g.obj.id, avant: JSON.parse(g.avant), apres: cloner(g.obj) });
+          enregistrer({ t: "modif", coll: g.coll || "lacs", id: g.obj.id, avant: JSON.parse(g.avant), apres: cloner(g.obj) });
           marquer();
         }
         break;
@@ -1607,10 +1643,10 @@
     if (E.outil === "ligne" && E.ligneEnCours) { terminerLigne(); return; }
     if (E.outil !== "selection") return;
     var sel = E.selection;
-    if (sel && (sel.coll === "lignes" || sel.coll === "lacs")) {
-      // Double-clic sur un tracé (ou un lac) sélectionné : un sommet de plus à cet endroit.
+    if (aPoints(sel)) {
+      // Double-clic sur un tracé, un lac ou un contour de maison sélectionné : un sommet de plus à cet endroit.
       var w = versMonde(p.x, p.y), pts = sel.obj.pts, seuil = 9 / E.vue.zoom;
-      var nSeg = sel.coll === "lacs" ? pts.length / 2 : pts.length / 2 - 1;
+      var nSeg = sel.coll !== "lignes" ? pts.length / 2 : pts.length / 2 - 1;
       for (var j = 0; j < nSeg; j++) {
         var j2 = ((j + 1) % (pts.length / 2)) * 2;
         var r = distanceSegment(w[0], w[1], pts[2 * j], pts[2 * j + 1], pts[j2], pts[j2 + 1]);
@@ -2185,8 +2221,8 @@
       zone.appendChild(el("p", { classe: "aide", texte: "Glissez un carré pour déplacer un point. Double-clic sur le tracé pour en ajouter un." }));
     } else if (sel.coll === "tampons") {
       zone.appendChild(champChoix("Décor", Moteur.TAMPONS.filter(function (t) { return !t.cache && !!t.int === !!E.carte.interieur; }).map(function (t) { return [t.id, t.nom]; }), o.type,
-        function (v) { editer(function (x) { x.type = v; }); }));
-      zone.appendChild(champCurseur("Taille", 8, 600, 1, borne(o.s * E.vue.zoom, 8, 600), function (v) { return Math.round(v) + " px"; },
+        function (v) { editer(function (x) { x.type = v; if (!Moteur.BATIMENTS[v]) delete x.pts; }); panneauSelection(); }));
+      if (!o.pts) zone.appendChild(champCurseur("Taille", 8, 600, 1, borne(o.s * E.vue.zoom, 8, 600), function (v) { return Math.round(v) + " px"; },
         function (v) { editer(function (x) { var pied = x.y - x.s * 0.3; x.s = v / E.vue.zoom; x.y = pied + x.s * 0.3; }); }));
       if (Moteur.BATIMENTS[o.type] && !E.carte.interieur) {
         zone.appendChild(champTexte("Nom du bâtiment (facultatif)", o.nom || "", function (v) { editer(function (x) { if (v.trim()) x.nom = v.trim(); else delete x.nom; }); panneauSelection(); }, "Auberge du Cerf, Académie…"));
@@ -2196,9 +2232,13 @@
       zone.appendChild(el("div", { classe: "rangee" }, [
         el("button", { type: "button", classe: "btn", texte: "Autre forme", onclick: function () { editer(function (x) { x.v = (x.v || 0) + 1; }); } })
       ]));
-      zone.appendChild(champCurseur("Rotation", -180, 180, 1, o.a || 0, function (v) { return Math.round(v) + "°"; },
+      if (!o.pts) zone.appendChild(champCurseur("Rotation", -180, 180, 1, o.a || 0, function (v) { return Math.round(v) + "°"; },
         function (v) { editer(function (x) { if (v) x.a = v; else delete x.a; }); }));
-      zone.appendChild(el("p", { classe: "aide", texte: "Glissez le décor pour le déplacer. « Autre forme » en change le dessin." }));
+      if (Moteur.BATIMENTS[o.type] && themeActuel().dessus) {
+        if (!o.pts) zone.appendChild(el("div", { classe: "rangee" }, [el("button", { type: "button", classe: "btn", texte: "Modifier le contour (points)", onclick: function () { editer(function (x) { x.pts = coinsDeMaison(x); }); panneauSelection(); } })]));
+        else zone.appendChild(el("div", { classe: "rangee" }, [el("button", { type: "button", classe: "btn", texte: "Remettre en rectangle", onclick: function () { editer(function (x) { var r = maisonDepuisContour(x); delete x.pts; x.x = r.x; x.y = r.y; x.s = r.s; x.a = r.a; x.ar = r.ar; }); panneauSelection(); } })]));
+      }
+      zone.appendChild(el("p", { classe: "aide", texte: o.pts ? "Glissez un carré pour déplacer un coin, double-clic sur un côté pour ajouter un point (L, T, U…), glissez la maison pour la déplacer." : "Glissez le décor pour le déplacer. « Autre forme » en change le dessin." }));
     } else if (sel.coll === "lacs") {
       zone.appendChild(champSegments("Type de lac", [["eau", "Eau"], ["lave", "Lave"]], o.lave ? "lave" : "eau", function (v) { editer(function (x) { if (v === "lave") x.lave = true; else delete x.lave; }); }));
       zone.appendChild(el("div", { classe: "rangee" }, [
