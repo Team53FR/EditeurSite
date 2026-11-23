@@ -2041,6 +2041,18 @@
     liste.push({ x: cx, y: cy, sprite: "cour", cour: { pts: pts, v: genre, lw: Dk * 0.07 } });
   }
 
+  // Répartit des nombres d'étages sur les parties d'un bâtiment (rectangles { x, y, w, h, a }) de façon qu'une partie
+  // plus haute ne se tienne jamais devant une plus basse : en vue de profil, ce qui est vers le bas de l'écran cache
+  // ce qui est derrière. Les étages sont triés du plus bas au plus haut et donnés de l'avant (bord sud le plus bas
+  // à l'écran) vers l'arrière ; le plus haut se retrouve donc au fond.
+  function etagesParProfondeur(parts, ets) {
+    var base = parts.map(function (b) { var P = rectPoly(b.x, b.y, b.w, b.h, b.a), m = -Infinity; P.forEach(function (q) { m = Math.max(m, q[1]); }); return m; });
+    var ordre = parts.map(function (_, i) { return i; }).sort(function (a, b) { return base[b] - base[a] || a - b; });
+    var tries = ets.slice().sort(function (a, b) { return a - b; }), out = [];
+    ordre.forEach(function (ip, k) { out[ip] = tries[k]; });
+    return out;
+  }
+
   // Envoie dans la liste les corps d'UN bâtiment (rectangles { x, y, w, h, a, et }) : même identifiant, même teinte.
   // Le corps dont une arête longe le mieux une rue reçoit la porte et le chemin d'accès. `et` : étages de chaque
   // corps (un bâtiment peut avoir des ailes de hauteurs différentes) ; `hf` : la hauteur d'un étage.
@@ -2059,6 +2071,9 @@
   // Un grand bâtiment à plusieurs corps (monument, hôtel, couvent…) : un corps principal et deux ou trois
   // ailes qui s'y accrochent en équerre (T, L, U), de proportions variées. Un bâtiment unique : un seul
   // identifiant (`bid`), toits de même teinte ; en ardoise pour un monument, en tuiles sinon.
+  // Diagnostic : combien de grands bâtiments tentés, combien ont dû perdre une aile, combien ont été abandonnés.
+  var STATS_BATI = { essais: 0, ailesRetirees: 0, aminces: 0, replis: 0 };
+  function statsBati(raz) { var c = { essais: STATS_BATI.essais, ailesRetirees: STATS_BATI.ailesRetirees, aminces: STATS_BATI.aminces, replis: STATS_BATI.replis }; if (raz) { STATS_BATI.essais = STATS_BATI.ailesRetirees = STATS_BATI.aminces = STATS_BATI.replis = 0; } return c; }
   function batimentComplexe(liste, bid, cx, cy, dx, dy, Dk, ech, g, h, ardoise, lim, bloc) {
     if (retire(bid)) return true;                                // (repris en main : l'îlot n'a pas à être rebâti)
     var L = Math.hypot(dx, dy) || 1, ux = dx / L, uy = dy / L, nx = -uy, ny = ux, a = Math.atan2(uy, ux), i;
@@ -2066,7 +2081,7 @@
     var w0 = u * (4 + 2 * r(0)), h0 = u * (2 + 0.7 * r(1)), tint = Math.floor(r(2) * 40), corps = [{ x: cx, y: cy, w: w0, h: h0, a: a }], cote = {};
     // Les ailes se posent BORD À BORD contre le corps principal (aucun recouvrement), et deux ailes du même côté
     // ont chacune sa place le long du corps : on essaie quatre positions et on garde la première qui est libre.
-    var nW = 2 + Math.floor(r(3) * 2), occupe = { "1": [], "-1": [] };
+    var nW = 2 + Math.floor(r(3) * 2), occupe = { "1": [], "-1": [] }, specs = [];
     for (i = 0; i < nW; i++) {
       var side = i === 0 ? 1 : (r(10 + i) < 0.5 ? -1 : 1);
       var w1 = u * (1.8 + 1.4 * r(20 + i)), h1 = Math.min(u * (2.2 + 1.6 * r(30 + i)), u * 3.5);
@@ -2083,30 +2098,55 @@
         }
       }
       if (along === null) continue;                                  // plus de place : pas d'aile de plus
-      var perp = side * (h0 / 2 + h1 / 2);
-      corps.push({ x: cx + ux * along + nx * perp, y: cy + uy * along + ny * perp, w: h1, h: w1, a: a + Math.PI / 2 });
+      specs.push({ side: side, along: along, w1: w1, h1: h1 });
       occupe[side].push([along - w1 / 2, along + w1 / 2]);
     }
-    // Il doit tenir dans le rectangle disponible (`lim` : longueur le long de u, largeur le long de n) : on
-    // mesure l'emprise de tous les corps dans ce repère, puis on réduit l'ensemble autour du centre.
-    if (lim) {
-      var e0 = Infinity, e1 = -Infinity, f0 = Infinity, f1 = -Infinity;
-      corps.forEach(function (b) {
-        var ca = Math.abs(Math.cos(b.a - a)), sa = Math.abs(Math.sin(b.a - a)), hx = (b.w * ca + b.h * sa) / 2, hy = (b.w * sa + b.h * ca) / 2;
-        var pu = (b.x - cx) * ux + (b.y - cy) * uy, pn = (b.x - cx) * nx + (b.y - cy) * ny;
-        e0 = Math.min(e0, pu - hx); e1 = Math.max(e1, pu + hx); f0 = Math.min(f0, pn - hy); f1 = Math.max(f1, pn + hy);
+    // Le bâtiment pour `n` ailes, de profondeur multipliée par `df` (posées bord à bord contre le corps principal).
+    var construire = function (n, df) {
+      var out = [corps[0]];
+      specs.slice(0, n).forEach(function (sp) {
+        var hh = sp.h1 * df;
+        out.push({ x: cx + ux * sp.along + nx * sp.side * (h0 / 2 + hh / 2), y: cy + uy * sp.along + ny * sp.side * (h0 / 2 + hh / 2), w: hh, h: sp.w1, a: a + Math.PI / 2 });
       });
-      var k = Math.min(ardoise ? 1.7 : 1, lim.w * 0.96 / Math.max(e1 - e0, 1e-9), lim.h * 0.96 / Math.max(f1 - f0, 1e-9)), cu = (e0 + e1) / 2, cn = (f0 + f1) / 2;
+      return out;
+    };
+    corps = construire(specs.length, 1);
+    // Il doit tenir dans le rectangle disponible (`lim` : longueur le long de u, largeur le long de n) : on
+    // mesure l'emprise de tous les corps dans ce repère, puis on réduit l'ensemble autour du centre. S'il faudrait
+    // le réduire de plus de moitié, on lui retire d'abord une aile (la dernière posée), puis une autre, avant de
+    // renoncer au bâtiment : mieux vaut un corps principal avec une aile qu'une poignée de maisons séparées.
+    STATS_BATI.essais++;
+    if (lim) {
+      var mesure = function () {
+        var e0 = Infinity, e1 = -Infinity, f0 = Infinity, f1 = -Infinity;
+        corps.forEach(function (b) {
+          var ca = Math.abs(Math.cos(b.a - a)), sa = Math.abs(Math.sin(b.a - a)), hx = (b.w * ca + b.h * sa) / 2, hy = (b.w * sa + b.h * ca) / 2;
+          var pu = (b.x - cx) * ux + (b.y - cy) * uy, pn = (b.x - cx) * nx + (b.y - cy) * ny;
+          e0 = Math.min(e0, pu - hx); e1 = Math.max(e1, pu + hx); f0 = Math.min(f0, pn - hy); f1 = Math.max(f1, pn + hy);
+        });
+        return { k: Math.min(ardoise ? 1.7 : 1, lim.w * 0.96 / Math.max(e1 - e0, 1e-9), lim.h * 0.96 / Math.max(f1 - f0, 1e-9)), cu: (e0 + e1) / 2, cn: (f0 + f1) / 2 };
+      };
+      // On garde le plus d'ailes possible : toutes les ailes à pleine profondeur, puis moins profondes (×0,8, ×0,65), puis
+      // une aile de moins, et ainsi de suite.
+      var m = null, tente = false;
+      for (var nA = specs.length; nA >= 0 && !tente; nA--) {
+        for (var df = 1; df >= 0.6 && !tente; df -= 0.175) {
+          corps = construire(nA, df); m = mesure();
+          if (m.k >= 0.5) { tente = true; if (nA < specs.length) STATS_BATI.ailesRetirees += specs.length - nA; if (df < 1) STATS_BATI.aminces++; }
+        }
+      }
+      if (!tente) { STATS_BATI.replis++; return false; }            // même le corps seul ne tient pas
       // (recentré : l'emprise peut être décalée si les ailes sont d'un seul côté)
       corps.forEach(function (b) {
-        var pu = (b.x - cx) * ux + (b.y - cy) * uy - cu, pn = (b.x - cx) * nx + (b.y - cy) * ny - cn;
-        b.x = cx + (ux * pu + nx * pn) * k; b.y = cy + (uy * pu + ny * pn) * k; b.w *= k; b.h *= k;
+        var pu = (b.x - cx) * ux + (b.y - cy) * uy - m.cu, pn = (b.x - cx) * nx + (b.y - cy) * ny - m.cn;
+        b.x = cx + (ux * pu + nx * pn) * m.k; b.y = cy + (uy * pu + ny * pn) * m.k; b.w *= m.k; b.h *= m.k;
       });
-      if (k < 0.5) return false;                                  // trop petit pour un bâtiment à plusieurs corps
     }
     // Les étages : le corps principal est le plus haut (un monument encore plus), les ailes un ou deux étages de moins.
     var haut = ardoise ? 3 + Math.floor(r(60) * 2) : 2 + Math.floor(r(61) * 3);
-    corps.forEach(function (b, ib) { b.et = ib === 0 ? haut : Math.max(1, haut - 1 - Math.floor(r(62 + ib) * 2)); });
+    var etsC = corps.map(function (b, ib) { return ib === 0 ? haut : Math.max(1, haut - 1 - Math.floor(r(62 + ib) * 2)); });
+    etsC = etagesParProfondeur(corps, etsC);                         // (le corps le plus haut se retrouve au fond, pas devant les ailes)
+    corps.forEach(function (b, ib) { b.et = etsC[ib]; });
     pousserCorps(liste, bid, corps, tint, ardoise, bloc, Dk, Dk * 0.7);
     return true;
   }
@@ -2209,6 +2249,7 @@
       if (alea(g + 551, h) < 0.34 && rect.length >= 2) {
         var ets = rect.map(function (rc, ir) { return Math.max(1, Math.min(4, et0 + [-1, 0, 0, 1][Math.floor(alea(g + 552 + ir, h) * 4)])); });
         if (ets.every(function (e0) { return e0 === ets[0]; })) ets[Math.floor(alea(g + 556, h) * ets.length)] = ets[0] === 1 ? 2 : ets[0] - 1;
+        ets = etagesParProfondeur(rect, ets);
         pousserCorps(liste, bk + "a", rect.map(function (rc, ir) { return { x: rc.x, y: rc.y, w: rc.w, h: rc.h, a: rc.a, et: ets[ir] }; }), Math.floor(alea(g + 520, h) * 64), false, bloc, Dk, hfA);
       } else {
         // Le pied du bâtiment : l'anneau lui-même, ou — pour un U ou un L — sa bande (contour extérieur puis intérieur).
@@ -5967,7 +6008,7 @@
     boiteEtiquette: boiteEtiquette, poseEtiquette: poseEtiquette, positionSurLigne: positionSurLigne, visibleLieu: visibleLieu, tailleIcone: tailleIcone,
     styleLigne: styleLigne, pointsAffiches: pointsAffiches, dansPolygone: dansPolygone,
     icone: icone, iconeAuto: iconeAuto, dessinerIconeLieu: dessinerIconeLieu,
-    apercuDecor: apercuDecor, batimentEn: batimentEn, BATIMENTS: BATIMENTS, tailleTampon: tailleTampon, FINESSE_MAX: FINESSE_MAX, preparerImages: preparerImages, surImage: null,
+    apercuDecor: apercuDecor, batimentEn: batimentEn, statsBati: statsBati, BATIMENTS: BATIMENTS, tailleTampon: tailleTampon, FINESSE_MAX: FINESSE_MAX, preparerImages: preparerImages, surImage: null,
     dessiner: dessiner, carteEntiere: carteEntiere, vignette: vignette, apercuTrait: apercuTrait
   };
 })();
