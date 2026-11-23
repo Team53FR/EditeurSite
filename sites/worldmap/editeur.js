@@ -192,6 +192,7 @@
   }
 
   function zoomerVers(px, py, facteur) {
+    if (E.zoomVerrouille) return;                  // une carte de ville a une vue fixe : on ne fait que la déplacer
     var av = versMonde(px, py);
     E.vue.zoom = borne(E.vue.zoom * facteur, zoomMin(), zoomMax());
     var ap = versMonde(px, py);
@@ -1105,8 +1106,37 @@
         debuterGizmo(p, "move", null);
       }
     } else {
+      // Un bâtiment généré par la ville (pas encore un objet) : un clic le rend modifiable, et on peut le glisser.
+      var bat = Moteur.batimentEn(w[0], w[1]), libre = bat ? rendreModifiable(bat, w) : null;
+      if (libre) {
+        selectionner("tampons", libre);
+        geste = { type: "deplace", coll: "tampons", obj: libre, avant: JSON.stringify(libre), dx: libre.x - w[0], dy: libre.y - w[1], bouge: false };
+        return;
+      }
       geste = { type: "clic", x: p.x, y: p.y, vide: true };
     }
+  }
+
+  // Les bâtiments d'une ville sont générés : on ne peut pas les déplacer un à un. Mais un clic en rend un
+  // modifiable : il est remplacé par des décors « Maison » posés à la main (un par aile pour un volume en
+  // anneau, en U ou en L, un par corps pour un grand bâtiment), que l'on déplace, tourne, redimensionne
+  // ou supprime comme n'importe quel décor. Son identifiant est noté dans `carte.retraits` : la ville ne le
+  // génère plus, à aucun zoom. Un seul pas d'historique : Ctrl+Z le rend à la ville.
+  function rendreModifiable(bat, w) {
+    var base = E.carte.tampons.length, actions = [], choisi = null;
+    bat.rects.forEach(function (r, i) {
+      var sm = r.w / 0.62;
+      var t = { id: nouvelId("d"), type: "maison", v: r.v, x: r.x, y: r.y + sm * 0.3, s: sm, a: Math.round(r.a * 180 / Math.PI * 10) / 10, ar: r.h / r.w };
+      if (r.ardoise) t.ardoise = true; else t.tuile = true;
+      actions.push({ t: "ajout", coll: "tampons", obj: t, idx: base + i });
+      var dx = w[0] - r.x, dy = w[1] - r.y, c = Math.cos(r.a), s = Math.sin(r.a);
+      if (!choisi && Math.abs(dx * c + dy * s) <= r.w / 2 && Math.abs(-dx * s + dy * c) <= r.h / 2) choisi = t;
+    });
+    if (!actions.length) return null;
+    actions.push({ t: "ajout", coll: "retraits", obj: { id: nouvelId("r"), bid: bat.bid }, idx: E.carte.retraits.length });
+    executer({ t: "lot", actions: actions });
+    etat(actions.length > 2 ? "Bâtiment rendu modifiable (" + (actions.length - 1) + " parties) : déplacez, tournez ou supprimez-les une à une." : "Bâtiment rendu modifiable : déplacez, tournez ou supprimez-le.");
+    return choisi || E.carte.tampons[base];
   }
 
   // Accroche : un point posé près d'une voie existante (route ou sentier pour une voie,
@@ -2599,6 +2629,7 @@
     carte.etiquettes = carte.etiquettes || [];
     carte.lieux = carte.lieux || [];
     carte.lacs = carte.lacs || [];
+    carte.retraits = carte.retraits || [];                 // bâtiments générés repris en main (voir rendreModifiable)
     carte.tampons = carte.tampons || [];
     // L'échelle des décors automatiques est figée une fois pour toutes dans la carte : changer
     // sa taille ne déplace plus aucun décor (voir Moteur.fixerEchelleDecors).
@@ -2618,9 +2649,12 @@
       lp.href = "editeur.html?id=" + encodeURIComponent(carte.parent.carteId);
       lp.addEventListener("click", function (ev) { ev.preventDefault(); allerVers(lp.href); });
     }
+    // La carte d'une ville (carte fille d'un lieu, pas un plan d'intérieur) a une vue fixe : plus de zoom.
+    E.zoomVerrouille = !!(carte.parent && carte.parent.carteId && !carte.interieur);
+    if (E.zoomVerrouille) ["btnZoomMoins", "niveauZoom", "btnZoomPlus"].forEach(function (i) { $(i).hidden = true; });
     if (carte.interieur) { E.materiau = "parquet"; E.typeLigne = "mur"; E.epaisseurPx = 6; E.tampon = "porte"; }
     tailleScene();
-    if (carte.vue && carte.vue.zoom > 0) { E.vue.cx = carte.vue.cx; E.vue.cy = carte.vue.cy; E.vue.zoom = borne(carte.vue.zoom, zoomMin(), zoomMax()); }
+    if (carte.vue && carte.vue.zoom > 0 && !E.zoomVerrouille) { E.vue.cx = carte.vue.cx; E.vue.cy = carte.vue.cy; E.vue.zoom = borne(carte.vue.zoom, zoomMin(), zoomMax()); }
     else ajusterVue();
     panneauOutil();
     panneauSelection();
@@ -2634,7 +2668,7 @@
     majMini();
     var apresRedim = function () {
       tailleScene();
-      if (E.ajusterQuandMesuree && W > 2 && H > 2) ajusterVue();
+      if ((E.ajusterQuandMesuree || E.zoomVerrouille) && W > 2 && H > 2) ajusterVue();
       infosVue();
       rendre();
     };
