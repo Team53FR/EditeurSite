@@ -1887,8 +1887,9 @@
           if (!monu && forme < 0.84) fait = batirAnneau(liste, bk, c, cx, cy, Dk, ici, enVille, g, h, zoom);
           else if (!ici.route) {
             // Un grand bâtiment à plusieurs corps (monument en ardoise, ou hôtel en tuiles), dans le rectangle libre de l'îlot.
-            Rx = rectangleInscrit(c, cx, cy, Dk * 0.95 / 2 + Dk * 0.06);
-            if (Rx && batimentComplexe(liste, bk + (monu ? "m" : "x"), (Rx[0][0] + Rx[2][0]) / 2, (Rx[0][1] + Rx[2][1]) / 2, Rx[1][0] - Rx[0][0], Rx[1][1] - Rx[0][1], Dk, ici.ech, g, h, monu, limR(Rx))) {
+            var Rc = rectangleCollee(c, cx, cy, Dk * 0.95 / 2 + Dk * (0.4 + 0.7 * alea(g + 381, h)), Dk);
+            Rx = Rc ? Rc.pts : null;
+            if (Rx && batimentComplexe(liste, bk + (monu ? "m" : "x"), Rc.cx, Rc.cy, Rx[1][0] - Rx[0][0], Rx[1][1] - Rx[0][1], Dk, ici.ech, g, h, monu, limR(Rx), c)) {
               courQuad(liste, c, cx, cy, 0.9, Dk, monu ? 1 : 0);
               fait = true;
             }
@@ -1952,16 +1953,85 @@
     return null;
   }
 
+  // Les quatre coins d'un rectangle orienté (centre, longueur, largeur, angle), dans l'ordre utilisé partout
+  // (nord-ouest, nord-est, sud-est, sud-ouest dans son repère) : l'indice d'une arête désigne le même côté
+  // à la génération et au dessin.
+  function rectPoly(x, y, w, h, a) {
+    var c = Math.cos(a), s = Math.sin(a), P = [];
+    [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(function (k) { P.push([x + k[0] * w / 2 * c - k[1] * h / 2 * s, y + k[0] * w / 2 * s + k[1] * h / 2 * c]); });
+    return P;
+  }
+
+  // Le plus grand rectangle COLLÉ à une rue : un de ses côtés longe la rue de l'îlot (à `e` de son axe), et il
+  // s'étend en profondeur jusqu'à ce qu'une autre rue l'arrête. On essaie chaque côté de l'îlot, plusieurs
+  // positions et largeurs, et on garde la plus grande surface. Renvoie { pts, cx, cy } ou null.
+  function rectangleCollee(c, cx, cy, e, Dk) {
+    var S = [], q, k;
+    for (q = 0; q < 4; q++) {
+      var a = c[q], b = c[(q + 1) % 4], dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy) || 1, nx = -dy / L, ny = dx / L;
+      if ((cx - a[0]) * nx + (cy - a[1]) * ny < 0) { nx = -nx; ny = -ny; }
+      S.push({ a: a, ux: dx / L, uy: dy / L, nx: nx, ny: ny, L: L });
+    }
+    var dist = function (k2, x, y) { return (x - S[k2].a[0]) * S[k2].nx + (y - S[k2].a[1]) * S[k2].ny; };
+    var best = null;
+    for (q = 0; q < 4; q++) {
+      var sq = S[q];
+      for (var i0 = 0; i0 <= 8; i0++) for (var wi = 0; wi < 9; wi++) {
+        var w = sq.L * (1 - wi * 0.09), s0 = (sq.L - w) * i0 / 8;
+        if (w < Dk * 2) continue;
+        var B = [[sq.a[0] + sq.ux * s0 + sq.nx * e, sq.a[1] + sq.uy * s0 + sq.ny * e], [sq.a[0] + sq.ux * (s0 + w) + sq.nx * e, sq.a[1] + sq.uy * (s0 + w) + sq.ny * e]];
+        var dd = Infinity, ok = true;
+        for (k = 0; k < 4 && ok; k++) {
+          if (k === q) continue;
+          var dot = sq.nx * S[k].nx + sq.ny * S[k].ny;
+          for (var bi = 0; bi < 2; bi++) {
+            var d0 = dist(k, B[bi][0], B[bi][1]) - e;
+            if (d0 < -1e-9) { ok = false; break; }
+            if (dot < -1e-6) dd = Math.min(dd, d0 / -dot);
+          }
+        }
+        if (!ok || dd === Infinity || dd < Dk * 1.2) continue;
+        dd = Math.min(dd, w * 1.4);
+        if (!best || w * dd > best.aire) best = { aire: w * dd, pts: [B[0], B[1], [B[1][0] + sq.nx * dd, B[1][1] + sq.ny * dd], [B[0][0] + sq.nx * dd, B[0][1] + sq.ny * dd]] };
+      }
+    }
+    if (!best) return null;
+    var P2 = best.pts;
+    return { pts: P2, cx: (P2[0][0] + P2[1][0] + P2[2][0] + P2[3][0]) / 4, cy: (P2[0][1] + P2[1][1] + P2[2][1] + P2[3][1]) / 4 };
+  }
+
+  // Le chemin qui relie un bâtiment à sa rue : l'arête de son pied la plus proche d'une rue de l'îlot (et tournée
+  // vers elle). Renvoie { edge, dist, path } ; `path` va du milieu de l'arête (la porte) au bord de la chaussée.
+  function accesBatiment(bloc, P, Dk) {
+    var bcx = 0, bcy = 0, q, i, n = P.length, rueW = Dk * 0.95, best = null, sgn = airePoly(P) >= 0 ? 1 : -1;
+    bloc.forEach(function (p) { bcx += p[0] / 4; bcy += p[1] / 4; });
+    for (q = 0; q < 4; q++) {
+      var a = bloc[q], b = bloc[(q + 1) % 4], dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy) || 1, nx = -dy / L, ny = dx / L;
+      if ((bcx - a[0]) * nx + (bcy - a[1]) * ny < 0) { nx = -nx; ny = -ny; }
+      for (i = 0; i < n; i++) {
+        var j = (i + 1) % n, ex = P[j][0] - P[i][0], ey = P[j][1] - P[i][1], Le = Math.hypot(ex, ey) || 1;
+        if ((ey / Le * sgn) * nx + (-ex / Le * sgn) * ny > -0.85) continue;                 // pas tournée vers cette rue
+        var mx = (P[i][0] + P[j][0]) / 2, my = (P[i][1] + P[j][1]) / 2, dist = (mx - a[0]) * nx + (my - a[1]) * ny;
+        if (dist < rueW * 0.45 || dist > rueW / 2 + Dk * 1.3) continue;
+        var sc = dist - Le * 0.04;
+        if (!best || sc < best.sc) best = { sc: sc, edge: i, mx: mx, my: my, nx: nx, ny: ny, dist: dist };
+      }
+    }
+    if (!best) return null;
+    var t = best.dist - rueW * 0.5;
+    return { edge: best.edge, dist: best.dist, path: [best.mx, best.my, best.mx - best.nx * t, best.my - best.ny * t, Dk * 0.2] };
+  }
+
   // Un bâtiment d'un seul tenant : anneau, U ou L qui suit les rues de l'îlot (angles en biais) ; si
   // l'îlot est déformé, il suit à la place un rectangle posé dedans (les angles restent droits) ; le reste
   // de l'îlot devient une cour. Faux s'il n'y a vraiment pas la place (l'appelant pose alors des maisons).
   function batirAnneau(liste, bk, c, cx, cy, Dk, ici, enVille, g, h, zoom) {
-    var e = Dk * 0.95 / 2 + Dk * 0.06;
+    var e = Dk * 0.95 / 2 + Dk * (0.4 + 0.7 * alea(g + 380, h));           // la rue, puis la cour d'accès (le chemin de la porte la traverse)
     if (quadRegulier(c) && volumeIlot(liste, bk, c, cx, cy, e, null, Dk, ici, enVille, g, h, zoom)) return true;
-    var R = rectangleInscrit(c, cx, cy, e);
+    var R = rectangleCollee(c, cx, cy, e, Dk);
     if (!R) return false;
     var cp = []; c.forEach(function (p) { cp.push(cx + (p[0] - cx) * 0.92, cy + (p[1] - cy) * 0.92); });
-    return volumeIlot(liste, bk, R, cx, cy, Dk * 0.02, cp, Dk, ici, enVille, g, h, zoom);
+    return volumeIlot(liste, bk, R.pts, R.cx, R.cy, 0, cp, Dk, ici, enVille, g, h, zoom, c);
   }
 
   // Une cour d'îlot (jardin ou cour pavée) : le quadrilatère de l'îlot réduit d'un facteur f.
@@ -1973,7 +2043,7 @@
   // Un grand bâtiment à plusieurs corps (monument, hôtel, couvent…) : un corps principal et deux ou trois
   // ailes qui s'y accrochent en équerre (T, L, U), de proportions variées. Un bâtiment unique : un seul
   // identifiant (`bid`), toits de même teinte ; en ardoise pour un monument, en tuiles sinon.
-  function batimentComplexe(liste, bid, cx, cy, dx, dy, Dk, ech, g, h, ardoise, lim) {
+  function batimentComplexe(liste, bid, cx, cy, dx, dy, Dk, ech, g, h, ardoise, lim, bloc) {
     if (retire(bid)) return true;                                // (repris en main : l'îlot n'a pas à être rebâti)
     var L = Math.hypot(dx, dy) || 1, ux = dx / L, uy = dy / L, nx = -uy, ny = ux, a = Math.atan2(uy, ux), i;
     var r = function (n) { return alea(g + 600 + n, h); }, u = Dk * ech * (ardoise ? 1.35 : 1);        // (un monument : plus grand)
@@ -2004,7 +2074,13 @@
       });
       if (k < 0.5) return false;                                  // trop petit pour un bâtiment à plusieurs corps
     }
-    corps.forEach(function (b) { liste.push({ x: b.x, y: b.y, bid: bid, maison: { w: b.w, h: b.h, a: b.a, v: tint, ardoise: !!ardoise, tuile: !ardoise } }); });
+    // L'accès : le corps dont une arête longe le mieux une rue reçoit la porte et le chemin.
+    var meilleur = -1, macc = null;
+    if (bloc) corps.forEach(function (b, ib) {
+      var ac = accesBatiment(bloc, rectPoly(b.x, b.y, b.w, b.h, b.a), Dk);
+      if (ac && (!macc || ac.dist < macc.dist)) { macc = ac; meilleur = ib; }
+    });
+    corps.forEach(function (b, ib) { liste.push({ x: b.x, y: b.y, bid: bid, acc: ib === meilleur ? macc.path : null, maison: { w: b.w, h: b.h, a: b.a, v: tint, ardoise: !!ardoise, tuile: !ardoise, fac: ib === meilleur ? macc.edge : null } }); });
     return true;
   }
 
@@ -2012,7 +2088,8 @@
   // Les côtés sont décalés vers l'intérieur de l'épaisseur du trottoir, puis de la profondeur du corps de
   // bâtiment ; aux angles les deux contours se rejoignent en biais (mitre). Renvoie false s'il n'y a pas la
   // place ou si l'îlot sort de la ville : l'appelant retombe alors sur des maisons séparées.
-  function volumeIlot(liste, bk, c, cx, cy, e, courPts, Dk, ici, enVille, g, h, zoom) {
+  function volumeIlot(liste, bk, c, cx, cy, e, courPts, Dk, ici, enVille, g, h, zoom, bloc) {
+    bloc = bloc || c;
     var ech = ici.ech, S = [], d = [], q, j;
     for (q = 0; q < 4; q++) {
       var a = c[q], b = c[(q + 1) % 4], dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy) || 1, ux = dx / L, uy = dy / L, nx = -uy, ny = ux;
@@ -2080,7 +2157,13 @@
     // La cour, sous le bâtiment : jardin ou cour pavée (le U et le L la laissent ouverte sur la rue).
     var genre = alea(g + 400, h) < 0.7 ? 0 : 1;
     liste.push({ x: cx, y: cy, sprite: "cour", cour: { pts: courPts || [Oq[0][0], Oq[0][1], Oq[1][0], Oq[1][1], Oq[2][0], Oq[2][1], Oq[3][0], Oq[3][1]], v: genre, lw: Dk * 0.07 } });
-    if (!retire(bk + "a")) liste.push({ x: cx, y: cy, bid: bk + "a", anneau: { chaines: [{ O: O, I: I, nrm: nrm, ferme: chaine.ferme, joints: joints }], v: Math.floor(alea(g + 520, h) * 64), lw: Dk * 0.07, sh: Dk * 0.32, rect: rect } });
+    if (!retire(bk + "a")) {
+      // Le pied du bâtiment : l'anneau lui-même, ou — pour un U ou un L — sa bande (contour extérieur puis intérieur).
+      var pied = [], io; for (io = 0; io < O.length; io += 2) pied.push([O[io], O[io + 1]]);
+      if (!chaine.ferme) for (io = I.length - 2; io >= 0; io -= 2) pied.push([I[io], I[io + 1]]);
+      var acc = accesBatiment(bloc, pied, Dk);
+      liste.push({ x: cx, y: cy, bid: bk + "a", acc: acc ? acc.path : null, anneau: { chaines: [{ O: O, I: I, nrm: nrm, ferme: chaine.ferme, joints: joints }], v: Math.floor(alea(g + 520, h) * 64), lw: Dk * 0.07, sh: Dk * 0.32, rect: rect, porte: acc ? acc.edge : null } });
+    }
     if (genre === 0) {
       for (var t = 0, nT = 2 + Math.floor(alea(g + 420, h) * 4); t < nT; t++) {
         var r1 = 0.15 + 0.7 * alea(g + 430 + t, h), r2 = 0.15 + 0.7 * alea(g + 440 + t, h);
@@ -2097,7 +2180,7 @@
   // prennent les angles, les deux autres s'arrêtent contre eux. Au milieu, une cour : un jardin planté
   // d'arbres, une cour pavée, parfois un corps de logis ; un monument occupe le cœur à la place de la cour.
   function batirIlot(liste, bk, c, cx, cy, Dk, ici, enVille, g, h, zoom, monument) {
-    var rueW = Dk * 0.95, gap = Dk * 0.06, R = ici.dd.rues, ech = ici.ech, prof = [], q, k;
+    var rueW = Dk * 0.95, gap = Dk * 0.6, R = ici.dd.rues, ech = ici.ech, prof = [], q, k;
     for (q = 0; q < 4; q++) prof[q] = Dk * ech * (1.9 + 0.9 * alea(g + 300 + q, h));
     for (q = 0; q < 4; q++) {
       var a = c[q], b = c[(q + 1) % 4], dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy) || 1, ux = dx / L, uy = dy / L;
@@ -2112,11 +2195,13 @@
         s0 += w; k++;
         if (retire(bk + "l" + q + "_" + k)) continue;                              // repris en main par l'auteur
         if (alea(g + 350 + q * 13 + k, h) < R.vide * 0.5) continue;                // une dent creuse : un jardin sur rue
-        var px = a[0] + ux * sm + nx * (rueW / 2 + gap / 2 + dd / 2), py = a[1] + uy * sm + ny * (rueW / 2 + gap / 2 + dd / 2);
+        var yd = Dk * (0.22 + 0.36 * alea(g + 365 + q * 13 + k, h));                  // sa cour d'accès, entre la rue et la façade
+        var px = a[0] + ux * sm + nx * (rueW / 2 + yd + dd / 2), py = a[1] + uy * sm + ny * (rueW / 2 + yd + dd / 2);
         var v = enVille(px, py);
         if (!v || v.route || v.mat !== ici.mat || alea(g + 370 + q * 13 + k, h) >= Math.min(1, v.dens)) ok = false;
         if (!ok || w * zoom < 1.5) continue;
-        liste.push({ x: px, y: py, bid: bk + "l" + q + "_" + k, maison: { w: w * 0.97, h: dd, a: Math.atan2(uy, ux), v: Math.floor(alea(g + 390 + q * 13 + k, h) * 64), tuile: true } });
+        var ac = accesBatiment(c, rectPoly(px, py, w * 0.97, dd, Math.atan2(uy, ux)), Dk);
+        liste.push({ x: px, y: py, bid: bk + "l" + q + "_" + k, acc: ac ? ac.path : null, maison: { w: w * 0.97, h: dd, a: Math.atan2(uy, ux), v: Math.floor(alea(g + 390 + q * 13 + k, h) * 64), tuile: true, fac: ac ? ac.edge : null } });
       }
     }
     if (monument) return;
@@ -2196,6 +2281,26 @@
   }
 
   // Les rues d'une ville, peintes dans la terre : un bord sombre, la chaussée de terre claire.
+  // Les petits chemins d'accès : de la porte d'un bâtiment au bord de la chaussée. Un liseré sombre (bouts
+  // plats, qui s'arrête au bord de la rue), puis la terre claire, qui se fond un peu dans la chaussée.
+  function peindreAcces(lc, acces, zoom) {
+    if (!acces || !acces.length) return;
+    lc.save();
+    lc.globalCompositeOperation = "source-atop";
+    lc.lineCap = "butt";
+    [["rgba(86,62,30,0.75)", 1.4, 0], [null, 1, 1]].forEach(function (passe) {
+      acces.forEach(function (r) {
+        if (r[4] * zoom < 0.8) return;
+        var dx = r[2] - r[0], dy = r[3] - r[1], L = Math.hypot(dx, dy) || 1, ext = passe[2] * r[4] * 0.5;
+        lc.strokeStyle = passe[0] || "#f1e8c9";
+        lc.lineWidth = r[4] * passe[1];
+        lc.beginPath(); lc.moveTo(r[0], r[1]); lc.lineTo(r[2] + dx / L * ext, r[3] + dy / L * ext); lc.stroke();
+      });
+    });
+    lc.restore();
+    lc.globalCompositeOperation = "source-over";
+  }
+
   function peindreRues(lc, rues, zoom) {
     if (!rues || !rues.length) return;
     lc.save();
@@ -2518,7 +2623,7 @@
   // La porte : un parallélogramme qui SUIT l'arête du mur (pied sur l'arête, montants verticaux), posé sur le
   // meilleur mur — tourné vers le sud, assez long, et dont la porte n'est cachée ni par le toit ni par un
   // autre mur plus au sud.
-  function porteProfil(lc, P, sg, H, u) {
+  function porteProfil(lc, P, sg, H, u, pref) {
     var n = P.length, i, T = P.map(function (p) { return [p[0], p[1] - H]; });
     var dedansPoly = function (Q, x, y) {
       var r = false, m = Q.length, q;
@@ -2531,6 +2636,11 @@
       if (oyy > 0.35) cand.push({ i: i, j: j2, L: El, sc: oyy * El });
     }
     cand.sort(function (a, b) { return b.sc - a.sc; });
+    // La façade (le côté qui regarde la rue, où arrive le chemin) passe en premier si on la voit.
+    if (pref != null) {
+      var jp = (pref + 1) % n, exp = P[jp][0] - P[pref][0], eyp = P[jp][1] - P[pref][1], Lp = Math.hypot(exp, eyp) || 1;
+      if (-exp / Lp * sg > 0.15) cand.unshift({ i: pref, j: jp, L: Lp, sc: 1e9 });
+    }
     for (var ci = 0; ci < cand.length; ci++) {
       var cd = cand[ci], dw = Math.min(H * 0.3, cd.L * 0.4), dh = Math.min(H * 0.6, H - u * 2);
       if (dw < u * 3) continue;
@@ -2580,13 +2690,12 @@
 
   // Un bâtiment rectangulaire orienté (une maison de ville), vu de profil : une boîte, et son toit à croupes.
   function peintMaisonBoite(lc, o) {
-    var m = o.maison, c = Math.cos(m.a), s = Math.sin(m.a), hw = m.w / 2, hh = m.h / 2, P = [];
-    [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(function (k) { P.push([o.x + k[0] * hw * c - k[1] * hh * s, o.y + k[0] * hw * s + k[1] * hh * c]); });
+    var m = o.maison, P = rectPoly(o.x, o.y, m.w, m.h, m.a);
     var sg = airePoly(P) >= 0 ? 1 : -1, H = Math.min(m.w, m.h) * 0.66, u = Math.max(m.w, m.h) / 60;
     lc.save(); lc.lineJoin = "round";
     ombreProfil(lc, [P], H);
     mursProfil(lc, P, H, sg, u);
-    porteProfil(lc, P, sg, H, u);
+    porteProfil(lc, P, sg, H, u, m.fac);
     OMBRE_TOIT = false;
     maisonDessus(lc, o.x, o.y - H, m.w, m.h, m.a, m.v, 0, m.ardoise ? TOITS_ARDOISE[m.v % TOITS_ARDOISE.length] : TOITS_VILLE[m.v % TOITS_VILLE.length]);
     OMBRE_TOIT = true;
@@ -2607,7 +2716,7 @@
         mursProfil(lc, O, H, airePoly(O) >= 0 ? 1 : -1, u);
         mursProfil(lc, I, H, airePoly(I) >= 0 ? -1 : 1, u);       // la cour : c'est la face intérieure que l'on voit
       } else mursProfil(lc, corps, H, airePoly(corps) >= 0 ? 1 : -1, u);
-      porteProfil(lc, corps.length === O.length ? O : corps, airePoly(corps) >= 0 ? 1 : -1, H, u);
+      porteProfil(lc, corps.length === O.length ? O : corps, airePoly(corps) >= 0 ? 1 : -1, H, u, an.porte);
       lc.translate(0, -H);
       peindreAnneau(lc, { chaines: [ch], v: an.v, lw: an.lw, sh: 0, sansOmbre: true, palette: TOITS_VILLE });
       lc.restore();
@@ -5442,6 +5551,7 @@
       var nAvant = decors.length;
       if (!sansDecors) semerDecors(carte, vue, masque, X0, Y0, X1, Y1, visibles, decors);
       BAT_VUE = decors.filter(function (d) { return d.bid; });
+      decors.acces = BAT_VUE.filter(function (d) { return d.acc; }).map(function (d) { return d.acc; });          // (après la purge : un bâtiment écarté n'a plus de chemin)
       // Rien ne pousse sur une place : on retire les décors semés (arbres, collines, maisons…)
       // dont le dessin mord sur elle.
       (carte.tampons || []).forEach(function (tp) {
@@ -5459,6 +5569,7 @@
       lc.clip();
       dessinerChamps(lc, carte, vue, masque, X0, Y0, X1, Y1, !!th.encreDecors);
       peindreRues(lc, decors.rues, vue.zoom);
+      peindreAcces(lc, decors.acces, vue.zoom);
       fissuresLave(lc, carte, vue, masque, X0, Y0, X1, Y1);
       lacsDeLave(lc, carte, vue, X0, Y0, X1, Y1);
       tracerMurs(lc, carte, vue, X0, Y0, X1, Y1);
@@ -5728,7 +5839,7 @@
     var rues = (liste.rues || []).filter(function (r) {
       return Math.max(r[0], r[2]) >= X0 && Math.min(r[0], r[2]) <= X1 && Math.max(r[1], r[3]) >= Y0 && Math.min(r[1], r[3]) <= Y1;
     });
-    return { objets: out, rect: [X0, Y0, X1, Y1], rues: rues };
+    return { objets: out, rect: [X0, Y0, X1, Y1], rues: rues, acces: liste.filter(function (o) { return o.acc; }).map(function (o) { return o.acc; }), batiments: liste.filter(function (o) { return o.bid; }).map(function (o) { return o.bid; }) };
   }
 
   window.Moteur = {
