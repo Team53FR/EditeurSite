@@ -1477,6 +1477,15 @@
       return;
     }
     var p = posEvt(ev);
+    // Clic droit sur un sommet d'un objet à points sélectionné (tracé, lac, contour de maison) : on le supprime.
+    if (aPoints(E.selection)) {
+      var sv = sommetProche(E.selection.obj, p.x, p.y), mini = E.selection.coll === "lignes" ? 2 : 3;
+      if (sv >= 0) {
+        if (E.selection.obj.pts.length / 2 > mini) { editer(function (o) { o.pts.splice(sv, 2); }); surcouche(); etat("Point supprimé."); }
+        else etat("Il faut au moins " + mini + " points.");
+        return;
+      }
+    }
     var hit = trouver(p.x, p.y);
     if (hit) {
       choisirOutil("selection");
@@ -2234,11 +2243,11 @@
       ]));
       if (!o.pts) zone.appendChild(champCurseur("Rotation", -180, 180, 1, o.a || 0, function (v) { return Math.round(v) + "°"; },
         function (v) { editer(function (x) { if (v) x.a = v; else delete x.a; }); }));
-      if (Moteur.BATIMENTS[o.type] && themeActuel().dessus) {
+      if (Moteur.BATIMENTS[o.type]) {
         if (!o.pts) zone.appendChild(el("div", { classe: "rangee" }, [el("button", { type: "button", classe: "btn", texte: "Modifier le contour (points)", onclick: function () { editer(function (x) { x.pts = coinsDeMaison(x); }); panneauSelection(); } })]));
         else zone.appendChild(el("div", { classe: "rangee" }, [el("button", { type: "button", classe: "btn", texte: "Remettre en rectangle", onclick: function () { editer(function (x) { var r = maisonDepuisContour(x); delete x.pts; x.x = r.x; x.y = r.y; x.s = r.s; x.a = r.a; x.ar = r.ar; }); panneauSelection(); } })]));
       }
-      zone.appendChild(el("p", { classe: "aide", texte: o.pts ? "Glissez un carré pour déplacer un coin, double-clic sur un côté pour ajouter un point (L, T, U…), glissez la maison pour la déplacer." : "Glissez le décor pour le déplacer. « Autre forme » en change le dessin." }));
+      zone.appendChild(el("p", { classe: "aide", texte: o.pts ? "Glissez un carré pour déplacer un coin, double-clic sur un côté pour ajouter un point (L, T, U…), clic droit sur un carré pour le supprimer, glissez la maison pour la déplacer." : "Glissez le décor pour le déplacer. « Autre forme » en change le dessin." }));
     } else if (sel.coll === "lacs") {
       zone.appendChild(champSegments("Type de lac", [["eau", "Eau"], ["lave", "Lave"]], o.lave ? "lave" : "eau", function (v) { editer(function (x) { if (v === "lave") x.lave = true; else delete x.lave; }); }));
       zone.appendChild(el("div", { classe: "rangee" }, [

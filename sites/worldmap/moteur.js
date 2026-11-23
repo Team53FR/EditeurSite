@@ -2393,57 +2393,124 @@
     lc.restore();
   }
 
-  // Le contour d'une maison, décalé vers l'intérieur de `d` (chaque sommet glisse le long de sa bissectrice,
-  // y compris aux angles rentrants d'un L ou d'un U).
-  function polygoneReduit(P, d) {
-    var n = P.length, A = 0, i;
-    for (i = 0; i < n; i++) { var a = P[i], b = P[(i + 1) % n]; A += a[0] * b[1] - b[0] * a[1]; }
-    var sg = A >= 0 ? 1 : -1, N = [];
+  // Le toit d'une maison à contour libre, pour N'IMPORTE QUELLE forme (L, U, étoile, pointe…). Chaque point
+  // du toit appartient au pan du côté qui lui est le plus proche : on lit donc la pente (donc la lumière)
+  // de ce côté, et une arête se dessine là où le côté le plus proche change. Aucun pan ne peut en recouvrir
+  // un autre, quelle que soit la forme. Aux angles rentrants le pan tourne en cône autour du sommet.
+  // Calculé une fois pour une forme et une résolution (mis en cache), à la taille réelle de l'écran.
+  var CACHE_TOITS = new Map();
+  function toitRaster(P, px) {
+    var n = P.length, i, x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    P.forEach(function (p) { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]); });
+    var sc = Math.min(px, 360 / Math.max(x1 - x0, y1 - y0, 1e-12)), W = Math.max(4, Math.ceil((x1 - x0) * sc) + 1), H = Math.max(4, Math.ceil((y1 - y0) * sc) + 1);
+    var cle = P.map(function (p) { return p[0].toExponential(6) + "," + p[1].toExponential(6); }).join(";") + "|" + sc.toPrecision(3);
+    var hit = CACHE_TOITS.get(cle);
+    if (hit) return hit;
+    var cv = document.createElement("canvas"); cv.width = W; cv.height = H;
+    var g = cv.getContext("2d"), im = g.createImageData(W, H), d = im.data, ids = new Int16Array(W * H).fill(-1);
+    // Le sens du polygone : la normale « vers l'extérieur » de chaque côté.
+    var A = 0; for (i = 0; i < n; i++) A += P[i][0] * P[(i + 1) % n][1] - P[(i + 1) % n][0] * P[i][1];
+    var sgn = A >= 0 ? 1 : -1, E = [];
     for (i = 0; i < n; i++) {
-      var p = P[i], q = P[(i + 1) % n], dx = q[0] - p[0], dy = q[1] - p[1], L = Math.hypot(dx, dy) || 1;
-      N.push([-dy / L * sg, dx / L * sg]);                        // la normale de l'arête i (vers l'intérieur)
+      var a = P[i], b = P[(i + 1) % n], dx = b[0] - a[0], dy = b[1] - a[1], L2 = dx * dx + dy * dy || 1e-18, L = Math.sqrt(L2);
+      E.push({ ax: a[0], ay: a[1], dx: dx, dy: dy, L2: L2, ox: dy / L * sgn, oy: -dx / L * sgn });
     }
-    return P.map(function (p, i) {
-      var n1 = N[(i + n - 1) % n], n2 = N[i], mx = n1[0] + n2[0], my = n1[1] + n2[1], ml = Math.hypot(mx, my) || 1;
-      mx /= ml; my /= ml;
-      var ch = Math.max(0.25, mx * n1[0] + my * n1[1]), k = d / ch;
-      return [p[0] + mx * k, p[1] + my * k];
-    });
+    for (var jy = 0; jy < H; jy++) {
+      for (var ix = 0; ix < W; ix++) {
+        var qx = x0 + (ix + 0.5) / sc, qy = y0 + (jy + 0.5) / sc, dedans = false;
+        for (i = 0; i < n; i++) {                                   // dedans ? (règle pair-impair)
+          var p1 = P[i], p2 = P[(i + 1) % n];
+          if ((p1[1] > qy) !== (p2[1] > qy) && qx < (p2[0] - p1[0]) * (qy - p1[1]) / (p2[1] - p1[1]) + p1[0]) dedans = !dedans;
+        }
+        if (!dedans) continue;
+        var best = Infinity, id = -1, nx = 0, ny = 0;
+        for (i = 0; i < n; i++) {
+          var e = E[i], t = ((qx - e.ax) * e.dx + (qy - e.ay) * e.dy) / e.L2, cl = t < 0 ? 0 : t > 1 ? 1 : t;
+          var fx = e.ax + e.dx * cl - qx, fy = e.ay + e.dy * cl - qy, dd = fx * fx + fy * fy;
+          if (dd < best) {
+            best = dd;
+            if (t > 0 && t < 1) { id = i; nx = e.ox; ny = e.oy; }
+            else { id = n + (t <= 0 ? i : (i + 1) % n); var dl = Math.sqrt(dd) || 1; nx = fx / dl; ny = fy / dl; }
+          }
+        }
+        ids[jy * W + ix] = id;
+        var lum = -(nx + ny) / 1.414, o = (jy * W + ix) * 4;
+        if (lum > 0) { d[o] = 255; d[o + 1] = 232; d[o + 2] = 190; d[o + 3] = Math.round((0.1 + 0.3 * lum) * 255); }
+        else { d[o] = 40; d[o + 1] = 16; d[o + 2] = 6; d[o + 3] = Math.round((0.08 - 0.34 * lum) * 255); }
+      }
+    }
+    // Les arêtes : là où le pan voisin n'est plus le même.
+    for (jy = 0; jy < H - 1; jy++) for (ix = 0; ix < W - 1; ix++) {
+      var k = jy * W + ix, v = ids[k];
+      if (v < 0) continue;
+      if ((ids[k + 1] >= 0 && ids[k + 1] !== v) || (ids[k + W] >= 0 && ids[k + W] !== v)) { var o2 = k * 4; d[o2] = 40; d[o2 + 1] = 18; d[o2 + 2] = 8; d[o2 + 3] = 150; }
+    }
+    g.putImageData(im, 0, 0);
+    if (CACHE_TOITS.size > 80) CACHE_TOITS.clear();
+    var r = { cv: cv, x0: x0, y0: y0, w: W / sc, h: H / sc };
+    CACHE_TOITS.set(cle, r);
+    return r;
   }
 
-  // Une maison dont l'auteur a remodelé le contour (`tampon.pts`) : un toit à croupes déduit du polygone. Chaque
-  // côté reçoit son pan, éclairé du nord-ouest, et une petite crête (le contour réduit) les réunit ; un L ou
-  // un U donne donc des pans qui se rencontrent en arêtiers.
+  // Une maison dont l'auteur a remodelé le contour (`tampon.pts`), vue du dessus.
   function peintContour(lc, c) {
-    var P = [], n = c.pts.length / 2, i, A = 0, per = 0;
+    var P = [], n = c.pts.length / 2, i, A = 0;
     for (i = 0; i < n; i++) P.push([c.pts[2 * i], c.pts[2 * i + 1]]);
-    for (i = 0; i < n; i++) { var a = P[i], b = P[(i + 1) % n]; A += a[0] * b[1] - b[0] * a[1]; per += Math.hypot(b[0] - a[0], b[1] - a[1]); }
+    for (i = 0; i < n; i++) { var a = P[i], b = P[(i + 1) % n]; A += a[0] * b[1] - b[0] * a[1]; }
     A = Math.abs(A) / 2;
-    if (!(A > 0) || !(per > 0)) return;
-    var rin = 2 * A / per, d = rin * 0.7, I = polygoneReduit(P, d), u = Math.sqrt(A) / 30;
-    var sg = 0; for (i = 0; i < n; i++) sg += P[i][0] * P[(i + 1) % n][1] - P[(i + 1) % n][0] * P[i][1];
-    sg = sg >= 0 ? 1 : -1;
+    if (!(A > 0)) return;
+    var u = Math.sqrt(A) / 30, trace = function () { lc.beginPath(); P.forEach(function (p, k) { if (k) lc.lineTo(p[0], p[1]); else lc.moveTo(p[0], p[1]); }); lc.closePath(); };
     lc.save(); lc.lineJoin = "round";
-    var trace = function (T) { lc.beginPath(); T.forEach(function (p, k) { if (k) lc.lineTo(p[0], p[1]); else lc.moveTo(p[0], p[1]); }); lc.closePath(); };
-    lc.save(); lc.translate(Math.sqrt(A) * 0.1, Math.sqrt(A) * 0.14); trace(P); lc.fillStyle = "rgba(16,30,28,0.32)"; lc.fill(); lc.restore();
-    var pal = c.ardoise ? TOITS_ARDOISE : c.tuile ? TOITS_TUILE : TOITS_DESSUS;
-    trace(P); lc.fillStyle = pal[c.v % pal.length]; lc.fill();
-    for (i = 0; i < n; i++) {
-      var j = (i + 1) % n, dx = P[j][0] - P[i][0], dy = P[j][1] - P[i][1], L = Math.hypot(dx, dy) || 1;
-      var ox = dy / L * sg, oy = -dx / L * sg, lum = -(ox + oy) / 1.414;                // la normale vers l'extérieur
-      lc.beginPath(); lc.moveTo(P[i][0], P[i][1]); lc.lineTo(P[j][0], P[j][1]); lc.lineTo(I[j][0], I[j][1]); lc.lineTo(I[i][0], I[i][1]); lc.closePath();
-      lc.fillStyle = lum > 0 ? "rgba(255,232,190," + (0.1 + 0.3 * lum) + ")" : "rgba(40,16,6," + (0.08 - 0.34 * lum) + ")"; lc.fill();
+    if (!c.sansOmbre) { lc.save(); lc.translate(Math.sqrt(A) * 0.1, Math.sqrt(A) * 0.14); trace(); lc.fillStyle = "rgba(16,30,28,0.32)"; lc.fill(); lc.restore(); }
+    var pal = c.palette || (c.ardoise ? TOITS_ARDOISE : c.tuile ? TOITS_TUILE : TOITS_DESSUS);
+    trace(); lc.fillStyle = pal[c.v % pal.length]; lc.fill();
+    var dim = Math.sqrt(A);
+    if (dim * ZPX >= 10) {
+      var ro = toitRaster(P, ZPX);
+      lc.save(); trace(); lc.clip(); lc.imageSmoothingEnabled = true; lc.drawImage(ro.cv, ro.x0, ro.y0, ro.w, ro.h); lc.restore();
     }
-    lc.strokeStyle = "rgba(40,18,8,0.55)"; lc.lineWidth = u * 1.3; lc.beginPath();
-    for (i = 0; i < n; i++) { lc.moveTo(P[i][0], P[i][1]); lc.lineTo(I[i][0], I[i][1]); }
-    lc.stroke();
-    trace(I); lc.strokeStyle = "rgba(40,18,8,0.6)"; lc.lineWidth = u * 1.3; lc.stroke();
-    trace(I); lc.fillStyle = "rgba(255,236,200,0.08)"; lc.fill();
     if (u * ZPX >= 0.9 && alea(c.v + 5, 3.3) < 0.7) {
-      var cx = 0, cy = 0; I.forEach(function (p) { cx += p[0]; cy += p[1]; }); cx /= n; cy /= n;
-      cheminee(lc, cx, cy, u * 1.9, u);
+      // Une cheminée, au point le plus éloigné des côtés (le cœur du toit).
+      var bx = 0, by = 0, bd = -1;
+      for (var s1 = 0; s1 < 24; s1++) {
+        var qx = P[s1 % n][0] * 0.5 + P[(s1 * 7 + 3) % n][0] * 0.5, qy = P[s1 % n][1] * 0.5 + P[(s1 * 7 + 3) % n][1] * 0.5, mn = Infinity;
+        for (i = 0; i < n; i++) { var p1 = P[i], p2 = P[(i + 1) % n], ddx = p2[0] - p1[0], ddy = p2[1] - p1[1], tt = Math.max(0, Math.min(1, ((qx - p1[0]) * ddx + (qy - p1[1]) * ddy) / (ddx * ddx + ddy * ddy || 1e-18))); mn = Math.min(mn, Math.hypot(qx - p1[0] - ddx * tt, qy - p1[1] - ddy * tt)); }
+        if (mn > bd) { bd = mn; bx = qx; by = qy; }
+      }
+      cheminee(lc, bx, by, u * 1.9, u);
     }
-    trace(P); lc.strokeStyle = "#1c2622"; lc.lineWidth = u * 2.2; lc.stroke();
+    trace(); lc.strokeStyle = "#1c2622"; lc.lineWidth = u * 2.2; lc.stroke();
+    lc.restore();
+  }
+
+  // Le même bâtiment dans un style de PROFIL (Atlas, Illustré…) : on voit ses murs. Le contour est le pied
+  // du bâtiment ; les murs montent d'une hauteur H (vers le haut de l'écran, comme les maisons de profil) et
+  // le toit, calculé de la même façon, repose dessus. Les murs tournés vers le sud sont clairs, ceux des
+  // côtés plus sombres ; une porte s'ouvre sur le mur le plus au sud.
+  function peintContourProfil(lc, c) {
+    var P = [], n = c.pts.length / 2, i, A = 0;
+    for (i = 0; i < n; i++) P.push([c.pts[2 * i], c.pts[2 * i + 1]]);
+    for (i = 0; i < n; i++) { var a = P[i], b = P[(i + 1) % n]; A += a[0] * b[1] - b[0] * a[1]; }
+    var sg = A >= 0 ? 1 : -1; A = Math.abs(A) / 2;
+    if (!(A > 0)) return;
+    var H = Math.min(Math.sqrt(A) * 0.42, 2 * A / Math.max(1e-12, P.reduce(function (t, p, k) { var q = P[(k + 1) % n]; return t + Math.hypot(q[0] - p[0], q[1] - p[1]); }, 0)) * 1.6), u = Math.sqrt(A) / 30, T = P.map(function (p) { return [p[0], p[1] - H]; });
+    lc.save(); lc.lineJoin = "round";
+    lc.save(); lc.translate(H * 0.5, H * 0.12); lc.beginPath(); P.forEach(function (p, k) { if (k) lc.lineTo(p[0], p[1]); else lc.moveTo(p[0], p[1]); }); lc.closePath(); lc.fillStyle = "rgba(16,30,28,0.28)"; lc.fill(); lc.restore();
+    var sud = -1, sudI = -1;
+    for (i = 0; i < n; i++) {
+      var j = (i + 1) % n, dx = P[j][0] - P[i][0], dy = P[j][1] - P[i][1], L = Math.hypot(dx, dy) || 1, oy = -dx / L * sg;
+      if (oy > sud) { sud = oy; sudI = i; }
+      if (oy < -0.05) continue;                                   // un mur tourné vers le nord est caché par le toit
+      lc.beginPath(); lc.moveTo(P[i][0], P[i][1]); lc.lineTo(P[j][0], P[j][1]); lc.lineTo(T[j][0], T[j][1]); lc.lineTo(T[i][0], T[i][1]); lc.closePath();
+      lc.fillStyle = oy > 0.5 ? MURMAISON : "#cfc2a0"; lc.fill();
+      lc.strokeStyle = "#2a1c0e"; lc.lineWidth = u * 1.6; lc.stroke();
+    }
+    if (sudI >= 0 && sud > 0.4) {                                  // la porte, au milieu du mur le plus au sud
+      var j2 = (sudI + 1) % n, mx = (P[sudI][0] + P[j2][0]) / 2, my = (P[sudI][1] + P[j2][1]) / 2;
+      lc.fillStyle = "#6a4a2a"; lc.fillRect(mx - H * 0.14, my - H * 0.55, H * 0.28, H * 0.55);
+      lc.strokeStyle = "#2a1c0e"; lc.lineWidth = u * 1.2; lc.strokeRect(mx - H * 0.14, my - H * 0.55, H * 0.28, H * 0.55);
+    }
+    peintContour(lc, { pts: [].concat.apply([], T), v: c.v, sansOmbre: true, palette: TOITS_VILLE });
     lc.restore();
   }
 
@@ -2472,7 +2539,7 @@
       var o = liste[i];
       if (o.cour) { peintCour(lc, o.cour); continue; }
       if (o.anneau) { peindreAnneau(lc, o.anneau); continue; }
-      if (o.contour) { peintContour(lc, o.contour); continue; }
+      if (o.contour) { if (o.contour.profil) peintContourProfil(lc, o.contour); else peintContour(lc, o.contour); continue; }
       if (o.maison) { maisonDessus(lc, o.x, o.y, o.maison.w, o.maison.h, o.maison.a, o.maison.v, 0, o.maison.ardoise ? TOITS_ARDOISE[o.maison.v % TOITS_ARDOISE.length] : o.maison.tuile ? TOITS_TUILE[o.maison.v % TOITS_TUILE.length] : null); continue; }
       var vp = variantePeinte(o);
       if (o.rot) {
@@ -5239,12 +5306,12 @@
       (carte.tampons || []).forEach(function (tp) {
         if (!PEINTRES[tp.type]) return;
         // Le centre du décor ne bouge pas : c'est autour de lui que la taille est plafonnée.
-        if (tp.pts && tp.pts.length >= 6 && DESSUS && BATIMENTS[tp.type]) {
+        if (tp.pts && tp.pts.length >= 6 && BATIMENTS[tp.type]) {
           // Une maison au contour remodelé : son toit se déduit du polygone (sa taille et sa place sont celles des points).
           var bbp = boiteTrait(tp.pts, 0), ccx = (bbp[0] + bbp[2]) / 2, ccy = (bbp[1] + bbp[3]) / 2, dim = Math.max(bbp[2] - bbp[0], bbp[3] - bbp[1]);
           if (!chevauche(bbp, X0, Y0, X1, Y1) || dim * vue.zoom < 0.7) return;
           visibles.push({ x: ccx, y: ccy + dim / 0.62 * 0.3, s: dim / 0.62 });
-          decors.push({ x: ccx, y: ccy, contour: { pts: tp.pts, v: tp.v || 0, tuile: !!tp.tuile, ardoise: !!tp.ardoise } });
+          decors.push({ x: ccx, y: DESSUS ? ccy : bbp[3], contour: { pts: tp.pts, v: tp.v || 0, tuile: !!tp.tuile, ardoise: !!tp.ardoise, profil: !DESSUS } });
           return;
         }
         var s = tailleTampon(tp, vue.zoom), y = tp.y - tp.s * 0.3 + s * 0.3;
