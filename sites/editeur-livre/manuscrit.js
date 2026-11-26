@@ -197,6 +197,12 @@ function ouvrirManuscrit(indexChapitre) {
         '<span class="ms-separateur"></span>' +
         '<button type="button" data-cmd="insertUnorderedList" title="Liste à puces">&#8226;</button>' +
         '<button type="button" data-cmd="insertOrderedList" title="Liste numérotée">1.</button>' +
+        (rechercheManuscritPossible()
+          ? '<span class="ms-separateur"></span>' +
+            '<button type="button" id="msBtnRecherche" title="Rechercher dans le chapitre (Ctrl+F)" aria-label="Rechercher">' +
+            '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+            'stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg></button>'
+          : "") +
       "</div>" +
       '<div class="ms-actions">' +
         '<span id="msMots" class="ms-mots"></span>' +
@@ -207,6 +213,14 @@ function ouvrirManuscrit(indexChapitre) {
     '<p class="ms-aide">Le chapitre entier, d\'une seule coulée : aucune page à gérer. ' +
       "Les tailles sont celles du livre ; seule la largeur de la feuille change. " +
       "En enregistrant, le livre se recompose et la pagination se refait.</p>" +
+    '<div class="ms-recherche" id="msRecherche" hidden>' +
+      '<input type="search" id="msRechercheChamp" placeholder="Rechercher dans le chapitre" ' +
+        'autocomplete="off" spellcheck="false" aria-label="Rechercher dans le chapitre">' +
+      '<span class="ms-recherche-compte" id="msRechercheCompte" aria-live="polite"></span>' +
+      '<button type="button" id="msRecherchePrec" title="Résultat précédent (Maj+Entrée)" aria-label="Précédent">&#8593;</button>' +
+      '<button type="button" id="msRechercheSuiv" title="Résultat suivant (Entrée)" aria-label="Suivant">&#8595;</button>' +
+      '<button type="button" id="msRechercheFermer" title="Fermer (Échap)" aria-label="Fermer la recherche">&#10005;</button>' +
+    "</div>" +
     '<div class="ms-feuille">' +
       '<div class="ms-texte texte-livre" id="manuscritTexte" contenteditable="true" spellcheck="true"></div>' +
     "</div>";
@@ -239,6 +253,7 @@ function ouvrirManuscrit(indexChapitre) {
 
   zone.addEventListener("input", majMotsManuscrit);
   zone.addEventListener("paste", collerDansManuscrit);
+  brancherRechercheManuscrit(zone);
   document.addEventListener("keydown", raccourcisManuscrit, true);
 
   majMotsManuscrit();
@@ -313,7 +328,16 @@ function raccourcisManuscrit(e) {
   if (e.key === "Escape") {
     e.preventDefault();
     e.stopPropagation();
-    fermerManuscrit();
+    // La recherche se ferme d'abord : Échap ne doit pas jeter le chapitre
+    // quand on voulait seulement refermer la barre.
+    if (rechercheManuscritOuverte()) fermerRechercheManuscrit(true);
+    else fermerManuscrit();
+    return;
+  }
+  if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === "f" && rechercheManuscritPossible()) {
+    e.preventDefault();
+    e.stopPropagation();
+    ouvrirRechercheManuscrit();
     return;
   }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
@@ -321,6 +345,183 @@ function raccourcisManuscrit(e) {
     e.stopPropagation();
     enregistrerManuscrit();
   }
+}
+
+// =====================================================================
+//  Rechercher dans le chapitre (Ctrl+F)
+// =====================================================================
+//
+//  Les résultats sont surlignés avec l'API CSS « Custom Highlight » : rien
+//  n'est inséré dans le texte. C'est ce qui compte ici — le chapitre est
+//  enregistré tel qu'il est dans la zone, et un <mark> semé dans le HTML
+//  finirait dans le livre. Sans cette API (vieux navigateur), le bouton
+//  n'est pas proposé et Ctrl+F reste celui du navigateur.
+//
+//  La comparaison ignore la casse et les accents, et confond les
+//  apostrophes droite et typographique et les espaces insécables : on cherche
+//  « elyra » ou « l'ombre » et on trouve « Élyra » et « l’ombre ».
+
+let rechercheMs = null; // { resultats: [Range], actif: Number, minuteur }
+
+function rechercheManuscritPossible() {
+  return typeof CSS !== "undefined" && !!CSS.highlights && typeof Highlight === "function";
+}
+
+function rechercheManuscritOuverte() {
+  const barre = document.getElementById("msRecherche");
+  return !!barre && !barre.hidden;
+}
+
+// Un caractère → sa forme de comparaison (toujours UN caractère, pour que
+// les positions du texte cherché restent celles du texte réel).
+function formeRecherche(c) {
+  if (c === "\u2019" || c === "\u2018" || c === "\u02bc") return "'";
+  if (c === "\u00a0" || c === "\u202f") return " ";
+  const f = c.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  return f.length === 1 ? f : c;
+}
+
+function texteDeRecherche(zone) {
+  let texte = "";
+  const places = []; // places[i] = { noeud, decalage } du i-ème caractère de `texte`
+  const arbre = document.createTreeWalker(zone, NodeFilter.SHOW_TEXT);
+  let dernierBloc = null;
+  for (let n = arbre.nextNode(); n; n = arbre.nextNode()) {
+    const bloc = n.parentElement && n.parentElement.closest("p, h1, h2, h3, h4, li, blockquote, div");
+    // Entre deux blocs, un séparateur : une recherche ne doit pas relier la fin
+    // d'un paragraphe au début du suivant.
+    if (dernierBloc && bloc !== dernierBloc) { texte += "\n"; places.push(null); }
+    dernierBloc = bloc;
+    const brut = n.data;
+    for (let i = 0; i < brut.length; i++) {
+      texte += formeRecherche(brut[i]);
+      places.push({ noeud: n, decalage: i });
+    }
+  }
+  return { texte, places };
+}
+
+function effacerSurlignagesManuscrit() {
+  if (!rechercheManuscritPossible()) return;
+  CSS.highlights.delete("ms-recherche");
+  CSS.highlights.delete("ms-recherche-actif");
+}
+
+function lancerRechercheManuscrit(garderPosition) {
+  const zone = document.getElementById("manuscritTexte");
+  const champ = document.getElementById("msRechercheChamp");
+  const compte = document.getElementById("msRechercheCompte");
+  if (!zone || !champ || !rechercheMs) return;
+
+  const precedent = garderPosition ? rechercheMs.actif : 0;
+  const requete = Array.from(champ.value, formeRecherche).join("");
+  rechercheMs.resultats = [];
+  effacerSurlignagesManuscrit();
+  champ.classList.remove("ms-recherche-vide");
+
+  if (requete.trim()) {
+    const { texte, places } = texteDeRecherche(zone);
+    for (let i = texte.indexOf(requete); i !== -1; i = texte.indexOf(requete, i + requete.length)) {
+      const debut = places[i], fin = places[i + requete.length - 1];
+      if (!debut || !fin) continue;
+      const r = document.createRange();
+      r.setStart(debut.noeud, debut.decalage);
+      r.setEnd(fin.noeud, fin.decalage + 1);
+      rechercheMs.resultats.push(r);
+    }
+  }
+
+  const n = rechercheMs.resultats.length;
+  rechercheMs.actif = n ? Math.min(precedent, n - 1) : -1;
+  if (n) CSS.highlights.set("ms-recherche", new Highlight(...rechercheMs.resultats));
+  if (requete.trim() && !n) champ.classList.add("ms-recherche-vide");
+  compte.textContent = !requete.trim() ? "" : n ? "" : "Aucun résultat";
+  allerAuResultatManuscrit(rechercheMs.actif, !garderPosition);
+}
+
+// Met le résultat `i` en évidence ; `defiler` l'amène à l'écran.
+function allerAuResultatManuscrit(i, defiler) {
+  const compte = document.getElementById("msRechercheCompte");
+  const n = rechercheMs ? rechercheMs.resultats.length : 0;
+  CSS.highlights.delete("ms-recherche-actif");
+  if (!n || i < 0) return;
+  rechercheMs.actif = ((i % n) + n) % n;
+  const r = rechercheMs.resultats[rechercheMs.actif];
+  CSS.highlights.set("ms-recherche-actif", new Highlight(r));
+  compte.textContent = (rechercheMs.actif + 1) + " / " + n;
+  if (defiler) {
+    const feuille = document.querySelector("#manuscrit .ms-feuille");
+    const rect = r.getBoundingClientRect();
+    if (feuille && rect) {
+      const cadre = feuille.getBoundingClientRect();
+      if (rect.top < cadre.top + 20 || rect.bottom > cadre.bottom - 20) {
+        feuille.scrollTop += rect.top - cadre.top - feuille.clientHeight / 3;
+      }
+    }
+  }
+}
+
+function ouvrirRechercheManuscrit() {
+  const barre = document.getElementById("msRecherche");
+  const champ = document.getElementById("msRechercheChamp");
+  if (!barre || !champ || !rechercheMs) return;
+  // Un mot sélectionné dans le texte devient la recherche, comme dans Chrome.
+  const sel = window.getSelection();
+  const zone = document.getElementById("manuscritTexte");
+  if (sel && !sel.isCollapsed && zone && zone.contains(sel.anchorNode)) {
+    const mot = sel.toString().trim();
+    if (mot && !mot.includes("\n") && mot.length <= 80) champ.value = mot;
+  }
+  barre.hidden = false;
+  champ.focus();
+  champ.select();
+  lancerRechercheManuscrit(false);
+}
+
+// `retourTexte` : le curseur revient dans le chapitre, sur le dernier
+// résultat visité — on cherchait pour aller écrire à cet endroit.
+function fermerRechercheManuscrit(retourTexte) {
+  const barre = document.getElementById("msRecherche");
+  const zone = document.getElementById("manuscritTexte");
+  const actif = rechercheMs && rechercheMs.actif >= 0 ? rechercheMs.resultats[rechercheMs.actif] : null;
+  effacerSurlignagesManuscrit();
+  if (rechercheMs) { rechercheMs.resultats = []; rechercheMs.actif = -1; }
+  if (barre) barre.hidden = true;
+  if (retourTexte && zone) {
+    zone.focus();
+    if (actif) {
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(actif);
+    }
+  }
+}
+
+function brancherRechercheManuscrit(zone) {
+  if (!rechercheManuscritPossible()) return;
+  rechercheMs = { resultats: [], actif: -1, minuteur: null };
+  const champ = document.getElementById("msRechercheChamp");
+  const btn = document.getElementById("msBtnRecherche");
+
+  // Le texte change : on refait la recherche (sans sauter au début).
+  zone.addEventListener("input", () => {
+    if (!rechercheManuscritOuverte()) return;
+    clearTimeout(rechercheMs.minuteur);
+    rechercheMs.minuteur = setTimeout(() => rechercheMs && lancerRechercheManuscrit(true), 250);
+  });
+
+  champ.addEventListener("input", () => lancerRechercheManuscrit(false));
+  champ.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      allerAuResultatManuscrit(rechercheMs.actif + (e.shiftKey ? -1 : 1), true);
+    }
+  });
+  document.getElementById("msRechercheSuiv").onclick = () => allerAuResultatManuscrit(rechercheMs.actif + 1, true);
+  document.getElementById("msRecherchePrec").onclick = () => allerAuResultatManuscrit(rechercheMs.actif - 1, true);
+  document.getElementById("msRechercheFermer").onclick = () => fermerRechercheManuscrit(true);
+  btn.addEventListener("mousedown", (e) => e.preventDefault());
+  btn.onclick = () => (rechercheManuscritOuverte() ? fermerRechercheManuscrit(true) : ouvrirRechercheManuscrit());
 }
 
 function texteManuscritModifie() {
@@ -343,6 +544,8 @@ function fermerManuscrit(sansDemander) {
     return;
   }
   document.removeEventListener("keydown", raccourcisManuscrit, true);
+  effacerSurlignagesManuscrit();
+  rechercheMs = null;
   const fond = document.getElementById("manuscrit");
   if (fond) fond.remove();
   document.body.classList.remove("manuscrit-ouvert");

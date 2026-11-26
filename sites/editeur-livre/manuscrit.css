@@ -101,6 +101,51 @@ body.manuscrit-ouvert .bouton-retour-portail { display: none !important; }
   border-bottom: 1px solid var(--s-line, #e6ddc9);
 }
 
+/* ----- Recherche (Ctrl+F) ----- */
+.ms-recherche {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  background: var(--s-paper, #fffdf8);
+  border-bottom: 1px solid var(--s-line, #e6ddc9);
+}
+.ms-recherche[hidden] { display: none; }
+.ms-recherche input {
+  flex: 0 1 280px;
+  min-width: 0;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--s-line, #e6ddc9);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--s-ink, #2b2622);
+  font-size: 14px;
+}
+.ms-recherche input:focus { outline: none; border-color: var(--s-accent, #8a4b38); }
+.ms-recherche input.ms-recherche-vide { border-color: #b3402f; }
+.ms-recherche-compte {
+  min-width: 70px;
+  font-size: 12px;
+  color: var(--s-ink-soft, #6f6455);
+  font-variant-numeric: tabular-nums;
+}
+.ms-recherche button {
+  min-width: 30px;
+  height: 30px;
+  border: 1px solid var(--s-line, #e6ddc9);
+  border-radius: 8px;
+  background: var(--s-paper, #fffdf8);
+  color: var(--s-ink, #2b2622);
+  cursor: pointer;
+}
+.ms-recherche button:hover { border-color: var(--s-accent, #8a4b38); color: var(--s-accent, #8a4b38); }
+
+/* Comme Chrome : tous les résultats en jaune, celui en cours en orange. */
+::highlight(ms-recherche) { background-color: #ffe27a; color: inherit; }
+::highlight(ms-recherche-actif) { background-color: #ff9d3c; color: #000; }
+
 /* ----- La feuille ----- */
 .ms-feuille {
   flex: 1;
